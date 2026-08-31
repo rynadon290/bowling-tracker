@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import TeamManagement from "./TeamManagement.jsx";
 
 // Browser persistence adapter. The original app used the ChatGPT host
 // storage API; GitHub Pages needs a browser-native equivalent.
@@ -1683,11 +1684,11 @@ export default function BowlingTracker(){
       <div style={S.header}>
         <div style={S.title}>🎳 Shot Tracker</div>
         <div style={S.nav}>
-          {["log","history","stats"].map(v=>(
-            <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-              {v==="log"?"Log":v==="history"?"History":"Stats"}
-            </button>
-          ))}
+          {["log","history","stats","teams"].map(v=>(
+  <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
+    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":"Teams"}
+  </button>
+))}
         </div>
       </div>
 
