@@ -282,7 +282,7 @@ function tenthBall3Pins(f10b1,f10b2,f10b3){
 // ── Empty shot factory ────────────────────────────────────────────────────────
 function emptyShot(){
   return{
-    id:Date.now(),bowler:"",league:"",date:new Date().toISOString().slice(0,10),
+    id:Date.now(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
     lane:"",game:"1",frame:"1",ballNum:null,
     ball:"",surface:"",startingBoard:"",targetArrows:"",
     result:"",otherLeave:[],spareMade:"",strikeDescription:"",
