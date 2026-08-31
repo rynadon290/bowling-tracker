@@ -254,7 +254,7 @@ export default function TeamManagement({
           onChange={e => setSelectedLeague(e.target.value)}
           style={{
             ...S.input,
-            appearance:"none",
+            appearance:"auto",
           }}
         >
           {leagueList.map(league => (
