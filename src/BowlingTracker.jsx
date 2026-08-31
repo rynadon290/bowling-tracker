@@ -353,7 +353,16 @@ export default function BowlingTracker(){
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
-  const[teams,setTeams]=useState([]);
+  const[teams,setTeams]=useState(()=>{
+  try{
+    const raw=window.localStorage.getItem("bowling-teams-v1");
+    if(!raw)return [];
+    const parsed=JSON.parse(raw);
+    return Array.isArray(parsed)?parsed:[];
+  }catch{
+    return [];
+  }
+  });
   const[leagues,setLeagues]=useState(DEFAULT_LEAGUES);
   const[activeBowler,setActiveBowler]=useState("");
   const[newBowlerName,setNewBowlerName]=useState("");
