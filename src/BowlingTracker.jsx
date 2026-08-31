@@ -351,6 +351,7 @@ export default function BowlingTracker(){
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
+  const[teams,setTeams]=useState([]);
   const[activeBowler,setActiveBowler]=useState("");
   const[newBowlerName,setNewBowlerName]=useState("");
   const[arsenals,setArsenals]=useState({}); // {bowlerName: [ballName,...]}
@@ -1703,6 +1704,7 @@ export default function BowlingTracker(){
             setBowlers={setBowlers}
             leagues={LEAGUES}
             lineupOrder={LINEUP_ORDER}
+            onTeamsChange={setTeams}
           />
         )}
 
