@@ -3163,7 +3163,7 @@ export default function BowlingTracker(){
                         <div style={S.statBox}>
                           <div style={S.statNum}>{rAvg(statsBowler,"Tuesday House Shot")}</div>
                           <div style={S.statLbl}>Tuesday</div>
-                          {isTeamView&&teamGameTotalAvg("Tuesday House Shot")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Tuesday House Shot")}</div>}
+                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Tuesday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Tuesday House Shot")}</div>}
                           {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Tuesday House Shot")} teamValue={rAvg(compareBowler,"Tuesday House Shot")} label={compareLabel}/>}
                         </div>
                       )}
@@ -3171,7 +3171,7 @@ export default function BowlingTracker(){
                         <div style={S.statBox}>
                           <div style={S.statNum}>{rAvg(statsBowler,"Thursday House Shot")}</div>
                           <div style={S.statLbl}>Thursday</div>
-                          {isTeamView&&teamGameTotalAvg("Thursday House Shot")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Thursday House Shot")}</div>}
+                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Thursday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Thursday House Shot")}</div>}
                           {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Thursday House Shot")} teamValue={rAvg(compareBowler,"Thursday House Shot")} label={compareLabel}/>}
                         </div>
                       )}
@@ -3212,7 +3212,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const consistency=scoreConsistency(statsBowler,statsLeague);
+                  const consistency=scoreConsistency(statsBowler,statsLeague,statsTeamId);
                   if(!consistency)return null;
                   const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague):null;
                   return(
@@ -3278,7 +3278,7 @@ export default function BowlingTracker(){
                       {[0,1,2].map(idx=>{
                         const v=gameAvg(statsBowler,idx,statsLeague);
                         if(v==null)return null;
-                        const teamV=(isTeamView&&statsLeague)?teamGameTotalAvgAt(statsLeague,idx):null;
+                        const teamV=(isTeamView&&statsTeamId)?teamGameTotalAvgAt(statsTeamId,idx):null;
                         return(
                           <div key={idx} style={S.statBox}>
                             <div style={S.statNum}>{v}</div>
