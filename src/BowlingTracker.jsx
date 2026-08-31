@@ -557,6 +557,8 @@ export default function BowlingTracker(){
   }
 
   function selectBowler(name){
+    const team=teams.find(t=>t.league===sessionLeague&&t.members.includes(name));
+    const teamId=team?.id||"";
     setActiveBowler(name);
     setShowSummary(false);
 
@@ -573,12 +575,12 @@ export default function BowlingTracker(){
         const allBShots=shots.filter(s=>s.bowler===name&&s.league===sessionLeague&&s.date===sessionDate);
         const{game:ng,frame:nf,ballNum:nb}=nextState(allBShots,name,last.game,last.frame,last.ballNum);
         const line=nb===null?autoFillLineFor(name,form.ball,ng,nf):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-        setForm(f=>({...f,bowler:name,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+        setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
         return;
       }
       // No shots yet for this bowler tonight — start fresh at Game 1 Frame 1
       const line=autoFillLineFor(name,form.ball,"1","1");
-      setForm(f=>({...f,bowler:name,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+      setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
       return;
     }
     set("bowler",name);
