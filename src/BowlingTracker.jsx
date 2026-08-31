@@ -454,6 +454,7 @@ export default function BowlingTracker(){
       if(!ss.length)return s; // no matching shots found; leave whatever was already stored untouched
       return{
         ...s,
+        teamId:s.teamId||ss[0]?.teamId||"",
         shotCount:ss.length,
         strikes:ss.filter(sh=>sh.result==="Strike").length,
         tenPinLeaves:ss.filter(isTenPinLeave).length,
