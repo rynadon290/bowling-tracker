@@ -87,6 +87,8 @@ export default function TeamManagement({
   leagues = [],
   lineupOrder = {},
   onTeamsChange,
+  onLeagueAdd,
+  onLeagueRename,
 }) {
   const [teams, setTeams] = useState(() => {
   const existing = loadTeams();
@@ -107,6 +109,8 @@ export default function TeamManagement({
   const [newTeamName, setNewTeamName] = useState("");
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editingName, setEditingName] = useState("");
+  const [newLeagueName, setNewLeagueName] = useState("");
+  const [editingLeagueName, setEditingLeagueName] = useState("");
 
   useEffect(() => {
   saveTeams(teams);
@@ -246,25 +250,56 @@ export default function TeamManagement({
     );
   }
 
+  function createLeague() {
+    const name=newLeagueName.trim();
+    if(!name)return;
+    if(leagueList.some(league=>league.toLowerCase()===name.toLowerCase())){alert("A league with that name already exists.");return;}
+    onLeagueAdd?.(name);
+    setSelectedLeague(name);
+    setNewLeagueName("");
+  }
+
+  function startRenameLeague() {
+    setEditingLeagueName(selectedLeague);
+  }
+
+  function saveLeagueRename() {
+    const name=editingLeagueName.trim();
+    if(!name||name===selectedLeague){setEditingLeagueName("");return;}
+    if(leagueList.some(league=>league!==selectedLeague&&league.toLowerCase()===name.toLowerCase())){alert("A league with that name already exists.");return;}
+    const oldName=selectedLeague;
+    setTeams(prev=>prev.map(team=>team.league===oldName?{...team,league:name}:team));
+    onLeagueRename?.(oldName,name);
+    setSelectedLeague(name);
+    setEditingLeagueName("");
+  }
+
   return (
     <div>
       <div style={S.card}>
         <div style={S.label}>League</div>
-
-        <select
-          value={selectedLeague}
-          onChange={e => setSelectedLeague(e.target.value)}
-          style={{
-            ...S.input,
-            appearance:"auto",
-          }}
-        >
-          {leagueList.map(league => (
-            <option key={league} value={league}>
-              {league}
-            </option>
-          ))}
+        <select value={selectedLeague} onChange={e=>setSelectedLeague(e.target.value)} style={{...S.input,appearance:"auto"}}>
+          {leagueList.map(league=><option key={league} value={league}>{league}</option>)}
         </select>
+        {!editingLeagueName ? (
+          <button style={{...S.button,width:"100%",marginTop:"8px"}} onClick={startRenameLeague} disabled={!selectedLeague}>Rename League</button>
+        ) : (
+          <div style={{marginTop:"10px"}}>
+            <div style={S.label}>New League Name</div>
+            <div style={{display:"flex",gap:"8px"}}>
+              <input value={editingLeagueName} onChange={e=>setEditingLeagueName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveLeagueRename();}} autoFocus style={{...S.input,flex:1}}/>
+              <button style={S.primary} onClick={saveLeagueRename}>Save</button>
+              <button style={S.button} onClick={()=>setEditingLeagueName("")}>Cancel</button>
+            </div>
+          </div>
+        )}
+        <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
+          <div style={S.label}>Add League</div>
+          <div style={{display:"flex",gap:"8px"}}>
+            <input value={newLeagueName} onChange={e=>setNewLeagueName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")createLeague();}} placeholder="League name" style={{...S.input,flex:1}}/>
+            <button style={S.primary} onClick={createLeague}>Add</button>
+          </div>
+        </div>
       </div>
 
       <div style={S.card}>
