@@ -1701,6 +1701,7 @@ export default function BowlingTracker(){
           <TeamManagement
             bowlers={bowlers}
             setBowlers={setBowlers}
+            leagues={LEAGUES}
             lineupOrder={LINEUP_ORDER}
           />
         )}
