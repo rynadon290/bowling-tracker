@@ -740,7 +740,6 @@ export default function BowlingTracker(){
   // where we actually have a legitimate combined team total. league, if
   // given, scopes to just that league's sessions.
   function teamDateGroups(league){
-    function teamDateGroups(league){
     const byKey={};
     sessions.filter(s=>!league||s.league===league).forEach(s=>{
       const k=`${s.teamId||"legacy"}__${s.league}__${s.date}`;
