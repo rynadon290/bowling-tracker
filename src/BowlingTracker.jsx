@@ -3214,7 +3214,8 @@ export default function BowlingTracker(){
                 {(()=>{
                   const consistency=scoreConsistency(statsBowler,statsLeague,statsTeamId);
                   if(!consistency)return null;
-                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague):null;
+                  const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":""; 
+                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague,compareTeamId):null;
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Score Consistency</div>
@@ -3243,7 +3244,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const values=scoreValues(statsBowler,statsLeague);
+                  const values=scoreValues(statsBowler,statsLeague,statsTeamId);
                   if(values.length<4)return null;
                   const buckets=histogramBuckets(values);
                   return(
