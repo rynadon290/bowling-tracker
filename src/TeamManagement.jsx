@@ -85,8 +85,21 @@ function makeId(prefix="id") {
 export default function TeamManagement({
   bowlers = [],
   leagues = [],
+  lineupOrder = {},
 }) {
-  const [teams, setTeams] = useState(loadTeams);
+  const [teams, setTeams] = useState(() => {
+  const existing = loadTeams();
+  if (existing.length) return existing;
+
+  return leagues.map((league, index) => ({
+    id: makeId("team"),
+    name: `${league.replace(" House Shot", "")} Team`,
+    league,
+    members: Array.isArray(lineupOrder[league])
+      ? [...lineupOrder[league]]
+      : [],
+  }));
+});
   const [selectedLeague, setSelectedLeague] = useState(
     leagues[0] || "Tuesday House Shot"
   );
