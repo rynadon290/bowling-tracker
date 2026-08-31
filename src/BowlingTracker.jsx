@@ -366,6 +366,7 @@ export default function BowlingTracker(){
   const[statsBowler,setStatsBowler]=useState("");
   const[compareBowler,setCompareBowler]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
+  const[statsTeamId,setStatsTeamId]=useState("");
   const[trendMetric,setTrendMetric]=useState("weekly"); // 0, 1, 2, or "weekly"
   const[trendScope,setTrendScope]=useState(""); // "" = combined both teams, or a specific league
   const[compareLeague,setCompareLeague]=useState("");
@@ -1296,13 +1297,13 @@ export default function BowlingTracker(){
   // whole team for each date+game — not every bowler's individual scores
   // pooled together, which would measure the spread of individual
   // performances rather than the team's actual combined-score volatility.
-  function scoreValues(bowler,league){
+  function scoreValues(bowler,league,teamId){
     return bowler
       ?sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores)
-      :teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+      :teamDateGroups(teamId).flatMap(g=>g.gameTotals.filter(v=>v!=null));
   }
-  function scoreConsistency(bowler,league){
-    const all=scoreValues(bowler,league);
+  function scoreConsistency(bowler,league,teamId){
+    const all=scoreValues(bowler,league,teamId);
     if(all.length<2)return null;
     const mean=all.reduce((a,b)=>a+b,0)/all.length;
     const variance=all.reduce((a,b)=>a+(b-mean)**2,0)/all.length;
@@ -1349,15 +1350,15 @@ export default function BowlingTracker(){
   // Game/Series and Score Consistency, so it stays consistent with those.
   // Truncated rather than rounded — a whole number, but never bumped up past
   // what was actually earned the way rounding up would.
-  function teamGameTotalAvgAt(league,gameIdx){
-    const vals=teamDateGroups(league).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
+  function teamGameTotalAvgAt(teamId,gameIdx){
+    const vals=teamDateGroups(teamId).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
   // Same idea but pooling all 3 game positions together — the team-total
   // companion to rAvg's per-person combined average.
-  function teamGameTotalAvg(league){
-    const vals=teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+  function teamGameTotalAvg(teamId){
+    const vals=teamDateGroups(teamId).flatMap(g=>g.gameTotals.filter(v=>v!=null));
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
