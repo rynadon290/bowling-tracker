@@ -3163,7 +3163,7 @@ export default function BowlingTracker(){
                         <div style={S.statBox}>
                           <div style={S.statNum}>{rAvg(statsBowler,"Tuesday House Shot")}</div>
                           <div style={S.statLbl}>Tuesday</div>
-                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Tuesday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Tuesday House Shot")}</div>}
+                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Tuesday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(teams.find(t=>t.league==="Tuesday House Shot")?.id||"")}</div>}
                           {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Tuesday House Shot")} teamValue={rAvg(compareBowler,"Tuesday House Shot")} label={compareLabel}/>}
                         </div>
                       )}
@@ -3171,7 +3171,7 @@ export default function BowlingTracker(){
                         <div style={S.statBox}>
                           <div style={S.statNum}>{rAvg(statsBowler,"Thursday House Shot")}</div>
                           <div style={S.statLbl}>Thursday</div>
-                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Thursday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Thursday House Shot")}</div>}
+                          {isTeamView&&teamGameTotalAvg(teams.find(t=>t.league==="Thursday House Shot")?.id||"")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(teams.find(t=>t.league==="Thursday House Shot")?.id||"")}</div>}
                           {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Thursday House Shot")} teamValue={rAvg(compareBowler,"Thursday House Shot")} label={compareLabel}/>}
                         </div>
                       )}
