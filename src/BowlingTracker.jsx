@@ -404,6 +404,26 @@ export default function BowlingTracker(){
     });
   }
 
+  function migrateShotTeams(rawShots,currentTeams){
+    if(!currentTeams.length)return rawShots;
+
+    let changed=false;
+    const updated=rawShots.map(s=>{
+      if(s.teamId||!s.bowler||!s.league)return s;
+
+      const team=currentTeams.find(
+        t=>t.league===s.league&&t.members.includes(s.bowler)
+      );
+
+      if(!team)return s;
+
+      changed=true;
+      return {...s,teamId:team.id};
+    });
+
+    return changed?updated:rawShots;
+    }
+  
   // Retroactively fixes sessions with stale/missing derived stats:
   // (a) tenPinLeaves/singlePin* fields that didn't exist yet when the session
   //     was saved (only counted Weak 10/Ringing 10, missing Other-Leave-10),
@@ -488,6 +508,18 @@ export default function BowlingTracker(){
     load();
   },[]);
 
+    useEffect(()=>{
+    if(!teams.length||!shots.length)return;
+
+    const migrated=migrateShotTeams(shots,teams);
+    if(migrated===shots)return;
+
+    setShots(migrated);
+    try{
+      window.storage.set(STORAGE_KEY,JSON.stringify(migrated));
+    }catch{}
+  },[teams,shots]);
+  
   async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
   async function saveLanePatterns(u){setLanePatterns(u);try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}}
