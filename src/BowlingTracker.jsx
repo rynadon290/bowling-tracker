@@ -739,22 +739,22 @@ export default function BowlingTracker(){
   // (league,date) groups where 2+ bowlers logged a session — the only groups
   // where we actually have a legitimate combined team total. league, if
   // given, scopes to just that league's sessions.
-  function teamDateGroups(league){
-    const byKey={};
-    sessions.filter(s=>!league||s.league===league).forEach(s=>{
-      const k=`${s.teamId||"legacy"}__${s.league}__${s.date}`;
-      if(!byKey[k])byKey[k]={teamId:s.teamId||"",league:s.league,date:s.date,entries:[]};
-      byKey[k].entries.push(s);
+  function teamDateGroups(teamId){
+  const byKey={};
+  sessions.filter(s=>s.teamId===teamId).forEach(s=>{
+    const k=`${s.teamId}__${s.league}__${s.date}`;
+    if(!byKey[k])byKey[k]={teamId:s.teamId,league:s.league,date:s.date,entries:[]};
+    byKey[k].entries.push(s);
+  });
+  return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
+    const gameTotals=[0,1,2].map(i=>{
+      const vals=g.entries.map(e=>e.scores[i]).filter(v=>v!=null);
+      return vals.length?vals.reduce((a,b)=>a+b,0):null;
     });
-    return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
-      const gameTotals=[0,1,2].map(i=>{
-        const vals=g.entries.map(e=>e.scores[i]).filter(v=>v!=null);
-        return vals.length?vals.reduce((a,b)=>a+b,0):null;
-      });
-      const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
-      return{...g,gameTotals,seriesTotal};
-    });
-    }
+    const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
+    return{...g,gameTotals,seriesTotal};
+  });
+  }
 
   // High game / high series — auto-derived from logged sessions, always up to date.
   function bowlerHighGame(bowler){
@@ -771,16 +771,16 @@ export default function BowlingTracker(){
     });
     return best;
   }
-  function teamHighGame(league){
-    let best=null;
-    teamDateGroups(league).forEach(g=>g.gameTotals.forEach((v,i)=>{
+  function teamHighGame(teamId){
+  let best=null;
+  teamDateGroups(teamId).forEach(g=>g.gameTotals.forEach((v,i)=>{
       if(v!=null&&(best===null||v>best.value))best={value:v,date:g.date,league:g.league,game:i+1};
     }));
     return best;
   }
-  function teamHighSeries(league){
-    let best=null;
-    teamDateGroups(league).forEach(g=>{
+  function teamHighSeries(teamId){
+  let best=null;
+  teamDateGroups(teamId).forEach(g=>{
       if(best===null||g.seriesTotal>best.value)best={value:g.seriesTotal,date:g.date,league:g.league};
     });
     return best;
@@ -2371,20 +2371,25 @@ export default function BowlingTracker(){
                   <div style={S.card}>
                     <div style={S.label}>Viewing</div>
                     <div style={S.chips}>
-                      {LEAGUES.map(l=>(
-                        <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={statsLeague===l&&!statsBowler} onToggle={()=>{
-                          const next=(statsLeague===l&&!statsBowler)?"":l;
-                          setStatsLeague(next);
-                          setStatsBowler("");
-                          setCompareBowler("");
-                          setCompareLeague("");
-                        }}/>
-                      ))}
+                      {LEAGUES.map(l=>{
+  const team=teams.find(t=>t.league===l);
+  return(
+    <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={statsTeamId===team?.id&&!statsBowler} onToggle={()=>{
+      const next=statsTeamId===team?.id&&!statsBowler?"":team?.id||"";
+      setStatsTeamId(next);
+      setStatsLeague(next?l:"");
+      setStatsBowler("");
+      setCompareBowler("");
+      setCompareLeague("");
+    }}/>
+  );
+})}
                       {bowlers.map(b=>(
                         <Chip key={b} label={b} selected={statsBowler===b} onToggle={()=>{
                           const next=statsBowler===b?"":b;
                           setStatsBowler(next);
                           setStatsLeague("");
+                          setStatsTeamId("");
                           setCompareBowler("");
                           setCompareLeague("");
                         }}/>
@@ -2478,8 +2483,8 @@ export default function BowlingTracker(){
                       </div>
                     );
                   }
-                  const hg=recordsBowler?bowlerHighGame(recordsBowler):teamHighGame(statsLeague);
-                  const hs=recordsBowler?bowlerHighSeries(recordsBowler):teamHighSeries(statsLeague);
+                  const hg=recordsBowler?bowlerHighGame(recordsBowler):teamHighGame(statsTeamId);
+                  const hs=recordsBowler?bowlerHighSeries(recordsBowler):teamHighSeries(statsTeamId);
                   if(!hg&&!hs)return null;
                   return(
                     <div style={S.card}>
