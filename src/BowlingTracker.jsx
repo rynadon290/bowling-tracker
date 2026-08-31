@@ -381,7 +381,22 @@ export default function BowlingTracker(){
   const[ballLaneLines,setBallLaneLines]=useState({});
   const[matches,setMatches]=useState([]); // [{id,league,date,games:[null|true|false×3],series:null|true|false}]
   const[lanePatterns,setLanePatterns]=useState([]); // [{league,date,lane,patternType:"house"|"official",patternName,length,volume,ratio}]
+  useEffect(() => {
+    async function testSupabaseConnection() {
+      const { data, error } = await supabase
+        .from("bowlers")
+        .select("*")
+        .limit(1);
 
+      if (error) {
+        console.error("Supabase connection test failed:", error);
+      } else {
+        console.log("Supabase connection successful:", data);
+      }
+    }
+
+    testSupabaseConnection();
+  }, []);
   // One-time self-healing cleanup for a fixed bug: some 10th-frame "ball 1"
   // shots got saved with ballNum null instead of an explicit 1 (a frame
   // 9→10 transition bug, since fixed). That produced phantom duplicate rows
