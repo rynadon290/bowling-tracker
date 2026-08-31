@@ -86,6 +86,7 @@ export default function TeamManagement({
   bowlers = [],
   leagues = [],
   lineupOrder = {},
+  onTeamsChange,
 }) {
   const [teams, setTeams] = useState(() => {
   const existing = loadTeams();
@@ -108,8 +109,9 @@ export default function TeamManagement({
   const [editingName, setEditingName] = useState("");
 
   useEffect(() => {
-    saveTeams(teams);
-  }, [teams]);
+  saveTeams(teams);
+  onTeamsChange?.(teams);
+}, [teams, onTeamsChange]);
 
   const leagueList = leagues.length
     ? leagues
