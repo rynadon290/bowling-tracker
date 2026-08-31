@@ -1693,6 +1693,16 @@ export default function BowlingTracker(){
       </div>
 
       <div style={S.content}>
+        
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* TEAMS VIEW                                                        */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="teams"&&(
+          <TeamManagement
+            bowlers={bowlers}
+            setBowlers={setBowlers}
+          />
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* LOG VIEW                                                          */}
