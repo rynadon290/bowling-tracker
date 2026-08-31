@@ -1778,7 +1778,7 @@ export default function BowlingTracker(){
                 <div style={S.chips}>
                   {LEAGUES.map(l=>(
                     <Chip key={l} label={l.replace(" House Shot","")} selected={sessionLeague===l}
-                      onToggle={()=>{setSessionLeague(l);set("league",l);set("date",sessionDate);setShowSummary(false);}}/>
+                      onToggle={()=>{const team=teams.find(t=>t.league===l&&t.members.includes(activeBowler));setSessionLeague(l);setForm(f=>({...f,league:l,teamId:team?.id||"",date:sessionDate}));setShowSummary(false);}}/>
                   ))}
                 </div>
                 <div style={{marginBottom:"10px"}}>
