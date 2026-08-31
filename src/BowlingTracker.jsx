@@ -1664,11 +1664,12 @@ export default function BowlingTracker(){
   // default (no comparison, no badges) rather than silently comparing to a
   // blended team. Pick a specific bowler (compareBowler) or a specific
   // league's team (compareLeague, e.g. Tuesday Team vs Thursday Team).
+  const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":"";
   const compareShots=compareBowler
-    ?shots.filter(s=>s.bowler===compareBowler)
-    :compareLeague
-      ?shots.filter(s=>s.league===compareLeague)
-      :shots; // unused when showTeamCompare is false
+  ?shots.filter(s=>s.bowler===compareBowler)
+  :compareLeague
+    ?shots.filter(s=>s.teamId===compareTeamId)
+    :shots; // unused when showTeamCompare is false
   const teamTot=compareShots.length;
   const teamStkR=teamTot?Math.round((compareShots.filter(s=>s.result==="Strike").length/teamTot)*100):0;
   const teamSpAtt=compareShots.filter(s=>s.result!=="Strike"&&s.spareMade!==""&&!isSplit(s));
