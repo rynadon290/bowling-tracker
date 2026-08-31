@@ -1168,7 +1168,7 @@ export default function BowlingTracker(){
     // night in every average, the leaderboard, and the season record.
     const existing=sessions.find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
     const session={
-      id:existing?existing.id:Date.now(),bowler:activeBowler,league:sessionLeague,date:sessionDate,scores,
+      id:existing?existing.id:Date.now(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
       shotCount:ss.length, // every shot delivered, including 10th-frame bonus balls — matches how 'strikes' is counted
