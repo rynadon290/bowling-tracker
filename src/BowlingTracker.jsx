@@ -740,10 +740,11 @@ export default function BowlingTracker(){
   // where we actually have a legitimate combined team total. league, if
   // given, scopes to just that league's sessions.
   function teamDateGroups(league){
+    function teamDateGroups(league){
     const byKey={};
     sessions.filter(s=>!league||s.league===league).forEach(s=>{
-      const k=`${s.league}__${s.date}`;
-      if(!byKey[k])byKey[k]={league:s.league,date:s.date,entries:[]};
+      const k=`${s.teamId||"legacy"}__${s.league}__${s.date}`;
+      if(!byKey[k])byKey[k]={teamId:s.teamId||"",league:s.league,date:s.date,entries:[]};
       byKey[k].entries.push(s);
     });
     return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
@@ -754,7 +755,7 @@ export default function BowlingTracker(){
       const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
       return{...g,gameTotals,seriesTotal};
     });
-  }
+    }
 
   // High game / high series — auto-derived from logged sessions, always up to date.
   function bowlerHighGame(bowler){
