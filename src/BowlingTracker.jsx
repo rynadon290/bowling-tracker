@@ -728,9 +728,9 @@ export default function BowlingTracker(){
   }
 
   // Distinct (league,date) pairs that have at least one session logged, newest first.
-  function sessionDateGroups(){
+  function sessionDateGroups(league){
     const seen={};
-    sessions.forEach(s=>{
+    sessions.filter(s=>!league||s.league===league).forEach(s=>{
       const k=`${s.league}__${s.date}`;
       if(!seen[k])seen[k]={league:s.league,date:s.date};
     });
@@ -2569,13 +2569,13 @@ export default function BowlingTracker(){
                   );
                 })()}
 
-                {!statsBowler&&sessionDateGroups().length>0&&(
+                {!statsBowler&&sessionDateGroups(statsLeague).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Log Match Results</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                       4 points per night — 1 per game, 1 for total pinfall. Tap to cycle: not marked → won → lost.
                     </div>
-                    {sessionDateGroups().map((g,i)=>{
+                    {sessionDateGroups(statsLeague).map((g,i)=>{
                       const m=getMatch(g.league,g.date)||{games:[null,null,null],series:null,opponent:"",handicap:""};
                       const handicap=matchHandicap(m);
                       const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
