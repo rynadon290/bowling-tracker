@@ -3286,7 +3286,7 @@ export default function BowlingTracker(){
                             <div style={S.statNum}>{v}</div>
                             <div style={S.statLbl}>Game {idx+1}</div>
                             {teamV!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
-                            {showTeamCompare&&<CompareBadge value={v} teamValue={gameAvg(compareBowler,idx,compareLeague)} label={compareLabel}/>}
+                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):teamGameTotalAvgAt(compareTeamId,idx)} label={compareLabel}/>}
                           </div>
                         );
                       })}
