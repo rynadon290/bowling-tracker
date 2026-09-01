@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import TeamManagement from "./TeamManagement.jsx";
 
 // Browser persistence adapter. The original app used the ChatGPT host
 // storage API; GitHub Pages needs a browser-native equivalent.
@@ -36,7 +37,7 @@ const BALL_CHANGE_REASONS = [
   "Too early","Too late","Too round","Too sharp",
   "Roll out","Poor carry","No miss room","Lane transition","Surface worn",
 ];
-const LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
+const DEFAULT_LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
 // Bowling lineup order per league — used to display per-bowler breakdowns
 // within a shared night (e.g. Team Series) in actual turn order rather than
 // alphabetically. Anyone not listed here falls to the end, in whatever
@@ -45,8 +46,9 @@ const LINEUP_ORDER = {
   "Thursday House Shot": ["Tommy","Zack","Ryan","Rob","Aaron"],
   "Tuesday House Shot": ["Tommy","Zack","Ryan","Lee"],
 };
-function lineupSort(bowlers,league){
-  const order=LINEUP_ORDER[league]||[];
+function lineupSort(bowlers,league,teamList=[]){
+  const team=teamList.find(t=>t.league===league);
+  const order=team?.members?.length?team.members:(LINEUP_ORDER[league]||[]);
   return [...bowlers].sort((a,b)=>{
     const ia=order.indexOf(a),ib=order.indexOf(b);
     if(ia===-1&&ib===-1)return 0;
@@ -61,6 +63,7 @@ const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
+const LEAGUES_KEY = "bowling-leagues-v1";
 
 const C = {
   bg:"#0f1117",surface:"#1a1d27",card:"#22263a",
@@ -281,7 +284,7 @@ function tenthBall3Pins(f10b1,f10b2,f10b3){
 // ── Empty shot factory ────────────────────────────────────────────────────────
 function emptyShot(){
   return{
-    id:Date.now(),bowler:"",league:"",date:new Date().toISOString().slice(0,10),
+    id:Date.now(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
     lane:"",game:"1",frame:"1",ballNum:null,
     ball:"",surface:"",startingBoard:"",targetArrows:"",
     result:"",otherLeave:[],spareMade:"",strikeDescription:"",
@@ -350,6 +353,17 @@ export default function BowlingTracker(){
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
+  const[teams,setTeams]=useState(()=>{
+  try{
+    const raw=window.localStorage.getItem("bowling-teams-v1");
+    if(!raw)return [];
+    const parsed=JSON.parse(raw);
+    return Array.isArray(parsed)?parsed:[];
+  }catch{
+    return [];
+  }
+  });
+  const[leagues,setLeagues]=useState(DEFAULT_LEAGUES);
   const[activeBowler,setActiveBowler]=useState("");
   const[newBowlerName,setNewBowlerName]=useState("");
   const[arsenals,setArsenals]=useState({}); // {bowlerName: [ballName,...]}
@@ -364,6 +378,7 @@ export default function BowlingTracker(){
   const[statsBowler,setStatsBowler]=useState("");
   const[compareBowler,setCompareBowler]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
+  const[statsTeamId,setStatsTeamId]=useState("");
   const[trendMetric,setTrendMetric]=useState("weekly"); // 0, 1, 2, or "weekly"
   const[trendScope,setTrendScope]=useState(""); // "" = combined both teams, or a specific league
   const[compareLeague,setCompareLeague]=useState("");
@@ -402,6 +417,26 @@ export default function BowlingTracker(){
     });
   }
 
+  function migrateShotTeams(rawShots,currentTeams){
+    if(!currentTeams.length)return rawShots;
+
+    let changed=false;
+    const updated=rawShots.map(s=>{
+      if(s.teamId||!s.bowler||!s.league)return s;
+
+      const team=currentTeams.find(
+        t=>t.league===s.league&&t.members.includes(s.bowler)
+      );
+
+      if(!team)return s;
+
+      changed=true;
+      return {...s,teamId:team.id};
+    });
+
+    return changed?updated:rawShots;
+    }
+  
   // Retroactively fixes sessions with stale/missing derived stats:
   // (a) tenPinLeaves/singlePin* fields that didn't exist yet when the session
   //     was saved (only counted Weak 10/Ringing 10, missing Other-Leave-10),
@@ -432,6 +467,7 @@ export default function BowlingTracker(){
       if(!ss.length)return s; // no matching shots found; leave whatever was already stored untouched
       return{
         ...s,
+        teamId:s.teamId||ss[0]?.teamId||"",
         shotCount:ss.length,
         strikes:ss.filter(sh=>sh.result==="Strike").length,
         tenPinLeaves:ss.filter(isTenPinLeave).length,
@@ -479,6 +515,13 @@ export default function BowlingTracker(){
         if(m)setMatches(JSON.parse(m.value));
         const lp=await window.storage.get(LANE_PATTERNS_KEY);
         if(lp)setLanePatterns(JSON.parse(lp.value));
+        const lg=await window.storage.get(LEAGUES_KEY);
+        if(lg){
+          const list=JSON.parse(lg.value);
+          if(Array.isArray(list)&&list.length)setLeagues([...new Set(list.map(String).map(s=>s.trim()).filter(Boolean))]);
+        }else{
+          try{await window.storage.set(LEAGUES_KEY,JSON.stringify(DEFAULT_LEAGUES));}catch{}
+        }
         const bl=await window.storage.get("bowling-ball-lane-lines-v1");
         if(bl)setBallLaneLines(JSON.parse(bl.value));
       }catch{}
@@ -486,9 +529,52 @@ export default function BowlingTracker(){
     load();
   },[]);
 
+    useEffect(()=>{
+    if(!teams.length||!shots.length)return;
+
+    const migrated=migrateShotTeams(shots,teams);
+    if(migrated===shots)return;
+
+    setShots(migrated);
+    try{
+      window.storage.set(STORAGE_KEY,JSON.stringify(migrated));
+    }catch{}
+  },[teams,shots]);
+  
   async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
   async function saveLanePatterns(u){setLanePatterns(u);try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}}
+  async function saveLeagues(u){setLeagues(u);try{await window.storage.set(LEAGUES_KEY,JSON.stringify(u));}catch{}}
+
+  async function addLeague(name){
+    const clean=name.trim();
+    if(!clean)return;
+    if(leagues.some(l=>l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
+    await saveLeagues([...leagues,clean]);
+  }
+
+  async function renameLeague(oldName,newName){
+    const clean=newName.trim();
+    if(!clean||oldName===clean)return;
+    if(leagues.some(l=>l!==oldName&&l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
+    const renameRecords=list=>list.map(item=>item.league===oldName?{...item,league:clean}:item);
+    const updatedShots=renameRecords(shots);
+    const updatedSessions=renameRecords(sessions);
+    const updatedMatches=renameRecords(matches);
+    const updatedLanePatterns=renameRecords(lanePatterns);
+    const updatedLeagues=leagues.map(l=>l===oldName?clean:l);
+    await saveShots(updatedShots);
+    await saveSessions(updatedSessions);
+    await saveMatches(updatedMatches);
+    await saveLanePatterns(updatedLanePatterns);
+    await saveLeagues(updatedLeagues);
+    setSessionLeague(v=>v===oldName?clean:v);
+    setStatsLeague(v=>v===oldName?clean:v);
+    setTrendScope(v=>v===oldName?clean:v);
+    setCompareLeague(v=>v===oldName?clean:v);
+    setForm(f=>f.league===oldName?{...f,league:clean}:f);
+    setPreEditForm(f=>f?.league===oldName?{...f,league:clean}:f);
+  }
 
   async function addBowler(){
     const name=newBowlerName.trim();
@@ -555,6 +641,8 @@ export default function BowlingTracker(){
   }
 
   function selectBowler(name){
+    const team=teams.find(t=>t.league===sessionLeague&&t.members.includes(name));
+    const teamId=team?.id||"";
     setActiveBowler(name);
     setShowSummary(false);
 
@@ -571,12 +659,12 @@ export default function BowlingTracker(){
         const allBShots=shots.filter(s=>s.bowler===name&&s.league===sessionLeague&&s.date===sessionDate);
         const{game:ng,frame:nf,ballNum:nb}=nextState(allBShots,name,last.game,last.frame,last.ballNum);
         const line=nb===null?autoFillLineFor(name,form.ball,ng,nf):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-        setForm(f=>({...f,bowler:name,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+        setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
         return;
       }
       // No shots yet for this bowler tonight — start fresh at Game 1 Frame 1
       const line=autoFillLineFor(name,form.ball,"1","1");
-      setForm(f=>({...f,bowler:name,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+      setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
       return;
     }
     set("bowler",name);
@@ -690,9 +778,9 @@ export default function BowlingTracker(){
   }
 
   // Distinct (league,date) pairs that have at least one session logged, newest first.
-  function sessionDateGroups(){
+  function sessionDateGroups(league){
     const seen={};
-    sessions.forEach(s=>{
+    sessions.filter(s=>!league||s.league===league).forEach(s=>{
       const k=`${s.league}__${s.date}`;
       if(!seen[k])seen[k]={league:s.league,date:s.date};
     });
@@ -702,21 +790,21 @@ export default function BowlingTracker(){
   // (league,date) groups where 2+ bowlers logged a session — the only groups
   // where we actually have a legitimate combined team total. league, if
   // given, scopes to just that league's sessions.
-  function teamDateGroups(league){
-    const byKey={};
-    sessions.filter(s=>!league||s.league===league).forEach(s=>{
-      const k=`${s.league}__${s.date}`;
-      if(!byKey[k])byKey[k]={league:s.league,date:s.date,entries:[]};
-      byKey[k].entries.push(s);
+  function teamDateGroups(teamId){
+  const byKey={};
+  sessions.filter(s=>s.teamId===teamId).forEach(s=>{
+    const k=`${s.teamId}__${s.league}__${s.date}`;
+    if(!byKey[k])byKey[k]={teamId:s.teamId,league:s.league,date:s.date,entries:[]};
+    byKey[k].entries.push(s);
+  });
+  return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
+    const gameTotals=[0,1,2].map(i=>{
+      const vals=g.entries.map(e=>e.scores[i]).filter(v=>v!=null);
+      return vals.length?vals.reduce((a,b)=>a+b,0):null;
     });
-    return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
-      const gameTotals=[0,1,2].map(i=>{
-        const vals=g.entries.map(e=>e.scores[i]).filter(v=>v!=null);
-        return vals.length?vals.reduce((a,b)=>a+b,0):null;
-      });
-      const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
-      return{...g,gameTotals,seriesTotal};
-    });
+    const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
+    return{...g,gameTotals,seriesTotal};
+  });
   }
 
   // High game / high series — auto-derived from logged sessions, always up to date.
@@ -734,16 +822,16 @@ export default function BowlingTracker(){
     });
     return best;
   }
-  function teamHighGame(league){
-    let best=null;
-    teamDateGroups(league).forEach(g=>g.gameTotals.forEach((v,i)=>{
+  function teamHighGame(teamId){
+  let best=null;
+  teamDateGroups(teamId).forEach(g=>g.gameTotals.forEach((v,i)=>{
       if(v!=null&&(best===null||v>best.value))best={value:v,date:g.date,league:g.league,game:i+1};
     }));
     return best;
   }
-  function teamHighSeries(league){
-    let best=null;
-    teamDateGroups(league).forEach(g=>{
+  function teamHighSeries(teamId){
+  let best=null;
+  teamDateGroups(teamId).forEach(g=>{
       if(best===null||g.seriesTotal>best.value)best={value:g.seriesTotal,date:g.date,league:g.league};
     });
     return best;
@@ -952,7 +1040,7 @@ export default function BowlingTracker(){
     return JSON.stringify({
       exportedAt:new Date().toISOString(),
       version:2,
-      shots,sessions,bowlers,arsenals,matches,ballLaneLines,lanePatterns,
+      shots,sessions,bowlers,arsenals,matches,ballLaneLines,lanePatterns,leagues,
     },null,2);
   }
 
@@ -966,6 +1054,14 @@ export default function BowlingTracker(){
     const newMatches=Array.isArray(data.matches)?data.matches:[];
     const newBallLaneLines=(data.ballLaneLines&&typeof data.ballLaneLines==="object")?data.ballLaneLines:{};
     const newLanePatterns=Array.isArray(data.lanePatterns)?data.lanePatterns:[];
+    const discoveredLeagues=[
+      ...(Array.isArray(data.leagues)?data.leagues:[]),
+      ...newShots.map(s=>s.league),
+      ...newSessions.map(s=>s.league),
+      ...newMatches.map(m=>m.league),
+      ...newLanePatterns.map(p=>p.league),
+    ].filter(Boolean);
+    const importedLeagues=[...new Set(discoveredLeagues.map(String).map(s=>s.trim()).filter(Boolean))];
     const migratedShots=migrateShots(newShots);
     await saveShots(migratedShots);
     await saveSessions(migrateSessions(newSessions,migratedShots));
@@ -973,6 +1069,7 @@ export default function BowlingTracker(){
     await saveArsenals(newArsenals);
     await saveMatches(newMatches);
     await saveLanePatterns(newLanePatterns);
+    await saveLeagues(importedLeagues.length?importedLeagues:DEFAULT_LEAGUES);
     setBallLaneLines(newBallLaneLines);
     try{window.localStorage.setItem("bowling-ball-lane-lines-v1",JSON.stringify(newBallLaneLines));}catch{}
     if(newBowlers.length)setActiveBowler(newBowlers[0]);
@@ -1132,7 +1229,7 @@ export default function BowlingTracker(){
     // night in every average, the leaderboard, and the season record.
     const existing=sessions.find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
     const session={
-      id:existing?existing.id:Date.now(),bowler:activeBowler,league:sessionLeague,date:sessionDate,scores,
+      id:existing?existing.id:Date.now(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
       shotCount:ss.length, // every shot delivered, including 10th-frame bonus balls — matches how 'strikes' is counted
@@ -1259,13 +1356,13 @@ export default function BowlingTracker(){
   // whole team for each date+game — not every bowler's individual scores
   // pooled together, which would measure the spread of individual
   // performances rather than the team's actual combined-score volatility.
-  function scoreValues(bowler,league){
+  function scoreValues(bowler,league,teamId){
     return bowler
       ?sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores)
-      :teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+      :teamDateGroups(teamId).flatMap(g=>g.gameTotals.filter(v=>v!=null));
   }
-  function scoreConsistency(bowler,league){
-    const all=scoreValues(bowler,league);
+  function scoreConsistency(bowler,league,teamId){
+    const all=scoreValues(bowler,league,teamId);
     if(all.length<2)return null;
     const mean=all.reduce((a,b)=>a+b,0)/all.length;
     const variance=all.reduce((a,b)=>a+(b-mean)**2,0)/all.length;
@@ -1312,15 +1409,15 @@ export default function BowlingTracker(){
   // Game/Series and Score Consistency, so it stays consistent with those.
   // Truncated rather than rounded — a whole number, but never bumped up past
   // what was actually earned the way rounding up would.
-  function teamGameTotalAvgAt(league,gameIdx){
-    const vals=teamDateGroups(league).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
+  function teamGameTotalAvgAt(teamId,gameIdx){
+    const vals=teamDateGroups(teamId).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
   // Same idea but pooling all 3 game positions together — the team-total
   // companion to rAvg's per-person combined average.
-  function teamGameTotalAvg(league){
-    const vals=teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+  function teamGameTotalAvg(teamId){
+    const vals=teamDateGroups(teamId).flatMap(g=>g.gameTotals.filter(v=>v!=null));
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
@@ -1626,11 +1723,12 @@ export default function BowlingTracker(){
   // default (no comparison, no badges) rather than silently comparing to a
   // blended team. Pick a specific bowler (compareBowler) or a specific
   // league's team (compareLeague, e.g. Tuesday Team vs Thursday Team).
+  const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":"";
   const compareShots=compareBowler
-    ?shots.filter(s=>s.bowler===compareBowler)
-    :compareLeague
-      ?shots.filter(s=>s.league===compareLeague)
-      :shots; // unused when showTeamCompare is false
+  ?shots.filter(s=>s.bowler===compareBowler)
+  :compareLeague
+    ?shots.filter(s=>s.teamId===compareTeamId)
+    :shots; // unused when showTeamCompare is false
   const teamTot=compareShots.length;
   const teamStkR=teamTot?Math.round((compareShots.filter(s=>s.result==="Strike").length/teamTot)*100):0;
   const teamSpAtt=compareShots.filter(s=>s.result!=="Strike"&&s.spareMade!==""&&!isSplit(s));
@@ -1683,15 +1781,30 @@ export default function BowlingTracker(){
       <div style={S.header}>
         <div style={S.title}>🎳 Shot Tracker</div>
         <div style={S.nav}>
-          {["log","history","stats"].map(v=>(
-            <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-              {v==="log"?"Log":v==="history"?"History":"Stats"}
-            </button>
-          ))}
+          {["log","history","stats","teams"].map(v=>(
+  <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
+    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":"Teams"}
+  </button>
+))}
         </div>
       </div>
 
       <div style={S.content}>
+        
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* TEAMS VIEW                                                        */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="teams"&&(
+          <TeamManagement
+            bowlers={bowlers}
+            setBowlers={setBowlers}
+            leagues={leagues}
+            lineupOrder={LINEUP_ORDER}
+            onTeamsChange={setTeams}
+            onLeagueAdd={addLeague}
+            onLeagueRename={renameLeague}
+          />
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* LOG VIEW                                                          */}
@@ -1759,9 +1872,9 @@ export default function BowlingTracker(){
               <div style={S.card}>
                 <div style={S.label}>Tonight's Session</div>
                 <div style={S.chips}>
-                  {LEAGUES.map(l=>(
+                  {leagues.map(l=>(
                     <Chip key={l} label={l.replace(" House Shot","")} selected={sessionLeague===l}
-                      onToggle={()=>{setSessionLeague(l);set("league",l);set("date",sessionDate);setShowSummary(false);}}/>
+                      onToggle={()=>{const team=teams.find(t=>t.league===l&&t.members.includes(activeBowler));setSessionLeague(l);setForm(f=>({...f,league:l,teamId:team?.id||"",date:sessionDate}));setShowSummary(false);}}/>
                   ))}
                 </div>
                 <div style={{marginBottom:"10px"}}>
@@ -1865,7 +1978,7 @@ export default function BowlingTracker(){
               const cs=curSession;
               const sr=cs.shotCount?Math.round((cs.strikes/cs.shotCount)*100):0;
               const spr=cs.spareAttempts?Math.round((cs.sparesMade/cs.spareAttempts)*100):0;
-              const tA=rAvg(activeBowler,"Tuesday House Shot"),thA=rAvg(activeBowler,"Thursday House Shot"),cA=cAvg(activeBowler);
+              const leagueAs=leagues.map(league=>({league,avg:rAvg(activeBowler,league)})).filter(x=>x.avg!=null),cA=cAvg(activeBowler);
               const mDist=MISSES.map(m=>({m,c:cs.misses.filter(x=>x===m).length})).filter(x=>x.c>0);
               const gR=cs.releases.filter(r=>r==="Good").length,bR=cs.releases.filter(r=>r==="Bad").length,rT=cs.releases.length;
               return(
@@ -1911,9 +2024,8 @@ export default function BowlingTracker(){
                   {mDist.length>0&&(<div style={{marginBottom:"12px"}}><div style={S.label}>Misses</div><div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{mDist.map(x=><span key={x.m} style={S.tag(C.miss)}>{x.m}: {x.c}</span>)}</div></div>)}
                   <div style={S.divider}/>
                   <div style={S.label}>Running Averages</div>
-                  <div style={{display:"flex",gap:"6px"}}>
-                    {tA&&<div style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{tA}</div><div style={S.statLbl}>Tuesday</div></div>}
-                    {thA&&<div style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{thA}</div><div style={S.statLbl}>Thursday</div></div>}
+                  <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                    {leagueAs.map(({league,avg})=><div key={league} style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{avg}</div><div style={S.statLbl}>{league.replace(" House Shot","")}</div></div>)}
                     {cA&&<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,fontSize:"18px",color:C.accent}}>{cA}</div><div style={S.statLbl}>Combined</div></div>}
                   </div>
                 </div>
@@ -2191,7 +2303,7 @@ export default function BowlingTracker(){
                 </div>
               )}
               <div style={S.chips}>
-                {LEAGUES.map(l=>(
+                {leagues.map(l=>(
                   <Chip key={l} label={l.replace(" House Shot","")}
                     selected={filterBall==="__"+l} onToggle={()=>setFilterBall(filterBall==="__"+l?"":"__"+l)}/>
                 ))}
@@ -2321,20 +2433,25 @@ export default function BowlingTracker(){
                   <div style={S.card}>
                     <div style={S.label}>Viewing</div>
                     <div style={S.chips}>
-                      {LEAGUES.map(l=>(
-                        <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={statsLeague===l&&!statsBowler} onToggle={()=>{
-                          const next=(statsLeague===l&&!statsBowler)?"":l;
-                          setStatsLeague(next);
-                          setStatsBowler("");
-                          setCompareBowler("");
-                          setCompareLeague("");
-                        }}/>
-                      ))}
+                      {leagues.map(l=>{
+  const team=teams.find(t=>t.league===l);
+  return(
+    <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={statsTeamId===team?.id&&!statsBowler} onToggle={()=>{
+      const next=statsTeamId===team?.id&&!statsBowler?"":team?.id||"";
+      setStatsTeamId(next);
+      setStatsLeague(next?l:"");
+      setStatsBowler("");
+      setCompareBowler("");
+      setCompareLeague("");
+    }}/>
+  );
+})}
                       {bowlers.map(b=>(
                         <Chip key={b} label={b} selected={statsBowler===b} onToggle={()=>{
                           const next=statsBowler===b?"":b;
                           setStatsBowler(next);
                           setStatsLeague("");
+                          setStatsTeamId("");
                           setCompareBowler("");
                           setCompareLeague("");
                         }}/>
@@ -2352,7 +2469,7 @@ export default function BowlingTracker(){
                               setCompareLeague("");
                             }} color={C.spare}/>
                           ))}
-                          {LEAGUES.filter(l=>l!==statsLeague).map(l=>(
+                          {leagues.filter(l=>l!==statsLeague).map(l=>(
                             <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={compareLeague===l} onToggle={()=>{
                               setCompareLeague(compareLeague===l?"":l);
                               setCompareBowler("");
@@ -2428,8 +2545,8 @@ export default function BowlingTracker(){
                       </div>
                     );
                   }
-                  const hg=recordsBowler?bowlerHighGame(recordsBowler):teamHighGame(statsLeague);
-                  const hs=recordsBowler?bowlerHighSeries(recordsBowler):teamHighSeries(statsLeague);
+                  const hg=recordsBowler?bowlerHighGame(recordsBowler):teamHighGame(statsTeamId);
+                  const hs=recordsBowler?bowlerHighSeries(recordsBowler):teamHighSeries(statsTeamId);
                   if(!hg&&!hs)return null;
                   return(
                     <div style={S.card}>
@@ -2453,8 +2570,7 @@ export default function BowlingTracker(){
                 {!statsBowler&&(()=>{
                   const rMain=seasonRecord(statsLeague);
                   if(!rMain.gameWins&&!rMain.gameLosses&&!rMain.seriesWins&&!rMain.seriesLosses)return null;
-                  const rTue=!statsLeague?seasonRecord("Tuesday House Shot"):null;
-                  const rThu=!statsLeague?seasonRecord("Thursday House Shot"):null;
+                  const otherRecords=leagues.filter(l=>l!==statsLeague).map(league=>({league,record:seasonRecord(league)})).filter(x=>x.record.gameWins+x.record.gameLosses+x.record.seriesWins+x.record.seriesLosses>0);
                   return(
                     <div style={S.card}>
                       <div style={S.label}>{statsLeague?`${statsLeague.replace(" House Shot","")} Season Record`:"Season Record"}</div>
@@ -2465,21 +2581,10 @@ export default function BowlingTracker(){
                         </div>
                       </div>
                       <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{rMain.gameWins}-{rMain.gameLosses}</div>
-                          <div style={S.statLbl}>Games</div>
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{rMain.seriesWins}-{rMain.seriesLosses}</div>
-                          <div style={S.statLbl}>Pinfall</div>
-                        </div>
+                        <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{rMain.gameWins}-{rMain.gameLosses}</div><div style={S.statLbl}>Games</div></div>
+                        <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{rMain.seriesWins}-{rMain.seriesLosses}</div><div style={S.statLbl}>Pinfall</div></div>
                       </div>
-                      {rTue&&(rTue.gameWins+rTue.gameLosses>0)&&(
-                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Tuesday: {rTue.pointsWon}/{rTue.pointsAvailable} points ({rTue.gameWins}-{rTue.gameLosses} games, {rTue.seriesWins}-{rTue.seriesLosses} pinfall)</div>
-                      )}
-                      {rThu&&(rThu.gameWins+rThu.gameLosses>0)&&(
-                        <div style={{fontSize:"12px",color:C.textMuted}}>Thursday: {rThu.pointsWon}/{rThu.pointsAvailable} points ({rThu.gameWins}-{rThu.gameLosses} games, {rThu.seriesWins}-{rThu.seriesLosses} pinfall)</div>
-                      )}
+                      {!statsLeague&&otherRecords.map(({league,record})=><div key={league} style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>{league.replace(" House Shot","")}: {record.pointsWon}/{record.pointsAvailable} points ({record.gameWins}-{record.gameLosses} games, {record.seriesWins}-{record.seriesLosses} pinfall)</div>)}
                     </div>
                   );
                 })()}
@@ -2512,13 +2617,13 @@ export default function BowlingTracker(){
                   );
                 })()}
 
-                {!statsBowler&&sessionDateGroups().length>0&&(
+                {!statsBowler&&sessionDateGroups(statsLeague).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Log Match Results</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                       4 points per night — 1 per game, 1 for total pinfall. Tap to cycle: not marked → won → lost.
                     </div>
-                    {sessionDateGroups().map((g,i)=>{
+                    {sessionDateGroups(statsLeague).map((g,i)=>{
                       const m=getMatch(g.league,g.date)||{games:[null,null,null],series:null,opponent:"",handicap:""};
                       const handicap=matchHandicap(m);
                       const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
@@ -2736,7 +2841,7 @@ export default function BowlingTracker(){
                             <span style={{fontSize:"12px",fontWeight:600}}>{g.league.replace(" House Shot","")}</span>
                             <span style={{fontSize:"11px",color:C.textMuted}}>{g.date}</span>
                           </div>
-                          {lineupSort(g.entries.map(e=>e.bowler),g.league).map(bowlerName=>{
+                          {lineupSort(g.entries.map(e=>e.bowler),g.league,teams).map(bowlerName=>{
                             const e=g.entries.find(en=>en.bowler===bowlerName);
                             return(
                               <div key={e.id} style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
@@ -3098,38 +3203,29 @@ export default function BowlingTracker(){
                   </div>
                 )}
 
-                {sessions.length>0&&(rAvg(statsBowler,"Tuesday House Shot")||rAvg(statsBowler,"Thursday House Shot"))&&(
-                  <div style={S.card}>
-                    <div style={S.label}>Running Averages</div>
-                    {isTeamView&&<div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Top number is the average bowler's score. "Team" below it is what the whole team scores together that game.</div>}
-                    <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                      {(!statsLeague||statsLeague==="Tuesday House Shot")&&rAvg(statsBowler,"Tuesday House Shot")&&(
-                        <div style={S.statBox}>
-                          <div style={S.statNum}>{rAvg(statsBowler,"Tuesday House Shot")}</div>
-                          <div style={S.statLbl}>Tuesday</div>
-                          {isTeamView&&teamGameTotalAvg("Tuesday House Shot")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Tuesday House Shot")}</div>}
-                          {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Tuesday House Shot")} teamValue={rAvg(compareBowler,"Tuesday House Shot")} label={compareLabel}/>}
-                        </div>
-                      )}
-                      {(!statsLeague||statsLeague==="Thursday House Shot")&&rAvg(statsBowler,"Thursday House Shot")&&(
-                        <div style={S.statBox}>
-                          <div style={S.statNum}>{rAvg(statsBowler,"Thursday House Shot")}</div>
-                          <div style={S.statLbl}>Thursday</div>
-                          {isTeamView&&teamGameTotalAvg("Thursday House Shot")!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg("Thursday House Shot")}</div>}
-                          {showTeamCompare&&<CompareBadge value={rAvg(statsBowler,"Thursday House Shot")} teamValue={rAvg(compareBowler,"Thursday House Shot")} label={compareLabel}/>}
-                        </div>
-                      )}
-                      {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&cAvg(statsBowler)&&(
-                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                          <div style={{...S.statNum,color:C.accent}}>{cAvg(statsBowler)}</div>
-                          <div style={S.statLbl}>Combined</div>
-                          {showTeamCompare&&compareBowler&&<CompareBadge value={cAvg(statsBowler)} teamValue={cAvg(compareBowler)} label={compareLabel}/>}
-                        </div>
-                      )}
+                {sessions.length>0&&(()=>{
+                  const leagueAvgs=leagues.map(league=>({league,avg:rAvg(statsBowler,league),teamId:teams.find(t=>t.league===league)?.id||""})).filter(x=>x.avg!=null);
+                  const combined=cAvg(statsBowler);
+                  if(!leagueAvgs.length&&!combined)return null;
+                  return(
+                    <div style={S.card}>
+                      <div style={S.label}>Running Averages</div>
+                      {isTeamView&&<div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Top number is the average bowler's score. "Team" below it is what the whole team scores together that game.</div>}
+                      <div style={{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
+                        {leagueAvgs.map(({league,avg,teamId})=>(
+                          <div key={league} style={S.statBox}>
+                            <div style={S.statNum}>{avg}</div>
+                            <div style={S.statLbl}>{league.replace(" House Shot","")}</div>
+                            {isTeamView&&teamGameTotalAvg(teamId)!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(teamId)}</div>}
+                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(compareBowler,league):teamGameTotalAvg(teams.find(t=>t.league===league)?.id||"")} label={compareLabel}/>}
+                          </div>
+                        ))}
+                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Combined</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(compareBowler)} label={compareLabel}/>}</div>)}
+                      </div>
+                      {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}
                     </div>
-                    {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans both leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To" above, or see the Tuesday/Thursday comparisons instead.</div>}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {(()=>{
                   const progress=avgProgress(statsBowler,statsLeague);
@@ -3156,9 +3252,10 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const consistency=scoreConsistency(statsBowler,statsLeague);
+                  const consistency=scoreConsistency(statsBowler,statsLeague,statsTeamId);
                   if(!consistency)return null;
-                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague):null;
+                  const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":""; 
+                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague,compareTeamId):null;
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Score Consistency</div>
@@ -3187,7 +3284,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const values=scoreValues(statsBowler,statsLeague);
+                  const values=scoreValues(statsBowler,statsLeague,statsTeamId);
                   if(values.length<4)return null;
                   const buckets=histogramBuckets(values);
                   return(
@@ -3222,13 +3319,13 @@ export default function BowlingTracker(){
                       {[0,1,2].map(idx=>{
                         const v=gameAvg(statsBowler,idx,statsLeague);
                         if(v==null)return null;
-                        const teamV=(isTeamView&&statsLeague)?teamGameTotalAvgAt(statsLeague,idx):null;
+                        const teamV=(isTeamView&&statsTeamId)?teamGameTotalAvgAt(statsTeamId,idx):null;
                         return(
                           <div key={idx} style={S.statBox}>
                             <div style={S.statNum}>{v}</div>
                             <div style={S.statLbl}>Game {idx+1}</div>
                             {teamV!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
-                            {showTeamCompare&&<CompareBadge value={v} teamValue={gameAvg(compareBowler,idx,compareLeague)} label={compareLabel}/>}
+                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):teamGameTotalAvgAt(compareTeamId,idx)} label={compareLabel}/>}
                           </div>
                         );
                       })}
@@ -3252,7 +3349,7 @@ export default function BowlingTracker(){
                       </div>
                       <div style={{...S.chips,marginTop:"8px"}}>
                         <Chip label="Combined" selected={!trendScope} onToggle={()=>setTrendScope("")} color={C.accent}/>
-                        {LEAGUES.map(l=>(
+                        {leagues.map(l=>(
                           <Chip key={l} label={l.replace(" House Shot","")} selected={trendScope===l} onToggle={()=>setTrendScope(trendScope===l?"":l)} color={C.accent}/>
                         ))}
                       </div>
