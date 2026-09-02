@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import TeamManagement from "./TeamManagement.jsx";
+import { useAuth } from "./AuthProvider.jsx";
+import { cloudRead, cloudWrite, getQueuedRecordsForTable } from "./syncQueue.js";
 
 // Browser persistence adapter. The original app used the ChatGPT host
 // storage API; GitHub Pages needs a browser-native equivalent.
@@ -349,6 +351,14 @@ function nextState(savedShots, bowler, game, frame, ballNum){
 }
 
 export default function BowlingTracker(){
+  const{user}=useAuth();
+  // Maps league name -> its Supabase row id. The client keeps `leagues` as
+  // plain name strings everywhere (unchanged, to avoid rewriting every call
+  // site that compares/filters by league name) — this ref is what lets
+  // renameLeague update the correct row in place by id, instead of
+  // deleting-and-recreating it (which would cascade-delete every team in
+  // that league, since teams.league_id references leagues.id).
+  const leagueIdsRef=useRef({});
   const[view,setView]=useState("log");
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
@@ -540,18 +550,40 @@ export default function BowlingTracker(){
         if(m)setMatches(JSON.parse(m.value));
         const lp=await window.storage.get(LANE_PATTERNS_KEY);
         if(lp)setLanePatterns(JSON.parse(lp.value));
-        const lg=await window.storage.get(LEAGUES_KEY);
-        if(lg){
-          const list=JSON.parse(lg.value);
-          if(Array.isArray(list)&&list.length)setLeagues([...new Set(list.map(String).map(s=>s.trim()).filter(Boolean))]);
-        }else{
-          try{await window.storage.set(LEAGUES_KEY,JSON.stringify(DEFAULT_LEAGUES));}catch{}
-        }
         const bl=await window.storage.get("bowling-ball-lane-lines-v1");
         if(bl)setBallLaneLines(JSON.parse(bl.value));
       }catch{}
     }
     load();
+  },[]);
+
+  // Leagues: cloud-first, falling back to whatever's cached locally if
+  // there's no signal right now. Local storage doubles as the offline
+  // cache here — every successful cloud load mirrors into it, so a later
+  // offline load still has something to show instead of nothing.
+  useEffect(()=>{
+    async function loadLeagues(){
+      const{data,online}=await cloudRead("leagues",q=>q.select("id,name"));
+      if(online&&data){
+        const pending=await getQueuedRecordsForTable("leagues");
+        data.forEach(r=>{leagueIdsRef.current[r.name]=r.id;});
+        pending.forEach(r=>{if(!leagueIdsRef.current[r.name])leagueIdsRef.current[r.name]=r.id;});
+        const names=[...new Set([...data.map(r=>r.name),...pending.map(r=>r.name)])];
+        if(names.length){
+          setLeagues(names);
+          try{await window.storage.set(LEAGUES_KEY,JSON.stringify(names));}catch{}
+        }
+        return;
+      }
+      try{
+        const lg=await window.storage.get(LEAGUES_KEY);
+        if(lg){
+          const list=JSON.parse(lg.value);
+          if(Array.isArray(list)&&list.length)setLeagues([...new Set(list.map(String).map(s=>s.trim()).filter(Boolean))]);
+        }
+      }catch{}
+    }
+    loadLeagues();
   },[]);
 
     useEffect(()=>{
@@ -583,11 +615,25 @@ export default function BowlingTracker(){
   async function saveLanePatterns(u){setLanePatterns(u);try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}}
   async function saveLeagues(u){setLeagues(u);try{await window.storage.set(LEAGUES_KEY,JSON.stringify(u));}catch{}}
 
+  // Ensures each of these league names has a real row in Supabase, inserting
+  // one (with a client-generated id, so it's stable even if this goes
+  // through the offline sync queue) for any name not already tracked.
+  function ensureLeaguesInCloud(names){
+    names.forEach(name=>{
+      if(!leagueIdsRef.current[name]){
+        const id=crypto.randomUUID();
+        leagueIdsRef.current[name]=id;
+        cloudWrite("leagues",{id,name,created_by:user?.id||null});
+      }
+    });
+  }
+
   async function addLeague(name){
     const clean=name.trim();
     if(!clean)return;
     if(leagues.some(l=>l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
     await saveLeagues([...leagues,clean]);
+    ensureLeaguesInCloud([clean]);
   }
 
   async function renameLeague(oldName,newName){
@@ -605,6 +651,17 @@ export default function BowlingTracker(){
     await saveMatches(updatedMatches);
     await saveLanePatterns(updatedLanePatterns);
     await saveLeagues(updatedLeagues);
+    // Update the SAME row by its existing id — never delete-and-recreate,
+    // since teams.league_id references this row and deleting it would
+    // cascade-delete every team in the league.
+    const existingId=leagueIdsRef.current[oldName];
+    if(existingId){
+      delete leagueIdsRef.current[oldName];
+      leagueIdsRef.current[clean]=existingId;
+      cloudWrite("leagues",{id:existingId,name:clean});
+    }else{
+      ensureLeaguesInCloud([clean]);
+    }
     setSessionLeague(v=>v===oldName?clean:v);
     setStatsLeague(v=>v===oldName?clean:v);
     setTrendScope(v=>v===oldName?clean:v);
@@ -1142,7 +1199,9 @@ export default function BowlingTracker(){
     await saveArsenals(newArsenals);
     await saveMatches(newMatches);
     await saveLanePatterns(newLanePatterns);
-    await saveLeagues(importedLeagues.length?importedLeagues:DEFAULT_LEAGUES);
+    const finalLeagues=importedLeagues.length?importedLeagues:DEFAULT_LEAGUES;
+    await saveLeagues(finalLeagues);
+    ensureLeaguesInCloud(finalLeagues);
     setBallLaneLines(newBallLaneLines);
     try{window.localStorage.setItem("bowling-ball-lane-lines-v1",JSON.stringify(newBallLaneLines));}catch{}
     if(newBowlers.length)setActiveBowler(newBowlers[0]);

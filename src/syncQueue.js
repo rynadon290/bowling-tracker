@@ -90,6 +90,21 @@ export async function cloudDelete(table, id, { timeoutMs = 6000 } = {}) {
   }
 }
 
+// Cloud-first read with a timeout, for the same reason writes need one — no
+// signal at the lanes shouldn't hang the UI. `queryFn` receives the table's
+// query builder so the caller can add .select()/.eq()/etc. however that
+// table needs. On failure or timeout, returns online:false so the caller
+// can fall back to whatever it has cached locally.
+export async function cloudRead(table, queryFn, { timeoutMs = 6000 } = {}) {
+  try {
+    const { data, error } = await withTimeout(queryFn(supabase.from(table)), timeoutMs);
+    if (error) throw error;
+    return { data, online: true };
+  } catch (err) {
+    return { data: null, online: false, reason: err.message };
+  }
+}
+
 // Returns any not-yet-synced records queued for a given table, so a read
 // (e.g. loading shot history) can merge them in — otherwise a shot logged
 // while offline would be invisible until the queue actually flushes.
