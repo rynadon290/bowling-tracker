@@ -94,8 +94,9 @@ const S = {
   statLbl:{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"},
 };
 
-function Chip({label,selected,onToggle,color}){
-  return <button style={S.chip(selected,color)} onClick={onToggle}>{label}</button>;
+function Chip({label,selected,onToggle,color,dense}){
+  const style=dense?{...S.chip(selected,color),padding:"5px 9px"}:S.chip(selected,color);
+  return <button style={style} onClick={onToggle}>{label}</button>;
 }
 
 function CollapsibleCard({title,summary,expanded,onToggle,children}){
@@ -1815,9 +1816,9 @@ export default function BowlingTracker(){
             {!editingId&&(
               <div style={S.card}>
                 <div style={S.label}>Who's Bowling</div>
-                <div style={S.chips}>
+                <div style={{...S.chips,gap:"4px"}}>
                   {bowlers.map(b=>(
-                    <Chip key={b} label={b} selected={activeBowler===b} onToggle={()=>selectBowler(b)} color={C.accent}/>
+                    <Chip key={b} label={b} selected={activeBowler===b} onToggle={()=>selectBowler(b)} color={C.accent} dense/>
                   ))}
                 </div>
                 <div style={S.row}>
