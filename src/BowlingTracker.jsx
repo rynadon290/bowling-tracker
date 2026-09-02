@@ -1176,6 +1176,7 @@ export default function BowlingTracker(){
     await saveShots([]);
     await saveSessions([]);
     await saveMatches([]);
+    await saveLanePatterns([]);
     setForm({...emptyShot(),bowler:activeBowler});
     setEditingId(null);
     setShowSummary(false);
@@ -3452,7 +3453,7 @@ export default function BowlingTracker(){
                     ):(
                       <>
                         <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                          This deletes every logged shot, session, and match result (opponents, handicaps, win/loss). This can't be undone.
+                          This deletes every logged shot, session, match result (opponents, handicaps, win/loss), and lane condition note. This can't be undone.
                         </div>
                         <div style={{display:"flex",gap:"8px"}}>
                           <button style={{...S.btn("warn"),flex:1}} onClick={async()=>{await clearAllData();setConfirmClear(false);}}>
