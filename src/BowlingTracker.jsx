@@ -12,6 +12,7 @@ import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/s
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
+  matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
 } from "./domain/supabaseMapping.js";
 
 // Browser persistence adapter. The original app used the ChatGPT host
@@ -381,6 +382,22 @@ export default function BowlingTracker(){
     });
   }
 
+  const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Legacy local records predate this data type having a real UUID id at
+  // all (matches used Date.now(), lane patterns had no id field
+  // whatsoever) — Supabase's uuid columns will reject both. Backfills a
+  // fresh crypto.randomUUID() for anything that isn't already a valid one,
+  // leaving everything else untouched.
+  function ensureValidUuids(records){
+    let changed=false;
+    const updated=records.map(r=>{
+      if(typeof r.id==="string"&&UUID_PATTERN.test(r.id))return r;
+      changed=true;
+      return{...r,id:crypto.randomUUID()};
+    });
+    return changed?updated:records;
+  }
+
   useEffect(()=>{
     async function load(){
       try{
@@ -442,10 +459,34 @@ export default function BowlingTracker(){
         }
         const a=await window.storage.get(ARSENALS_KEY);
         if(a)setArsenals(JSON.parse(a.value));
-        const m=await window.storage.get(MATCHES_KEY);
-        if(m)setMatches(JSON.parse(m.value));
-        const lp=await window.storage.get(LANE_PATTERNS_KEY);
-        if(lp)setLanePatterns(JSON.parse(lp.value));
+
+        const matchesRes=await cloudRead("matches",q=>q.select("*"));
+        if(matchesRes.online&&matchesRes.data){
+          const pendingMatches=await getQueuedRecordsForTable("matches");
+          const pendingMatchIds=new Set(pendingMatches.map(p=>p.id));
+          const cloudMatches=matchesRes.data.filter(row=>!pendingMatchIds.has(row.id)).map(row=>matchFromSupabaseRow(row,leagueNameById));
+          const pendingMatchObjs=pendingMatches.map(row=>matchFromSupabaseRow(row,leagueNameById));
+          const mergedMatches=[...cloudMatches,...pendingMatchObjs];
+          setMatches(mergedMatches);
+          try{await window.storage.set(MATCHES_KEY,JSON.stringify(mergedMatches));}catch{}
+        }else{
+          const m=await window.storage.get(MATCHES_KEY);
+          if(m)setMatches(ensureValidUuids(JSON.parse(m.value)));
+        }
+
+        const lanePatternsRes=await cloudRead("lane_patterns",q=>q.select("*"));
+        if(lanePatternsRes.online&&lanePatternsRes.data){
+          const pendingPatterns=await getQueuedRecordsForTable("lane_patterns");
+          const pendingPatternIds=new Set(pendingPatterns.map(p=>p.id));
+          const cloudPatterns=lanePatternsRes.data.filter(row=>!pendingPatternIds.has(row.id)).map(row=>lanePatternFromSupabaseRow(row,leagueNameById));
+          const pendingPatternObjs=pendingPatterns.map(row=>lanePatternFromSupabaseRow(row,leagueNameById));
+          const mergedPatterns=[...cloudPatterns,...pendingPatternObjs];
+          setLanePatterns(mergedPatterns);
+          try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(mergedPatterns));}catch{}
+        }else{
+          const lp=await window.storage.get(LANE_PATTERNS_KEY);
+          if(lp)setLanePatterns(ensureValidUuids(JSON.parse(lp.value)));
+        }
         const bl=await window.storage.get("bowling-ball-lane-lines-v1");
         if(bl)setBallLaneLines(JSON.parse(bl.value));
       }catch{}
@@ -508,7 +549,22 @@ export default function BowlingTracker(){
   
   async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
-  async function saveLanePatterns(u){setLanePatterns(u);try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}}
+  async function saveLanePatterns(u){
+    const prevById=new Map(lanePatterns.map(p=>[p.id,p]));
+    const nextById=new Map(u.map(p=>[p.id,p]));
+    setLanePatterns(u);
+    try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}
+
+    for(const id of prevById.keys()){
+      if(!nextById.has(id))cloudDelete("lane_patterns",id);
+    }
+    for(const[id,pattern]of nextById){
+      const prev=prevById.get(id);
+      if(!prev||JSON.stringify(prev)!==JSON.stringify(pattern)){
+        cloudWrite("lane_patterns",lanePatternToSupabaseRow(pattern,leagueIdsRef.current));
+      }
+    }
+  }
   async function saveLeagues(u){setLeagues(u);try{await window.storage.set(LEAGUES_KEY,JSON.stringify(u));}catch{}}
 
   // Ensures each of these league names has a real row in Supabase, inserting
@@ -726,7 +782,22 @@ export default function BowlingTracker(){
       }
     }
   }
-  async function saveMatches(u){setMatches(u);try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}}
+  async function saveMatches(u){
+    const prevById=new Map(matches.map(m=>[m.id,m]));
+    const nextById=new Map(u.map(m=>[m.id,m]));
+    setMatches(u);
+    try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}
+
+    for(const id of prevById.keys()){
+      if(!nextById.has(id))cloudDelete("matches",id);
+    }
+    for(const[id,match]of nextById){
+      const prev=prevById.get(id);
+      if(!prev||JSON.stringify(prev)!==JSON.stringify(match)){
+        cloudWrite("matches",matchToSupabaseRow(match,leagueIdsRef.current));
+      }
+    }
+  }
 
   // Matches are keyed by teamId (not league) so two teams in the same
   // league on the same date don't collide into one shared record. league is
@@ -739,16 +810,19 @@ export default function BowlingTracker(){
 
   // Lane condition (oil pattern) for a specific lane on a specific night —
   // defaults to House Shot implicitly (no record needed) until the user
-  // actively records an official pattern for that lane.
+  // actively records an official pattern for that lane. Lookup stays
+  // league+date+lane based (unaffected by team resolution) since a lane's
+  // physical condition isn't inherently team-specific — teamId is only
+  // attached at creation time, for the Supabase row's RLS/ownership.
   function getLanePattern(league,date,lane){
     return lanePatterns.find(p=>p.league===league&&p.date===date&&String(p.lane)===String(lane));
   }
-  async function setLanePattern(league,date,lane,updates){
+  async function setLanePattern(teamId,league,date,lane,updates){
     const existing=getLanePattern(league,date,lane);
     if(existing){
       await saveLanePatterns(lanePatterns.map(p=>p===existing?{...p,...updates}:p));
     } else {
-      await saveLanePatterns([...lanePatterns,{league,date,lane:String(lane),patternType:"house",patternName:"",length:"",volume:"",ratio:"",...updates}]);
+      await saveLanePatterns([...lanePatterns,{id:crypto.randomUUID(),teamId,league,date,lane:String(lane),patternType:"house",patternName:"",length:"",volume:"",ratio:"",...updates}]);
     }
   }
   // Cycles a result through Not Marked → Won → Lost → Not Marked
@@ -763,7 +837,7 @@ export default function BowlingTracker(){
     } else {
       const games=[null,null,null];
       games[gameIdx]=true;
-      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games,series:null,opponent:"",handicap:""}]);
+      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games,series:null,opponent:"",handicap:""}]);
     }
   }
 
@@ -772,7 +846,7 @@ export default function BowlingTracker(){
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,series:nextResult(existing.series??null)}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:true,opponent:"",handicap:""}]);
+      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:true,opponent:"",handicap:""}]);
     }
   }
 
@@ -781,7 +855,7 @@ export default function BowlingTracker(){
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,opponent}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:null,opponent,handicap:""}]);
+      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:null,opponent,handicap:""}]);
     }
   }
 
@@ -792,7 +866,7 @@ export default function BowlingTracker(){
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,handicap:value}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:null,opponent:"",handicap:value}]);
+      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:null,opponent:"",handicap:value}]);
     }
   }
 
@@ -1691,10 +1765,7 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="teams"&&(
           <TeamManagement
-            bowlers={bowlers}
-            setBowlers={setBowlers}
             leagues={leagues}
-            lineupOrder={LINEUP_ORDER}
             onTeamsChange={setTeams}
             onLeagueAdd={addLeague}
             onLeagueRename={renameLeague}
@@ -1842,20 +1913,20 @@ export default function BowlingTracker(){
                       <div key={lane} style={{marginBottom:"10px"}}>
                         <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"4px"}}>Lane {lane}</div>
                         <div style={S.chips}>
-                          <Chip label="House Shot" selected={!isOfficial} onToggle={()=>setLanePattern(sessionLeague,sessionDate,lane,{patternType:"house"})}/>
-                          <Chip label="Official Pattern" selected={isOfficial} onToggle={()=>setLanePattern(sessionLeague,sessionDate,lane,{patternType:"official"})} color={C.spare}/>
+                          <Chip label="House Shot" selected={!isOfficial} onToggle={()=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{patternType:"house"})}/>
+                          <Chip label="Official Pattern" selected={isOfficial} onToggle={()=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{patternType:"official"})} color={C.spare}/>
                         </div>
                         {isOfficial&&(
                           <div style={{marginTop:"6px"}}>
                             <input style={{...S.input,marginBottom:"6px"}} placeholder="Pattern name (e.g. Kegel Main Street)"
-                              value={rec.patternName} onChange={e=>setLanePattern(sessionLeague,sessionDate,lane,{patternName:e.target.value})}/>
+                              value={rec.patternName} onChange={e=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{patternName:e.target.value})}/>
                             <div style={S.row}>
                               <input style={{...S.input,flex:1}} type="number" placeholder="Length (ft)"
-                                value={rec.length} onChange={e=>setLanePattern(sessionLeague,sessionDate,lane,{length:e.target.value})}/>
+                                value={rec.length} onChange={e=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{length:e.target.value})}/>
                               <input style={{...S.input,flex:1}} type="number" placeholder="Volume (mL)"
-                                value={rec.volume} onChange={e=>setLanePattern(sessionLeague,sessionDate,lane,{volume:e.target.value})}/>
+                                value={rec.volume} onChange={e=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{volume:e.target.value})}/>
                               <input style={{...S.input,flex:1}} placeholder="Ratio (e.g. 3:1)"
-                                value={rec.ratio} onChange={e=>setLanePattern(sessionLeague,sessionDate,lane,{ratio:e.target.value})}/>
+                                value={rec.ratio} onChange={e=>setLanePattern(form.teamId||sessionLeague,sessionLeague,sessionDate,lane,{ratio:e.target.value})}/>
                             </div>
                           </div>
                         )}
