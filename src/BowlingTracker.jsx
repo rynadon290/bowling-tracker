@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tool
 import TeamManagement from "./TeamManagement.jsx";
 import Friends from "./Friends.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -547,8 +547,18 @@ export default function BowlingTracker(){
       window.storage.set(MATCHES_KEY,JSON.stringify(migrated));
     }catch{}
   },[teams,matches]);
-  
-  async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
+
+  // Live count of writes sitting in the offline queue, not yet confirmed
+  // synced to Supabase. Surfaced in the header so "is my data actually
+  // reaching the cloud" has a direct, always-visible answer instead of
+  // needing to manually check Supabase after every entry.
+  const[pendingSyncCount,setPendingSyncCount]=useState(0);
+  useEffect(()=>{
+    getPendingCount().then(setPendingSyncCount);
+    return onPendingCountChange(setPendingSyncCount);
+  },[]);
+
+    async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
   async function saveLanePatterns(u){
     const prevById=new Map(lanePatterns.map(p=>[p.id,p]));
@@ -1770,7 +1780,12 @@ export default function BowlingTracker(){
     <div style={S.app}>
       {/* Header */}
       <div style={S.header}>
-        <div style={S.title}>🎳 Shot Tracker</div>
+        <div>
+          <div style={S.title}>🎳 Shot Tracker</div>
+          <div style={{fontSize:"10px",fontWeight:600,color:pendingSyncCount>0?C.spare:C.strike,marginTop:"2px"}}>
+            {pendingSyncCount>0?`⏳ ${pendingSyncCount} syncing…`:"✓ All synced"}
+          </div>
+        </div>
         <div style={S.nav}>
           {["log","history","stats","teams","friends"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
