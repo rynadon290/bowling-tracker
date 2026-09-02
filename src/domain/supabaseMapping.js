@@ -112,10 +112,18 @@ export function sessionFromSupabaseRow(row,leagueNameById){
   };
 }
 
+const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// match.teamId can legitimately be a league NAME string, not a real team
+// id — the local matchKey fallback (form.teamId||sessionLeague) exists so
+// opponent/handicap tracking still works before a bowler is set up as a
+// team member, and that fallback value flows straight into this field.
+// Never let a non-UUID value reach a uuid column.
 export function matchToSupabaseRow(match,leagueIdsMap){
+  const validTeamId=(typeof match.teamId==="string"&&UUID_PATTERN.test(match.teamId))?match.teamId:null;
   return{
     id:match.id,
-    team_id:match.teamId||null,
+    team_id:validTeamId,
     league_id:leagueIdsMap[match.league]||null,
     date:match.date,
     games:match.games||[null,null,null],
