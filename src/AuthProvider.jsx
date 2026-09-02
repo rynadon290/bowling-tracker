@@ -57,7 +57,10 @@ export function AuthProvider({ children }) {
     const clean = newName.trim();
     if (!clean || !session?.user?.id) return { error: new Error('Not signed in or name is empty') };
     setDisplayName(clean); // optimistic, matches the rest of the app's pattern
-    await cloudWrite('profiles', { id: session.user.id, display_name: clean });
+    const result = await cloudWrite('profiles', { id: session.user.id, display_name: clean });
+    if (!result.synced) {
+      return { error: new Error(`Name change hasn't reached the cloud yet (${result.reason || 'unknown reason'}) — teammates won't be able to find you until it syncs.`) };
+    }
     return { error: null };
   }
 

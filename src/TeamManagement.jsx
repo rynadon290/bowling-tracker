@@ -466,11 +466,12 @@ export default function TeamManagement({
     await loadAll(); // refresh so the newly-real membership shows up if this is your own team too
   }
 
-  function saveMyName() {
+  async function saveMyName() {
     const name = myNameInput.trim();
     if (!name) return;
-    updateDisplayName(name);
     setEditingMyName(false);
+    const { error } = await updateDisplayName(name);
+    if (error) alert(error.message);
   }
 
   function moveMember(teamId, index, direction) {

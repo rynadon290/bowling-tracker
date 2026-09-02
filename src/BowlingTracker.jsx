@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import TeamManagement from "./TeamManagement.jsx";
+import Friends from "./Friends.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave } from "./domain/splits.js";
@@ -570,14 +571,22 @@ export default function BowlingTracker(){
   // Ensures each of these league names has a real row in Supabase, inserting
   // one (with a client-generated id, so it's stable even if this goes
   // through the offline sync queue) for any name not already tracked.
-  function ensureLeaguesInCloud(names){
-    names.forEach(name=>{
+  // Returns the list of names that failed to actually sync, so callers can
+  // warn rather than silently trust a write that may never have happened.
+  async function ensureLeaguesInCloud(names){
+    const failed=[];
+    for(const name of names){
       if(!leagueIdsRef.current[name]){
         const id=crypto.randomUUID();
-        leagueIdsRef.current[name]=id;
-        cloudWrite("leagues",{id,name,created_by:user?.id||null});
+        const result=await cloudWrite("leagues",{id,name,created_by:user?.id||null});
+        if(result.synced){
+          leagueIdsRef.current[name]=id;
+        }else{
+          failed.push(name);
+        }
       }
-    });
+    }
+    return failed;
   }
 
   async function addLeague(name){
@@ -585,7 +594,10 @@ export default function BowlingTracker(){
     if(!clean)return;
     if(leagues.some(l=>l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
     await saveLeagues([...leagues,clean]);
-    ensureLeaguesInCloud([clean]);
+    const failed=await ensureLeaguesInCloud([clean]);
+    if(failed.length){
+      alert(`"${clean}" was saved on this device only and hasn't reached the cloud yet — it won't be visible to teammates or usable for creating a team until it syncs. It'll keep retrying in the background if you're offline; check back if this persists.`);
+    }
   }
 
   async function renameLeague(oldName,newName){
@@ -606,12 +618,18 @@ export default function BowlingTracker(){
     // since teams.league_id references this row and deleting it would
     // cascade-delete every team in the league.
     const existingId=leagueIdsRef.current[oldName];
+    let renameFailed=false;
     if(existingId){
       delete leagueIdsRef.current[oldName];
       leagueIdsRef.current[clean]=existingId;
-      cloudWrite("leagues",{id:existingId,name:clean});
+      const result=await cloudWrite("leagues",{id:existingId,name:clean});
+      renameFailed=!result.synced;
     }else{
-      ensureLeaguesInCloud([clean]);
+      const failed=await ensureLeaguesInCloud([clean]);
+      renameFailed=failed.length>0;
+    }
+    if(renameFailed){
+      alert(`"${clean}" was renamed on this device only and hasn't reached the cloud yet. It'll keep retrying in the background if you're offline; check back if this persists.`);
     }
     setSessionLeague(v=>v===oldName?clean:v);
     setStatsLeague(v=>v===oldName?clean:v);
@@ -1202,7 +1220,10 @@ export default function BowlingTracker(){
     await saveLanePatterns(newLanePatterns);
     const finalLeagues=importedLeagues.length?importedLeagues:DEFAULT_LEAGUES;
     await saveLeagues(finalLeagues);
-    ensureLeaguesInCloud(finalLeagues);
+    const failedLeagues=await ensureLeaguesInCloud(finalLeagues);
+    if(failedLeagues.length){
+      alert(`These leagues were restored on this device only and haven't reached the cloud yet: ${failedLeagues.join(", ")}. They'll keep retrying in the background if you're offline.`);
+    }
     setBallLaneLines(newBallLaneLines);
     try{window.localStorage.setItem("bowling-ball-lane-lines-v1",JSON.stringify(newBallLaneLines));}catch{}
     if(newBowlers.length)setActiveBowler(newBowlers[0]);
@@ -1750,9 +1771,9 @@ export default function BowlingTracker(){
       <div style={S.header}>
         <div style={S.title}>🎳 Shot Tracker</div>
         <div style={S.nav}>
-          {["log","history","stats","teams"].map(v=>(
+          {["log","history","stats","teams","friends"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":"Teams"}
+    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":v==="teams"?"Teams":"Friends"}
   </button>
 ))}
         </div>
@@ -1770,6 +1791,13 @@ export default function BowlingTracker(){
             onLeagueAdd={addLeague}
             onLeagueRename={renameLeague}
           />
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* FRIENDS VIEW                                                      */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="friends"&&(
+          <Friends/>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
