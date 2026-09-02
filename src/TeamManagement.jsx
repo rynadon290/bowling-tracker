@@ -44,17 +44,20 @@ export function moveTeamMember(teams, teamId, index, direction) {
 // Returns { teams, invite, error }. error is 'invalid' (blank name/email),
 // 'no-team' (bad teamId), 'duplicate' (email already invited to this team),
 // or null on success.
+// email is optional — a blank one creates a name-only "placeholder" roster
+// slot rather than an error. Duplicate-checking only applies when an email
+// is actually given, since multiple email-less placeholders are allowed.
 export function createTeamInvite(teams, teamId, id, name, email) {
   const cleanName = (name || "").trim();
   const cleanEmail = (email || "").trim().toLowerCase();
-  if (!cleanName || !cleanEmail) return { teams, invite: null, error: "invalid" };
+  if (!cleanName) return { teams, invite: null, error: "invalid" };
   const team = teams.find(t => t.id === teamId);
   if (!team) return { teams, invite: null, error: "no-team" };
-  if (team.pendingInvites.some(inv => inv.email.toLowerCase() === cleanEmail)) {
+  if (cleanEmail && team.pendingInvites.some(inv => inv.email && inv.email.toLowerCase() === cleanEmail)) {
     return { teams, invite: null, error: "duplicate" };
   }
   const lineupPosition = team.members.length + team.pendingInvites.length;
-  const invite = { id, name: cleanName, email: cleanEmail, lineupPosition };
+  const invite = { id, name: cleanName, email: cleanEmail || null, lineupPosition };
   const newTeams = teams.map(t => t.id === teamId ? { ...t, pendingInvites: [...t.pendingInvites, invite] } : t);
   return { teams: newTeams, invite, error: null };
 }
@@ -516,7 +519,9 @@ export default function TeamManagement({
               <div style={{width:"24px"}}></div>
               <div style={{flex:1}}>
                 <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
-                <div style={{color:C.textMuted,fontSize:"10px"}}>invited · not signed in yet</div>
+                <div style={{color:C.textMuted,fontSize:"10px"}}>
+                  {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
+                </div>
               </div>
               <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
             </div>
@@ -553,9 +558,9 @@ export default function TeamManagement({
             )}
 
             <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
-              <div style={S.label}>Or Invite Someone Not Signed Up Yet</div>
+              <div style={S.label}>Or Add Someone Not Signed Up Yet</div>
               <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                Reserves their spot on the roster now. The moment they sign in with this exact email, they're linked automatically — no extra steps.
+                Reserves their spot on the roster now — you can start logging their scores under their name right away via Who's Bowling, no account needed yet. Email is optional: with one, they're linked automatically the moment they sign in with that exact address. Without one, you'll need to link them manually once they join.
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
                 <input
@@ -567,11 +572,11 @@ export default function TeamManagement({
                 <input
                   value={inviteForm[team.id]?.email || ""}
                   onChange={e=>setInviteForm(prev=>({...prev,[team.id]:{...prev[team.id],email:e.target.value}}))}
-                  placeholder="Their email"
+                  placeholder="Their email (optional)"
                   type="email"
                   style={S.input}
                 />
-                <button style={S.primary} onClick={()=>createInvite(team.id)}>Send Invite</button>
+                <button style={S.primary} onClick={()=>createInvite(team.id)}>Add to Roster</button>
               </div>
             </div>
           </div>

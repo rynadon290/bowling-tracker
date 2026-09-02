@@ -87,10 +87,26 @@ describe('createTeamInvite', () => {
     expect(newTeams[0].pendingInvites).toHaveLength(2);
   });
 
-  it('rejects a blank name or email', () => {
+  it('rejects a blank name', () => {
     const teams = [team()];
     expect(createTeamInvite(teams, 'team-1', 'id', '', 'a@example.com').error).toBe('invalid');
-    expect(createTeamInvite(teams, 'team-1', 'id', 'Aaron', '').error).toBe('invalid');
+  });
+
+  it('a blank email is valid — creates a name-only placeholder, not an error', () => {
+    const teams = [team()];
+    const result = createTeamInvite(teams, 'team-1', 'id', 'Aaron', '');
+    expect(result.error).toBeNull();
+    expect(result.invite.email).toBeNull();
+    expect(result.invite.name).toBe('Aaron');
+  });
+
+  it('multiple email-less placeholders on the same team do not collide as duplicates', () => {
+    let teams = [team()];
+    const first = createTeamInvite(teams, 'team-1', 'id-1', 'Aaron', '');
+    teams = first.teams;
+    const second = createTeamInvite(teams, 'team-1', 'id-2', 'Rob', '');
+    expect(second.error).toBeNull();
+    expect(second.teams[0].pendingInvites).toHaveLength(2);
   });
 
   it('rejects a duplicate email, case-insensitively', () => {
