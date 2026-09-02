@@ -1764,9 +1764,16 @@ export default function BowlingTracker(){
           ):(
             <div style={{marginBottom:"10px"}}>
               {Object.entries(syncBreakdown.byTable).map(([table,count])=>(
-                <div key={table} style={{display:"flex",justifyContent:"space-between",fontSize:"12px",padding:"3px 0"}}>
-                  <span style={{color:C.text}}>{table}</span>
-                  <span style={{color:C.textMuted}}>{count}</span>
+                <div key={table} style={{padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px"}}>
+                    <span style={{color:C.text}}>{table}</span>
+                    <span style={{color:C.textMuted}}>{count}</span>
+                  </div>
+                  {syncBreakdown.reasonsByTable?.[table]&&(
+                    <div style={{fontSize:"11px",color:C.miss,marginTop:"3px",fontFamily:"monospace"}}>
+                      {syncBreakdown.reasonsByTable[table]}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

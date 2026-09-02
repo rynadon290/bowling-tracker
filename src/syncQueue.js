@@ -57,10 +57,12 @@ export async function inspectPendingQueue() {
   const db = await getDb();
   const all = await db.getAll(STORE_NAME);
   const byTable = {};
+  const reasonsByTable = {};
   all.forEach(item => {
     byTable[item.table] = (byTable[item.table] || 0) + 1;
+    if (!reasonsByTable[item.table] && item.reason) reasonsByTable[item.table] = item.reason;
   });
-  return { total: all.length, byTable, items: all };
+  return { total: all.length, byTable, reasonsByTable, items: all };
 }
 
 // Discards every queued write without attempting to sync it. Use with real
@@ -77,9 +79,9 @@ export async function clearPendingQueue() {
   notifyListeners(await getPendingCount());
 }
 
-async function queueWrite(table, operation, payload) {
+async function queueWrite(table, operation, payload, reason) {
   const db = await getDb();
-  await db.add(STORE_NAME, { table, operation, payload, createdAt: Date.now() });
+  await db.add(STORE_NAME, { table, operation, payload, reason, createdAt: Date.now() });
   notifyListeners(await getPendingCount());
 }
 
@@ -99,7 +101,7 @@ export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'upsert', record);
+    await queueWrite(table, 'upsert', record, err.message);
     return { synced: false, queued: true, reason: err.message };
   }
 }
@@ -117,7 +119,7 @@ export async function cloudDelete(table, match, { timeoutMs = 6000 } = {}) {
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'delete', matchObj);
+    await queueWrite(table, 'delete', matchObj, err.message);
     return { synced: false, queued: true, reason: err.message };
   }
 }
@@ -167,7 +169,12 @@ export async function flushPendingQueue() {
       }
       if (error) throw error;
       await db.delete(STORE_NAME, item.queueId);
-    } catch {
+    } catch (err) {
+      // Record why this retry failed too — items queued before reason
+      // tracking existed (or whose failure reason has since changed) still
+      // end up with something useful the next time someone inspects the
+      // queue, without needing to discard and start over.
+      await db.put(STORE_NAME, { ...item, reason: err?.message || String(err) });
       break; // leave this item and everything after it queued; try again later
     }
   }
