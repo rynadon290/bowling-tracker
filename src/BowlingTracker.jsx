@@ -788,7 +788,12 @@ export default function BowlingTracker(){
     for(const[id,match]of nextById){
       const prev=prevById.get(id);
       if(!prev||JSON.stringify(prev)!==JSON.stringify(match)){
-        cloudWrite("matches",matchToSupabaseRow(match,leagueIdsRef.current));
+        const row=matchToSupabaseRow(match,leagueIdsRef.current);
+        // Without a real team_id, this write can never succeed — matches
+        // RLS requires team_id is not null. Rather than queue a doomed
+        // write forever, leave it tracked locally only until the bowler
+        // is actually set up as a team member.
+        if(row.team_id)cloudWrite("matches",row);
       }
     }
   }
