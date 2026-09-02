@@ -415,7 +415,7 @@ function sessionFromSupabaseRow(row,leagueNameById){
 }
 
 // ── Determine next state after saving a shot ─────────────────────────────────
-function nextState(savedShots, bowler, game, frame, ballNum){
+function nextState(savedShots, bowler, league, date, game, frame, ballNum){
   const g=parseInt(game),f=parseInt(frame);
 
   if(f<10){
@@ -426,10 +426,16 @@ function nextState(savedShots, bowler, game, frame, ballNum){
     return{game:String(g),frame:String(f+1),ballNum:(f+1===10)?1:null};
   }
 
-  // Frame 10 logic
+  // Frame 10 logic. Every lookup below is scoped by league+date, not just
+  // bowler+game — game numbers (1/2/3) repeat every single night, so
+  // without this, a brand-new frame tonight could "find" an unrelated
+  // completed frame from a past night sharing the same game number and
+  // jump straight to whatever ball that old frame ended on, or a genuine
+  // 3rd ball earned tonight could get miscounted against that old data and
+  // skipped entirely.
   if(!ballNum||ballNum===1){
     // Just saved ball 1
-    const f10shots=savedShots.filter(s=>s.bowler===bowler&&s.game===String(g)&&parseInt(s.frame)===10);
+    const f10shots=savedShots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(g)&&parseInt(s.frame)===10);
     const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
     if(!b1) return{game:String(g),frame:"10",ballNum:2};
 
@@ -454,7 +460,7 @@ function nextState(savedShots, bowler, game, frame, ballNum){
     // struck, the rack reset again and a genuine 3rd ball is still owed. If
     // ball 2 was NOT a strike, it bundles its own spare attempt (Spare Made
     // Yes/No) just like any other frame — the frame is complete right here.
-    const f10shots=savedShots.filter(s=>s.bowler===bowler&&s.game===String(g)&&parseInt(s.frame)===10);
+    const f10shots=savedShots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(g)&&parseInt(s.frame)===10);
     const b2=f10shots.find(s=>s.ballNum===2);
     if(b2&&isStk(b2)){
       return{game:String(g),frame:"10",ballNum:3};
@@ -935,7 +941,7 @@ export default function BowlingTracker(){
           return parseInt(a.frame)-parseInt(b.frame);
         }).pop();
         const allBShots=shots.filter(s=>s.bowler===name&&s.league===sessionLeague&&s.date===sessionDate);
-        const{game:ng,frame:nf,ballNum:nb}=nextState(allBShots,name,last.game,last.frame,last.ballNum);
+        const{game:ng,frame:nf,ballNum:nb}=nextState(allBShots,name,sessionLeague,sessionDate,last.game,last.frame,last.ballNum);
         setForm(f=>({...f,...resetFields,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb}));
         return;
       }
@@ -1292,7 +1298,7 @@ export default function BowlingTracker(){
       await saveShots(updated);
 
       // Determine next frame/game/ballNum
-      const{game:ng,frame:nf,ballNum:nb}=nextState(updated,form.bowler,form.game,form.frame,form.ballNum);
+      const{game:ng,frame:nf,ballNum:nb}=nextState(updated,form.bowler,form.league,form.date,form.game,form.frame,form.ballNum);
 
       // Auto-fill line for next shot
       let line={startingBoard:"",targetArrows:""};
@@ -1838,7 +1844,7 @@ export default function BowlingTracker(){
   // A non-strike + spare on ball 1 means ball 2 WAS the spare conversion —
   // there is no separate "ball 2" shot to log, so it's never offered.
   function tenthBallOptions(){
-    const f10shots=shots.filter(s=>s.bowler===form.bowler&&s.game===form.game&&parseInt(s.frame)===10);
+    const f10shots=shots.filter(s=>s.bowler===form.bowler&&s.league===form.league&&s.date===form.date&&s.game===form.game&&parseInt(s.frame)===10);
     const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
     if(!b1)return[1];
     if(isStk(b1)){
