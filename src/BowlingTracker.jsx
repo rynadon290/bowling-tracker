@@ -482,6 +482,25 @@ export default function BowlingTracker(){
     setShowSyncDetail(false);
   }
 
+  // Forces every match currently held locally through a fresh diff-and-sync
+  // attempt using whatever the CURRENT code actually does — not a retry of
+  // some already-queued payload. Needed because flushPendingQueue() resends
+  // a stuck item's stored payload verbatim; it was captured at the moment
+  // of the original failure using whatever mapping logic existed then, and
+  // never gets re-transformed on retry. If that logic was buggy at the
+  // time, every retry just resends the exact same broken data forever —
+  // this is the only way to actually apply a fix to data that predates it.
+  function handleResyncMatches(){
+    syncMatchesToCloud([],matches);
+  }
+
+  async function handleDiscardAndResyncMatches(){
+    if(!window.confirm(`Discard all ${pendingSyncCount} queued writes, then attempt a fresh sync of everything currently saved on this device? Anything not yet confirmed as reaching the cloud will be lost from the queue, but your local matches themselves are untouched and will be re-attempted.`))return;
+    await clearPendingQueue();
+    handleResyncMatches();
+    setShowSyncDetail(false);
+  }
+
   const[syncingNow,setSyncingNow]=useState(false);
   async function handleSyncNow(){
     setSyncingNow(true);
@@ -1811,6 +1830,10 @@ export default function BowlingTracker(){
             {syncingNow?"Syncing…":"Sync Now"}
           </button>
           <button style={S.btn("warn")} onClick={handleClearPendingQueue}>Discard All Queued Writes</button>
+          <div style={{fontSize:"11px",color:C.textMuted,margin:"10px 0"}}>
+            If a stuck item's error message looks like bad data rather than a connection issue (e.g. a value that clearly shouldn't be there), Sync Now will keep failing on it forever — it resends exactly what's already stored, not a fresh attempt. This clears the queue AND re-attempts your actual local matches fresh, using whatever the app currently does.
+          </div>
+          <button style={{...S.btn(),width:"100%",color:C.accent,borderColor:C.accent+"44"}} onClick={handleDiscardAndResyncMatches}>Discard &amp; Resync Matches</button>
         </div>
       )}
 
