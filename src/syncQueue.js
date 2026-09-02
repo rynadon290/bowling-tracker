@@ -49,6 +49,34 @@ export async function getPendingCount() {
   return db.count(STORE_NAME);
 }
 
+// A per-table breakdown of what's actually stuck in the queue, for
+// diagnosing a count that isn't draining — e.g. flushPendingQueue() stops
+// at the first failure to preserve ordering, so one permanently-broken
+// item can freeze everything queued behind it indefinitely.
+export async function inspectPendingQueue() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  const byTable = {};
+  all.forEach(item => {
+    byTable[item.table] = (byTable[item.table] || 0) + 1;
+  });
+  return { total: all.length, byTable, items: all };
+}
+
+// Discards every queued write without attempting to sync it. Use with real
+// caution — anything only sitting in the queue (never confirmed as having
+// reached Supabase) is gone for good after this. Appropriate right before
+// a full data wipe/re-entry, where that backlog is about to be irrelevant
+// anyway; not appropriate as a routine fix for a slow connection.
+export async function clearPendingQueue() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  for (const item of all) {
+    await db.delete(STORE_NAME, item.queueId);
+  }
+  notifyListeners(await getPendingCount());
+}
+
 async function queueWrite(table, operation, payload) {
   const db = await getDb();
   await db.add(STORE_NAME, { table, operation, payload, createdAt: Date.now() });

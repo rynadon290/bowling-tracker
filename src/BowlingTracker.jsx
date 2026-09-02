@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tool
 import TeamManagement from "./TeamManagement.jsx";
 import Friends from "./Friends.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -557,6 +557,19 @@ export default function BowlingTracker(){
     getPendingCount().then(setPendingSyncCount);
     return onPendingCountChange(setPendingSyncCount);
   },[]);
+
+  const[showSyncDetail,setShowSyncDetail]=useState(false);
+  const[syncBreakdown,setSyncBreakdown]=useState(null);
+  async function openSyncDetail(){
+    const inspection=await inspectPendingQueue();
+    setSyncBreakdown(inspection);
+    setShowSyncDetail(true);
+  }
+  async function handleClearPendingQueue(){
+    if(!window.confirm(`Discard all ${pendingSyncCount} queued writes without syncing them? This cannot be undone — anything not yet confirmed as reaching the cloud will be lost.`))return;
+    await clearPendingQueue();
+    setShowSyncDetail(false);
+  }
 
     async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
@@ -1782,9 +1795,13 @@ export default function BowlingTracker(){
       <div style={S.header}>
         <div>
           <div style={S.title}>🎳 Shot Tracker</div>
-          <div style={{fontSize:"10px",fontWeight:600,color:pendingSyncCount>0?C.spare:C.strike,marginTop:"2px"}}>
-            {pendingSyncCount>0?`⏳ ${pendingSyncCount} syncing…`:"✓ All synced"}
-          </div>
+          {pendingSyncCount>0?(
+            <button onClick={openSyncDetail} style={{background:"none",border:"none",padding:0,fontSize:"10px",fontWeight:600,color:C.spare,marginTop:"2px",cursor:"pointer",textDecoration:"underline"}}>
+              ⏳ {pendingSyncCount} syncing… (tap for details)
+            </button>
+          ):(
+            <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ All synced</div>
+          )}
         </div>
         <div style={S.nav}>
           {["log","history","stats","teams","friends"].map(v=>(
@@ -1794,6 +1811,31 @@ export default function BowlingTracker(){
 ))}
         </div>
       </div>
+
+      {showSyncDetail&&syncBreakdown&&(
+        <div style={{...S.card,margin:"12px 16px",border:`1px solid ${C.spare}44`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+            <div style={S.label}>Pending Sync — {syncBreakdown.total} total</div>
+            <button style={{...S.btn(),padding:"4px 10px",fontSize:"11px"}} onClick={()=>setShowSyncDetail(false)}>Close</button>
+          </div>
+          {Object.entries(syncBreakdown.byTable).length===0?(
+            <div style={{fontSize:"12px",color:C.textMuted}}>Nothing queued.</div>
+          ):(
+            <div style={{marginBottom:"10px"}}>
+              {Object.entries(syncBreakdown.byTable).map(([table,count])=>(
+                <div key={table} style={{display:"flex",justifyContent:"space-between",fontSize:"12px",padding:"3px 0"}}>
+                  <span style={{color:C.text}}>{table}</span>
+                  <span style={{color:C.textMuted}}>{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+            These writes haven't been confirmed as reaching the cloud. If this number isn't dropping over time, one item is likely stuck and blocking everything queued behind it — clearing discards all of it without syncing, which can't be undone.
+          </div>
+          <button style={S.btn("warn")} onClick={handleClearPendingQueue}>Discard All Queued Writes</button>
+        </div>
+      )}
 
       <div style={S.content}>
         
