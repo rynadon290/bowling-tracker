@@ -5,8 +5,10 @@ import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable } from "./syncQueue.js";
 
 // Browser persistence adapter. The original app used the ChatGPT host
-// storage API; GitHub Pages needs a browser-native equivalent.
-if (!window.storage) {
+// storage API; GitHub Pages needs a browser-native equivalent. Guarded by
+// typeof so this module can also be imported under Vitest's Node test
+// environment, where there is no `window` at all.
+if (typeof window !== "undefined" && !window.storage) {
   window.storage = {
     async get(key) {
       const value = window.localStorage.getItem(key);
