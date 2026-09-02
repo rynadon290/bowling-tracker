@@ -283,18 +283,35 @@ export default function TeamManagement({
   const leagueList = leagues.length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
   const leagueTeams = teams.filter(team => team.league === selectedLeague);
 
-  function createTeam() {
+  async function createTeam() {
     const name = newTeamName.trim();
     if (!name) return;
     const duplicate = leagueTeams.some(team => team.name.toLowerCase() === name.toLowerCase());
     if (duplicate) { alert("A team with that name already exists in this league."); return; }
 
     const id = crypto.randomUUID();
-    const leagueId = leagueIdsRef.current[selectedLeague];
+    let leagueId = leagueIdsRef.current[selectedLeague];
+    if (!leagueId) {
+      // Cached ref might be stale (e.g. this league was created/renamed
+      // after this screen last loaded) — try a fresh lookup rather than
+      // silently creating a team that can never actually sync to the cloud.
+      const { data, online } = await cloudRead("leagues", q => q.select("id").eq("name", selectedLeague).limit(1));
+      if (online && data && data[0]) {
+        leagueId = data[0].id;
+        leagueIdsRef.current[selectedLeague] = leagueId;
+      }
+    }
+
     setTeams(prev => [...prev, newTeamObject(id, name, selectedLeague)]);
     setNewTeamName("");
-    if (leagueId) {
-      cloudWrite("teams", { id, name, league_id: leagueId, created_by: user?.id || null });
+
+    if (!leagueId) {
+      alert(`Couldn't find "${selectedLeague}" — this team was created on this device only and won't be visible to teammates or survive leaving this screen. Try again once you're back online, or check the league exists.`);
+      return;
+    }
+    const result = await cloudWrite("teams", { id, name, league_id: leagueId, created_by: user?.id || null });
+    if (!result.synced) {
+      alert(`"${name}" was created locally but couldn't reach the cloud yet (${result.reason || "unknown reason"}). It'll keep retrying in the background — if this keeps happening, check your connection.`);
     }
   }
 
