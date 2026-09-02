@@ -78,6 +78,28 @@ export function newTeamObject(id, name, league) {
   return { id, name, league, members: [], pendingInvites: [] };
 }
 
+// Converts a placeholder into a real member, in one atomic local update.
+// Used by both linking directions: a team member manually picking an
+// account, or the new person claiming their own placeholder. Preserves the
+// invite's original lineup position so the roster order doesn't shuffle
+// just because someone finally signed up. Returns the SAME array reference
+// if teamId/inviteId don't resolve to anything, so callers can check
+// `result === teams` to know nothing changed.
+export function resolvePlaceholder(teams, teamId, inviteId, profile) {
+  const team = teams.find(t => t.id === teamId);
+  if (!team) return teams;
+  const invite = team.pendingInvites.find(inv => inv.id === inviteId);
+  if (!invite) return teams;
+
+  const withoutPlaceholder = team.pendingInvites.filter(inv => inv.id !== inviteId);
+  const alreadyMember = team.members.some(m => m.userId === profile.id);
+  const newMembers = alreadyMember
+    ? team.members
+    : [...team.members, { userId: profile.id, displayName: profile.display_name, lineupPosition: invite.lineupPosition ?? team.members.length }];
+
+  return teams.map(t => t.id === teamId ? { ...t, pendingInvites: withoutPlaceholder, members: newMembers } : t);
+}
+
 const C = {
   bg:"#0f1117",
   surface:"#1a1d27",
@@ -168,6 +190,16 @@ export default function TeamManagement({
   const[myNameInput, setMyNameInput] = useState("");
   // Per-team invite-by-email form: {[teamId]: {name, email}}
   const[inviteForm, setInviteForm] = useState({});
+  // Per-placeholder "link to an account" search, keyed by invite id:
+  // {[inviteId]: {term, results, searching}}
+  const[linkSearchState, setLinkSearchState] = useState({});
+  const linkSearchTimers = useRef({});
+  // Self-claim: a brand-new person searching across every team's unclaimed
+  // placeholders to find their own name.
+  const[claimTerm, setClaimTerm] = useState("");
+  const[claimResults, setClaimResults] = useState([]);
+  const[claimSearching, setClaimSearching] = useState(false);
+  const claimSearchTimer = useRef(null);
   // QR code for the sign-in URL, generated once on mount
   const[qrDataUrl, setQrDataUrl] = useState("");
 
@@ -184,7 +216,7 @@ export default function TeamManagement({
 
     const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id"));
     const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,profiles(display_name)"));
-    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email").is("accepted_at", null));
+    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email,lineup_position").is("accepted_at", null));
 
     if (teamsRes.online && teamsRes.data) {
       const membersByTeam = {};
@@ -201,7 +233,7 @@ export default function TeamManagement({
       const invitesByTeam = {};
       (invitesRes.data || []).forEach(inv => {
         if (!invitesByTeam[inv.team_id]) invitesByTeam[inv.team_id] = [];
-        invitesByTeam[inv.team_id].push({ id: inv.id, name: inv.invited_name, email: inv.invited_email });
+        invitesByTeam[inv.team_id].push({ id: inv.id, name: inv.invited_name, email: inv.invited_email, lineupPosition: inv.lineup_position });
       });
 
       setTeams(teamsRes.data.map(t => ({
@@ -350,6 +382,73 @@ export default function TeamManagement({
     cloudDelete("pending_invites", inviteId);
   }
 
+  // Manual link: a team member picks any real, already-signed-up account
+  // for one of their own placeholders.
+  function handleLinkSearchChange(inviteId, term) {
+    setLinkSearchState(prev => ({ ...prev, [inviteId]: { term, results: prev[inviteId]?.results || [], searching: !!term.trim() } }));
+    clearTimeout(linkSearchTimers.current[inviteId]);
+    if (!term.trim()) {
+      setLinkSearchState(prev => ({ ...prev, [inviteId]: { term: "", results: [], searching: false } }));
+      return;
+    }
+    linkSearchTimers.current[inviteId] = setTimeout(async () => {
+      const { data, online } = await cloudRead("profiles", q =>
+        q.select("id,display_name").ilike("display_name", `%${term.trim()}%`).limit(8)
+      );
+      setLinkSearchState(prev => ({ ...prev, [inviteId]: { term, results: online && data ? data : [], searching: false } }));
+    }, 300);
+  }
+
+  function linkPlaceholderToAccount(teamId, inviteId, profile) {
+    const invite = teams.find(t => t.id === teamId)?.pendingInvites.find(i => i.id === inviteId);
+    const lineupPosition = invite?.lineupPosition ?? 0;
+    setTeams(prev => resolvePlaceholder(prev, teamId, inviteId, profile));
+    setLinkSearchState(prev => ({ ...prev, [inviteId]: { term: "", results: [], searching: false } }));
+    cloudWrite("team_members", { team_id: teamId, user_id: profile.id, lineup_position: lineupPosition });
+    cloudWrite("pending_invites", { id: inviteId, accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
+  }
+
+  // Self-claim: search across EVERY team's unclaimed placeholders, not just
+  // ones you already belong to — you aren't a team member of anything yet,
+  // that's the whole point.
+  function handleClaimSearch(term) {
+    setClaimTerm(term);
+    clearTimeout(claimSearchTimer.current);
+    if (!term.trim()) { setClaimResults([]); setClaimSearching(false); return; }
+    setClaimSearching(true);
+    claimSearchTimer.current = setTimeout(async () => {
+      const { data, online } = await cloudRead("pending_invites", q =>
+        q.select("id,team_id,invited_name,lineup_position").is("accepted_at", null).ilike("invited_name", `%${term.trim()}%`).limit(8)
+      );
+      if (!online || !data || !data.length) { setClaimResults([]); setClaimSearching(false); return; }
+
+      const teamIds = [...new Set(data.map(inv => inv.team_id))];
+      const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id").in("id", teamIds));
+      const teamById = Object.fromEntries((teamsRes.data || []).map(t => [t.id, t]));
+      const leagueIds = [...new Set(Object.values(teamById).map(t => t.league_id).filter(Boolean))];
+      const leaguesRes = leagueIds.length ? await cloudRead("leagues", q => q.select("id,name").in("id", leagueIds)) : { data: [] };
+      const leagueNameById = Object.fromEntries((leaguesRes.data || []).map(l => [l.id, l.name]));
+
+      const enriched = data.map(inv => ({
+        id: inv.id, teamId: inv.team_id, name: inv.invited_name, lineupPosition: inv.lineup_position,
+        teamName: teamById[inv.team_id]?.name || "Unknown team",
+        leagueName: leagueNameById[teamById[inv.team_id]?.league_id] || "",
+      }));
+      setClaimResults(enriched);
+      setClaimSearching(false);
+    }, 300);
+  }
+
+  async function claimPlaceholder(invite) {
+    if (!user?.id) return;
+    setClaimResults(prev => prev.filter(r => r.id !== invite.id));
+    setClaimTerm("");
+    await cloudWrite("team_members", { team_id: invite.teamId, user_id: user.id, lineup_position: invite.lineupPosition ?? 0 });
+    const acceptedAt = new Date().toISOString();
+    await cloudWrite("pending_invites", { id: invite.id, accepted_at: acceptedAt, accepted_user_id: user.id });
+    await loadAll(); // refresh so the newly-real membership shows up if this is your own team too
+  }
+
   function saveMyName() {
     const name = myNameInput.trim();
     if (!name) return;
@@ -415,6 +514,36 @@ export default function TeamManagement({
         <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
           This is what teammates see when they search for you or view the roster — it defaults to your email prefix until you set it.
         </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.label}>Is a Teammate Already Tracking Your Scores?</div>
+        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+          If someone added you to a roster before you signed up, search for your name below to claim your spot — no need to wait on them.
+        </div>
+        <input
+          value={claimTerm}
+          onChange={e=>handleClaimSearch(e.target.value)}
+          placeholder="Search for your name…"
+          style={S.input}
+        />
+        {claimSearching && <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>Searching…</div>}
+        {!claimSearching && claimResults.length>0 && (
+          <div style={{marginTop:"8px"}}>
+            {claimResults.map(r=>(
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+                <div>
+                  <div style={{color:C.text}}>{r.name}</div>
+                  <div style={{color:C.textMuted,fontSize:"10px"}}>{r.teamName}{r.leagueName?` · ${r.leagueName}`:""}</div>
+                </div>
+                <button style={S.primary} onClick={()=>claimPlaceholder(r)}>This is me</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!claimSearching && claimTerm && claimResults.length===0 && (
+          <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>No unclaimed spot found with that name.</div>
+        )}
       </div>
 
       <div style={S.card}>
@@ -515,15 +644,47 @@ export default function TeamManagement({
             </div>
           ))}
           {team.pendingInvites.map(invite => (
-            <div key={invite.id} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
-              <div style={{width:"24px"}}></div>
-              <div style={{flex:1}}>
-                <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
-                <div style={{color:C.textMuted,fontSize:"10px"}}>
-                  {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
+            <div key={invite.id} style={{padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                <div style={{width:"24px"}}></div>
+                <div style={{flex:1}}>
+                  <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
+                  <div style={{color:C.textMuted,fontSize:"10px"}}>
+                    {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
+                  </div>
                 </div>
+                <button style={S.button} onClick={()=>setLinkSearchState(prev=>prev[invite.id]!==undefined
+                  ?{...prev,[invite.id]:undefined}
+                  :{...prev,[invite.id]:{term:"",results:[],searching:false}}
+                )}>{linkSearchState[invite.id]!==undefined?"Cancel":"Link Account"}</button>
+                <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
               </div>
-              <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
+              {linkSearchState[invite.id]!==undefined && (
+                <div style={{marginTop:"8px",marginLeft:"32px"}}>
+                  <input
+                    value={linkSearchState[invite.id]?.term||""}
+                    onChange={e=>handleLinkSearchChange(invite.id,e.target.value)}
+                    placeholder="Search for their real account…"
+                    style={S.input}
+                  />
+                  {linkSearchState[invite.id]?.searching && (
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Searching…</div>
+                  )}
+                  {!linkSearchState[invite.id]?.searching && (linkSearchState[invite.id]?.results?.length>0) && (
+                    <div style={{marginTop:"6px"}}>
+                      {linkSearchState[invite.id].results.map(p=>(
+                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+                          <span style={{color:C.text}}>{p.display_name}</span>
+                          <button style={S.button} onClick={()=>linkPlaceholderToAccount(team.id,invite.id,p)}>Link</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!linkSearchState[invite.id]?.searching && linkSearchState[invite.id]?.term && linkSearchState[invite.id]?.results?.length===0 && (
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>No one found with that name.</div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 

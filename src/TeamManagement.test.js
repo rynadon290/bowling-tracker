@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addTeamMember, removeTeamMember, moveTeamMember, createTeamInvite, cancelTeamInvite, newTeamObject } from './TeamManagement.jsx';
+import { addTeamMember, removeTeamMember, moveTeamMember, createTeamInvite, cancelTeamInvite, newTeamObject, resolvePlaceholder } from './TeamManagement.jsx';
 
 function team(overrides) {
   return { id: 'team-1', name: 'Thursday Team', league: 'Thursday House Shot', members: [], pendingInvites: [], ...overrides };
@@ -169,5 +169,56 @@ describe('newTeamObject', () => {
       const rendered = team.pendingInvites.map(inv => inv.name);
       return { isEmpty, rendered };
     }).not.toThrow();
+  });
+});
+
+describe('resolvePlaceholder', () => {
+  function team(overrides) {
+    return { id: 'team-1', name: 'Thursday Team', league: 'Thursday House Shot', members: [], pendingInvites: [], ...overrides };
+  }
+
+  it('converts a placeholder into a real member, preserving its lineup position', () => {
+    const teams = [team({
+      members: [{ userId: 'u1', displayName: 'Ryan', lineupPosition: 0 }],
+      pendingInvites: [{ id: 'inv-1', name: 'Aaron', email: null, lineupPosition: 1 }],
+    })];
+    const result = resolvePlaceholder(teams, 'team-1', 'inv-1', { id: 'u2', display_name: 'Aaron' });
+    expect(result[0].pendingInvites).toHaveLength(0);
+    expect(result[0].members[1]).toEqual({ userId: 'u2', displayName: 'Aaron', lineupPosition: 1 });
+  });
+
+  it('does not mutate the original teams array', () => {
+    const teams = [team({ pendingInvites: [{ id: 'inv-1', name: 'Aaron', email: null, lineupPosition: 0 }] })];
+    resolvePlaceholder(teams, 'team-1', 'inv-1', { id: 'u2', display_name: 'Aaron' });
+    expect(teams[0].pendingInvites).toHaveLength(1);
+  });
+
+  it('returns the same array reference for an unknown team', () => {
+    const teams = [team()];
+    expect(resolvePlaceholder(teams, 'nonexistent', 'inv-1', { id: 'u2', display_name: 'Aaron' })).toBe(teams);
+  });
+
+  it('returns the same array reference for an unknown invite', () => {
+    const teams = [team({ pendingInvites: [{ id: 'inv-1', name: 'Aaron', email: null, lineupPosition: 0 }] })];
+    expect(resolvePlaceholder(teams, 'team-1', 'nonexistent-invite', { id: 'u2', display_name: 'Aaron' })).toBe(teams);
+  });
+
+  it('drops the placeholder without duplicating if the account is already a member somehow', () => {
+    const teams = [team({
+      members: [{ userId: 'u2', displayName: 'Aaron', lineupPosition: 0 }],
+      pendingInvites: [{ id: 'inv-1', name: 'Aaron', email: null, lineupPosition: 1 }],
+    })];
+    const result = resolvePlaceholder(teams, 'team-1', 'inv-1', { id: 'u2', display_name: 'Aaron' });
+    expect(result[0].members).toHaveLength(1);
+    expect(result[0].pendingInvites).toHaveLength(0);
+  });
+
+  it('falls back to the end of the roster if the invite has no lineup position at all', () => {
+    const teams = [team({
+      members: [{ userId: 'u1', displayName: 'Ryan', lineupPosition: 0 }],
+      pendingInvites: [{ id: 'inv-1', name: 'Aaron', email: null }],
+    })];
+    const result = resolvePlaceholder(teams, 'team-1', 'inv-1', { id: 'u2', display_name: 'Aaron' });
+    expect(result[0].members[1].lineupPosition).toBe(1);
   });
 });
