@@ -48,7 +48,7 @@ const LINEUP_ORDER = {
   "Thursday House Shot": ["Tommy","Zack","Ryan","Rob","Aaron"],
   "Tuesday House Shot": ["Tommy","Zack","Ryan","Lee"],
 };
-function lineupSort(bowlers,league,teamList=[]){
+export function lineupSort(bowlers,league,teamList=[]){
   const team=teamList.find(t=>t.league===league);
   const order=team?.members?.length?team.members:(LINEUP_ORDER[league]||[]);
   return [...bowlers].sort((a,b)=>{
@@ -143,7 +143,7 @@ function resultSym(r){
 //            for frame 10: per-ball pin count
 // isStk(s): Strike or 9 Pin No-Tap
 
-function isStk(s){ return s&&(s.result==="Strike"); }
+export function isStk(s){ return s&&(s.result==="Strike"); }
 
 // ── Split detection ───────────────────────────────────────────────────────────
 // Pin rows, front to back: row 1 = pin 1; row 2 = pins 2,3; row 3 = pins 4,5,6;
@@ -162,7 +162,7 @@ for(const pin of Object.keys(PIN_COL)){
 //     row ahead of it (a "row" leave with nothing left to guide the ball in), or
 // (2) two standing pins have at least one completely empty pin column
 //     between their columns (a gap the ball can't carry through).
-function isSplit(shot){
+export function isSplit(shot){
   if(!shot||shot.result!=="Other Leave")return false;
   const leave=Array.isArray(shot.otherLeave)?shot.otherLeave:[];
   if(leave.includes("9 Pin No-Tap"))return false; // scored as a strike, not a real leave
@@ -199,7 +199,7 @@ function isSplit(shot){
 // A "10 pin leave" is any shot where the 10 pin was the only pin left
 // standing — whether logged via the dedicated Weak 10 / Ringing 10 buttons,
 // or via "Other Leave" with just pin 10 selected.
-function isTenPinLeave(shot){
+export function isTenPinLeave(shot){
   if(!shot)return false;
   if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
   if(shot.result==="Other Leave"){
@@ -212,7 +212,7 @@ function isTenPinLeave(shot){
 // A "single pin leave" is any shot where exactly one pin was left standing,
 // regardless of which pin — Weak 10/Ringing 10 (always the 10 pin), or
 // "Other Leave" with exactly one pin selected (7, 4, 8, 10, etc.).
-function isSinglePinLeave(shot){
+export function isSinglePinLeave(shot){
   if(!shot)return false;
   if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
   if(shot.result==="Other Leave"){
@@ -225,7 +225,7 @@ function isSinglePinLeave(shot){
 // first ball pins for a frame (used for bonus calculation)
 // For frames 1-9: otherLeave = pins standing after ball 1 → firstBall = 10 - standing
 // For 10th frame balls: same logic applies when ball is at a fresh set
-function firstBallOf(s){
+export function firstBallOf(s){
   if(!s)return null;
   if(isStk(s))return 10;
   // Derive from otherLeave (pins standing after this ball's delivery)
@@ -243,7 +243,7 @@ function firstBallOf(s){
 // Second ball pins for a non-strike frame
 // For open frames: pinCount is the TOTAL frame pins (both balls)
 // so second ball = pinCount - firstBall
-function secondBallOf(s){
+export function secondBallOf(s){
   if(!s||isStk(s))return null;
   if(s.spareMade==="Yes"){
     const fb=firstBallOf(s);
@@ -259,7 +259,7 @@ function secondBallOf(s){
 // but ball 2 did NOT (left some pins standing), ball 3 is attempting only
 // those specific remaining pins — not a full fresh rack. This computes how
 // many pins were actually available to ball 3.
-function tenthBall3Available(f10b1,f10b2){
+export function tenthBall3Available(f10b1,f10b2){
   if(!isStk(f10b1))return 10; // ball 3 only reached here via ball1's embedded spare -> fresh rack
   if(!f10b2)return null; // not yet known
   if(isStk(f10b2))return 10; // two strikes -> rack reset again
@@ -269,7 +269,7 @@ function tenthBall3Available(f10b1,f10b2){
 
 // Pins knocked on 10th-frame ball 3, correctly scoped to what was available
 // (rather than always assuming a fresh 10-pin rack).
-function tenthBall3Pins(f10b1,f10b2,f10b3){
+export function tenthBall3Pins(f10b1,f10b2,f10b3){
   if(!f10b3)return null;
   const available=tenthBall3Available(f10b1,f10b2);
   if(available===null)return null;
@@ -284,7 +284,7 @@ function tenthBall3Pins(f10b1,f10b2,f10b3){
 }
 
 // ── Empty shot factory ────────────────────────────────────────────────────────
-function emptyShot(){
+export function emptyShot(){
   return{
     id:crypto.randomUUID(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
     lane:"",game:"1",frame:"1",ballNum:null,
@@ -298,7 +298,7 @@ function emptyShot(){
 // resolved from the shot's league NAME via leagueIdsMap (name -> id) — the
 // client keeps working with league names everywhere else, this is the one
 // place that needs the real id.
-function shotToSupabaseRow(shot,userId,leagueIdsMap){
+export function shotToSupabaseRow(shot,userId,leagueIdsMap){
   return{
     id:shot.id,
     user_id:userId,
@@ -330,7 +330,7 @@ function shotToSupabaseRow(shot,userId,leagueIdsMap){
 
 // The inverse: a Supabase row back to the client's shot shape. leagueNameById
 // is id -> name, the reverse of leagueIdsMap above.
-function shotFromSupabaseRow(row,leagueNameById){
+export function shotFromSupabaseRow(row,leagueNameById){
   return{
     id:row.id,
     bowler:row.bowler_name||"",
@@ -359,7 +359,7 @@ function shotFromSupabaseRow(row,leagueNameById){
   };
 }
 
-function sessionToSupabaseRow(session,userId,leagueIdsMap){
+export function sessionToSupabaseRow(session,userId,leagueIdsMap){
   return{
     id:session.id,
     user_id:userId,
@@ -387,7 +387,7 @@ function sessionToSupabaseRow(session,userId,leagueIdsMap){
   };
 }
 
-function sessionFromSupabaseRow(row,leagueNameById){
+export function sessionFromSupabaseRow(row,leagueNameById){
   return{
     id:row.id,
     bowler:row.bowler_name||"",
@@ -415,7 +415,7 @@ function sessionFromSupabaseRow(row,leagueNameById){
 }
 
 // ── Determine next state after saving a shot ─────────────────────────────────
-function nextState(savedShots, bowler, league, date, game, frame, ballNum){
+export function nextState(savedShots, bowler, league, date, game, frame, ballNum){
   const g=parseInt(game),f=parseInt(frame);
 
   if(f<10){
@@ -474,6 +474,170 @@ function nextState(savedShots, bowler, league, date, game, frame, ballNum){
   }
 
   return{game:String(g+1),frame:"1",ballNum:null};
+}
+
+// Given a bowler's shots for one specific night, returns which ball
+// number(s) are valid to enter next in the 10th frame — [] means the frame
+// is complete (no bonus ball earned), [1] means it hasn't started yet.
+// Scoped by league+date+game for the same reason nextState is: game
+// numbers (1/2/3) repeat every night, so an unscoped lookup would let an
+// unrelated night's 10th frame contaminate tonight's.
+export function tenthFrameStatus(shots,bowler,league,date,game){
+  const f10shots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===game&&parseInt(s.frame)===10);
+  const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
+  if(!b1)return[1];
+  if(isStk(b1)){
+    const b2=f10shots.find(s=>s.ballNum===2);
+    if(!b2)return[2];
+    if(isStk(b2))return[3];
+    return[];
+  }
+  if(b1.spareMade==="Yes")return[3];
+  if(b1.spareMade==="No")return[];
+  return[2];
+}
+
+
+export function strictPartial(shots){
+  const byFrame={};
+  for(let f=1;f<=9;f++) byFrame[f]=shots.find(s=>parseInt(s.frame)===f&&!s.ballNum)||null;
+  const f10shots=shots.filter(s=>parseInt(s.frame)===10);
+  const f10b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1))||null;
+  const f10b2=f10shots.find(s=>s.ballNum===2)||null;
+  const f10b3=f10shots.find(s=>s.ballNum===3)||null;
+
+  function nextFirst(f){
+    if(f===9)return f10b1?firstBallOf(f10b1):null;
+    return byFrame[f+1]?firstBallOf(byFrame[f+1]):null;
+  }
+  function nextSecond(f){
+    if(f===8){
+      const n1=byFrame[9];
+      if(!n1)return null;
+      if(isStk(n1))return f10b1?firstBallOf(f10b1):null;
+      return secondBallOf(n1);
+    }
+    if(f===9){
+      const p1=f10b1?firstBallOf(f10b1):null;
+      if(p1===null)return null;
+      if(isStk(f10b1))return f10b2?firstBallOf(f10b2):null;
+      // f10b1 isn't a strike — its own second delivery is embedded in its
+      // own record (spareMade/pinCount), not a separate f10b2 shot.
+      return secondBallOf(f10b1);
+    }
+    const n1=byFrame[f+1];
+    if(!n1)return null;
+    if(isStk(n1)){
+      if(f+2===10)return f10b1?firstBallOf(f10b1):null;
+      const n2=byFrame[f+2];
+      return n2?firstBallOf(n2):null;
+    }
+    return secondBallOf(n1);
+  }
+
+  let total=0;
+  let framesResolved=0;
+  for(let f=1;f<=9;f++){
+    const s=byFrame[f];
+    if(!s)break;
+    if(isStk(s)){
+      const n1=nextFirst(f);
+      const n2=nextSecond(f);
+      if(n1===null||n2===null)break;
+      total+=10+n1+n2;
+      framesResolved++;
+    } else if(s.spareMade==="Yes"){
+      const n1=nextFirst(f);
+      if(n1===null)break;
+      total+=10+n1;
+      framesResolved++;
+    } else {
+      // Open frame — pinCount is total pins for the frame
+      const pc=s.pinCount!==""&&s.pinCount!==undefined&&s.pinCount!==null?parseInt(s.pinCount):null;
+      if(pc===null)break;
+      total+=pc;
+      framesResolved++;
+    }
+  }
+
+  // 10th frame — only add once frames 1-9 are ALL fully resolved. If the
+  // loop above broke early (framesResolved<9), adding the 10th's value on
+  // top would silently skip the stuck frame and report a wrong total.
+  if(f10b1&&framesResolved===9){
+    const p1=firstBallOf(f10b1);
+    if(p1===null)return framesResolved>0?total:null;
+    if(isStk(f10b1)){
+      if(!f10b2)return framesResolved>0?total:null;
+      if(isStk(f10b2)){
+        // Rack cleared again — a genuine 3rd ball is owed on a fresh rack.
+        const p3=tenthBall3Pins(f10b1,f10b2,f10b3);
+        if(p3===null)return framesResolved>0?total:null;
+        total+=10+10+p3;
+        framesResolved++;
+      } else if(f10b3){
+        // Backward compatibility: older pattern with ball 2 + a separate
+        // ball 3 record already saved — score independently, as before.
+        const p2=firstBallOf(f10b2);
+        const p3=tenthBall3Pins(f10b1,f10b2,f10b3);
+        if(p2===null||p3===null)return framesResolved>0?total:null;
+        total+=10+p2+p3;
+        framesResolved++;
+      } else {
+        // Ball 2 wasn't a strike — bundles its own spare attempt, frame done in 2 balls.
+        const b2Total=f10b2.spareMade==="Yes"?10:
+          (f10b2.pinCount!==""&&f10b2.pinCount!==undefined&&f10b2.pinCount!==null?parseInt(f10b2.pinCount):null);
+        if(b2Total===null)return framesResolved>0?total:null;
+        total+=10+b2Total;
+        framesResolved++;
+      }
+    } else if(f10b1.spareMade==="Yes"){
+      // Ball 2 was the spare conversion, embedded in f10b1 — need ball 3 bonus
+      const p3=f10b3?firstBallOf(f10b3):null;
+      if(p3===null)return framesResolved>0?total:null;
+      total+=10+p3;
+      framesResolved++;
+    } else if(f10b1.spareMade==="No"){
+      // Open 10th frame — no bonus ball, game over. pinCount is the frame total.
+      const frameTotal=(f10b1.pinCount!==""&&f10b1.pinCount!==undefined&&f10b1.pinCount!==null)?parseInt(f10b1.pinCount):null;
+      if(frameTotal===null)return framesResolved>0?total:null;
+      total+=frameTotal;
+      framesResolved++;
+    } else if(f10b2){
+      // Legacy data: ball 2 logged as a separate shot
+      const p2=firstBallOf(f10b2);
+      if(p2===null)return framesResolved>0?total:null;
+      if(f10b2.spareMade==="Yes"){
+        const p3=f10b3?firstBallOf(f10b3):null;
+        if(p3===null)return framesResolved>0?total:null;
+        total+=10+p3;
+        framesResolved++;
+      } else {
+        const b2total=(f10b2.pinCount!==""&&f10b2.pinCount!==undefined)?parseInt(f10b2.pinCount):null;
+        if(b2total===null)return framesResolved>0?total:null;
+        const b2pins=Math.max(0,b2total-p1);
+        total+=p1+b2pins;
+        framesResolved++;
+      }
+    } else {
+      // f10b1 thrown but its outcome (spareMade) not yet chosen — don't add anything
+      return framesResolved>0?total:null;
+    }
+  }
+
+  return framesResolved>0?total:null;
+}
+
+export function frameQualityScore(s){
+  if(s.result==="Strike")return 100;
+  if(s.spareMade==="Yes"){
+    const c=firstBallOf(s); // pins knocked on ball 1 -- fewer pins left standing = higher c
+    const frac=c!=null?Math.max(0,Math.min(1,c/9)):0;
+    const band=isSplit(s)?[50,69]:[70,89];
+    return Math.round((band[0]+frac*(band[1]-band[0]))*10)/10;
+  }
+  const pins=s.pinCount!==""&&s.pinCount!=null?parseInt(s.pinCount):null;
+  if(pins==null)return null;
+  return Math.round(Math.max(0,Math.min(1,pins/9))*49*10)/10;
 }
 
 export default function BowlingTracker(){
@@ -1401,134 +1565,6 @@ export default function BowlingTracker(){
   // ── Score helpers ─────────────────────────────────────────────────────────
 
   // Strict running score: only frames with fully resolved bonus balls
-  function strictPartial(shots){
-    const byFrame={};
-    for(let f=1;f<=9;f++) byFrame[f]=shots.find(s=>parseInt(s.frame)===f&&!s.ballNum)||null;
-    const f10shots=shots.filter(s=>parseInt(s.frame)===10);
-    const f10b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1))||null;
-    const f10b2=f10shots.find(s=>s.ballNum===2)||null;
-    const f10b3=f10shots.find(s=>s.ballNum===3)||null;
-
-    function nextFirst(f){
-      if(f===9)return f10b1?firstBallOf(f10b1):null;
-      return byFrame[f+1]?firstBallOf(byFrame[f+1]):null;
-    }
-    function nextSecond(f){
-      if(f===8){
-        const n1=byFrame[9];
-        if(!n1)return null;
-        if(isStk(n1))return f10b1?firstBallOf(f10b1):null;
-        return secondBallOf(n1);
-      }
-      if(f===9){
-        const p1=f10b1?firstBallOf(f10b1):null;
-        if(p1===null)return null;
-        if(isStk(f10b1))return f10b2?firstBallOf(f10b2):null;
-        // f10b1 isn't a strike — its own second delivery is embedded in its
-        // own record (spareMade/pinCount), not a separate f10b2 shot.
-        return secondBallOf(f10b1);
-      }
-      const n1=byFrame[f+1];
-      if(!n1)return null;
-      if(isStk(n1)){
-        if(f+2===10)return f10b1?firstBallOf(f10b1):null;
-        const n2=byFrame[f+2];
-        return n2?firstBallOf(n2):null;
-      }
-      return secondBallOf(n1);
-    }
-
-    let total=0;
-    let framesResolved=0;
-    for(let f=1;f<=9;f++){
-      const s=byFrame[f];
-      if(!s)break;
-      if(isStk(s)){
-        const n1=nextFirst(f);
-        const n2=nextSecond(f);
-        if(n1===null||n2===null)break;
-        total+=10+n1+n2;
-        framesResolved++;
-      } else if(s.spareMade==="Yes"){
-        const n1=nextFirst(f);
-        if(n1===null)break;
-        total+=10+n1;
-        framesResolved++;
-      } else {
-        // Open frame — pinCount is total pins for the frame
-        const pc=s.pinCount!==""&&s.pinCount!==undefined&&s.pinCount!==null?parseInt(s.pinCount):null;
-        if(pc===null)break;
-        total+=pc;
-        framesResolved++;
-      }
-    }
-
-    // 10th frame — only add once frames 1-9 are ALL fully resolved. If the
-    // loop above broke early (framesResolved<9), adding the 10th's value on
-    // top would silently skip the stuck frame and report a wrong total.
-    if(f10b1&&framesResolved===9){
-      const p1=firstBallOf(f10b1);
-      if(p1===null)return framesResolved>0?total:null;
-      if(isStk(f10b1)){
-        if(!f10b2)return framesResolved>0?total:null;
-        if(isStk(f10b2)){
-          // Rack cleared again — a genuine 3rd ball is owed on a fresh rack.
-          const p3=tenthBall3Pins(f10b1,f10b2,f10b3);
-          if(p3===null)return framesResolved>0?total:null;
-          total+=10+10+p3;
-          framesResolved++;
-        } else if(f10b3){
-          // Backward compatibility: older pattern with ball 2 + a separate
-          // ball 3 record already saved — score independently, as before.
-          const p2=firstBallOf(f10b2);
-          const p3=tenthBall3Pins(f10b1,f10b2,f10b3);
-          if(p2===null||p3===null)return framesResolved>0?total:null;
-          total+=10+p2+p3;
-          framesResolved++;
-        } else {
-          // Ball 2 wasn't a strike — bundles its own spare attempt, frame done in 2 balls.
-          const b2Total=f10b2.spareMade==="Yes"?10:
-            (f10b2.pinCount!==""&&f10b2.pinCount!==undefined&&f10b2.pinCount!==null?parseInt(f10b2.pinCount):null);
-          if(b2Total===null)return framesResolved>0?total:null;
-          total+=10+b2Total;
-          framesResolved++;
-        }
-      } else if(f10b1.spareMade==="Yes"){
-        // Ball 2 was the spare conversion, embedded in f10b1 — need ball 3 bonus
-        const p3=f10b3?firstBallOf(f10b3):null;
-        if(p3===null)return framesResolved>0?total:null;
-        total+=10+p3;
-        framesResolved++;
-      } else if(f10b1.spareMade==="No"){
-        // Open 10th frame — no bonus ball, game over. pinCount is the frame total.
-        const frameTotal=(f10b1.pinCount!==""&&f10b1.pinCount!==undefined&&f10b1.pinCount!==null)?parseInt(f10b1.pinCount):null;
-        if(frameTotal===null)return framesResolved>0?total:null;
-        total+=frameTotal;
-        framesResolved++;
-      } else if(f10b2){
-        // Legacy data: ball 2 logged as a separate shot
-        const p2=firstBallOf(f10b2);
-        if(p2===null)return framesResolved>0?total:null;
-        if(f10b2.spareMade==="Yes"){
-          const p3=f10b3?firstBallOf(f10b3):null;
-          if(p3===null)return framesResolved>0?total:null;
-          total+=10+p3;
-          framesResolved++;
-        } else {
-          const b2total=(f10b2.pinCount!==""&&f10b2.pinCount!==undefined)?parseInt(f10b2.pinCount):null;
-          if(b2total===null)return framesResolved>0?total:null;
-          const b2pins=Math.max(0,b2total-p1);
-          total+=p1+b2pins;
-          framesResolved++;
-        }
-      } else {
-        // f10b1 thrown but its outcome (spareMade) not yet chosen — don't add anything
-        return framesResolved>0?total:null;
-      }
-    }
-
-    return framesResolved>0?total:null;
-  }
 
   function getGameStrict(bowler,league,date,game){
     const gs=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(game));
@@ -1844,18 +1880,7 @@ export default function BowlingTracker(){
   // A non-strike + spare on ball 1 means ball 2 WAS the spare conversion —
   // there is no separate "ball 2" shot to log, so it's never offered.
   function tenthBallOptions(){
-    const f10shots=shots.filter(s=>s.bowler===form.bowler&&s.league===form.league&&s.date===form.date&&s.game===form.game&&parseInt(s.frame)===10);
-    const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
-    if(!b1)return[1];
-    if(isStk(b1)){
-      const b2=f10shots.find(s=>s.ballNum===2);
-      if(!b2)return[2]; // ball 2 not yet played — that's the only open slot
-      if(isStk(b2))return[3]; // rack cleared again — a genuine bonus ball is owed
-      return[]; // ball 2 wasn't a strike — it bundles its own spare attempt, frame's done
-    }
-    if(b1.spareMade==="Yes")return[3];
-    if(b1.spareMade==="No")return[];
-    return[2];
+    return tenthFrameStatus(shots,form.bowler,form.league,form.date,form.game);
   }
   const tenthOptions=tenthBallOptions();
 
@@ -1922,18 +1947,6 @@ export default function BowlingTracker(){
   // Each tier gets its own fixed band so a lower tier can never outscore a
   // higher one no matter the pin count — e.g. a converted 7-pin split still
   // beats every open frame, but loses to every made non-split spare.
-  function frameQualityScore(s){
-    if(s.result==="Strike")return 100;
-    if(s.spareMade==="Yes"){
-      const c=firstBallOf(s); // pins knocked on ball 1 -- fewer pins left standing = higher c
-      const frac=c!=null?Math.max(0,Math.min(1,c/9)):0;
-      const band=isSplit(s)?[50,69]:[70,89];
-      return Math.round((band[0]+frac*(band[1]-band[0]))*10)/10;
-    }
-    const pins=s.pinCount!==""&&s.pinCount!=null?parseInt(s.pinCount):null;
-    if(pins==null)return null;
-    return Math.round(Math.max(0,Math.min(1,pins/9))*49*10)/10;
-  }
 
   // Clean-frame rate broken out by FRAME NUMBER (1-10) instead of aggregated
   // or by game — answers "is there a specific spot in every game where I
