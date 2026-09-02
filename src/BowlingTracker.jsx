@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tool
 import TeamManagement from "./TeamManagement.jsx";
 import Friends from "./Friends.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -458,6 +458,12 @@ export default function BowlingTracker(){
   // reaching the cloud" has a direct, always-visible answer instead of
   // needing to manually check Supabase after every entry.
   const[pendingSyncCount,setPendingSyncCount]=useState(0);
+  // Debounce timers for match text fields (opponent, handicap) — typing
+  // fires a cloud write on every keystroke otherwise, which is both
+  // wasteful and a plausible way to overwhelm the connection with rapid
+  // concurrent requests to the same row. Keyed per team+date so editing one
+  // match doesn't reset another's pending save.
+  const matchSaveTimers=useRef({});
   useEffect(()=>{
     getPendingCount().then(setPendingSyncCount);
     return onPendingCountChange(setPendingSyncCount);
@@ -474,6 +480,15 @@ export default function BowlingTracker(){
     if(!window.confirm(`Discard all ${pendingSyncCount} queued writes without syncing them? This cannot be undone — anything not yet confirmed as reaching the cloud will be lost.`))return;
     await clearPendingQueue();
     setShowSyncDetail(false);
+  }
+
+  const[syncingNow,setSyncingNow]=useState(false);
+  async function handleSyncNow(){
+    setSyncingNow(true);
+    await flushPendingQueue();
+    const inspection=await inspectPendingQueue();
+    setSyncBreakdown(inspection);
+    setSyncingNow(false);
   }
 
     async function saveBowlers(u){
@@ -764,12 +779,9 @@ export default function BowlingTracker(){
       }
     }
   }
-  async function saveMatches(u){
-    const prevById=new Map(matches.map(m=>[m.id,m]));
-    const nextById=new Map(u.map(m=>[m.id,m]));
-    setMatches(u);
-    try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}
-
+  function syncMatchesToCloud(prevMatches,nextMatches){
+    const prevById=new Map(prevMatches.map(m=>[m.id,m]));
+    const nextById=new Map(nextMatches.map(m=>[m.id,m]));
     for(const id of prevById.keys()){
       if(!nextById.has(id))cloudDelete("matches",id);
     }
@@ -779,6 +791,12 @@ export default function BowlingTracker(){
         cloudWrite("matches",matchToSupabaseRow(match,leagueIdsRef.current));
       }
     }
+  }
+  async function saveMatches(u){
+    const prev=matches;
+    setMatches(u);
+    try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}
+    syncMatchesToCloud(prev,u);
   }
 
   // Matches are keyed by teamId (not league) so two teams in the same
@@ -832,24 +850,27 @@ export default function BowlingTracker(){
     }
   }
 
-  async function setMatchOpponent(teamId,league,date,opponent){
+  function updateMatchField(teamId,league,date,field,value){
     const existing=getMatch(teamId,date);
-    if(existing){
-      await saveMatches(matches.map(m=>m.id===existing.id?{...m,opponent}:m));
-    } else {
-      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:null,opponent,handicap:""}]);
-    }
-  }
+    const prevMatches=matches;
+    const updatedMatches=existing
+      ?matches.map(m=>m.id===existing.id?{...m,[field]:value}:m)
+      :[...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:null,opponent:"",handicap:"",[field]:value}];
 
-  // Handicap: one value per match (same for all 3 games), typically 80% of
-  // the gap between the two teams' averages.
-  async function setMatchHandicap(teamId,league,date,value){
-    const existing=getMatch(teamId,date);
-    if(existing){
-      await saveMatches(matches.map(m=>m.id===existing.id?{...m,handicap:value}:m));
-    } else {
-      await saveMatches([...matches,{id:crypto.randomUUID(),teamId,league,date,games:[null,null,null],series:null,opponent:"",handicap:value}]);
-    }
+    setMatches(updatedMatches);
+    try{window.storage.set(MATCHES_KEY,JSON.stringify(updatedMatches));}catch{}
+
+    const debounceKey=`${teamId}|${date}`;
+    clearTimeout(matchSaveTimers.current[debounceKey]);
+    matchSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncMatchesToCloud(prevMatches,updatedMatches);
+    },600);
+  }
+  function setMatchOpponent(teamId,league,date,opponent){
+    updateMatchField(teamId,league,date,"opponent",opponent);
+  }
+  function setMatchHandicap(teamId,league,date,value){
+    updateMatchField(teamId,league,date,"handicap",value);
   }
 
   // Normalizes legacy per-game handicap arrays (from before this was a single
@@ -1779,8 +1800,11 @@ export default function BowlingTracker(){
             </div>
           )}
           <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-            These writes haven't been confirmed as reaching the cloud. If this number isn't dropping over time, one item is likely stuck and blocking everything queued behind it — clearing discards all of it without syncing, which can't be undone.
+            These writes haven't been confirmed as reaching the cloud. Sync Now retries them immediately instead of waiting for the automatic retry — if the underlying issue is actually fixed, this drains the queue without losing anything. If it's still stuck after retrying, clearing discards all of it without syncing, which can't be undone.
           </div>
+          <button style={{...S.btn("primary"),marginBottom:"8px"}} onClick={handleSyncNow} disabled={syncingNow}>
+            {syncingNow?"Syncing…":"Sync Now"}
+          </button>
           <button style={S.btn("warn")} onClick={handleClearPendingQueue}>Discard All Queued Writes</button>
         </div>
       )}
