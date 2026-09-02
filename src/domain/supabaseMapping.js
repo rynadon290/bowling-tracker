@@ -111,3 +111,59 @@ export function sessionFromSupabaseRow(row,leagueNameById){
     releases:row.releases||[],
   };
 }
+
+export function matchToSupabaseRow(match,leagueIdsMap){
+  return{
+    id:match.id,
+    team_id:match.teamId||null,
+    league_id:leagueIdsMap[match.league]||null,
+    date:match.date,
+    games:match.games||[null,null,null],
+    series:match.series??null,
+    opponent:match.opponent||"",
+    handicap:match.handicap||"",
+  };
+}
+
+export function matchFromSupabaseRow(row,leagueNameById){
+  return{
+    id:row.id,
+    teamId:row.team_id||"",
+    league:leagueNameById[row.league_id]||"",
+    date:row.date,
+    games:row.games||[null,null,null],
+    series:row.series,
+    opponent:row.opponent||"",
+    handicap:row.handicap||"",
+  };
+}
+
+export function lanePatternToSupabaseRow(pattern,leagueIdsMap){
+  return{
+    id:pattern.id,
+    team_id:pattern.teamId||null,
+    league_id:leagueIdsMap[pattern.league]||null,
+    date:pattern.date,
+    lane:String(pattern.lane),
+    pattern_type:pattern.patternType||"house",
+    pattern_name:pattern.patternName||"",
+    length:pattern.length||"",
+    volume:pattern.volume||"",
+    ratio:pattern.ratio||"",
+  };
+}
+
+export function lanePatternFromSupabaseRow(row,leagueNameById){
+  return{
+    id:row.id,
+    teamId:row.team_id||"",
+    league:leagueNameById[row.league_id]||"",
+    date:row.date,
+    lane:row.lane,
+    patternType:row.pattern_type||"house",
+    patternName:row.pattern_name||"",
+    length:row.length||"",
+    volume:row.volume||"",
+    ratio:row.ratio||"",
+  };
+}
