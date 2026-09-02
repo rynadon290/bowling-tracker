@@ -388,7 +388,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,grit:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -675,6 +675,29 @@ export default function BowlingTracker(){
   }
   function autoFillLine(ball,game,frame){
     return autoFillLineFor(activeBowler,ball,game,frame);
+  }
+
+  // The ball used on the most recently logged shot for whoever's active
+  // right now (editing an existing shot uses that shot's own bowler/league/
+  // date instead). Used to show Ball Change Reason only when the current
+  // ball selection actually differs from what was just thrown — not on
+  // every shot, and not on the very first shot of the night when there's
+  // nothing yet to compare against.
+  function previousShotBall(){
+    const bowlerName=editingId?form.bowler:activeBowler;
+    const league=editingId?form.league:sessionLeague;
+    const date=editingId?form.date:sessionDate;
+    if(!bowlerName||!league||!date)return null;
+    const relevant=shots.filter(s=>s.bowler===bowlerName&&s.league===league&&s.date===date&&s.id!==editingId);
+    if(!relevant.length)return null;
+    const last=[...relevant].sort((a,b)=>{
+      const ga=parseInt(a.game),gb=parseInt(b.game);
+      if(ga!==gb)return ga-gb;
+      const fa=parseInt(a.frame),fb=parseInt(b.frame);
+      if(fa!==fb)return fa-fb;
+      return (a.ballNum||0)-(b.ballNum||0);
+    }).pop();
+    return last?.ball||null;
   }
 
   function selectBowler(name){
@@ -2145,6 +2168,52 @@ export default function BowlingTracker(){
 
             {!editingId&&<div style={S.divider}/>}
 
+            {/* Ball */}
+            <div style={S.card}>
+              <div style={S.label}>Ball</div>
+              <div style={S.chips}>
+                {(arsenals[form.bowler]||[]).map(b=><Chip key={b} label={b} selected={form.ball===b} onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>)}
+              </div>
+              {(arsenals[form.bowler]||[]).length===0&&(
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
+                  {form.bowler?`No balls in ${form.bowler}'s arsenal yet — add some above.`:"Select a bowler to see their arsenal."}
+                </div>
+              )}
+            </div>
+
+            {/* Ball Change Reason — only relevant when the ball actually
+                changed from the previous shot; collapsed by default. */}
+            {(()=>{
+              const lastBall=previousShotBall();
+              const ballJustChanged=!!lastBall&&!!form.ball&&lastBall!==form.ball;
+              if(!ballJustChanged)return null;
+              return(
+                <CollapsibleCard
+                  title="Ball Change Reason"
+                  summary={form.ballChangeReason.length?`${form.ballChangeReason.length} selected`:""}
+                  expanded={editingId?true:expandedSections.ballChange}
+                  onToggle={()=>toggleSection("ballChange")}>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Switched from {lastBall} to {form.ball} — why?</div>
+                  <div style={S.chips}>
+                    {BALL_CHANGE_REASONS.map(r=>(
+                      <Chip key={r} label={r} selected={form.ballChangeReason.includes(r)} onToggle={()=>toggleMulti("ballChangeReason",r)}/>
+                    ))}
+                  </div>
+                </CollapsibleCard>
+              );
+            })()}
+
+            {/* Grit */}
+            <CollapsibleCard
+              title="Grit"
+              summary={form.surface||""}
+              expanded={editingId?true:expandedSections.grit}
+              onToggle={()=>toggleSection("grit")}>
+              <div style={S.chips}>
+                {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
+              </div>
+            </CollapsibleCard>
+
             {/* Shot Context */}
             <div style={S.card}>
               <div style={S.label}>
@@ -2223,23 +2292,6 @@ export default function BowlingTracker(){
               {editingId&&(
                 <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
               )}
-            </div>
-
-            {/* Equipment */}
-            <div style={S.card}>
-              <div style={S.label}>Ball</div>
-              <div style={S.chips}>
-                {(arsenals[form.bowler]||[]).map(b=><Chip key={b} label={b} selected={form.ball===b} onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>)}
-              </div>
-              {(arsenals[form.bowler]||[]).length===0&&(
-                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-                  {form.bowler?`No balls in ${form.bowler}'s arsenal yet — add some above.`:"Select a bowler to see their arsenal."}
-                </div>
-              )}
-              <div style={S.label}>Surface (grit)</div>
-              <div style={S.chips}>
-                {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
-              </div>
             </div>
 
             {/* Line */}
@@ -2363,19 +2415,6 @@ export default function BowlingTracker(){
               </div>
             </CollapsibleCard>
 
-            {/* Ball Change */}
-            <CollapsibleCard
-              title="Ball Change Reason"
-              summary={form.ballChangeReason.length?`${form.ballChangeReason.length} selected`:""}
-              expanded={editingId?true:expandedSections.ballChange}
-              onToggle={()=>toggleSection("ballChange")}>
-              <div style={S.chips}>
-                {BALL_CHANGE_REASONS.map(r=>(
-                  <Chip key={r} label={r} selected={form.ballChangeReason.includes(r)} onToggle={()=>toggleMulti("ballChangeReason",r)}/>
-                ))}
-              </div>
-            </CollapsibleCard>
-
             {/* Notes */}
             <CollapsibleCard
               title="Notes"
@@ -2385,6 +2424,7 @@ export default function BowlingTracker(){
               <textarea style={{...S.input,minHeight:"60px",resize:"vertical"}}
                 placeholder="Optional notes..." value={form.notes} onChange={e=>set("notes",e.target.value)}/>
             </CollapsibleCard>
+
 
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}
