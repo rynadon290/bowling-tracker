@@ -2627,7 +2627,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const recordsBowler=statsBowler||(bowlers.length<=1?(bowlers[0]||""):"");
+                  const recordsBowler=statsBowler||(!statsLeague&&bowlers.length<=1?(bowlers[0]||""):"");
                   if(!recordsBowler&&!statsLeague&&bowlers.length>1){
                     return(
                       <div style={S.card}>
