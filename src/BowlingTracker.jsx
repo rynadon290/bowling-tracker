@@ -279,124 +279,30 @@ export default function BowlingTracker(){
   // in history — one untagged, one correctly tagged ballNum:1 — for the same
   // physical shot. This normalizes them and keeps only the most recent copy
   // per slot, so old corrupted data cleans itself up automatically on load.
+  // Dedup safety net: if a slot somehow ends up with more than one shot
+  // record (a sync race, a retry that landed twice), keep only the most
+  // recently-saved one so a duplicate never double-counts anywhere.
   function migrateShots(rawShots){
-    const normalized=rawShots.map(s=>
-      (parseInt(s.frame)===10&&!s.ballNum)?{...s,ballNum:1}:s
-    );
     const lastIndexForKey=new Map();
-    normalized.forEach((s,idx)=>{
+    rawShots.forEach((s,idx)=>{
       const key=`${s.bowler}|${s.league}|${s.date}|${s.game}|${s.frame}|${s.ballNum||""}`;
-      lastIndexForKey.set(key,idx); // later entries overwrite earlier ones for the same slot
+      lastIndexForKey.set(key,idx);
     });
-    return normalized.filter((s,idx)=>{
+    return rawShots.filter((s,idx)=>{
       const key=`${s.bowler}|${s.league}|${s.date}|${s.game}|${s.frame}|${s.ballNum||""}`;
       return lastIndexForKey.get(key)===idx;
     });
   }
 
-  function migrateShotTeams(rawShots,currentTeams){
-    if(!currentTeams.length)return rawShots;
-
-    let changed=false;
-    const updated=rawShots.map(s=>{
-      if(s.teamId||!s.bowler||!s.league)return s;
-
-      const team=currentTeams.find(
-        t=>t.league===s.league&&t.members.includes(s.bowler)
-      );
-
-      if(!team)return s;
-
-      changed=true;
-      return {...s,teamId:team.id};
-    });
-
-    return changed?updated:rawShots;
-    }
-
-  // Backfills teamId onto existing match records the same way
-  // migrateShotTeams does for shots — old records only have `league`, and
-  // for a single-team-per-league setup this resolves unambiguously to that
-  // league's one team. If a league ever gets a second team, only NEW match
-  // records (logged after that point) key correctly by teamId; existing
-  // records stay attached to whichever team they migrate to here (the first
-  // team found for that league) since there's no way to know in hindsight
-  // which team an old league-only record actually belonged to.
-  function migrateMatchTeams(rawMatches,currentTeams){
-    if(!currentTeams.length)return rawMatches;
-
-    let changed=false;
-    const updated=rawMatches.map(m=>{
-      if(m.teamId||!m.league)return m;
-
-      const team=currentTeams.find(t=>t.league===m.league);
-      if(!team)return m;
-
-      changed=true;
-      return {...m,teamId:team.id};
-    });
-
-    return changed?updated:rawMatches;
-  }
-  
-  // Retroactively fixes sessions with stale/missing derived stats:
-  // (a) tenPinLeaves/singlePin* fields that didn't exist yet when the session
-  //     was saved (only counted Weak 10/Ringing 10, missing Other-Leave-10),
-  // (b) splits/splitsConverted, which need recomputing unconditionally since
-  //     the split-detection RULE itself changed — an old count isn't just
-  //     missing, it's wrong under the current definition, and
-  // (c) shotCount, whose DEFINITION changed from "frames only" to "every
-  //     shot delivered" — old sessions' stored shotCount undercounted
-  //     relative to 'strikes' (which always counted every strike, bonus
-  //     balls included), producing an inflated strike % in Session History.
-  // Recomputes from the still-available underlying shots for that exact
-  // bowler+league+date. Only touches a session when matching shots are
-  // actually found, so it never overwrites a real count with a false zero.
-  function migrateSessions(rawSessions,allShots){
-    // Dedup first: if duplicate sessions exist for the same bowler+league+date
-    // (possible before the double-save guard existed), keep only the most
-    // recently-saved one so old duplicates don't double-count anywhere.
+  // Dedup safety net for sessions, same reasoning as migrateShots.
+  function migrateSessions(rawSessions){
     const lastIndexForSessionKey=new Map();
     rawSessions.forEach((s,idx)=>{
       lastIndexForSessionKey.set(`${s.bowler}|${s.league}|${s.date}`,idx);
     });
-    const deduped=rawSessions.filter((s,idx)=>
+    return rawSessions.filter((s,idx)=>
       lastIndexForSessionKey.get(`${s.bowler}|${s.league}|${s.date}`)===idx
     );
-    if(!allShots.length)return deduped;
-    return deduped.map(s=>{
-      const ss=allShots.filter(sh=>sh.bowler===s.bowler&&sh.league===s.league&&sh.date===s.date);
-      if(!ss.length)return s; // no matching shots found; leave whatever was already stored untouched
-      return{
-        ...s,
-        teamId:s.teamId||ss[0]?.teamId||"",
-        shotCount:ss.length,
-        strikes:ss.filter(sh=>sh.result==="Strike").length,
-        tenPinLeaves:ss.filter(isTenPinLeave).length,
-        singlePinLeaves:ss.filter(isSinglePinLeave).length,
-        singlePinSpares:ss.filter(sh=>isSinglePinLeave(sh)&&sh.spareMade==="Yes").length,
-        splits:ss.filter(isSplit).length,
-        splitsConverted:ss.filter(sh=>isSplit(sh)&&sh.spareMade==="Yes").length,
-        spareAttempts:ss.filter(sh=>sh.result!=="Strike"&&sh.spareMade!==""&&!isSplit(sh)).length,
-        sparesMade:ss.filter(sh=>sh.spareMade==="Yes"&&!isSplit(sh)).length,
-      };
-    });
-  }
-
-  const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  // Legacy local records predate this data type having a real UUID id at
-  // all (matches used Date.now(), lane patterns had no id field
-  // whatsoever) — Supabase's uuid columns will reject both. Backfills a
-  // fresh crypto.randomUUID() for anything that isn't already a valid one,
-  // leaving everything else untouched.
-  function ensureValidUuids(records){
-    let changed=false;
-    const updated=records.map(r=>{
-      if(typeof r.id==="string"&&UUID_PATTERN.test(r.id))return r;
-      changed=true;
-      return{...r,id:crypto.randomUUID()};
-    });
-    return changed?updated:records;
   }
 
   useEffect(()=>{
@@ -438,28 +344,50 @@ export default function BowlingTracker(){
           const pendingIds=new Set(pendingSessions.map(p=>p.id));
           const cloudSessions=sessionsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>sessionFromSupabaseRow(row,leagueNameById));
           const pendingSessionObjs=pendingSessions.map(row=>sessionFromSupabaseRow(row,leagueNameById));
-          const migratedSessions=migrateSessions([...cloudSessions,...pendingSessionObjs],migratedShots);
+          const migratedSessions=migrateSessions([...cloudSessions,...pendingSessionObjs]);
           setSessions(migratedSessions);
           try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
         }else{
           const s=await window.storage.get(SESSIONS_KEY);
           if(s){
             const loadedSessions=JSON.parse(s.value);
-            const migratedSessions=migrateSessions(loadedSessions,migratedShots);
+            const migratedSessions=migrateSessions(loadedSessions);
             setSessions(migratedSessions);
             if(JSON.stringify(migratedSessions)!==JSON.stringify(loadedSessions)){
               try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
             }
           }
         }
-        const b=await window.storage.get(BOWLERS_KEY);
-        if(b){
-          const list=JSON.parse(b.value);
-          setBowlers(list);
-          if(list.length)setActiveBowler(list[0]);
+        const bowlersRes=await cloudRead("bowler_names",q=>q.select("name"));
+        if(bowlersRes.online&&bowlersRes.data){
+          const pendingBowlers=await getQueuedRecordsForTable("bowler_names");
+          const names=[...new Set([...bowlersRes.data.map(r=>r.name),...pendingBowlers.map(r=>r.name)])];
+          setBowlers(names);
+          if(names.length)setActiveBowler(names[0]);
+          try{await window.storage.set(BOWLERS_KEY,JSON.stringify(names));}catch{}
+        }else{
+          const b=await window.storage.get(BOWLERS_KEY);
+          if(b){
+            const list=JSON.parse(b.value);
+            setBowlers(list);
+            if(list.length)setActiveBowler(list[0]);
+          }
         }
-        const a=await window.storage.get(ARSENALS_KEY);
-        if(a)setArsenals(JSON.parse(a.value));
+
+        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball"));
+        if(arsenalsRes.online&&arsenalsRes.data){
+          const pendingArsenalRows=await getQueuedRecordsForTable("arsenals");
+          const rebuilt={};
+          [...arsenalsRes.data,...pendingArsenalRows].forEach(row=>{
+            if(!rebuilt[row.bowler_name])rebuilt[row.bowler_name]=[];
+            if(!rebuilt[row.bowler_name].includes(row.ball))rebuilt[row.bowler_name].push(row.ball);
+          });
+          setArsenals(rebuilt);
+          try{await window.storage.set(ARSENALS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const a=await window.storage.get(ARSENALS_KEY);
+          if(a)setArsenals(JSON.parse(a.value));
+        }
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
         if(matchesRes.online&&matchesRes.data){
@@ -472,7 +400,7 @@ export default function BowlingTracker(){
           try{await window.storage.set(MATCHES_KEY,JSON.stringify(mergedMatches));}catch{}
         }else{
           const m=await window.storage.get(MATCHES_KEY);
-          if(m)setMatches(ensureValidUuids(JSON.parse(m.value)));
+          if(m)setMatches(JSON.parse(m.value));
         }
 
         const lanePatternsRes=await cloudRead("lane_patterns",q=>q.select("*"));
@@ -486,7 +414,7 @@ export default function BowlingTracker(){
           try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(mergedPatterns));}catch{}
         }else{
           const lp=await window.storage.get(LANE_PATTERNS_KEY);
-          if(lp)setLanePatterns(ensureValidUuids(JSON.parse(lp.value)));
+          if(lp)setLanePatterns(JSON.parse(lp.value));
         }
         const bl=await window.storage.get("bowling-ball-lane-lines-v1");
         if(bl)setBallLaneLines(JSON.parse(bl.value));
@@ -524,30 +452,6 @@ export default function BowlingTracker(){
     loadLeagues();
   },[]);
 
-    useEffect(()=>{
-    if(!teams.length||!shots.length)return;
-
-    const migrated=migrateShotTeams(shots,teams);
-    if(migrated===shots)return;
-
-    setShots(migrated);
-    try{
-      window.storage.set(STORAGE_KEY,JSON.stringify(migrated));
-    }catch{}
-  },[teams,shots]);
-
-  useEffect(()=>{
-    if(!teams.length||!matches.length)return;
-
-    const migrated=migrateMatchTeams(matches,teams);
-    if(migrated===matches)return;
-
-    setMatches(migrated);
-    try{
-      window.storage.set(MATCHES_KEY,JSON.stringify(migrated));
-    }catch{}
-  },[teams,matches]);
-
   // Live count of writes sitting in the offline queue, not yet confirmed
   // synced to Supabase. Surfaced in the header so "is my data actually
   // reaching the cloud" has a direct, always-visible answer instead of
@@ -571,8 +475,44 @@ export default function BowlingTracker(){
     setShowSyncDetail(false);
   }
 
-    async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
-  async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
+    async function saveBowlers(u){
+      const prevSet=new Set(bowlers);
+      const nextSet=new Set(u);
+      setBowlers(u);
+      try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}
+
+      for(const name of prevSet){
+        if(!nextSet.has(name))cloudDelete("bowler_names",{name});
+      }
+      for(const name of nextSet){
+        if(!prevSet.has(name))cloudWrite("bowler_names",{id:crypto.randomUUID(),name,created_by:user?.id||null});
+      }
+    }
+
+    // Arsenals are a nested {bowlerName: [balls]} object locally, but a flat
+    // set of (bowler_name, ball) rows in Supabase — diffed as composite
+    // pairs (via JSON.stringify, safe against any separator-collision risk
+    // a plain string key could have) rather than by a single id.
+    async function saveArsenals(u){
+      const prevPairs=new Map();
+      Object.entries(arsenals).forEach(([bowler,balls])=>{
+        balls.forEach(ball=>prevPairs.set(JSON.stringify([bowler,ball]),{bowler,ball}));
+      });
+      const nextPairs=new Map();
+      Object.entries(u).forEach(([bowler,balls])=>{
+        balls.forEach(ball=>nextPairs.set(JSON.stringify([bowler,ball]),{bowler,ball}));
+      });
+
+      setArsenals(u);
+      try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}
+
+      for(const[key,{bowler,ball}]of prevPairs){
+        if(!nextPairs.has(key))cloudDelete("arsenals",{bowler_name:bowler,ball});
+      }
+      for(const[key,{bowler,ball}]of nextPairs){
+        if(!prevPairs.has(key))cloudWrite("arsenals",{id:crypto.randomUUID(),bowler_name:bowler,ball,created_by:user?.id||null});
+      }
+    }
   async function saveLanePatterns(u){
     const prevById=new Map(lanePatterns.map(p=>[p.id,p]));
     const nextById=new Map(u.map(p=>[p.id,p]));
@@ -1237,7 +1177,7 @@ export default function BowlingTracker(){
     const importedLeagues=[...new Set(discoveredLeagues.map(String).map(s=>s.trim()).filter(Boolean))];
     const migratedShots=migrateShots(newShots);
     await saveShots(migratedShots);
-    await saveSessions(migrateSessions(newSessions,migratedShots));
+    await saveSessions(migrateSessions(newSessions));
     await saveBowlers(newBowlers);
     await saveArsenals(newArsenals);
     await saveMatches(newMatches);
