@@ -76,16 +76,20 @@ export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
   }
 }
 
-export async function cloudDelete(table, id, { timeoutMs = 6000 } = {}) {
+// `match` is either a plain id (for tables with a single `id` primary key)
+// or an object of column:value pairs to match on — needed for tables like
+// team_members, which use a composite primary key (team_id, user_id) with
+// no single `id` column at all.
+export async function cloudDelete(table, match, { timeoutMs = 6000 } = {}) {
+  const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
   try {
-    const { error } = await withTimeout(
-      supabase.from(table).delete().eq('id', id),
-      timeoutMs
-    );
+    let query = supabase.from(table).delete();
+    Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
+    const { error } = await withTimeout(query, timeoutMs);
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'delete', { id });
+    await queueWrite(table, 'delete', matchObj);
     return { synced: false, queued: true, reason: err.message };
   }
 }
@@ -125,9 +129,14 @@ export async function flushPendingQueue() {
 
   for (const item of all) {
     try {
-      const { error } = item.operation === 'delete'
-        ? await supabase.from(item.table).delete().eq('id', item.payload.id)
-        : await supabase.from(item.table).upsert(item.payload);
+      let error;
+      if (item.operation === 'delete') {
+        let query = supabase.from(item.table).delete();
+        Object.entries(item.payload).forEach(([k, v]) => { query = query.eq(k, v); });
+        ({ error } = await query);
+      } else {
+        ({ error } = await supabase.from(item.table).upsert(item.payload));
+      }
       if (error) throw error;
       await db.delete(STORE_NAME, item.queueId);
     } catch {

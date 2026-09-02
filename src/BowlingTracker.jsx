@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import TeamManagement from "./TeamManagement.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, getQueuedRecordsForTable } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable } from "./syncQueue.js";
 
 // Browser persistence adapter. The original app used the ChatGPT host
 // storage API; GitHub Pages needs a browser-native equivalent.
@@ -286,11 +286,131 @@ function tenthBall3Pins(f10b1,f10b2,f10b3){
 // ── Empty shot factory ────────────────────────────────────────────────────────
 function emptyShot(){
   return{
-    id:Date.now(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
+    id:crypto.randomUUID(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
     lane:"",game:"1",frame:"1",ballNum:null,
     ball:"",surface:"",startingBoard:"",targetArrows:"",
     result:"",otherLeave:[],spareMade:"",strikeDescription:"",
     release:"",miss:[],ballChangeReason:[],pinCount:"",notes:"",
+  };
+}
+
+// Maps a client shot object to a Supabase `shots` row. league_id is
+// resolved from the shot's league NAME via leagueIdsMap (name -> id) — the
+// client keeps working with league names everywhere else, this is the one
+// place that needs the real id.
+function shotToSupabaseRow(shot,userId,leagueIdsMap){
+  return{
+    id:shot.id,
+    user_id:userId,
+    team_id:shot.teamId||null,
+    league_id:leagueIdsMap[shot.league]||null,
+    bowler_name:shot.bowler||"",
+    date:shot.date,
+    game:parseInt(shot.game)||1,
+    frame:parseInt(shot.frame)||1,
+    ball_num:shot.ballNum??null,
+    lane:shot.lane||"",
+    ball:shot.ball||"",
+    surface:shot.surface||"",
+    starting_board:shot.startingBoard||"",
+    target_arrows:shot.targetArrows||"",
+    result:shot.result||"",
+    other_leave:shot.otherLeave||[],
+    spare_made:shot.spareMade||"",
+    strike_description:shot.strikeDescription||"",
+    release:shot.release||"",
+    miss:shot.miss||[],
+    ball_change_reason:shot.ballChangeReason||[],
+    pin_count:shot.pinCount!=null?String(shot.pinCount):"",
+    notes:shot.notes||"",
+    display_result:shot._displayResult||shot.result||"",
+    display_leave:shot._displayLeave||shot.otherLeave||[],
+  };
+}
+
+// The inverse: a Supabase row back to the client's shot shape. leagueNameById
+// is id -> name, the reverse of leagueIdsMap above.
+function shotFromSupabaseRow(row,leagueNameById){
+  return{
+    id:row.id,
+    bowler:row.bowler_name||"",
+    teamId:row.team_id||"",
+    league:leagueNameById[row.league_id]||"",
+    date:row.date,
+    game:String(row.game),
+    frame:String(row.frame),
+    ballNum:row.ball_num,
+    lane:row.lane||"",
+    ball:row.ball||"",
+    surface:row.surface||"",
+    startingBoard:row.starting_board||"",
+    targetArrows:row.target_arrows||"",
+    result:row.result||"",
+    otherLeave:row.other_leave||[],
+    spareMade:row.spare_made||"",
+    strikeDescription:row.strike_description||"",
+    release:row.release||"",
+    miss:row.miss||[],
+    ballChangeReason:row.ball_change_reason||[],
+    pinCount:row.pin_count||"",
+    notes:row.notes||"",
+    _displayResult:row.display_result||row.result||"",
+    _displayLeave:row.display_leave||row.other_leave||[],
+  };
+}
+
+function sessionToSupabaseRow(session,userId,leagueIdsMap){
+  return{
+    id:session.id,
+    user_id:userId,
+    team_id:session.teamId||null,
+    league_id:leagueIdsMap[session.league]||null,
+    bowler_name:session.bowler||"",
+    date:session.date,
+    scores:session.scores||[],
+    total:session.total??null,
+    average:session.average??null,
+    shot_count:session.shotCount||0,
+    strikes:session.strikes||0,
+    weak_tens:session.weakTens||0,
+    ringing_tens:session.ringingTens||0,
+    ten_pin_leaves:session.tenPinLeaves||0,
+    single_pin_leaves:session.singlePinLeaves||0,
+    single_pin_spares:session.singlePinSpares||0,
+    spare_attempts:session.spareAttempts||0,
+    spares_made:session.sparesMade||0,
+    splits:session.splits||0,
+    splits_converted:session.splitsConverted||0,
+    balls_used:session.ballsUsed||[],
+    misses:session.misses||[],
+    releases:session.releases||[],
+  };
+}
+
+function sessionFromSupabaseRow(row,leagueNameById){
+  return{
+    id:row.id,
+    bowler:row.bowler_name||"",
+    teamId:row.team_id||"",
+    league:leagueNameById[row.league_id]||"",
+    date:row.date,
+    scores:row.scores||[],
+    total:row.total,
+    average:row.average,
+    shotCount:row.shot_count||0,
+    strikes:row.strikes||0,
+    weakTens:row.weak_tens||0,
+    ringingTens:row.ringing_tens||0,
+    tenPinLeaves:row.ten_pin_leaves||0,
+    singlePinLeaves:row.single_pin_leaves||0,
+    singlePinSpares:row.single_pin_spares||0,
+    spareAttempts:row.spare_attempts||0,
+    sparesMade:row.spares_made||0,
+    splits:row.splits||0,
+    splitsConverted:row.splits_converted||0,
+    ballsUsed:row.balls_used||[],
+    misses:row.misses||[],
+    releases:row.releases||[],
   };
 }
 
@@ -520,22 +640,53 @@ export default function BowlingTracker(){
     async function load(){
       try{
         let migratedShots=[];
-        const r=await window.storage.get(STORAGE_KEY);
-        if(r){
-          const loaded=JSON.parse(r.value);
-          migratedShots=migrateShots(loaded);
+        // Shots: cloud-first, local storage as the offline fallback/cache.
+        // Fetches its own small league id<->name map rather than relying on
+        // the separate leagues-loading effect's timing, since effects don't
+        // guarantee ordering relative to each other.
+        const leaguesForShots=await cloudRead("leagues",q=>q.select("id,name"));
+        const leagueNameById={};
+        if(leaguesForShots.online&&leaguesForShots.data){
+          leaguesForShots.data.forEach(l=>{leagueNameById[l.id]=l.name;});
+        }
+        const shotsRes=await cloudRead("shots",q=>q.select("*"));
+        if(shotsRes.online&&shotsRes.data){
+          const pending=await getQueuedRecordsForTable("shots");
+          const pendingIds=new Set(pending.map(p=>p.id));
+          const cloudShots=shotsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>shotFromSupabaseRow(row,leagueNameById));
+          const pendingShots=pending.map(row=>shotFromSupabaseRow(row,leagueNameById));
+          migratedShots=migrateShots([...cloudShots,...pendingShots]);
           setShots(migratedShots);
-          if(JSON.stringify(migratedShots)!==JSON.stringify(loaded)){
-            try{await window.storage.set(STORAGE_KEY,JSON.stringify(migratedShots));}catch{}
+          try{await window.storage.set(STORAGE_KEY,JSON.stringify(migratedShots));}catch{}
+        }else{
+          const r=await window.storage.get(STORAGE_KEY);
+          if(r){
+            const loaded=JSON.parse(r.value);
+            migratedShots=migrateShots(loaded);
+            setShots(migratedShots);
+            if(JSON.stringify(migratedShots)!==JSON.stringify(loaded)){
+              try{await window.storage.set(STORAGE_KEY,JSON.stringify(migratedShots));}catch{}
+            }
           }
         }
-        const s=await window.storage.get(SESSIONS_KEY);
-        if(s){
-          const loadedSessions=JSON.parse(s.value);
-          const migratedSessions=migrateSessions(loadedSessions,migratedShots);
+        const sessionsRes=await cloudRead("sessions",q=>q.select("*"));
+        if(sessionsRes.online&&sessionsRes.data){
+          const pendingSessions=await getQueuedRecordsForTable("sessions");
+          const pendingIds=new Set(pendingSessions.map(p=>p.id));
+          const cloudSessions=sessionsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>sessionFromSupabaseRow(row,leagueNameById));
+          const pendingSessionObjs=pendingSessions.map(row=>sessionFromSupabaseRow(row,leagueNameById));
+          const migratedSessions=migrateSessions([...cloudSessions,...pendingSessionObjs],migratedShots);
           setSessions(migratedSessions);
-          if(JSON.stringify(migratedSessions)!==JSON.stringify(loadedSessions)){
-            try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
+          try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
+        }else{
+          const s=await window.storage.get(SESSIONS_KEY);
+          if(s){
+            const loadedSessions=JSON.parse(s.value);
+            const migratedSessions=migrateSessions(loadedSessions,migratedShots);
+            setSessions(migratedSessions);
+            if(JSON.stringify(migratedSessions)!==JSON.stringify(loadedSessions)){
+              try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
+            }
           }
         }
         const b=await window.storage.get(BOWLERS_KEY);
@@ -795,8 +946,42 @@ export default function BowlingTracker(){
     setForm(f=>({...f,...resetFields,bowler:name}));
   }
 
-  async function saveShots(u){setShots(u);try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}}
-  async function saveSessions(u){setSessions(u);try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}}
+  // Every existing call site passes the WHOLE new shots array (unchanged
+  // from before this migration) — this diffs it against current state so
+  // only what actually changed gets pushed to Supabase, rather than
+  // rewriting every shot on every save.
+  async function saveShots(u){
+    const prevById=new Map(shots.map(s=>[s.id,s]));
+    const nextById=new Map(u.map(s=>[s.id,s]));
+    setShots(u);
+    try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}
+
+    for(const id of prevById.keys()){
+      if(!nextById.has(id))cloudDelete("shots",id);
+    }
+    for(const[id,shot]of nextById){
+      const prev=prevById.get(id);
+      if(!prev||JSON.stringify(prev)!==JSON.stringify(shot)){
+        cloudWrite("shots",shotToSupabaseRow(shot,user?.id,leagueIdsRef.current));
+      }
+    }
+  }
+  async function saveSessions(u){
+    const prevById=new Map(sessions.map(s=>[s.id,s]));
+    const nextById=new Map(u.map(s=>[s.id,s]));
+    setSessions(u);
+    try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}
+
+    for(const id of prevById.keys()){
+      if(!nextById.has(id))cloudDelete("sessions",id);
+    }
+    for(const[id,session]of nextById){
+      const prev=prevById.get(id);
+      if(!prev||JSON.stringify(prev)!==JSON.stringify(session)){
+        cloudWrite("sessions",sessionToSupabaseRow(session,user?.id,leagueIdsRef.current));
+      }
+    }
+  }
   async function saveMatches(u){setMatches(u);try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}}
 
   // Matches are keyed by teamId (not league) so two teams in the same
@@ -1097,7 +1282,7 @@ export default function BowlingTracker(){
       const existingSlot=shots.find(slotMatch);
       const toSave={
         ...form,
-        id:existingSlot?existingSlot.id:Date.now(),
+        id:existingSlot?existingSlot.id:crypto.randomUUID(),
         result:effectiveResult,
         _displayResult:form.result,
         _displayLeave:[...(form.otherLeave||[])],
@@ -1361,7 +1546,7 @@ export default function BowlingTracker(){
     // night in every average, the leaderboard, and the season record.
     const existing=sessions.find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
     const session={
-      id:existing?existing.id:Date.now(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
+      id:existing?existing.id:crypto.randomUUID(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
       shotCount:ss.length, // every shot delivered, including 10th-frame bonus balls — matches how 'strikes' is counted
