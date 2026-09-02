@@ -259,10 +259,20 @@ export default function TeamManagement({
   // this component tracks richer per-member data (userId, lineup position)
   // that the parent doesn't need to know about.
   useEffect(() => {
-    const simplified = teams.map(t => ({
-      id: t.id, name: t.name, league: t.league,
-      members: t.members.map(m => m.displayName),
-    }));
+    const simplified = teams.map(t => {
+      // Placeholders merged in alongside real members, sorted together by
+      // lineup position — a placeholder's scores are tracked identically to
+      // a real member's (proxy-logged under their name), so anything that
+      // resolves "is this bowler on this team" (team_id lookups, match/shot
+      // cloud sync) needs to see them the same way, in the same actual
+      // bowling order. The only real difference is they don't have a
+      // linked account yet, which doesn't matter for local team membership.
+      const combined = [
+        ...t.members.map(m => ({ name: m.displayName, lineupPosition: m.lineupPosition ?? 0 })),
+        ...t.pendingInvites.map(inv => ({ name: inv.name, lineupPosition: inv.lineupPosition ?? 999 })),
+      ].sort((a, b) => a.lineupPosition - b.lineupPosition);
+      return { id: t.id, name: t.name, league: t.league, members: combined.map(x => x.name) };
+    });
     onTeamsChange?.(simplified);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams]);
