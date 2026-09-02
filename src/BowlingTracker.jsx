@@ -388,7 +388,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -436,6 +436,31 @@ export default function BowlingTracker(){
 
     return changed?updated:rawShots;
     }
+
+  // Backfills teamId onto existing match records the same way
+  // migrateShotTeams does for shots — old records only have `league`, and
+  // for a single-team-per-league setup this resolves unambiguously to that
+  // league's one team. If a league ever gets a second team, only NEW match
+  // records (logged after that point) key correctly by teamId; existing
+  // records stay attached to whichever team they migrate to here (the first
+  // team found for that league) since there's no way to know in hindsight
+  // which team an old league-only record actually belonged to.
+  function migrateMatchTeams(rawMatches,currentTeams){
+    if(!currentTeams.length)return rawMatches;
+
+    let changed=false;
+    const updated=rawMatches.map(m=>{
+      if(m.teamId||!m.league)return m;
+
+      const team=currentTeams.find(t=>t.league===m.league);
+      if(!team)return m;
+
+      changed=true;
+      return {...m,teamId:team.id};
+    });
+
+    return changed?updated:rawMatches;
+  }
   
   // Retroactively fixes sessions with stale/missing derived stats:
   // (a) tenPinLeaves/singlePin* fields that didn't exist yet when the session
@@ -540,6 +565,18 @@ export default function BowlingTracker(){
       window.storage.set(STORAGE_KEY,JSON.stringify(migrated));
     }catch{}
   },[teams,shots]);
+
+  useEffect(()=>{
+    if(!teams.length||!matches.length)return;
+
+    const migrated=migrateMatchTeams(matches,teams);
+    if(migrated===matches)return;
+
+    setMatches(migrated);
+    try{
+      window.storage.set(MATCHES_KEY,JSON.stringify(migrated));
+    }catch{}
+  },[teams,matches]);
   
   async function saveBowlers(u){setBowlers(u);try{await window.storage.set(BOWLERS_KEY,JSON.stringify(u));}catch{}}
   async function saveArsenals(u){setArsenals(u);try{await window.storage.set(ARSENALS_KEY,JSON.stringify(u));}catch{}}
@@ -646,6 +683,16 @@ export default function BowlingTracker(){
     setActiveBowler(name);
     setShowSummary(false);
 
+    // Everything about the shot itself — equipment, execution, and what
+    // happened on the delivery — is specific to whoever's actually at the
+    // line right now. None of it should follow from one bowler to another,
+    // or linger from this same bowler's last completed shot.
+    const resetFields={
+      ball:"",surface:"",startingBoard:"",targetArrows:"",
+      result:"",otherLeave:[],spareMade:"",strikeDescription:"",
+      release:"",miss:[],ballChangeReason:[],pinCount:"",notes:"",
+    };
+
     // Resume this bowler at their own next unplayed frame for tonight's
     // league/date, instead of leaving them wherever the previous bowler was.
     if(sessionLeague){
@@ -658,24 +705,27 @@ export default function BowlingTracker(){
         }).pop();
         const allBShots=shots.filter(s=>s.bowler===name&&s.league===sessionLeague&&s.date===sessionDate);
         const{game:ng,frame:nf,ballNum:nb}=nextState(allBShots,name,last.game,last.frame,last.ballNum);
-        const line=nb===null?autoFillLineFor(name,form.ball,ng,nf):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-        setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+        setForm(f=>({...f,...resetFields,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:ng,frame:nf,ballNum:nb}));
         return;
       }
       // No shots yet for this bowler tonight — start fresh at Game 1 Frame 1
-      const line=autoFillLineFor(name,form.ball,"1","1");
-      setForm(f=>({...f,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+      setForm(f=>({...f,...resetFields,bowler:name,teamId,league:sessionLeague,date:sessionDate,game:"1",frame:"1",ballNum:null}));
       return;
     }
-    set("bowler",name);
+    setForm(f=>({...f,...resetFields,bowler:name}));
   }
 
   async function saveShots(u){setShots(u);try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}}
   async function saveSessions(u){setSessions(u);try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}}
   async function saveMatches(u){setMatches(u);try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}}
 
-  function getMatch(league,date){
-    return matches.find(m=>m.league===league&&m.date===date);
+  // Matches are keyed by teamId (not league) so two teams in the same
+  // league on the same date don't collide into one shared record. league is
+  // still carried on each record for the stats-reading side (seasonRecord,
+  // weeklyPointsData, handicapMatches), which filter by league and don't
+  // need to change.
+  function getMatch(teamId,date){
+    return matches.find(m=>m.teamId===teamId&&m.date===date);
   }
 
   // Lane condition (oil pattern) for a specific lane on a specific night —
@@ -695,8 +745,8 @@ export default function BowlingTracker(){
   // Cycles a result through Not Marked → Won → Lost → Not Marked
   function nextResult(cur){ return cur===null?true:cur===true?false:null; }
 
-  async function cycleGameResult(league,date,gameIdx){
-    const existing=getMatch(league,date);
+  async function cycleGameResult(teamId,league,date,gameIdx){
+    const existing=getMatch(teamId,date);
     if(existing){
       const games=[...existing.games];
       games[gameIdx]=nextResult(games[gameIdx]??null);
@@ -704,36 +754,36 @@ export default function BowlingTracker(){
     } else {
       const games=[null,null,null];
       games[gameIdx]=true;
-      await saveMatches([...matches,{id:Date.now(),league,date,games,series:null,opponent:"",handicap:""}]);
+      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games,series:null,opponent:"",handicap:""}]);
     }
   }
 
-  async function cycleSeriesResult(league,date){
-    const existing=getMatch(league,date);
+  async function cycleSeriesResult(teamId,league,date){
+    const existing=getMatch(teamId,date);
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,series:nextResult(existing.series??null)}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),league,date,games:[null,null,null],series:true,opponent:"",handicap:""}]);
+      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:true,opponent:"",handicap:""}]);
     }
   }
 
-  async function setMatchOpponent(league,date,opponent){
-    const existing=getMatch(league,date);
+  async function setMatchOpponent(teamId,league,date,opponent){
+    const existing=getMatch(teamId,date);
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,opponent}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),league,date,games:[null,null,null],series:null,opponent,handicap:""}]);
+      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:null,opponent,handicap:""}]);
     }
   }
 
   // Handicap: one value per match (same for all 3 games), typically 80% of
   // the gap between the two teams' averages.
-  async function setMatchHandicap(league,date,value){
-    const existing=getMatch(league,date);
+  async function setMatchHandicap(teamId,league,date,value){
+    const existing=getMatch(teamId,date);
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,handicap:value}:m));
     } else {
-      await saveMatches([...matches,{id:Date.now(),league,date,games:[null,null,null],series:null,opponent:"",handicap:value}]);
+      await saveMatches([...matches,{id:Date.now(),teamId,league,date,games:[null,null,null],series:null,opponent:"",handicap:value}]);
     }
   }
 
@@ -1848,8 +1898,11 @@ export default function BowlingTracker(){
 
             {/* Arsenal card */}
             {!editingId&&activeBowler&&(
-              <div style={S.card}>
-                <div style={S.label}>{activeBowler}'s Arsenal</div>
+              <CollapsibleCard
+                title={`${activeBowler}'s Arsenal`}
+                summary={`${(arsenals[activeBowler]||[]).length} ball${(arsenals[activeBowler]||[]).length===1?"":"s"}`}
+                expanded={expandedSections.arsenal}
+                onToggle={()=>toggleSection("arsenal")}>
                 <div style={S.chips}>
                   {(arsenals[activeBowler]||[]).map(b=>(
                     <Chip key={b} label={`${b}  ×`} selected onToggle={()=>removeBall(activeBowler,b)} color={C.accent}/>
@@ -1864,13 +1917,16 @@ export default function BowlingTracker(){
                 {(arsenals[activeBowler]||[]).length===0&&(
                   <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>Add {activeBowler}'s balls to start logging shots. Tap a ball above to remove it.</div>
                 )}
-              </div>
+              </CollapsibleCard>
             )}
 
             {/* Session card */}
             {!editingId&&activeBowler&&(
-              <div style={S.card}>
-                <div style={S.label}>Tonight's Session</div>
+              <CollapsibleCard
+                title="Tonight's Session"
+                summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${sessionDate}`:""}
+                expanded={expandedSections.tonightSession}
+                onToggle={()=>toggleSection("tonightSession")}>
                 <div style={S.chips}>
                   {leagues.map(l=>(
                     <Chip key={l} label={l.replace(" House Shot","")} selected={sessionLeague===l}
@@ -1881,6 +1937,30 @@ export default function BowlingTracker(){
                   <input style={S.input} type="date" value={sessionDate}
                     onChange={e=>{setSessionDate(e.target.value);set("date",e.target.value);setShowSummary(false);}}/>
                 </div>
+
+                {/* Opponent & handicap — moved here from Stats, since this is
+                    known before bowling starts and belongs with the rest of
+                    tonight's setup. Keyed by team when one resolves (so two
+                    teams sharing a league on the same night get separate
+                    records); falls back to the league name itself when the
+                    active bowler isn't yet set up as a team member, so this
+                    still works before Teams is fully configured. */}
+                {sessionLeague&&(()=>{
+                  const matchKey=form.teamId||sessionLeague;
+                  const m=getMatch(matchKey,sessionDate)||{opponent:"",handicap:""};
+                  const handicap=matchHandicap(m);
+                  return(
+                    <div style={{marginBottom:"12px"}}>
+                      <div style={S.label}>Opponent</div>
+                      <div style={S.row}>
+                        <input style={{...S.input,flex:2}} placeholder="Opponent (e.g. Team Name)"
+                          value={m.opponent||""} onChange={e=>setMatchOpponent(matchKey,sessionLeague,sessionDate,e.target.value)}/>
+                        <input style={{...S.input,flex:1,textAlign:"center"}} type="number" placeholder="Handicap"
+                          value={handicap} onChange={e=>setMatchHandicap(matchKey,sessionLeague,sessionDate,e.target.value)}/>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Starting lane */}
                 <div style={{marginBottom:"12px"}}>
@@ -1965,12 +2045,43 @@ export default function BowlingTracker(){
                         <div style={S.statLbl}>Total</div>
                       </div>
                     </div>
+
+                    {/* Points won — moved here from Stats' Log Match Results,
+                        since you naturally mark these as the night wraps up. */}
+                    {sessionLeague&&(()=>{
+                      const matchKey=form.teamId||sessionLeague;
+                      const m=getMatch(matchKey,sessionDate)||{games:[null,null,null],series:null};
+                      const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
+                      const pointsMarked=m.games.filter(v=>v!==null).length+(m.series!==null?1:0);
+                      const resultChip=(val,onTap,label)=>(
+                        <button key={label} onClick={onTap} style={{
+                          padding:"6px 10px",borderRadius:"8px",border:`1px solid ${val===true?C.strike:val===false?C.miss:C.border}`,
+                          backgroundColor:val===true?C.strike+"22":val===false?C.miss+"22":"transparent",
+                          color:val===true?C.strike:val===false?C.miss:C.textMuted,
+                          fontSize:"12px",fontWeight:600,cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                        }}>{label}{val===true?" ✓":val===false?" ✗":""}</button>
+                      );
+                      return(
+                        <div style={{marginBottom:"10px"}}>
+                          <div style={S.label}>Points Won</div>
+                          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>4 points per night — 1 per game, 1 for total pinfall. Tap to cycle: not marked → won → lost.</div>
+                          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"6px"}}>
+                            {[0,1,2].map(idx=>resultChip(m.games[idx]??null,()=>cycleGameResult(matchKey,sessionLeague,sessionDate,idx),`G${idx+1}`))}
+                            {resultChip(m.series??null,()=>cycleSeriesResult(matchKey,sessionLeague,sessionDate),"Pinfall")}
+                          </div>
+                          {pointsMarked>0&&(
+                            <div style={{fontSize:"12px",fontWeight:600,color:C.accent}}>{pointsWon} of 4 points</div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <button style={S.btn("primary")} onClick={submitSession}>
                       Save Session & View Summary
                     </button>
                   </>
                 )}
-              </div>
+              </CollapsibleCard>
             )}
 
             {/* Summary */}
@@ -2616,50 +2727,6 @@ export default function BowlingTracker(){
                     </div>
                   );
                 })()}
-
-                {!statsBowler&&sessionDateGroups(statsLeague).length>0&&(
-                  <div style={S.card}>
-                    <div style={S.label}>Log Match Results</div>
-                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                      4 points per night — 1 per game, 1 for total pinfall. Tap to cycle: not marked → won → lost.
-                    </div>
-                    {sessionDateGroups(statsLeague).map((g,i)=>{
-                      const m=getMatch(g.league,g.date)||{games:[null,null,null],series:null,opponent:"",handicap:""};
-                      const handicap=matchHandicap(m);
-                      const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
-                      const pointsMarked=m.games.filter(v=>v!==null).length+(m.series!==null?1:0);
-                      const resultChip=(val,onTap,label)=>(
-                        <button key={label} onClick={onTap} style={{
-                          padding:"6px 10px",borderRadius:"8px",border:`1px solid ${val===true?C.strike:val===false?C.miss:C.border}`,
-                          backgroundColor:val===true?C.strike+"22":val===false?C.miss+"22":"transparent",
-                          color:val===true?C.strike:val===false?C.miss:C.textMuted,
-                          fontSize:"12px",fontWeight:600,cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                        }}>{label}{val===true?" ✓":val===false?" ✗":""}</button>
-                      );
-                      return(
-                        <div key={i} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"10px",marginBottom:"10px"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
-                            <span style={{fontSize:"12px",fontWeight:600}}>{g.league.replace(" House Shot","")}</span>
-                            <span style={{fontSize:"11px",color:C.textMuted}}>{g.date}</span>
-                          </div>
-                          <div style={{display:"flex",gap:"6px",marginBottom:"8px"}}>
-                            <input style={{...S.input,flex:2}} placeholder="Opponent (e.g. Team Name)"
-                              value={m.opponent||""} onChange={e=>setMatchOpponent(g.league,g.date,e.target.value)}/>
-                            <input style={{...S.input,flex:1,textAlign:"center"}} type="number" placeholder="Handicap"
-                              value={handicap} onChange={e=>setMatchHandicap(g.league,g.date,e.target.value)}/>
-                          </div>
-                          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"6px"}}>
-                            {[0,1,2].map(idx=>resultChip(m.games[idx]??null,()=>cycleGameResult(g.league,g.date,idx),`G${idx+1}`))}
-                            {resultChip(m.series??null,()=>cycleSeriesResult(g.league,g.date),"Pinfall")}
-                          </div>
-                          {pointsMarked>0&&(
-                            <div style={{fontSize:"12px",fontWeight:600,color:C.accent}}>{pointsWon} of 4 points</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 {!statsBowler&&(()=>{
                   if(!statsLeague&&bowlers.length>1){
