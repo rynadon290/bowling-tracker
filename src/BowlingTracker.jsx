@@ -499,6 +499,50 @@ export function tenthFrameStatus(shots,bowler,league,date,game){
   return[2];
 }
 
+// Aggregates a night's worth of shots for one bowler into the derived stats
+// a session record stores. Takes exactly the shots that belong to that
+// night (already filtered by bowler+league+date) — deliberately doesn't do
+// that filtering itself, so it stays a pure function of "these shots" with
+// no dependency on how the caller found them.
+export function computeSessionStats(shotsForNight){
+  return{
+    shotCount:shotsForNight.length, // every shot delivered, including 10th-frame bonus balls
+    strikes:shotsForNight.filter(s=>s.result==="Strike").length,
+    weakTens:shotsForNight.filter(s=>s.result==="Weak 10").length,
+    ringingTens:shotsForNight.filter(s=>s.result==="Ringing 10").length,
+    tenPinLeaves:shotsForNight.filter(isTenPinLeave).length,
+    singlePinLeaves:shotsForNight.filter(isSinglePinLeave).length,
+    singlePinSpares:shotsForNight.filter(s=>isSinglePinLeave(s)&&s.spareMade==="Yes").length,
+    spareAttempts:shotsForNight.filter(s=>s.result!=="Strike"&&s.spareMade!==""&&!isSplit(s)).length,
+    sparesMade:shotsForNight.filter(s=>s.spareMade==="Yes"&&!isSplit(s)).length,
+    splits:shotsForNight.filter(isSplit).length,
+    splitsConverted:shotsForNight.filter(s=>isSplit(s)&&s.spareMade==="Yes").length,
+    ballsUsed:[...new Set(shotsForNight.map(s=>s.ball).filter(Boolean))],
+    misses:shotsForNight.flatMap(s=>Array.isArray(s.miss)?s.miss:s.miss?[s.miss]:[]),
+    releases:shotsForNight.filter(s=>s.release).map(s=>s.release),
+  };
+}
+
+// A "slot" is uniquely identified by bowler+league+date+game+frame+ballNum.
+// Finding an existing match before saving is what prevents a duplicate shot
+// from corrupting frame lookups in strictPartial, which expects exactly one
+// shot per slot.
+export function findExistingShotSlot(shots,candidate){
+  return shots.find(s=>
+    s.bowler===candidate.bowler&&s.league===candidate.league&&s.date===candidate.date&&
+    s.game===candidate.game&&s.frame===candidate.frame&&
+    (s.ballNum||null)===(candidate.ballNum||null)
+  );
+}
+
+// Cascades a league rename across any record type that carries a `.league`
+// field (shots, sessions, matches, lane patterns) — renaming a league must
+// never leave old records silently orphaned under a name nothing matches
+// anymore.
+export function renameLeagueInRecords(records,oldName,newName){
+  return records.map(item=>item.league===oldName?{...item,league:newName}:item);
+}
+
 
 export function strictPartial(shots){
   const byFrame={};
@@ -963,11 +1007,10 @@ export default function BowlingTracker(){
     const clean=newName.trim();
     if(!clean||oldName===clean)return;
     if(leagues.some(l=>l!==oldName&&l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
-    const renameRecords=list=>list.map(item=>item.league===oldName?{...item,league:clean}:item);
-    const updatedShots=renameRecords(shots);
-    const updatedSessions=renameRecords(sessions);
-    const updatedMatches=renameRecords(matches);
-    const updatedLanePatterns=renameRecords(lanePatterns);
+    const updatedShots=renameLeagueInRecords(shots,oldName,clean);
+    const updatedSessions=renameLeagueInRecords(sessions,oldName,clean);
+    const updatedMatches=renameLeagueInRecords(matches,oldName,clean);
+    const updatedLanePatterns=renameLeagueInRecords(lanePatterns,oldName,clean);
     const updatedLeagues=leagues.map(l=>l===oldName?clean:l);
     await saveShots(updatedShots);
     await saveSessions(updatedSessions);
@@ -1448,10 +1491,8 @@ export default function BowlingTracker(){
       // If one somehow already exists (e.g. a stale ball selector re-offering an
       // already-played 10th-frame ball), overwrite it rather than adding a
       // second shot for the same slot — a duplicate would corrupt frame lookups
-      // in calcScore/strictPartial, which expect exactly one shot per slot.
-      const slotMatch=s=>s.bowler===form.bowler&&s.league===form.league&&s.date===form.date&&
-        s.game===form.game&&s.frame===form.frame&&(s.ballNum||null)===(form.ballNum||null);
-      const existingSlot=shots.find(slotMatch);
+      // in strictPartial, which expects exactly one shot per slot.
+      const existingSlot=findExistingShotSlot(shots,form);
       const toSave={
         ...form,
         id:existingSlot?existingSlot.id:crypto.randomUUID(),
@@ -1593,20 +1634,7 @@ export default function BowlingTracker(){
       id:existing?existing.id:crypto.randomUUID(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
-      shotCount:ss.length, // every shot delivered, including 10th-frame bonus balls — matches how 'strikes' is counted
-      strikes:ss.filter(s=>s.result==="Strike").length,
-      weakTens:ss.filter(s=>s.result==="Weak 10").length,
-      ringingTens:ss.filter(s=>s.result==="Ringing 10").length,
-      tenPinLeaves:ss.filter(isTenPinLeave).length,
-      singlePinLeaves:ss.filter(isSinglePinLeave).length,
-      singlePinSpares:ss.filter(s=>isSinglePinLeave(s)&&s.spareMade==="Yes").length,
-      spareAttempts:ss.filter(s=>s.result!=="Strike"&&s.spareMade!==""&&!isSplit(s)).length,
-      sparesMade:ss.filter(s=>s.spareMade==="Yes"&&!isSplit(s)).length,
-      splits:ss.filter(isSplit).length,
-      splitsConverted:ss.filter(s=>isSplit(s)&&s.spareMade==="Yes").length,
-      ballsUsed:[...new Set(ss.map(s=>s.ball).filter(Boolean))],
-      misses:ss.flatMap(s=>Array.isArray(s.miss)?s.miss:s.miss?[s.miss]:[]),
-      releases:ss.filter(s=>s.release).map(s=>s.release),
+      ...computeSessionStats(ss),
     };
     const updated=existing?sessions.map(s=>s.id===existing.id?session:s):[...sessions,session];
     await saveSessions(updated);

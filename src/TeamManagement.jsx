@@ -3,6 +3,69 @@ import QRCode from "qrcode";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
 
+// Pure roster-management functions, extracted so they're testable without
+// rendering the component. Each takes the current `teams` array plus
+// whatever's needed and returns a new array — no cloud calls, no React
+// state, no id generation (callers pass in an id already generated via
+// crypto.randomUUID(), keeping these fully deterministic).
+
+export function addTeamMember(teams, teamId, profile) {
+  const team = teams.find(t => t.id === teamId);
+  if (!team || team.members.some(m => m.userId === profile.id)) return teams;
+  const lineupPosition = team.members.length;
+  const newMember = { userId: profile.id, displayName: profile.display_name, lineupPosition };
+  return teams.map(t => t.id === teamId ? { ...t, members: [...t.members, newMember] } : t);
+}
+
+export function removeTeamMember(teams, teamId, userId) {
+  return teams.map(t => t.id === teamId
+    ? { ...t, members: t.members.filter(m => m.userId !== userId) }
+    : t
+  );
+}
+
+// Swaps the member at `index` with its neighbor in `direction` (-1 or +1)
+// and renumbers lineup_position to match the new order. Returns the SAME
+// array reference if the move is out of bounds, so callers can check
+// `result === teams` to know nothing changed.
+export function moveTeamMember(teams, teamId, index, direction) {
+  const team = teams.find(t => t.id === teamId);
+  if (!team) return teams;
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= team.members.length) return teams;
+
+  const members = [...team.members];
+  [members[index], members[newIndex]] = [members[newIndex], members[index]];
+  const renumbered = members.map((m, i) => ({ ...m, lineupPosition: i }));
+
+  return teams.map(t => t.id === teamId ? { ...t, members: renumbered } : t);
+}
+
+// Returns { teams, invite, error }. error is 'invalid' (blank name/email),
+// 'no-team' (bad teamId), 'duplicate' (email already invited to this team),
+// or null on success.
+export function createTeamInvite(teams, teamId, id, name, email) {
+  const cleanName = (name || "").trim();
+  const cleanEmail = (email || "").trim().toLowerCase();
+  if (!cleanName || !cleanEmail) return { teams, invite: null, error: "invalid" };
+  const team = teams.find(t => t.id === teamId);
+  if (!team) return { teams, invite: null, error: "no-team" };
+  if (team.pendingInvites.some(inv => inv.email.toLowerCase() === cleanEmail)) {
+    return { teams, invite: null, error: "duplicate" };
+  }
+  const lineupPosition = team.members.length + team.pendingInvites.length;
+  const invite = { id, name: cleanName, email: cleanEmail, lineupPosition };
+  const newTeams = teams.map(t => t.id === teamId ? { ...t, pendingInvites: [...t.pendingInvites, invite] } : t);
+  return { teams: newTeams, invite, error: null };
+}
+
+export function cancelTeamInvite(teams, teamId, inviteId) {
+  return teams.map(t => t.id === teamId
+    ? { ...t, pendingInvites: t.pendingInvites.filter(inv => inv.id !== inviteId) }
+    : t
+  );
+}
+
 const C = {
   bg:"#0f1117",
   surface:"#1a1d27",
@@ -239,20 +302,13 @@ export default function TeamManagement({
   function addMember(teamId, profile) {
     const team = teams.find(t => t.id === teamId);
     if (!team || team.members.some(m => m.userId === profile.id)) return;
-    const lineupPosition = team.members.length;
-    setTeams(prev => prev.map(t => t.id === teamId
-      ? { ...t, members: [...t.members, { userId: profile.id, displayName: profile.display_name, lineupPosition }] }
-      : t
-    ));
+    setTeams(prev => addTeamMember(prev, teamId, profile));
     setSearchState(prev => ({ ...prev, [teamId]: { term: "", results: [], searching: false } }));
-    cloudWrite("team_members", { team_id: teamId, user_id: profile.id, lineup_position: lineupPosition });
+    cloudWrite("team_members", { team_id: teamId, user_id: profile.id, lineup_position: team.members.length });
   }
 
   function removeMember(teamId, userId) {
-    setTeams(prev => prev.map(t => t.id === teamId
-      ? { ...t, members: t.members.filter(m => m.userId !== userId) }
-      : t
-    ));
+    setTeams(prev => removeTeamMember(prev, teamId, userId));
     cloudDelete("team_members", { team_id: teamId, user_id: userId });
   }
 
@@ -262,34 +318,23 @@ export default function TeamManagement({
   // nothing further needs to happen on this end.
   function createInvite(teamId) {
     const form = inviteForm[teamId] || {};
-    const name = (form.name || "").trim();
-    const email = (form.email || "").trim().toLowerCase();
-    if (!name || !email) return;
-    const team = teams.find(t => t.id === teamId);
-    if (!team) return;
-    if (team.pendingInvites.some(inv => inv.email.toLowerCase() === email)) {
+    const id = crypto.randomUUID();
+    const { teams: newTeams, invite, error } = createTeamInvite(teams, teamId, id, form.name, form.email);
+    if (error === "duplicate") {
       alert("There's already a pending invite for that email on this team.");
       return;
     }
-
-    const id = crypto.randomUUID();
-    const lineupPosition = team.members.length + team.pendingInvites.length;
-    setTeams(prev => prev.map(t => t.id === teamId
-      ? { ...t, pendingInvites: [...t.pendingInvites, { id, name, email }] }
-      : t
-    ));
+    if (error || !invite) return;
+    setTeams(newTeams);
     setInviteForm(prev => ({ ...prev, [teamId]: { name: "", email: "" } }));
     cloudWrite("pending_invites", {
-      id, team_id: teamId, invited_name: name, invited_email: email,
-      lineup_position: lineupPosition, created_by: user?.id || null,
+      id, team_id: teamId, invited_name: invite.name, invited_email: invite.email,
+      lineup_position: invite.lineupPosition, created_by: user?.id || null,
     });
   }
 
   function cancelInvite(teamId, inviteId) {
-    setTeams(prev => prev.map(t => t.id === teamId
-      ? { ...t, pendingInvites: t.pendingInvites.filter(inv => inv.id !== inviteId) }
-      : t
-    ));
+    setTeams(prev => cancelTeamInvite(prev, teamId, inviteId));
     cloudDelete("pending_invites", inviteId);
   }
 
@@ -301,18 +346,13 @@ export default function TeamManagement({
   }
 
   function moveMember(teamId, index, direction) {
-    const team = teams.find(t => t.id === teamId);
-    if (!team) return;
+    const newTeams = moveTeamMember(teams, teamId, index, direction);
+    if (newTeams === teams) return; // out of bounds, nothing changed
+    setTeams(newTeams);
+    const movedTeam = newTeams.find(t => t.id === teamId);
     const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= team.members.length) return;
-
-    const members = [...team.members];
-    [members[index], members[newIndex]] = [members[newIndex], members[index]];
-    const renumbered = members.map((m, i) => ({ ...m, lineupPosition: i }));
-
-    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, members: renumbered } : t));
-    cloudWrite("team_members", { team_id: teamId, user_id: renumbered[index].userId, lineup_position: renumbered[index].lineupPosition });
-    cloudWrite("team_members", { team_id: teamId, user_id: renumbered[newIndex].userId, lineup_position: renumbered[newIndex].lineupPosition });
+    cloudWrite("team_members", { team_id: teamId, user_id: movedTeam.members[index].userId, lineup_position: movedTeam.members[index].lineupPosition });
+    cloudWrite("team_members", { team_id: teamId, user_id: movedTeam.members[newIndex].userId, lineup_position: movedTeam.members[newIndex].lineupPosition });
   }
 
   function createLeague() {
