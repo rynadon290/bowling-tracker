@@ -2593,30 +2593,30 @@ export default function BowlingTracker(){
                     }}
                     color={r==="Strike"?C.strike:r.includes("10")?C.miss:C.spare}/>
                 ))}
-                {/* Gutter — a one-tap shortcut for "Other Leave" with all 10
-                    pins standing, rather than tapping all 10 pin chips
-                    individually. This is not a separate stored result value;
-                    it produces the exact same underlying state
-                    (otherLeave=all 10, pinCount="0") that manually tapping
-                    every pin would, so the scoring engine needs no changes
-                    and this chip's "selected" state just reflects whether
-                    that state currently holds. */}
-                <Chip label="Gutter"
-                  selected={form.result==="Other Leave"&&form.otherLeave.length===10}
-                  onToggle={()=>{
-                    const isGutter=form.result==="Other Leave"&&form.otherLeave.length===10;
-                    setForm(f=>(isGutter
-                      ?{...f,result:"",otherLeave:[],pinCount:"",spareMade:""}
-                      :{...f,result:"Other Leave",otherLeave:["1","2","3","4","5","6","7","8","9","10"],pinCount:"0",spareMade:""}
-                    ));
-                  }}
-                  color={C.miss}/>
               </div>
 
               {form.result==="Other Leave"&&(
                 <>
                   <div style={S.label}>Pins Standing</div>
                   <div style={S.chips}>
+                    {/* Gutter — a one-tap shortcut for all 10 pins standing,
+                        rather than tapping each pin chip individually. Not a
+                        separate stored result value; it produces the exact
+                        same underlying state (otherLeave=all 10,
+                        pinCount="0") that manually tapping every pin would,
+                        so the scoring engine needs no changes and this
+                        chip's "selected" state just reflects whether that
+                        state currently holds. */}
+                    <Chip label="Gutter"
+                      selected={form.otherLeave.length===10}
+                      onToggle={()=>{
+                        const isGutter=form.otherLeave.length===10;
+                        setForm(f=>(isGutter
+                          ?{...f,otherLeave:[],pinCount:"",spareMade:""}
+                          :{...f,otherLeave:["1","2","3","4","5","6","7","8","9","10"],pinCount:"0",spareMade:""}
+                        ));
+                      }}
+                      color={C.miss}/>
                     {["1","2","3","4","5","6","7","8","9","10","9 Pin No-Tap"].map(p=>(
                       <Chip key={p} label={p}
                         selected={Array.isArray(form.otherLeave)&&form.otherLeave.includes(p)}
