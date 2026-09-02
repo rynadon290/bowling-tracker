@@ -13,6 +13,12 @@ vi.mock('idb', () => ({
       dbState.store.push({ ...value, queueId });
       return queueId;
     },
+    async put(_storeName, value) {
+      const idx = dbState.store.findIndex(item => item.queueId === value.queueId);
+      if (idx >= 0) dbState.store[idx] = value;
+      else dbState.store.push(value);
+      return value.queueId;
+    },
     async getAll() {
       return [...dbState.store];
     },
