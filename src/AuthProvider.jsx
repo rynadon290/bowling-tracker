@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
+import { cloudRead, cloudWrite } from './syncQueue.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState('');
 
   useEffect(() => {
     // Check for an existing session on first load (e.g. returning visitor
@@ -28,6 +30,17 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Loads this user's own display name whenever they sign in (or the app
+  // starts with an existing session already active).
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) { setDisplayName(''); return; }
+    cloudRead('profiles', q => q.select('display_name').eq('id', userId).single())
+      .then(({ data, online }) => {
+        if (online && data) setDisplayName(data.display_name || '');
+      });
+  }, [session?.user?.id]);
+
   async function signInWithMagicLink(email) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -40,12 +53,22 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   }
 
+  async function updateDisplayName(newName) {
+    const clean = newName.trim();
+    if (!clean || !session?.user?.id) return { error: new Error('Not signed in or name is empty') };
+    setDisplayName(clean); // optimistic, matches the rest of the app's pattern
+    await cloudWrite('profiles', { id: session.user.id, display_name: clean });
+    return { error: null };
+  }
+
   const value = {
     session,
     user: session?.user ?? null,
+    displayName,
     loading,
     signInWithMagicLink,
     signOut,
+    updateDisplayName,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

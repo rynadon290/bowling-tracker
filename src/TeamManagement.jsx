@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
 
@@ -69,7 +70,7 @@ export default function TeamManagement({
   onLeagueAdd,
   onLeagueRename,
 }) {
-  const{user}=useAuth();
+  const{user,displayName,updateDisplayName}=useAuth();
   // Maps league name -> its Supabase row id, built from its own small fetch
   // on mount. Teams are stored client-side keyed by league NAME (matching
   // how the rest of the app already works with leagues as plain strings) —
@@ -87,6 +88,13 @@ export default function TeamManagement({
   // Per-team "add a teammate" search state: {[teamId]: {term, results, searching}}
   const[searchState, setSearchState] = useState({});
   const searchTimers = useRef({});
+  // "Your Name" editing
+  const[editingMyName, setEditingMyName] = useState(false);
+  const[myNameInput, setMyNameInput] = useState("");
+  // Per-team invite-by-email form: {[teamId]: {name, email}}
+  const[inviteForm, setInviteForm] = useState({});
+  // QR code for the sign-in URL, generated once on mount
+  const[qrDataUrl, setQrDataUrl] = useState("");
 
   async function loadAll() {
     setLoading(true);
@@ -101,6 +109,7 @@ export default function TeamManagement({
 
     const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id"));
     const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,profiles(display_name)"));
+    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email").is("accepted_at", null));
 
     if (teamsRes.online && teamsRes.data) {
       const membersByTeam = {};
@@ -114,11 +123,18 @@ export default function TeamManagement({
       });
       Object.values(membersByTeam).forEach(list => list.sort((a, b) => a.lineupPosition - b.lineupPosition));
 
+      const invitesByTeam = {};
+      (invitesRes.data || []).forEach(inv => {
+        if (!invitesByTeam[inv.team_id]) invitesByTeam[inv.team_id] = [];
+        invitesByTeam[inv.team_id].push({ id: inv.id, name: inv.invited_name, email: inv.invited_email });
+      });
+
       setTeams(teamsRes.data.map(t => ({
         id: t.id,
         name: t.name,
         league: leagueNameById[t.league_id] || "",
         members: membersByTeam[t.id] || [],
+        pendingInvites: invitesByTeam[t.id] || [],
       })));
     }
     setLoading(false);
@@ -143,6 +159,19 @@ export default function TeamManagement({
     onTeamsChange?.(simplified);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams]);
+
+  // A QR code for the app's own sign-in URL — a convenient way to hand
+  // someone the link, nothing more. It cannot log anyone in as anyone else;
+  // each person still has to enter their own email and get their own magic
+  // link. The actual "this person is pre-assigned to this roster slot"
+  // linking happens via email-matched pending invites, independent of how
+  // someone arrived at the sign-in screen.
+  useEffect(() => {
+    const url = window.location.origin + window.location.pathname;
+    QRCode.toDataURL(url, { width: 220, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(""));
+  }, []);
 
   const leagueList = leagues.length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
   const leagueTeams = teams.filter(team => team.league === selectedLeague);
@@ -227,6 +256,50 @@ export default function TeamManagement({
     cloudDelete("team_members", { team_id: teamId, user_id: userId });
   }
 
+  // Pre-assigns a roster slot to someone who hasn't signed up yet. When
+  // they eventually sign in with this exact email, a database trigger
+  // automatically sets their display name and adds them to this team —
+  // nothing further needs to happen on this end.
+  function createInvite(teamId) {
+    const form = inviteForm[teamId] || {};
+    const name = (form.name || "").trim();
+    const email = (form.email || "").trim().toLowerCase();
+    if (!name || !email) return;
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return;
+    if (team.pendingInvites.some(inv => inv.email.toLowerCase() === email)) {
+      alert("There's already a pending invite for that email on this team.");
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const lineupPosition = team.members.length + team.pendingInvites.length;
+    setTeams(prev => prev.map(t => t.id === teamId
+      ? { ...t, pendingInvites: [...t.pendingInvites, { id, name, email }] }
+      : t
+    ));
+    setInviteForm(prev => ({ ...prev, [teamId]: { name: "", email: "" } }));
+    cloudWrite("pending_invites", {
+      id, team_id: teamId, invited_name: name, invited_email: email,
+      lineup_position: lineupPosition, created_by: user?.id || null,
+    });
+  }
+
+  function cancelInvite(teamId, inviteId) {
+    setTeams(prev => prev.map(t => t.id === teamId
+      ? { ...t, pendingInvites: t.pendingInvites.filter(inv => inv.id !== inviteId) }
+      : t
+    ));
+    cloudDelete("pending_invites", inviteId);
+  }
+
+  function saveMyName() {
+    const name = myNameInput.trim();
+    if (!name) return;
+    updateDisplayName(name);
+    setEditingMyName(false);
+  }
+
   function moveMember(teamId, index, direction) {
     const team = teams.find(t => t.id === teamId);
     if (!team) return;
@@ -272,6 +345,37 @@ export default function TeamManagement({
           <div style={{ color:C.textMuted, textAlign:"center", padding:"12px 0" }}>Loading teams…</div>
         </div>
       )}
+
+      <div style={S.card}>
+        <div style={S.label}>Your Name</div>
+        {!editingMyName ? (
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:C.text,fontSize:"15px",fontWeight:600}}>{displayName || "(not set)"}</span>
+            <button style={S.button} onClick={()=>{setMyNameInput(displayName||"");setEditingMyName(true);}}>Edit</button>
+          </div>
+        ) : (
+          <div style={{display:"flex",gap:"8px"}}>
+            <input value={myNameInput} onChange={e=>setMyNameInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveMyName();}} autoFocus style={{...S.input,flex:1}}/>
+            <button style={S.primary} onClick={saveMyName}>Save</button>
+            <button style={S.button} onClick={()=>setEditingMyName(false)}>Cancel</button>
+          </div>
+        )}
+        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
+          This is what teammates see when they search for you or view the roster — it defaults to your email prefix until you set it.
+        </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.label}>Share Sign-In Link</div>
+        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+          A quick way to hand someone the app link — scanning this just opens the sign-in screen. It doesn't log anyone in as anyone; each person still enters their own email.
+        </div>
+        {qrDataUrl && (
+          <div style={{textAlign:"center"}}>
+            <img src={qrDataUrl} alt="QR code to sign-in page" style={{borderRadius:"8px",background:"#fff",padding:"8px"}}/>
+          </div>
+        )}
+      </div>
 
       <div style={S.card}>
         <div style={S.label}>League</div>
@@ -346,7 +450,7 @@ export default function TeamManagement({
           )}
 
           <div style={S.label}>Roster / Bowling Order</div>
-          {team.members.length===0 && (
+          {team.members.length===0 && team.pendingInvites.length===0 && (
             <div style={{color:C.textMuted,fontSize:"12px",padding:"6px 0 12px"}}>No bowlers assigned.</div>
           )}
           {team.members.map((member, index) => (
@@ -358,11 +462,21 @@ export default function TeamManagement({
               <button style={{...S.button,color:C.danger}} onClick={()=>removeMember(team.id,member.userId)}>×</button>
             </div>
           ))}
+          {team.pendingInvites.map(invite => (
+            <div key={invite.id} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
+              <div style={{width:"24px"}}></div>
+              <div style={{flex:1}}>
+                <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
+                <div style={{color:C.textMuted,fontSize:"10px"}}>invited · not signed in yet</div>
+              </div>
+              <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
+            </div>
+          ))}
 
           <div style={{marginTop:"12px",paddingTop:"12px",borderTop:`1px solid ${C.border}`}}>
             <div style={S.label}>Add a Teammate</div>
             <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-              Search only finds people who've actually signed in at least once — have them sign in first if they're not showing up.
+              Search only finds people who've actually signed in at least once.
             </div>
             <input
               value={searchState[team.id]?.term || ""}
@@ -388,6 +502,29 @@ export default function TeamManagement({
             {!searchState[team.id]?.searching && searchState[team.id]?.term && searchState[team.id]?.results?.length===0 && (
               <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>No one found with that name.</div>
             )}
+
+            <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
+              <div style={S.label}>Or Invite Someone Not Signed Up Yet</div>
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                Reserves their spot on the roster now. The moment they sign in with this exact email, they're linked automatically — no extra steps.
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+                <input
+                  value={inviteForm[team.id]?.name || ""}
+                  onChange={e=>setInviteForm(prev=>({...prev,[team.id]:{...prev[team.id],name:e.target.value}}))}
+                  placeholder="Their name"
+                  style={S.input}
+                />
+                <input
+                  value={inviteForm[team.id]?.email || ""}
+                  onChange={e=>setInviteForm(prev=>({...prev,[team.id]:{...prev[team.id],email:e.target.value}}))}
+                  placeholder="Their email"
+                  type="email"
+                  style={S.input}
+                />
+                <button style={S.primary} onClick={()=>createInvite(team.id)}>Send Invite</button>
+              </div>
+            </div>
           </div>
         </div>
       ))}
