@@ -66,6 +66,15 @@ export function cancelTeamInvite(teams, teamId, inviteId) {
   );
 }
 
+// The canonical shape of a freshly-created team — every field the render
+// code assumes exists (members, pendingInvites) must be present here, or
+// creating a team crashes the instant it tries to render. Centralized so
+// this can't silently drift out of sync with what the render code expects,
+// the way the inline version in createTeam() once did.
+export function newTeamObject(id, name, league) {
+  return { id, name, league, members: [], pendingInvites: [] };
+}
+
 const C = {
   bg:"#0f1117",
   surface:"#1a1d27",
@@ -247,7 +256,7 @@ export default function TeamManagement({
 
     const id = crypto.randomUUID();
     const leagueId = leagueIdsRef.current[selectedLeague];
-    setTeams(prev => [...prev, { id, name, league: selectedLeague, members: [] }]);
+    setTeams(prev => [...prev, newTeamObject(id, name, selectedLeague)]);
     setNewTeamName("");
     if (leagueId) {
       cloudWrite("teams", { id, name, league_id: leagueId, created_by: user?.id || null });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addTeamMember, removeTeamMember, moveTeamMember, createTeamInvite, cancelTeamInvite } from './TeamManagement.jsx';
+import { addTeamMember, removeTeamMember, moveTeamMember, createTeamInvite, cancelTeamInvite, newTeamObject } from './TeamManagement.jsx';
 
 function team(overrides) {
   return { id: 'team-1', name: 'Thursday Team', league: 'Thursday House Shot', members: [], pendingInvites: [], ...overrides };
@@ -115,5 +115,43 @@ describe('cancelTeamInvite', () => {
     const result = cancelTeamInvite(teams, 'team-1', 'inv-1');
     expect(result[0].pendingInvites).toHaveLength(1);
     expect(result[0].pendingInvites[0].id).toBe('inv-2');
+  });
+});
+
+describe('newTeamObject', () => {
+  // REGRESSION: a real production bug — createTeam() originally built the
+  // new team object inline as { id, name, league, members: [] }, omitting
+  // pendingInvites entirely. The render code calls team.pendingInvites.map()
+  // and .length unconditionally, so creating any team crashed the app the
+  // instant it tried to render (black screen, no error boundary). This test
+  // pins down every field the render code actually depends on.
+  it('includes pendingInvites as an empty array, not undefined', () => {
+    const team = newTeamObject('team-1', 'Thursday Team', 'Thursday House Shot');
+    expect(Array.isArray(team.pendingInvites)).toBe(true);
+    expect(team.pendingInvites).toEqual([]);
+  });
+
+  it('includes members as an empty array', () => {
+    const team = newTeamObject('team-1', 'Thursday Team', 'Thursday House Shot');
+    expect(Array.isArray(team.members)).toBe(true);
+    expect(team.members).toEqual([]);
+  });
+
+  it('sets id, name, and league exactly as given', () => {
+    const team = newTeamObject('team-1', 'Thursday Team', 'Thursday House Shot');
+    expect(team.id).toBe('team-1');
+    expect(team.name).toBe('Thursday Team');
+    expect(team.league).toBe('Thursday House Shot');
+  });
+
+  it('a freshly-created team survives the exact render-path operations that crashed before', () => {
+    // Simulates what the render code actually does: .length and .map() on
+    // pendingInvites, and the empty-roster check that reads both arrays.
+    const team = newTeamObject('team-1', 'Thursday Team', 'Thursday House Shot');
+    expect(() => {
+      const isEmpty = team.members.length === 0 && team.pendingInvites.length === 0;
+      const rendered = team.pendingInvites.map(inv => inv.name);
+      return { isEmpty, rendered };
+    }).not.toThrow();
   });
 });
