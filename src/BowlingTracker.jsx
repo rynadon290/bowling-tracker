@@ -491,11 +491,11 @@ export default function BowlingTracker(){
   // never gets re-transformed on retry. If that logic was buggy at the
   // time, every retry just resends the exact same broken data forever —
   // this is the only way to actually apply a fix to data that predates it.
-  function handleResyncAll(){
-    syncShotsToCloud([],shots);
-    syncSessionsToCloud([],sessions);
-    syncMatchesToCloud([],matches);
-    syncLanePatternsToCloud([],lanePatterns);
+  async function handleResyncAll(){
+    await syncShotsToCloud([],shots);
+    await syncSessionsToCloud([],sessions);
+    await syncMatchesToCloud([],matches);
+    await syncLanePatternsToCloud([],lanePatterns);
   }
 
   async function handleDiscardAndResyncAll(){
@@ -552,11 +552,11 @@ export default function BowlingTracker(){
         if(!prevPairs.has(key))cloudWrite("arsenals",{id:crypto.randomUUID(),bowler_name:bowler,ball,created_by:user?.id||null});
       }
     }
-  function syncLanePatternsToCloud(prevPatterns,nextPatterns){
+  async function syncLanePatternsToCloud(prevPatterns,nextPatterns){
     const prevById=new Map(prevPatterns.map(p=>[p.id,p]));
     const nextById=new Map(nextPatterns.map(p=>[p.id,p]));
     for(const id of prevById.keys()){
-      if(!nextById.has(id))cloudDelete("lane_patterns",id);
+      if(!nextById.has(id))await cloudDelete("lane_patterns",id);
     }
     for(const[id,pattern]of nextById){
       const prev=prevById.get(id);
@@ -564,7 +564,7 @@ export default function BowlingTracker(){
         const row=lanePatternToSupabaseRow(pattern,leagueIdsRef.current);
         // Without a real team_id, this write can never succeed — same
         // reasoning as matches, see syncMatchesToCloud.
-        if(row.team_id)cloudWrite("lane_patterns",row);
+        if(row.team_id)await cloudWrite("lane_patterns",row);
       }
     }
   }
@@ -572,7 +572,7 @@ export default function BowlingTracker(){
     const prev=lanePatterns;
     setLanePatterns(u);
     try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}
-    syncLanePatternsToCloud(prev,u);
+    await syncLanePatternsToCloud(prev,u);
   }
   async function saveLeagues(u){setLeagues(u);try{await window.storage.set(LEAGUES_KEY,JSON.stringify(u));}catch{}}
 
@@ -776,16 +776,16 @@ export default function BowlingTracker(){
   // from before this migration) — this diffs it against current state so
   // only what actually changed gets pushed to Supabase, rather than
   // rewriting every shot on every save.
-  function syncShotsToCloud(prevShots,nextShots){
+  async function syncShotsToCloud(prevShots,nextShots){
     const prevById=new Map(prevShots.map(s=>[s.id,s]));
     const nextById=new Map(nextShots.map(s=>[s.id,s]));
     for(const id of prevById.keys()){
-      if(!nextById.has(id))cloudDelete("shots",id);
+      if(!nextById.has(id))await cloudDelete("shots",id);
     }
     for(const[id,shot]of nextById){
       const prev=prevById.get(id);
       if(!prev||JSON.stringify(prev)!==JSON.stringify(shot)){
-        cloudWrite("shots",shotToSupabaseRow(shot,user?.id,leagueIdsRef.current));
+        await cloudWrite("shots",shotToSupabaseRow(shot,user?.id,leagueIdsRef.current));
       }
     }
   }
@@ -793,18 +793,18 @@ export default function BowlingTracker(){
     const prev=shots;
     setShots(u);
     try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}
-    syncShotsToCloud(prev,u);
+    await syncShotsToCloud(prev,u);
   }
-  function syncSessionsToCloud(prevSessions,nextSessions){
+  async function syncSessionsToCloud(prevSessions,nextSessions){
     const prevById=new Map(prevSessions.map(s=>[s.id,s]));
     const nextById=new Map(nextSessions.map(s=>[s.id,s]));
     for(const id of prevById.keys()){
-      if(!nextById.has(id))cloudDelete("sessions",id);
+      if(!nextById.has(id))await cloudDelete("sessions",id);
     }
     for(const[id,session]of nextById){
       const prev=prevById.get(id);
       if(!prev||JSON.stringify(prev)!==JSON.stringify(session)){
-        cloudWrite("sessions",sessionToSupabaseRow(session,user?.id,leagueIdsRef.current));
+        await cloudWrite("sessions",sessionToSupabaseRow(session,user?.id,leagueIdsRef.current));
       }
     }
   }
@@ -812,13 +812,13 @@ export default function BowlingTracker(){
     const prev=sessions;
     setSessions(u);
     try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}
-    syncSessionsToCloud(prev,u);
+    await syncSessionsToCloud(prev,u);
   }
-  function syncMatchesToCloud(prevMatches,nextMatches){
+  async function syncMatchesToCloud(prevMatches,nextMatches){
     const prevById=new Map(prevMatches.map(m=>[m.id,m]));
     const nextById=new Map(nextMatches.map(m=>[m.id,m]));
     for(const id of prevById.keys()){
-      if(!nextById.has(id))cloudDelete("matches",id);
+      if(!nextById.has(id))await cloudDelete("matches",id);
     }
     for(const[id,match]of nextById){
       const prev=prevById.get(id);
@@ -828,7 +828,7 @@ export default function BowlingTracker(){
         // RLS requires team_id is not null. Rather than queue a doomed
         // write forever, leave it tracked locally only until the bowler
         // is actually set up as a team member.
-        if(row.team_id)cloudWrite("matches",row);
+        if(row.team_id)await cloudWrite("matches",row);
       }
     }
   }
@@ -836,7 +836,7 @@ export default function BowlingTracker(){
     const prev=matches;
     setMatches(u);
     try{await window.storage.set(MATCHES_KEY,JSON.stringify(u));}catch{}
-    syncMatchesToCloud(prev,u);
+    await syncMatchesToCloud(prev,u);
   }
 
   // Matches are keyed by teamId (not league) so two teams in the same
