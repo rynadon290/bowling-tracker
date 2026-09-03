@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextState, tenthFrameStatus, strictPartial, frameQualityScore } from './scoring.js';
+import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots } from './scoring.js';
 
 describe('tenthFrameStatus', () => {
   it('returns [1] for a brand-new 10th frame with no shots yet', () => {
@@ -228,5 +228,115 @@ describe('frameQualityScore — strict tier ordering', () => {
     expect(oneStanding).toBeGreaterThan(twoStandingNonSplit);
     expect(twoStandingNonSplit).toBeGreaterThanOrEqual(70);
     expect(twoStandingNonSplit).toBeLessThanOrEqual(89);
+  });
+});
+
+describe('makeTheoreticalShots', () => {
+  function frame(f, opts) { return { frame: String(f), ballNum: null, ...opts }; }
+
+  it('converts a makeable missed spare in a regular frame', () => {
+    const shots = [frame(5, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'No', pinCount: '9' })];
+    const result = makeTheoreticalShots(shots, false, null);
+    expect(result[0].spareMade).toBe('Yes');
+  });
+
+  it('does NOT convert a washout (headpin + 6/10, 3-pin down)', () => {
+    const shots = [frame(5, { result: 'Other Leave', otherLeave: ['1', '6'], spareMade: 'No', pinCount: '2' })];
+    const result = makeTheoreticalShots(shots, false, null);
+    expect(result[0].spareMade).toBe('No');
+  });
+
+  it('does NOT convert a split (e.g. 7-10)', () => {
+    const shots = [frame(9, { result: 'Other Leave', otherLeave: ['7', '10'], spareMade: 'No', pinCount: '8' })];
+    const result = makeTheoreticalShots(shots, false, null);
+    expect(result[0].spareMade).toBe('No');
+  });
+
+  it('leaves an already-made spare unchanged', () => {
+    const shots = [frame(3, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'Yes', pinCount: '10' })];
+    const result = makeTheoreticalShots(shots, false, null);
+    expect(result[0]).toEqual(shots[0]);
+  });
+
+  it('leaves a strike unchanged', () => {
+    const shots = [frame(1, { result: 'Strike' })];
+    const result = makeTheoreticalShots(shots, false, null);
+    expect(result[0]).toEqual(shots[0]);
+  });
+
+  it('respects handedness: a righty washout (1-6) is NOT a washout for a lefty, so it converts', () => {
+    const shots = [frame(5, { result: 'Other Leave', otherLeave: ['1', '6'], spareMade: 'No', pinCount: '2' })];
+    const result = makeTheoreticalShots(shots, true, null); // leftHanded=true
+    expect(result[0].spareMade).toBe('Yes');
+  });
+
+  it('respects handedness: a lefty washout (1-7, 2-pin down) is correctly excluded for a lefty', () => {
+    const shots = [frame(5, { result: 'Other Leave', otherLeave: ['1', '7'], spareMade: 'No', pinCount: '2' })];
+    const result = makeTheoreticalShots(shots, true, null);
+    expect(result[0].spareMade).toBe('No');
+  });
+
+  describe('10th frame handling', () => {
+    it('does NOT convert the 10th frame when avgFirstBall is not supplied (would be unscoreable)', () => {
+      const shots = [frame(10, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'No', pinCount: '9', ballNum: 1 })];
+      const result = makeTheoreticalShots(shots, false, null);
+      expect(result.find(s => s.ballNum === 1).spareMade).toBe('No');
+      expect(result.some(s => s.ballNum === 3)).toBe(false); // no synthetic fill ball added
+    });
+
+    it('converts the 10th frame and synthesizes a fill ball when avgFirstBall IS supplied', () => {
+      const shots = [frame(10, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'No', pinCount: '9', ballNum: 1 })];
+      const result = makeTheoreticalShots(shots, false, 8.7);
+      const b1 = result.find(s => s.ballNum === 1);
+      const b3 = result.find(s => s.ballNum === 3);
+      expect(b1.spareMade).toBe('Yes');
+      expect(b3).toBeTruthy();
+      expect(b3.pinCount).toBe('8'); // floored, not rounded
+    });
+
+    it('does not add a synthetic fill ball when the 10th frame already has real ball 2/3 data', () => {
+      const shots = [
+        frame(10, { result: 'Strike', ballNum: 1 }),
+        frame(10, { result: 'Strike', ballNum: 2 }),
+        frame(10, { result: 'Weak 10', ballNum: 3, spareMade: 'No' }),
+      ];
+      const result = makeTheoreticalShots(shots, false, 9);
+      // No synthetic 4th ball added -- still exactly 3 real shots for frame 10
+      expect(result.filter(s => parseInt(s.frame) === 10).length).toBe(3);
+      // The real ball 3 (a makeable Weak 10 miss) IS still theoretically
+      // converted, same as any other makeable miss anywhere in the game --
+      // it's a genuine, already-known result, not an unknowable
+      // hypothetical like a never-thrown fill ball would be
+      expect(result.find(s => s.ballNum === 3).spareMade).toBe('Yes');
+    });
+
+    it('does NOT convert the 10th frame if the first ball is unmakeable (split/washout), even with avgFirstBall supplied', () => {
+      const shots = [frame(10, { result: 'Other Leave', otherLeave: ['7', '10'], spareMade: 'No', pinCount: '8', ballNum: 1 })];
+      const result = makeTheoreticalShots(shots, false, 9);
+      expect(result.find(s => s.ballNum === 1).spareMade).toBe('No');
+      expect(result.some(s => s.ballNum === 3)).toBe(false);
+    });
+  });
+
+  it('end-to-end: a mixed game scores strictly higher after theoretical conversion, and strictPartial fully resolves it', () => {
+    const shots = [
+      frame(1, { result: 'Strike' }),
+      frame(2, { result: 'Strike' }),
+      frame(3, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'No', pinCount: '9' }), // makeable, converts
+      frame(4, { result: 'Strike' }),
+      frame(5, { result: 'Other Leave', otherLeave: ['7', '10'], spareMade: 'No', pinCount: '8' }), // split, stays open
+      frame(6, { result: 'Strike' }),
+      frame(7, { result: 'Strike' }),
+      frame(8, { result: 'Strike' }),
+      frame(9, { result: 'Strike' }),
+      frame(10, { result: 'Strike', ballNum: 1 }),
+      frame(10, { result: 'Strike', ballNum: 2 }),
+      frame(10, { result: 'Strike', ballNum: 3 }),
+    ];
+    const actual = strictPartial(shots);
+    const theoretical = makeTheoreticalShots(shots, false, 9);
+    const theoreticalScore = strictPartial(theoretical);
+    expect(theoreticalScore).not.toBeNull();
+    expect(theoreticalScore).toBeGreaterThan(actual);
   });
 });
