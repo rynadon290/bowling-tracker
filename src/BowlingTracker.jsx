@@ -3542,7 +3542,7 @@ export default function BowlingTracker(){
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
                   const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
                   const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
-                  if(totalQuarter===0&&totalDollar===0)return null;
+                  if(!relevantSessions.length)return null;
                   return(
                     <div style={S.card}>
                       <div style={S.label}>{isTeamView?"Team Poker Winnings":"Poker Winnings"}</div>
