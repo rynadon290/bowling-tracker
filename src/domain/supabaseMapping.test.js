@@ -64,6 +64,7 @@ describe('session <-> Supabase row mapping', () => {
       tenPinLeaves: 4, singlePinLeaves: 5, singlePinSpares: 4,
       spareAttempts: 14, sparesMade: 13, splits: 1, splitsConverted: 1,
       ballsUsed: ['Bionic', 'Phaze II Solid'], misses: ['Left', 'Fast'], releases: ['Good', 'Good', 'Bad'],
+      pokerQuarter: [0.25, 0, 0.75], pokerDollar: [0, 4, 0],
     };
 
     const row = sessionToSupabaseRow(original, 'user-uuid-1', leagueIdsMap);
@@ -71,7 +72,8 @@ describe('session <-> Supabase row mapping', () => {
 
     const fields = ['bowler', 'league', 'date', 'scores', 'total', 'average', 'shotCount',
       'strikes', 'weakTens', 'ringingTens', 'tenPinLeaves', 'singlePinLeaves', 'singlePinSpares',
-      'spareAttempts', 'sparesMade', 'splits', 'splitsConverted', 'ballsUsed', 'misses', 'releases'];
+      'spareAttempts', 'sparesMade', 'splits', 'splitsConverted', 'ballsUsed', 'misses', 'releases',
+      'pokerQuarter', 'pokerDollar'];
     fields.forEach(f => expect(roundTripped[f]).toEqual(original[f]));
   });
 

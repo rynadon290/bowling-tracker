@@ -88,6 +88,8 @@ export function sessionToSupabaseRow(session,userId,leagueIdsMap){
     balls_used:session.ballsUsed||[],
     misses:session.misses||[],
     releases:session.releases||[],
+    poker_quarter:session.pokerQuarter||[0,0,0],
+    poker_dollar:session.pokerDollar||[0,0,0],
   };
 }
 
@@ -115,6 +117,8 @@ export function sessionFromSupabaseRow(row,leagueNameById){
     ballsUsed:row.balls_used||[],
     misses:row.misses||[],
     releases:row.releases||[],
+    pokerQuarter:row.poker_quarter||[0,0,0],
+    pokerDollar:row.poker_dollar||[0,0,0],
   };
 }
 
