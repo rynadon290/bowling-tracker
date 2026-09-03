@@ -99,6 +99,38 @@ function Chip({label,selected,onToggle,color,dense}){
   return <button style={style} onClick={onToggle}>{label}</button>;
 }
 
+// Renders the ten pins in their actual rack positions — back row (7-10) at
+// top, headpin (1) at bottom — so tapping matches where the pin physically
+// stood, rather than a linear row of numbered chips a bowler has to
+// translate from memory.
+function PinDeck({selected,onToggle}){
+  const rows=[
+    [{n:"7",x:14},{n:"8",x:38},{n:"9",x:62},{n:"10",x:86}],
+    [{n:"4",x:26},{n:"5",x:50},{n:"6",x:74}],
+    [{n:"2",x:38},{n:"3",x:62}],
+    [{n:"1",x:50}],
+  ];
+  const pinSize=52,rowGap=58,topPad=8;
+  return (
+    <div style={{position:"relative",height:`${topPad*2+rowGap*3+pinSize}px`,margin:"12px 0"}}>
+      {rows.map((row,rowIdx)=>row.map(pin=>{
+        const isSelected=Array.isArray(selected)&&selected.includes(pin.n);
+        return (
+          <button key={pin.n} onClick={()=>onToggle(pin.n)}
+            style={{
+              position:"absolute",left:`${pin.x}%`,top:`${rowIdx*rowGap+topPad}px`,
+              transform:"translateX(-50%)",width:`${pinSize}px`,height:`${pinSize}px`,
+              borderRadius:"50%",border:`2px solid ${isSelected?C.spare:C.border}`,
+              backgroundColor:isSelected?C.spare+"33":C.surface,color:isSelected?C.spare:C.textMuted,
+              fontSize:"16px",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",
+              WebkitTapHighlightColor:"transparent",cursor:"pointer",
+            }}>{pin.n}</button>
+        );
+      }))}
+    </div>
+  );
+}
+
 function CollapsibleCard({title,summary,expanded,onToggle,children}){
   return (
     <div style={S.card}>
@@ -2494,13 +2526,14 @@ export default function BowlingTracker(){
                         ));
                       }}
                       color={C.miss}/>
-                    {["1","2","3","4","5","6","7","8","9","10","9 Pin No-Tap"].map(p=>(
-                      <Chip key={p} label={p}
-                        selected={Array.isArray(form.otherLeave)&&form.otherLeave.includes(p)}
-                        onToggle={()=>handleLeaveToggle(p)}
-                        color={p==="9 Pin No-Tap"?C.strike:C.spare}/>
-                    ))}
+                    <Chip label="9 Pin No-Tap"
+                      selected={Array.isArray(form.otherLeave)&&form.otherLeave.includes("9 Pin No-Tap")}
+                      onToggle={()=>handleLeaveToggle("9 Pin No-Tap")}
+                      color={C.strike}/>
                   </div>
+                  <PinDeck
+                    selected={Array.isArray(form.otherLeave)?form.otherLeave:[]}
+                    onToggle={p=>handleLeaveToggle(p)}/>
                   {isNoTap&&<div style={{fontSize:"13px",color:C.strike,fontWeight:600,marginTop:"4px"}}>9 Pin No-Tap → scored as Strike</div>}
                   {!isNoTap&&Array.isArray(form.otherLeave)&&form.otherLeave.length>0&&(
                     <div style={{fontSize:"13px",color:C.spare,fontWeight:600,marginTop:"4px"}}>
@@ -2588,6 +2621,14 @@ export default function BowlingTracker(){
             </CollapsibleCard>
 
 
+            <div style={{height:"140px"}}/>
+          </>
+        )}
+
+        {/* Fixed footer, outside the scrollable content flow — always
+            visible regardless of scroll position within the Log tab. */}
+        {view==="log"&&(
+          <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}
             </button>
@@ -2597,8 +2638,7 @@ export default function BowlingTracker(){
             {editingId&&(
               <button style={{...S.btn("warn"),marginTop:"8px"}} onClick={cancelEdit}>Cancel Edit</button>
             )}
-            <div style={{height:"32px"}}/>
-          </>
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
