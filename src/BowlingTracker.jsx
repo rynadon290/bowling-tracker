@@ -464,6 +464,7 @@ export default function BowlingTracker(){
   // concurrent requests to the same row. Keyed per team+date so editing one
   // match doesn't reset another's pending save.
   const matchSaveTimers=useRef({});
+  const lanePatternSaveTimers=useRef({});
   useEffect(()=>{
     getPendingCount().then(setPendingSyncCount);
     return onPendingCountChange(setPendingSyncCount);
@@ -490,14 +491,17 @@ export default function BowlingTracker(){
   // never gets re-transformed on retry. If that logic was buggy at the
   // time, every retry just resends the exact same broken data forever —
   // this is the only way to actually apply a fix to data that predates it.
-  function handleResyncMatches(){
+  function handleResyncAll(){
+    syncShotsToCloud([],shots);
+    syncSessionsToCloud([],sessions);
     syncMatchesToCloud([],matches);
+    syncLanePatternsToCloud([],lanePatterns);
   }
 
-  async function handleDiscardAndResyncMatches(){
-    if(!window.confirm(`Discard all ${pendingSyncCount} queued writes, then attempt a fresh sync of everything currently saved on this device? Anything not yet confirmed as reaching the cloud will be lost from the queue, but your local matches themselves are untouched and will be re-attempted.`))return;
+  async function handleDiscardAndResyncAll(){
+    if(!window.confirm(`Discard all ${pendingSyncCount} queued writes, then attempt a fresh sync of everything currently saved on this device? Anything not yet confirmed as reaching the cloud will be lost from the queue, but your local shots, sessions, matches, and lane conditions are untouched and will be re-attempted.`))return;
     await clearPendingQueue();
-    handleResyncMatches();
+    handleResyncAll();
     setShowSyncDetail(false);
   }
 
@@ -548,21 +552,27 @@ export default function BowlingTracker(){
         if(!prevPairs.has(key))cloudWrite("arsenals",{id:crypto.randomUUID(),bowler_name:bowler,ball,created_by:user?.id||null});
       }
     }
-  async function saveLanePatterns(u){
-    const prevById=new Map(lanePatterns.map(p=>[p.id,p]));
-    const nextById=new Map(u.map(p=>[p.id,p]));
-    setLanePatterns(u);
-    try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}
-
+  function syncLanePatternsToCloud(prevPatterns,nextPatterns){
+    const prevById=new Map(prevPatterns.map(p=>[p.id,p]));
+    const nextById=new Map(nextPatterns.map(p=>[p.id,p]));
     for(const id of prevById.keys()){
       if(!nextById.has(id))cloudDelete("lane_patterns",id);
     }
     for(const[id,pattern]of nextById){
       const prev=prevById.get(id);
       if(!prev||JSON.stringify(prev)!==JSON.stringify(pattern)){
-        cloudWrite("lane_patterns",lanePatternToSupabaseRow(pattern,leagueIdsRef.current));
+        const row=lanePatternToSupabaseRow(pattern,leagueIdsRef.current);
+        // Without a real team_id, this write can never succeed — same
+        // reasoning as matches, see syncMatchesToCloud.
+        if(row.team_id)cloudWrite("lane_patterns",row);
       }
     }
+  }
+  async function saveLanePatterns(u){
+    const prev=lanePatterns;
+    setLanePatterns(u);
+    try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(u));}catch{}
+    syncLanePatternsToCloud(prev,u);
   }
   async function saveLeagues(u){setLeagues(u);try{await window.storage.set(LEAGUES_KEY,JSON.stringify(u));}catch{}}
 
@@ -766,12 +776,9 @@ export default function BowlingTracker(){
   // from before this migration) — this diffs it against current state so
   // only what actually changed gets pushed to Supabase, rather than
   // rewriting every shot on every save.
-  async function saveShots(u){
-    const prevById=new Map(shots.map(s=>[s.id,s]));
-    const nextById=new Map(u.map(s=>[s.id,s]));
-    setShots(u);
-    try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}
-
+  function syncShotsToCloud(prevShots,nextShots){
+    const prevById=new Map(prevShots.map(s=>[s.id,s]));
+    const nextById=new Map(nextShots.map(s=>[s.id,s]));
     for(const id of prevById.keys()){
       if(!nextById.has(id))cloudDelete("shots",id);
     }
@@ -782,12 +789,15 @@ export default function BowlingTracker(){
       }
     }
   }
-  async function saveSessions(u){
-    const prevById=new Map(sessions.map(s=>[s.id,s]));
-    const nextById=new Map(u.map(s=>[s.id,s]));
-    setSessions(u);
-    try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}
-
+  async function saveShots(u){
+    const prev=shots;
+    setShots(u);
+    try{await window.storage.set(STORAGE_KEY,JSON.stringify(u));}catch{}
+    syncShotsToCloud(prev,u);
+  }
+  function syncSessionsToCloud(prevSessions,nextSessions){
+    const prevById=new Map(prevSessions.map(s=>[s.id,s]));
+    const nextById=new Map(nextSessions.map(s=>[s.id,s]));
     for(const id of prevById.keys()){
       if(!nextById.has(id))cloudDelete("sessions",id);
     }
@@ -797,6 +807,12 @@ export default function BowlingTracker(){
         cloudWrite("sessions",sessionToSupabaseRow(session,user?.id,leagueIdsRef.current));
       }
     }
+  }
+  async function saveSessions(u){
+    const prev=sessions;
+    setSessions(u);
+    try{await window.storage.set(SESSIONS_KEY,JSON.stringify(u));}catch{}
+    syncSessionsToCloud(prev,u);
   }
   function syncMatchesToCloud(prevMatches,nextMatches){
     const prevById=new Map(prevMatches.map(m=>[m.id,m]));
@@ -841,13 +857,21 @@ export default function BowlingTracker(){
   function getLanePattern(league,date,lane){
     return lanePatterns.find(p=>p.league===league&&p.date===date&&String(p.lane)===String(lane));
   }
-  async function setLanePattern(teamId,league,date,lane,updates){
+  function setLanePattern(teamId,league,date,lane,updates){
     const existing=getLanePattern(league,date,lane);
-    if(existing){
-      await saveLanePatterns(lanePatterns.map(p=>p===existing?{...p,...updates}:p));
-    } else {
-      await saveLanePatterns([...lanePatterns,{id:crypto.randomUUID(),teamId,league,date,lane:String(lane),patternType:"house",patternName:"",length:"",volume:"",ratio:"",...updates}]);
-    }
+    const prevPatterns=lanePatterns;
+    const updatedPatterns=existing
+      ?lanePatterns.map(p=>p===existing?{...p,...updates}:p)
+      :[...lanePatterns,{id:crypto.randomUUID(),teamId,league,date,lane:String(lane),patternType:"house",patternName:"",length:"",volume:"",ratio:"",...updates}];
+
+    setLanePatterns(updatedPatterns);
+    try{window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(updatedPatterns));}catch{}
+
+    const debounceKey=`${teamId}|${date}|${lane}`;
+    clearTimeout(lanePatternSaveTimers.current[debounceKey]);
+    lanePatternSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncLanePatternsToCloud(prevPatterns,updatedPatterns);
+    },600);
   }
   // Cycles a result through Not Marked → Won → Lost → Not Marked
   function nextResult(cur){ return cur===null?true:cur===true?false:null; }
@@ -1831,9 +1855,9 @@ export default function BowlingTracker(){
           </button>
           <button style={S.btn("warn")} onClick={handleClearPendingQueue}>Discard All Queued Writes</button>
           <div style={{fontSize:"11px",color:C.textMuted,margin:"10px 0"}}>
-            If a stuck item's error message looks like bad data rather than a connection issue (e.g. a value that clearly shouldn't be there), Sync Now will keep failing on it forever — it resends exactly what's already stored, not a fresh attempt. This clears the queue AND re-attempts your actual local matches fresh, using whatever the app currently does.
+            If a stuck item's error message looks like bad data rather than a connection issue (e.g. a value that clearly shouldn't be there), Sync Now will keep failing on it forever — it resends exactly what's already stored, not a fresh attempt. This clears the queue AND re-attempts your actual local shots, sessions, matches, and lane conditions fresh, using whatever the app currently does.
           </div>
-          <button style={{...S.btn(),width:"100%",color:C.accent,borderColor:C.accent+"44"}} onClick={handleDiscardAndResyncMatches}>Discard &amp; Resync Matches</button>
+          <button style={{...S.btn(),width:"100%",color:C.accent,borderColor:C.accent+"44"}} onClick={handleDiscardAndResyncAll}>Discard &amp; Resync Everything</button>
         </div>
       )}
 
