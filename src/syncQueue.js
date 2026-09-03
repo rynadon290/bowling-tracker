@@ -4,6 +4,21 @@ import { supabase } from './supabaseClient.js';
 // Requires the `idb` package (a small, standard Promise wrapper around the
 // browser's IndexedDB API): npm install idb
 
+// Postgres/PostgREST errors carry more than just a message — `hint` in
+// particular often states the exact fix (e.g. "Grant the required
+// privileges with: GRANT SELECT ON public.x TO authenticated;"), and
+// `details`/`code` add further context. Capturing only `.message` (as this
+// file did until now) throws away information Postgres is actively trying
+// to hand back.
+function formatError(err) {
+  const parts = [];
+  if (err?.message) parts.push(err.message);
+  if (err?.hint) parts.push(`Hint: ${err.hint}`);
+  if (err?.details) parts.push(`Details: ${err.details}`);
+  if (err?.code) parts.push(`(${err.code})`);
+  return parts.length ? parts.join(' — ') : String(err);
+}
+
 const DB_NAME = 'bowling-tracker-sync';
 const DB_VERSION = 1;
 const STORE_NAME = 'pending_writes';
@@ -101,8 +116,8 @@ export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'upsert', record, err.message);
-    return { synced: false, queued: true, reason: err.message };
+    await queueWrite(table, 'upsert', record, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
   }
 }
 
@@ -119,8 +134,8 @@ export async function cloudDelete(table, match, { timeoutMs = 6000 } = {}) {
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'delete', matchObj, err.message);
-    return { synced: false, queued: true, reason: err.message };
+    await queueWrite(table, 'delete', matchObj, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
   }
 }
 
@@ -135,7 +150,7 @@ export async function cloudRead(table, queryFn, { timeoutMs = 6000 } = {}) {
     if (error) throw error;
     return { data, online: true };
   } catch (err) {
-    return { data: null, online: false, reason: err.message };
+    return { data: null, online: false, reason: formatError(err) };
   }
 }
 
@@ -174,7 +189,7 @@ export async function flushPendingQueue() {
       // tracking existed (or whose failure reason has since changed) still
       // end up with something useful the next time someone inspects the
       // queue, without needing to discard and start over.
-      await db.put(STORE_NAME, { ...item, reason: err?.message || String(err) });
+      await db.put(STORE_NAME, { ...item, reason: formatError(err) });
       break; // leave this item and everything after it queued; try again later
     }
   }
