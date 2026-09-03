@@ -1,8 +1,13 @@
+// team_id is validated defensively here even though shots never currently
+// use the form.teamId||sessionLeague fallback that caused this exact bug
+// in matches and lane_patterns — this same bug pattern has now shown up
+// twice, so trusting every caller forever isn't a great bet.
 export function shotToSupabaseRow(shot,userId,leagueIdsMap){
+  const validTeamId=(typeof shot.teamId==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(shot.teamId))?shot.teamId:null;
   return{
     id:shot.id,
     user_id:userId,
-    team_id:shot.teamId||null,
+    team_id:validTeamId,
     league_id:leagueIdsMap[shot.league]||null,
     bowler_name:shot.bowler||"",
     date:shot.date,
@@ -58,10 +63,11 @@ export function shotFromSupabaseRow(row,leagueNameById){
 }
 
 export function sessionToSupabaseRow(session,userId,leagueIdsMap){
+  const validTeamId=(typeof session.teamId==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session.teamId))?session.teamId:null;
   return{
     id:session.id,
     user_id:userId,
-    team_id:session.teamId||null,
+    team_id:validTeamId,
     league_id:leagueIdsMap[session.league]||null,
     bowler_name:session.bowler||"",
     date:session.date,
@@ -146,10 +152,14 @@ export function matchFromSupabaseRow(row,leagueNameById){
   };
 }
 
+// pattern.teamId can legitimately be a league NAME string, not a real team
+// id — same reasoning as matchToSupabaseRow, via the same
+// form.teamId||sessionLeague fallback used throughout Lane Conditions.
 export function lanePatternToSupabaseRow(pattern,leagueIdsMap){
+  const validTeamId=(typeof pattern.teamId==="string"&&UUID_PATTERN.test(pattern.teamId))?pattern.teamId:null;
   return{
     id:pattern.id,
-    team_id:pattern.teamId||null,
+    team_id:validTeamId,
     league_id:leagueIdsMap[pattern.league]||null,
     date:pattern.date,
     lane:String(pattern.lane),

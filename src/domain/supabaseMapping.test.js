@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   shotToSupabaseRow, shotFromSupabaseRow,
   sessionToSupabaseRow, sessionFromSupabaseRow,
+  matchToSupabaseRow, lanePatternToSupabaseRow,
 } from './supabaseMapping.js';
 
 describe('shot <-> Supabase row mapping', () => {
@@ -79,5 +80,59 @@ describe('session <-> Supabase row mapping', () => {
     const row = sessionToSupabaseRow(original, 'u1', leagueIdsMap);
     const back = sessionFromSupabaseRow(row, leagueNameById);
     expect(back.scores.every(s => typeof s === 'number')).toBe(true);
+  });
+});
+
+// Regression coverage for a bug that's now hit production twice: matchKey
+// (and its lane_patterns equivalent) falls back to a league NAME string
+// like "Mount Union Men's" when a bowler isn't yet a real team member —
+// and that string used to flow straight into a uuid column, crashing
+// Postgres. All four *ToSupabaseRow functions must null out anything that
+// isn't actually UUID-shaped rather than trust the caller.
+describe('team_id validation across every *ToSupabaseRow function', () => {
+  const leagueIdsMap = { "Mount Union Men's": 'league-uuid-1' };
+  const realUuid = '11111111-1111-1111-1111-111111111111';
+  const leagueNameLeakedAsTeamId = "Mount Union Men's";
+
+  it('shotToSupabaseRow nulls a non-UUID teamId instead of passing it through', () => {
+    const row = shotToSupabaseRow({ id: 's1', league: "Mount Union Men's", teamId: leagueNameLeakedAsTeamId }, 'user-1', leagueIdsMap);
+    expect(row.team_id).toBeNull();
+  });
+  it('shotToSupabaseRow passes through a genuinely valid UUID unchanged', () => {
+    const row = shotToSupabaseRow({ id: 's1', league: "Mount Union Men's", teamId: realUuid }, 'user-1', leagueIdsMap);
+    expect(row.team_id).toBe(realUuid);
+  });
+
+  it('sessionToSupabaseRow nulls a non-UUID teamId instead of passing it through', () => {
+    const row = sessionToSupabaseRow({ id: 'sess1', league: "Mount Union Men's", teamId: leagueNameLeakedAsTeamId }, 'user-1', leagueIdsMap);
+    expect(row.team_id).toBeNull();
+  });
+  it('sessionToSupabaseRow passes through a genuinely valid UUID unchanged', () => {
+    const row = sessionToSupabaseRow({ id: 'sess1', league: "Mount Union Men's", teamId: realUuid }, 'user-1', leagueIdsMap);
+    expect(row.team_id).toBe(realUuid);
+  });
+
+  it('matchToSupabaseRow nulls a non-UUID teamId instead of passing it through', () => {
+    const row = matchToSupabaseRow({ id: 'm1', league: "Mount Union Men's", teamId: leagueNameLeakedAsTeamId, opponent: 'Bafia Builders' }, leagueIdsMap);
+    expect(row.team_id).toBeNull();
+    expect(row.league_id).toBe('league-uuid-1'); // league resolution itself is unaffected
+  });
+  it('matchToSupabaseRow passes through a genuinely valid UUID unchanged', () => {
+    const row = matchToSupabaseRow({ id: 'm1', league: "Mount Union Men's", teamId: realUuid, opponent: 'Bafia Builders' }, leagueIdsMap);
+    expect(row.team_id).toBe(realUuid);
+  });
+
+  it('lanePatternToSupabaseRow nulls a non-UUID teamId instead of passing it through', () => {
+    const row = lanePatternToSupabaseRow({ id: 'lp1', league: "Mount Union Men's", teamId: leagueNameLeakedAsTeamId, lane: '12' }, leagueIdsMap);
+    expect(row.team_id).toBeNull();
+  });
+  it('lanePatternToSupabaseRow passes through a genuinely valid UUID unchanged', () => {
+    const row = lanePatternToSupabaseRow({ id: 'lp1', league: "Mount Union Men's", teamId: realUuid, lane: '12' }, leagueIdsMap);
+    expect(row.team_id).toBe(realUuid);
+  });
+
+  it('an empty string teamId (the normal "no team yet" case) is also nulled, not sent as-is', () => {
+    const row = matchToSupabaseRow({ id: 'm1', league: "Mount Union Men's", teamId: '', opponent: 'Bafia Builders' }, leagueIdsMap);
+    expect(row.team_id).toBeNull();
   });
 });
