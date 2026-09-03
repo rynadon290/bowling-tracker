@@ -58,7 +58,6 @@ const DEFAULT_LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
 const STORAGE_KEY = "bowling-shots-v2";
 const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
-const BOWLER_HANDEDNESS_KEY = "bowling-bowler-handedness-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
@@ -232,15 +231,6 @@ export default function BowlingTracker(){
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
-  // Maps bowler name -> true if left-handed, used for correctly mirroring
-  // washout/theoretical-spare geometry. Defaults to right-handed (false)
-  // for anyone not present in this map.
-  const[bowlerHandedness,setBowlerHandedness]=useState({});
-  // Maps bowler name -> their bowler_names row id. Needed so toggling
-  // handedness later can correctly target the SAME row via upsert (which
-  // conflicts on id, not on name) rather than risk colliding with name's
-  // separate unique constraint by generating a fresh id.
-  const[bowlerNameIds,setBowlerNameIds]=useState({});
   const[teams,setTeams]=useState(()=>{
   try{
     const raw=window.localStorage.getItem("bowling-teams-v1");
@@ -368,20 +358,13 @@ export default function BowlingTracker(){
             }
           }
         }
-        const bowlersRes=await cloudRead("bowler_names",q=>q.select("id,name,left_handed"));
+        const bowlersRes=await cloudRead("bowler_names",q=>q.select("name"));
         if(bowlersRes.online&&bowlersRes.data){
           const pendingBowlers=await getQueuedRecordsForTable("bowler_names");
-          const allRows=[...bowlersRes.data,...pendingBowlers];
-          const names=[...new Set(allRows.map(r=>r.name))];
-          const handedness={};
-          const nameIds={};
-          allRows.forEach(r=>{handedness[r.name]=!!r.left_handed;if(r.id)nameIds[r.name]=r.id;});
+          const names=[...new Set([...bowlersRes.data.map(r=>r.name),...pendingBowlers.map(r=>r.name)])];
           setBowlers(names);
-          setBowlerHandedness(handedness);
-          setBowlerNameIds(nameIds);
           if(names.length)setActiveBowler(names[0]);
           try{await window.storage.set(BOWLERS_KEY,JSON.stringify(names));}catch{}
-          try{await window.storage.set(BOWLER_HANDEDNESS_KEY,JSON.stringify(handedness));}catch{}
         }else{
           const b=await window.storage.get(BOWLERS_KEY);
           if(b){
@@ -389,10 +372,6 @@ export default function BowlingTracker(){
             setBowlers(list);
             if(list.length)setActiveBowler(list[0]);
           }
-          try{
-            const h=await window.storage.get(BOWLER_HANDEDNESS_KEY);
-            if(h)setBowlerHandedness(JSON.parse(h.value));
-          }catch{}
         }
 
         const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball"));
@@ -545,25 +524,8 @@ export default function BowlingTracker(){
         if(!nextSet.has(name))cloudDelete("bowler_names",{name});
       }
       for(const name of nextSet){
-        if(!prevSet.has(name)){
-          const id=crypto.randomUUID();
-          setBowlerNameIds(prev=>({...prev,[name]:id}));
-          cloudWrite("bowler_names",{id,name,created_by:user?.id||null});
-        }
+        if(!prevSet.has(name))cloudWrite("bowler_names",{id:crypto.randomUUID(),name,created_by:user?.id||null});
       }
-    }
-
-    // Updates one bowler's handedness in place, using their tracked row id
-    // so the upsert correctly targets the existing row (upsert conflicts
-    // on id, not on name's separate unique constraint) rather than risk
-    // colliding with it via a freshly-generated id.
-    function setBowlerLeftHanded(name,leftHanded){
-      const updated={...bowlerHandedness,[name]:leftHanded};
-      setBowlerHandedness(updated);
-      try{window.storage.set(BOWLER_HANDEDNESS_KEY,JSON.stringify(updated));}catch{}
-      const id=bowlerNameIds[name]||crypto.randomUUID();
-      if(!bowlerNameIds[name])setBowlerNameIds(prev=>({...prev,[name]:id}));
-      cloudWrite("bowler_names",{id,name,left_handed:leftHanded,created_by:user?.id||null});
     }
 
     // Arsenals are a nested {bowlerName: [balls]} object locally, but a flat
@@ -1812,7 +1774,9 @@ export default function BowlingTracker(){
     if(!gameShots.length)return null;
     const f10b1=gameShots.find(s=>parseInt(s.frame)===10&&(!s.ballNum||s.ballNum===1));
     const avgFB=f10b1?theoreticalFillBallValue(bowler,league,date,game):null;
-    const theoretical=makeTheoreticalShots(gameShots,!!bowlerHandedness[bowler],avgFB);
+    const team=teams.find(t=>t.league===league);
+    const isLeftHanded=!!team?.memberHandedness?.[bowler];
+    const theoretical=makeTheoreticalShots(gameShots,isLeftHanded,avgFB);
     return strictPartial(theoretical);
   }
 
@@ -2050,14 +2014,9 @@ export default function BowlingTracker(){
                   <button style={S.btn("sm")} onClick={addBowler}>+</button>
                 </div>
                 {activeBowler&&bowlers.length>0&&(
-                  <div style={{marginTop:"8px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                  <div style={{marginTop:"8px"}}>
                     <button style={{...S.btn(),padding:"4px 10px",fontSize:"11px",color:C.miss,borderColor:C.miss+"44"}}
                       onClick={()=>removeBowler(activeBowler)}>Remove "{activeBowler}"</button>
-                    <label style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:C.textMuted,cursor:"pointer"}}>
-                      <input type="checkbox" checked={!!bowlerHandedness[activeBowler]}
-                        onChange={e=>setBowlerLeftHanded(activeBowler,e.target.checked)}/>
-                      {activeBowler} bowls left-handed
-                    </label>
                   </div>
                 )}
                 {!activeBowler&&(

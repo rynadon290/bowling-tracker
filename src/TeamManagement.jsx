@@ -57,7 +57,7 @@ export function createTeamInvite(teams, teamId, id, name, email) {
     return { teams, invite: null, error: "duplicate" };
   }
   const lineupPosition = team.members.length + team.pendingInvites.length;
-  const invite = { id, name: cleanName, email: cleanEmail || null, lineupPosition };
+  const invite = { id, name: cleanName, email: cleanEmail || null, lineupPosition, leftHanded: false, isSub: false };
   const newTeams = teams.map(t => t.id === teamId ? { ...t, pendingInvites: [...t.pendingInvites, invite] } : t);
   return { teams: newTeams, invite, error: null };
 }
@@ -215,8 +215,8 @@ export default function TeamManagement({
     }
 
     const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id"));
-    const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,profiles(display_name)"));
-    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email,lineup_position").is("accepted_at", null));
+    const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,left_handed,is_sub,profiles(display_name)"));
+    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email,lineup_position,left_handed,is_sub").is("accepted_at", null));
 
     if (teamsRes.online && teamsRes.data) {
       const membersByTeam = {};
@@ -226,6 +226,8 @@ export default function TeamManagement({
           userId: m.user_id,
           displayName: m.profiles?.display_name || "Unknown",
           lineupPosition: m.lineup_position ?? 0,
+          leftHanded: !!m.left_handed,
+          isSub: !!m.is_sub,
         });
       });
       Object.values(membersByTeam).forEach(list => list.sort((a, b) => a.lineupPosition - b.lineupPosition));
@@ -233,7 +235,10 @@ export default function TeamManagement({
       const invitesByTeam = {};
       (invitesRes.data || []).forEach(inv => {
         if (!invitesByTeam[inv.team_id]) invitesByTeam[inv.team_id] = [];
-        invitesByTeam[inv.team_id].push({ id: inv.id, name: inv.invited_name, email: inv.invited_email, lineupPosition: inv.lineup_position });
+        invitesByTeam[inv.team_id].push({
+          id: inv.id, name: inv.invited_name, email: inv.invited_email, lineupPosition: inv.lineup_position,
+          leftHanded: !!inv.left_handed, isSub: !!inv.is_sub,
+        });
       });
 
       setTeams(teamsRes.data.map(t => ({
@@ -268,10 +273,13 @@ export default function TeamManagement({
       // bowling order. The only real difference is they don't have a
       // linked account yet, which doesn't matter for local team membership.
       const combined = [
-        ...t.members.map(m => ({ name: m.displayName, lineupPosition: m.lineupPosition ?? 0 })),
-        ...t.pendingInvites.map(inv => ({ name: inv.name, lineupPosition: inv.lineupPosition ?? 999 })),
+        ...t.members.map(m => ({ name: m.displayName, lineupPosition: m.lineupPosition ?? 0, leftHanded: !!m.leftHanded, isSub: !!m.isSub })),
+        ...t.pendingInvites.map(inv => ({ name: inv.name, lineupPosition: inv.lineupPosition ?? 999, leftHanded: !!inv.leftHanded, isSub: !!inv.isSub })),
       ].sort((a, b) => a.lineupPosition - b.lineupPosition);
-      return { id: t.id, name: t.name, league: t.league, members: combined.map(x => x.name) };
+      const memberHandedness = {};
+      const memberIsSub = {};
+      combined.forEach(x => { memberHandedness[x.name] = x.leftHanded; memberIsSub[x.name] = x.isSub; });
+      return { id: t.id, name: t.name, league: t.league, members: combined.map(x => x.name), memberHandedness, memberIsSub };
     });
     onTeamsChange?.(simplified);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -407,6 +415,40 @@ export default function TeamManagement({
   function cancelInvite(teamId, inviteId) {
     setTeams(prev => cancelTeamInvite(prev, teamId, inviteId));
     cloudDelete("pending_invites", inviteId);
+  }
+
+  // Handedness and sub status for a real member. Only the changed field is
+  // sent — upsert() only updates columns present in the payload, so
+  // lineup_position and everything else on the existing row is left alone.
+  function setMemberHandedness(teamId, userId, leftHanded) {
+    setTeams(prev => prev.map(t => t.id !== teamId ? t : {
+      ...t,
+      members: t.members.map(m => m.userId === userId ? { ...m, leftHanded } : m),
+    }));
+    cloudWrite("team_members", { team_id: teamId, user_id: userId, left_handed: leftHanded });
+  }
+  function setMemberIsSub(teamId, userId, isSub) {
+    setTeams(prev => prev.map(t => t.id !== teamId ? t : {
+      ...t,
+      members: t.members.map(m => m.userId === userId ? { ...m, isSub } : m),
+    }));
+    cloudWrite("team_members", { team_id: teamId, user_id: userId, is_sub: isSub });
+  }
+
+  // Same, for a placeholder.
+  function setInviteHandedness(teamId, inviteId, leftHanded) {
+    setTeams(prev => prev.map(t => t.id !== teamId ? t : {
+      ...t,
+      pendingInvites: t.pendingInvites.map(inv => inv.id === inviteId ? { ...inv, leftHanded } : inv),
+    }));
+    cloudWrite("pending_invites", { id: inviteId, left_handed: leftHanded });
+  }
+  function setInviteIsSub(teamId, inviteId, isSub) {
+    setTeams(prev => prev.map(t => t.id !== teamId ? t : {
+      ...t,
+      pendingInvites: t.pendingInvites.map(inv => inv.id === inviteId ? { ...inv, isSub } : inv),
+    }));
+    cloudWrite("pending_invites", { id: inviteId, is_sub: isSub });
   }
 
   // Manual link: a team member picks any real, already-signed-up account
@@ -666,6 +708,10 @@ export default function TeamManagement({
             <div key={member.userId} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
               <div style={{width:"24px",color:C.textMuted,fontWeight:700}}>{index+1}.</div>
               <div style={{flex:1,color:C.text}}>{member.displayName}</div>
+              <button style={{...S.button,minWidth:"28px"}} title="Bowling hand — tap to switch"
+                onClick={()=>setMemberHandedness(team.id,member.userId,!member.leftHanded)}>{member.leftHanded?"L":"R"}</button>
+              <button style={{...S.button,color:member.isSub?C.accent:undefined}} title="Sub — tap to toggle"
+                onClick={()=>setMemberIsSub(team.id,member.userId,!member.isSub)}>{member.isSub?"Sub ✓":"Sub"}</button>
               <button style={S.button} disabled={index===0} onClick={()=>moveMember(team.id,index,-1)}>↑</button>
               <button style={S.button} disabled={index===team.members.length-1} onClick={()=>moveMember(team.id,index,1)}>↓</button>
               <button style={{...S.button,color:C.danger}} onClick={()=>removeMember(team.id,member.userId)}>×</button>
@@ -681,6 +727,10 @@ export default function TeamManagement({
                     {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
                   </div>
                 </div>
+                <button style={{...S.button,minWidth:"28px"}} title="Bowling hand — tap to switch"
+                  onClick={()=>setInviteHandedness(team.id,invite.id,!invite.leftHanded)}>{invite.leftHanded?"L":"R"}</button>
+                <button style={{...S.button,color:invite.isSub?C.accent:undefined}} title="Sub — tap to toggle"
+                  onClick={()=>setInviteIsSub(team.id,invite.id,!invite.isSub)}>{invite.isSub?"Sub ✓":"Sub"}</button>
                 <button style={S.button} onClick={()=>setLinkSearchState(prev=>prev[invite.id]!==undefined
                   ?{...prev,[invite.id]:undefined}
                   :{...prev,[invite.id]:{term:"",results:[],searching:false}}
