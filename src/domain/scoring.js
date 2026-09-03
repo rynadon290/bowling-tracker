@@ -1,4 +1,4 @@
-import { isSplit } from './splits.js';
+import { isSplit, isMakeableSpare } from './splits.js';
 
 export function isStk(s){ return s&&(s.result==="Strike"); }
 
@@ -256,6 +256,44 @@ export function strictPartial(shots){
   return framesResolved>0?total:null;
 }
 
+// Theoretical scoring: reuses strictPartial's already-correct scoring
+// logic entirely, rather than reimplementing bowling scoring rules a
+// second time. Transforms the INPUT — any open frame whose leave was
+// makeable (not a split, not a washout) gets its spareMade flipped to
+// "Yes" — then strictPartial scores the transformed shots exactly as it
+// would score a real game where every makeable spare was actually
+// converted. Strikes, already-made spares, and genuinely unmakeable opens
+// (splits/washouts) pass through unchanged, since even a theoretically
+// perfect bowler can't convert those.
+//
+// The 10th frame's first ball converts too when makeable — but only when
+// avgFirstBall is supplied. Converting it earns a fill ball that was never
+// actually thrown in a real open 10th (the game legitimately ended
+// there), and there's no way to know what that ball would have scored, so
+// it's synthesized from the bowler's own overall first-ball average on a
+// fresh rack, floored to a whole number. Without that average available,
+// the 10th frame is left as its actual result rather than converted into
+// an unscoreable state.
+export function makeTheoreticalShots(shots,leftHanded,avgFirstBall){
+  const f10Shots=shots.filter(s=>parseInt(s.frame)===10);
+  const f10b1=f10Shots.find(s=>!s.ballNum||s.ballNum===1);
+  const f10HasLaterBalls=f10Shots.some(s=>s.ballNum===2||s.ballNum===3);
+  const canConvertF10b1=!!(f10b1&&f10b1.spareMade==="No"&&isMakeableSpare(f10b1,leftHanded)&&!f10HasLaterBalls&&avgFirstBall!=null);
+
+  const transformed=shots.map(s=>{
+    if(s===f10b1&&!canConvertF10b1)return s; // can't properly score a theoretical conversion here, leave untouched
+    if(s.spareMade!=="No")return s; // already made, a strike, or not yet decided
+    if(!isMakeableSpare(s,leftHanded))return s; // splits/washouts stay open
+    return {...s,spareMade:"Yes"};
+  });
+
+  if(canConvertF10b1){
+    const fillBall={frame:"10",ballNum:3,result:"Other Leave",otherLeave:[],spareMade:"No",pinCount:String(Math.floor(avgFirstBall))};
+    return [...transformed,fillBall];
+  }
+  return transformed;
+}
+
 export function frameQualityScore(s){
   if(s.result==="Strike")return 100;
   if(s.spareMade==="Yes"){
@@ -267,4 +305,4 @@ export function frameQualityScore(s){
   const pins=s.pinCount!==""&&s.pinCount!=null?parseInt(s.pinCount):null;
   if(pins==null)return null;
   return Math.round(Math.max(0,Math.min(1,pins/9))*49*10)/10;
-          }
+}

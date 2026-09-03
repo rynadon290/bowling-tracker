@@ -68,3 +68,41 @@ export function isSinglePinLeave(shot){
   }
   return false;
 }
+
+// A washout: the headpin (1) standing alongside the 6 and/or 10 pin, with
+// the 3-pin knocked DOWN (mirrored for a left-handed bowler: 4 and/or 7
+// standing, with the 2-pin knocked down). The 3-pin/2-pin condition is
+// what actually distinguishes a washout geometrically — it's what shows
+// the ball carried through that side of the rack rather than just some
+// other leave that happens to include the headpin and a corner pin.
+// Requires the headpin UP, making this mutually exclusive with isSplit,
+// which requires the headpin DOWN — a leave is never both.
+export function isWashout(shot,leftHanded){
+  if(!shot||shot.result!=="Other Leave")return false;
+  const leave=Array.isArray(shot.otherLeave)?shot.otherLeave:[];
+  if(leave.includes("9 Pin No-Tap"))return false;
+  const standing=leave.map(Number).filter(n=>!isNaN(n));
+  if(!standing.includes(1))return false;
+  if(leftHanded){
+    if(standing.includes(2))return false;
+    return standing.includes(4)||standing.includes(7);
+  }
+  if(standing.includes(3))return false;
+  return standing.includes(6)||standing.includes(10);
+}
+
+// A "makeable" spare for theoretical scoring purposes: any leave that
+// isn't a split and isn't a washout. Every other pin combination counts as
+// makeable regardless of how many pins are standing — per the definition
+// given, only these two specific geometries are excluded. A lone 10-pin
+// (Weak 10/Ringing 10) is always makeable — it can never be a split or a
+// washout, since neither is possible without other pins/the headpin
+// involved.
+export function isMakeableSpare(shot,leftHanded){
+  if(!shot)return false;
+  if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
+  if(shot.result!=="Other Leave")return false;
+  if(isSplit(shot))return false;
+  if(isWashout(shot,leftHanded))return false;
+  return true;
+}

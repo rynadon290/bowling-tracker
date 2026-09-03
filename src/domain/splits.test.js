@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSplit, isTenPinLeave, isSinglePinLeave } from './splits.js';
+import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from './splits.js';
 
 function leave(pins) {
   return { result: 'Other Leave', otherLeave: pins };
@@ -100,5 +100,62 @@ describe('isSinglePinLeave', () => {
 
   it('9 Pin No-Tap is excluded — it is not treated as a real leave at all', () => {
     expect(isSinglePinLeave(leave(['9 Pin No-Tap']))).toBe(false);
+  });
+});
+
+describe('isWashout', () => {
+  it('1-2-10 (classic washout, 3-pin down) is a washout', () => {
+    expect(isWashout(leave(['1', '2', '10']))).toBe(true);
+  });
+  it('1-6 with 3-pin down is a washout', () => {
+    expect(isWashout(leave(['1', '6']))).toBe(true);
+  });
+  it('1-6-10 with 3-pin down is a washout', () => {
+    expect(isWashout(leave(['1', '6', '10']))).toBe(true);
+  });
+  it('1-3-6 — 3-pin STILL standing — is NOT a washout', () => {
+    expect(isWashout(leave(['1', '3', '6']))).toBe(false);
+  });
+  it('1-3-10 — 3-pin still standing — is NOT a washout', () => {
+    expect(isWashout(leave(['1', '3', '10']))).toBe(false);
+  });
+  it('headpin alone (no 6 or 10) is NOT a washout', () => {
+    expect(isWashout(leave(['1']))).toBe(false);
+  });
+  it('6-10 without the headpin is NOT a washout', () => {
+    expect(isWashout(leave(['6', '10']))).toBe(false);
+  });
+  it('a strike is not a washout', () => {
+    expect(isWashout({ result: 'Strike', otherLeave: [] })).toBe(false);
+  });
+  it('mirrors correctly for a left-handed bowler: 1-7 with 2-pin down is a washout', () => {
+    expect(isWashout(leave(['1', '7']), true)).toBe(true);
+  });
+  it('for a lefty, 1-2-7 with the 2-pin still standing is NOT a washout', () => {
+    expect(isWashout(leave(['1', '2', '7']), true)).toBe(false);
+  });
+  it('for a lefty, the same 1-6 leave that is a righty washout is NOT a washout', () => {
+    expect(isWashout(leave(['1', '6']), true)).toBe(false);
+  });
+});
+
+describe('isMakeableSpare', () => {
+  it('a simple single-pin leave is makeable', () => {
+    expect(isMakeableSpare(leave(['7']))).toBe(true);
+  });
+  it('a washout is not makeable', () => {
+    expect(isMakeableSpare(leave(['1', '6']))).toBe(false);
+  });
+  it('a split is not makeable', () => {
+    expect(isMakeableSpare(leave(['7', '10']))).toBe(false);
+  });
+  it('a strike is not evaluated as makeable at all', () => {
+    expect(isMakeableSpare({ result: 'Strike', otherLeave: [] })).toBe(false);
+  });
+  it('a Weak 10 (lone 10-pin) is always makeable', () => {
+    expect(isMakeableSpare({ result: 'Weak 10', otherLeave: [] })).toBe(true);
+  });
+  it('a Ringing 10 (lone 10-pin) is always makeable', () => {
+    expect(isMakeableSpare({ result: 'Ringing 10', otherLeave: [] })).toBe(true);
   });
 });
