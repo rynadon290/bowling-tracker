@@ -1748,10 +1748,18 @@ export default function BowlingTracker(){
   // blended team. Pick a specific bowler (compareBowler) or a specific
   // league's team (compareLeague, e.g. Tuesday Team vs Thursday Team).
   const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":"";
+  // Filtered by league name, not team_id — a shot's league is set directly
+  // and reliably at log time, matching statsShots' approach for the same
+  // team viewed directly. team_id depends on team-membership resolution
+  // that's proven fragile (a bowler not yet recognized as a team member
+  // when a shot was logged, a team recreated afterward, etc.), so relying
+  // on it here could silently compare against a skewed subset of shots
+  // that share a league but disagree on team_id for reasons that have
+  // nothing to do with which team they actually belong to.
   const compareShots=compareBowler
   ?shots.filter(s=>s.bowler===compareBowler)
   :compareLeague
-    ?shots.filter(s=>s.teamId===compareTeamId)
+    ?shots.filter(s=>s.league===compareLeague)
     :shots; // unused when showTeamCompare is false
   const teamTot=compareShots.length;
   const teamStkR=teamTot?Math.round((compareShots.filter(s=>s.result==="Strike").length/teamTot)*100):0;
