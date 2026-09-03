@@ -1410,13 +1410,19 @@ export default function BowlingTracker(){
   // whole team for each date+game — not every bowler's individual scores
   // pooled together, which would measure the spread of individual
   // performances rather than the team's actual combined-score volatility.
-  function scoreValues(bowler,league){
-    return bowler
-      ?sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores)
-      :teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+  // pooled=true returns every bowler's individual game scores pooled
+  // together (fair to compare against a single person's scores) instead of
+  // the team's combined per-game total (fair only against another team's
+  // combined total). Needed specifically for person-vs-team comparisons —
+  // comparing one person's score to a whole team's SUMMED total was never
+  // a fair comparison in the first place.
+  function scoreValues(bowler,league,pooled){
+    if(bowler)return sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
+    if(pooled)return sessions.filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
+    return teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
   }
-  function scoreConsistency(bowler,league){
-    const all=scoreValues(bowler,league);
+  function scoreConsistency(bowler,league,pooled){
+    const all=scoreValues(bowler,league,pooled);
     if(all.length<2)return null;
     const mean=all.reduce((a,b)=>a+b,0)/all.length;
     const variance=all.reduce((a,b)=>a+(b-mean)**2,0)/all.length;
@@ -3362,7 +3368,7 @@ export default function BowlingTracker(){
                             <div style={S.statNum}>{avg}</div>
                             <div style={S.statLbl}>{league.replace(" House Shot","")}</div>
                             {isTeamView&&teamGameTotalAvg(league)!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(league)}</div>}
-                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(compareBowler,league):teamGameTotalAvg(league)} label={compareLabel}/>}
+                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(compareBowler,league):(isTeamView?teamGameTotalAvg(league):rAvg("",league))} label={compareLabel}/>}
                           </div>
                         ))}
                         {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Combined</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(compareBowler)} label={compareLabel}/>}</div>)}
@@ -3400,7 +3406,7 @@ export default function BowlingTracker(){
                   const consistency=scoreConsistency(statsBowler,statsLeague);
                   if(!consistency)return null;
                   const compareTeamId=compareLeague?teams.find(t=>t.league===compareLeague)?.id||"":""; 
-                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague):null;
+                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague,!isTeamView):null;
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Score Consistency</div>
@@ -3460,7 +3466,7 @@ export default function BowlingTracker(){
                       Cumulative average at each position in the night, across the whole season — shows whether {statsBowler?"they're":"the team is"} bowling better early, middle, or late.
                       {isTeamView&&" \"Team\" is what the whole team scores together at that position."}
                     </div>
-                    <div style={{display:"flex",gap:"8px"}}>
+                    <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
                       {[0,1,2].map(idx=>{
                         const v=gameAvg(statsBowler,idx,statsLeague);
                         if(v==null)return null;
@@ -3470,7 +3476,7 @@ export default function BowlingTracker(){
                             <div style={S.statNum}>{v}</div>
                             <div style={S.statLbl}>Game {idx+1}</div>
                             {teamV!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
-                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):teamGameTotalAvgAt(compareLeague,idx)} label={compareLabel}/>}
+                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):(isTeamView?teamGameTotalAvgAt(compareLeague,idx):gameAvg("",idx,compareLeague))} label={compareLabel}/>}
                           </div>
                         );
                       })}
