@@ -4,10 +4,10 @@ import TeamManagement from "./TeamManagement.jsx";
 import Friends from "./Friends.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
-import { isSplit, isTenPinLeave, isSinglePinLeave } from "./domain/splits.js";
+import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
-  nextState, tenthFrameStatus, strictPartial, frameQualityScore,
+  nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -121,7 +121,7 @@ function CompareBadge({value,teamValue,lowerIsBetter,label}){
   if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {who}</div>;
   const better=lowerIsBetter?diff<0:diff>0;
   return (
-    <div style={{fontSize:"10px",color:better?C.strike:C.miss,marginTop:"2px",fontWeight:600,whiteSpace:"nowrap"}}>
+    <div style={{fontSize:"10px",color:better?C.strike:C.miss,marginTop:"2px",fontWeight:600}}>
       {diff>0?"▲":"▼"} {Math.abs(diff)} vs {who}
     </div>
   );
@@ -465,6 +465,7 @@ export default function BowlingTracker(){
   // match doesn't reset another's pending save.
   const matchSaveTimers=useRef({});
   const lanePatternSaveTimers=useRef({});
+  const pokerSaveTimers=useRef({});
   useEffect(()=>{
     getPendingCount().then(setPendingSyncCount);
     return onPendingCountChange(setPendingSyncCount);
@@ -1299,11 +1300,37 @@ export default function BowlingTracker(){
       id:existing?existing.id:crypto.randomUUID(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
+      pokerQuarter:existing?.pokerQuarter||[0,0,0],
+      pokerDollar:existing?.pokerDollar||[0,0,0],
       ...computeSessionStats(ss),
     };
     const updated=existing?sessions.map(s=>s.id===existing.id?session:s):[...sessions,session];
     await saveSessions(updated);
     setShowSummary(true);
+  }
+
+  // Updates one game's poker winnings on an already-saved session. Local
+  // state updates instantly; the cloud sync is debounced the same way
+  // match opponent/handicap and lane pattern fields are, since typing a
+  // dollar amount digit-by-digit would otherwise fire a write per
+  // keystroke.
+  function setPokerWinnings(sessionId,gameIdx,type,amount){
+    const prevSessions=sessions;
+    const key=type==="quarter"?"pokerQuarter":"pokerDollar";
+    const updatedSessions=sessions.map(s=>{
+      if(s.id!==sessionId)return s;
+      const arr=[...(s[key]||[0,0,0])];
+      arr[gameIdx]=amount;
+      return{...s,[key]:arr};
+    });
+    setSessions(updatedSessions);
+    try{window.storage.set(SESSIONS_KEY,JSON.stringify(updatedSessions));}catch{}
+
+    const debounceKey=`${sessionId}|${type}`;
+    clearTimeout(pokerSaveTimers.current[debounceKey]);
+    pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncSessionsToCloud(prevSessions,updatedSessions);
+    },600);
   }
 
   // bowler === "" means combined/team (every bowler's sessions included)
@@ -1631,6 +1658,11 @@ export default function BowlingTracker(){
   const tenPinLeaveCount=statsShots.filter(isTenPinLeave).length;
   const singlePinAttempts=statsShots.filter(s=>isSinglePinLeave(s)&&s.spareMade!=="");
   const singlePinMade=singlePinAttempts.filter(s=>s.spareMade==="Yes").length;
+  // Specifically the lone 5-pin (not any other single pin) — a shot the
+  // request specifically wants counted as a named stat, not folded into
+  // the general single-pin spare rate above.
+  const fivePinAttempts=statsShots.filter(s=>s.result==="Other Leave"&&Array.isArray(s.otherLeave)&&s.otherLeave.filter(p=>p!=="9 Pin No-Tap").length===1&&s.otherLeave.includes("5")&&s.spareMade!=="");
+  const fivePinMisses=fivePinAttempts.filter(s=>s.spareMade==="No").length;
   const singlePinSpareR=singlePinAttempts.length?Math.round((singlePinMade/singlePinAttempts.length)*100):0;
   const frameShots=statsShots.filter(s=>!s.ballNum||s.ballNum===1);
   const cleanFrameCount=frameShots.filter(s=>s.result==="Strike"||s.spareMade==="Yes").length;
@@ -1696,6 +1728,47 @@ export default function BowlingTracker(){
     return result;
   }
   const freshRackCount=freshRackShots(statsShots);
+
+  // The bowler's average of their most recent N (default 10) fresh-rack
+  // first-ball deliveries, ordered chronologically, counting only
+  // deliveries strictly BEFORE the given reference shot. Always
+  // computable given at least one prior fresh-rack delivery exists
+  // anywhere in the bowler's history — frames 1-9 of the SAME game alone
+  // already provide up to 9 of them, so even a bowler's very first game
+  // has this available by the time the 10th frame is reached.
+  // The value to use for a theoretical 10th-frame fill ball: the bowler's
+  // cumulative first-ball average from every OTHER game they've bowled,
+  // blended with THIS specific game's own first-ball average so far
+  // (frames 1-9 plus the 10th frame's own first ball, up to 10 values).
+  // If no other games exist yet (this is their very first game), uses
+  // only this game's data — there's nothing else to blend with.
+  function theoreticalFillBallValue(bowler,league,date,game){
+    const bowlerShots=shots.filter(s=>s.bowler===bowler);
+    const isThisGame=(s)=>s.league===league&&s.date===date&&s.game===String(game);
+
+    const otherVals=freshRackShots(bowlerShots.filter(s=>!isThisGame(s))).map(firstBallOf).filter(v=>v!=null);
+    const cumulativeAvg=otherVals.length?otherVals.reduce((a,b)=>a+b,0)/otherVals.length:null;
+
+    const thisGameVals=freshRackShots(bowlerShots.filter(isThisGame)).map(firstBallOf).filter(v=>v!=null);
+    const thisGameAvg=thisGameVals.length?thisGameVals.reduce((a,b)=>a+b,0)/thisGameVals.length:null;
+
+    if(cumulativeAvg==null)return thisGameAvg; // no other games at all — only this game's data to go on
+    if(thisGameAvg==null)return cumulativeAvg; // shouldn't normally happen once frames 1-9 are logged, but be safe
+    return (cumulativeAvg+thisGameAvg)/2;
+  }
+
+  // Theoretical score for one specific game: what the bowler would have
+  // scored had every makeable spare (including the 10th frame's first
+  // ball, filled with their own recent first-ball average) been converted.
+  // Returns null if that game isn't fully logged yet.
+  function theoreticalScoreForGame(bowler,league,date,game){
+    const gameShots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(game));
+    if(!gameShots.length)return null;
+    const f10b1=gameShots.find(s=>parseInt(s.frame)===10&&(!s.ballNum||s.ballNum===1));
+    const avgFB=f10b1?theoreticalFillBallValue(bowler,league,date,game):null;
+    const theoretical=makeTheoreticalShots(gameShots,false,avgFB);
+    return strictPartial(theoretical);
+  }
 
   // First-Ball Average — standard definition, every fresh-rack delivery
   // counted with a strike scored as 10. This is the industry-standard
@@ -2129,6 +2202,42 @@ export default function BowlingTracker(){
                       <div style={{...S.statNum,fontSize:"20px",color:C.accent}}>{cs.total}</div>
                       <div style={S.statLbl}>Series</div>
                     </div>
+                  </div>
+                  {(()=>{
+                    const theoreticalScores=[1,2,3].map(g=>theoreticalScoreForGame(cs.bowler,cs.league,cs.date,g));
+                    const anyTheoretical=theoreticalScores.some(v=>v!=null);
+                    if(!anyTheoretical)return null;
+                    return(
+                      <div style={{marginBottom:"12px"}}>
+                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>If every makeable spare had been made</div>
+                        <div style={{display:"flex",gap:"6px"}}>
+                          {theoreticalScores.map((v,i)=>(
+                            <div key={i} style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
+                              <div style={{...S.statNum,fontSize:"18px",color:v!=null?C.spare:C.textMuted}}>{v??"—"}</div>
+                              <div style={S.statLbl}>G{i+1} Theory</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{marginBottom:"12px"}}>
+                    <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Poker Winnings ($)</div>
+                    {[0,1,2].map(gameIdx=>{
+                      if(cs.scores[gameIdx]==null)return null;
+                      const quarterVal=(cs.pokerQuarter||[0,0,0])[gameIdx]??0;
+                      const dollarVal=(cs.pokerDollar||[0,0,0])[gameIdx]??0;
+                      return(
+                        <div key={gameIdx} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                          <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{gameIdx+1}</div>
+                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="0.25" placeholder="Quarter $"
+                            value={quarterVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"quarter",e.target.value===""?0:parseFloat(e.target.value))}/>
+                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Dollar $"
+                            value={dollarVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"dollar",e.target.value===""?0:parseFloat(e.target.value))}/>
+                        </div>
+                      );
+                    })}
                   </div>
                   <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{sr}%</div><div style={S.statLbl}>Strike %</div></div>
@@ -3179,6 +3288,23 @@ export default function BowlingTracker(){
                   </div>
                 </div>
 
+                {fivePinAttempts.length>0&&(
+                  <div style={S.card}>
+                    <div style={S.label}>Lone 5-Pin</div>
+                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>The 5-pin standing completely alone, nothing else in the way.</div>
+                    <div style={{display:"flex",gap:"8px"}}>
+                      <div style={{...S.statBox,border:`1px solid ${C.miss}44`}}>
+                        <div style={{...S.statNum,color:C.miss,fontSize:"20px"}}>{fivePinMisses}</div>
+                        <div style={S.statLbl}>Misses</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={{...S.statNum,color:C.textMuted,fontSize:"20px"}}>{fivePinAttempts.length-fivePinMisses}/{fivePinAttempts.length}</div>
+                        <div style={S.statLbl}>Made / Attempts</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={S.card}>
                   <div style={S.label}>Splits</div>
                   <div style={{display:"flex",gap:"8px",marginBottom:splitBreakdownList.length?"14px":"0"}}>
@@ -3379,6 +3505,54 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
+                  const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
+                  const theoreticalGameScores=relevantSessions.flatMap(s=>
+                    [1,2,3].map(g=>theoreticalScoreForGame(s.bowler,s.league,s.date,g)).filter(v=>v!=null)
+                  );
+                  if(!theoreticalGameScores.length)return null;
+                  const theoreticalAvg=theoreticalGameScores.reduce((a,b)=>a+b,0)/theoreticalGameScores.length;
+                  return(
+                    <div style={S.card}>
+                      <div style={S.label}>Theoretical Average</div>
+                      <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>What the average would be if every makeable spare (not a split, not a washout) had been made — including a theoretical 10th-frame fill ball, estimated from each game's own recent first-ball average at that point.</div>
+                      <div style={{display:"flex",gap:"8px"}}>
+                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
+                          <div style={{...S.statNum,color:C.spare}}>{Math.floor(theoreticalAvg)}</div>
+                          <div style={S.statLbl}>Theoretical Avg</div>
+                        </div>
+                        <div style={S.statBox}>
+                          <div style={{...S.statNum,color:C.textMuted}}>{theoreticalGameScores.length}</div>
+                          <div style={S.statLbl}>Games</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {(()=>{
+                  const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
+                  const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
+                  const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
+                  if(totalQuarter===0&&totalDollar===0)return null;
+                  return(
+                    <div style={S.card}>
+                      <div style={S.label}>{isTeamView?"Team Poker Winnings":"Poker Winnings"}</div>
+                      <div style={{display:"flex",gap:"8px"}}>
+                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
+                          <div style={{...S.statNum,color:C.spare}}>${totalQuarter.toFixed(2)}</div>
+                          <div style={S.statLbl}>Quarter Game</div>
+                        </div>
+                        <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
+                          <div style={{...S.statNum,color:C.strike}}>${totalDollar.toFixed(2)}</div>
+                          <div style={S.statLbl}>Dollar Game</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+
+                {(()=>{
                   const progress=avgProgress(statsBowler,statsLeague);
                   if(!progress)return null;
                   return(
@@ -3466,16 +3640,16 @@ export default function BowlingTracker(){
                       Cumulative average at each position in the night, across the whole season — shows whether {statsBowler?"they're":"the team is"} bowling better early, middle, or late.
                       {isTeamView&&" \"Team\" is what the whole team scores together at that position."}
                     </div>
-                    <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:"6px"}}>
                       {[0,1,2].map(idx=>{
                         const v=gameAvg(statsBowler,idx,statsLeague);
                         if(v==null)return null;
                         const teamV=(isTeamView&&statsLeague)?teamGameTotalAvgAt(statsLeague,idx):null;
                         return(
-                          <div key={idx} style={S.statBox}>
-                            <div style={S.statNum}>{v}</div>
-                            <div style={S.statLbl}>Game {idx+1}</div>
-                            {teamV!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
+                          <div key={idx} style={{...S.statBox,padding:"8px 4px",minWidth:0}}>
+                            <div style={{...S.statNum,fontSize:"18px"}}>{v}</div>
+                            <div style={{...S.statLbl,fontSize:"9px"}}>Game {idx+1}</div>
+                            {teamV!=null&&<div style={{fontSize:"10px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
                             {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):(isTeamView?teamGameTotalAvgAt(compareLeague,idx):gameAvg("",idx,compareLeague))} label={compareLabel}/>}
                           </div>
                         );
