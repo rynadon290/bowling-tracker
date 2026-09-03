@@ -845,8 +845,17 @@ export default function BowlingTracker(){
   // still carried on each record for the stats-reading side (seasonRecord,
   // weeklyPointsData, handicapMatches), which filter by league and don't
   // need to change.
-  function getMatch(teamId,date){
-    return matches.find(m=>m.teamId===teamId&&m.date===date);
+  function getMatch(teamId,date,league){
+    const byTeam=matches.find(m=>m.teamId===teamId&&m.date===date);
+    if(byTeam)return byTeam;
+    // Falls back to league+date when the team_id-based lookup finds
+    // nothing — this happens when a bowler's team-membership resolution
+    // has changed since the match was originally saved (not yet a real
+    // team member when first logged, but resolves differently now), so
+    // today's teamId no longer matches what's actually stored on the old
+    // record even though it's the same match.
+    if(league)return matches.find(m=>m.league===league&&m.date===date);
+    return null;
   }
 
   // Lane condition (oil pattern) for a specific lane on a specific night —
@@ -878,7 +887,7 @@ export default function BowlingTracker(){
   function nextResult(cur){ return cur===null?true:cur===true?false:null; }
 
   async function cycleGameResult(teamId,league,date,gameIdx){
-    const existing=getMatch(teamId,date);
+    const existing=getMatch(teamId,date,league);
     if(existing){
       const games=[...existing.games];
       games[gameIdx]=nextResult(games[gameIdx]??null);
@@ -891,7 +900,7 @@ export default function BowlingTracker(){
   }
 
   async function cycleSeriesResult(teamId,league,date){
-    const existing=getMatch(teamId,date);
+    const existing=getMatch(teamId,date,league);
     if(existing){
       await saveMatches(matches.map(m=>m.id===existing.id?{...m,series:nextResult(existing.series??null)}:m));
     } else {
@@ -900,7 +909,7 @@ export default function BowlingTracker(){
   }
 
   function updateMatchField(teamId,league,date,field,value){
-    const existing=getMatch(teamId,date);
+    const existing=getMatch(teamId,date,league);
     const prevMatches=matches;
     const updatedMatches=existing
       ?matches.map(m=>m.id===existing.id?{...m,[field]:value}:m)
@@ -2067,7 +2076,7 @@ export default function BowlingTracker(){
                     still works before Teams is fully configured. */}
                 {sessionLeague&&(()=>{
                   const matchKey=form.teamId||sessionLeague;
-                  const m=getMatch(matchKey,sessionDate)||{opponent:"",handicap:""};
+                  const m=getMatch(matchKey,sessionDate,sessionLeague)||{opponent:"",handicap:""};
                   const handicap=matchHandicap(m);
                   return(
                     <div style={{marginBottom:"12px"}}>
@@ -2151,7 +2160,7 @@ export default function BowlingTracker(){
                         since you naturally mark these as the night wraps up. */}
                     {sessionLeague&&(()=>{
                       const matchKey=form.teamId||sessionLeague;
-                      const m=getMatch(matchKey,sessionDate)||{games:[null,null,null],series:null};
+                      const m=getMatch(matchKey,sessionDate,sessionLeague)||{games:[null,null,null],series:null};
                       const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
                       const pointsMarked=m.games.filter(v=>v!==null).length+(m.series!==null?1:0);
                       const resultChip=(val,onTap,label)=>(
@@ -2186,7 +2195,7 @@ export default function BowlingTracker(){
             )}
 
             {/* Summary */}
-            {!editingId&&showSummary&&curSession&&(()=>{
+            {!editingId&&curSession&&(()=>{
               const cs=curSession;
               const sr=cs.shotCount?Math.round((cs.strikes/cs.shotCount)*100):0;
               const spr=cs.spareAttempts?Math.round((cs.sparesMade/cs.spareAttempts)*100):0;
