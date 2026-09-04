@@ -1,0 +1,34 @@
+name: Generate package-lock.json
+
+# Manually triggered from the Actions tab -- runs npm install in the cloud
+# and commits the resulting package-lock.json back to the repo. Lets you
+# generate/update the lockfile entirely from a phone, no terminal needed.
+# Re-run this any time package.json's dependencies change, to refresh the
+# lockfile to match.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install dependencies (generates package-lock.json)
+        run: npm install
+      - name: Commit and push package-lock.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Add/update package-lock.json"
+          git push
