@@ -278,3 +278,48 @@ export function histogramBuckets(values,bucketCount=8){
     count:counts[start],
   }));
 }
+
+// The "3-6-9" side game: NOT a per-game win. To win the pot for the night,
+// a bowler must strike in frames 3, 6, and 9 of EVERY game in the series
+// (games 1, 2, AND 3) -- 9 specific strikes total, all-or-nothing for the
+// whole session. Missing even one of those 9 strikes (in any of the 3
+// games) means no win at all that night, regardless of how the other
+// frames or games went.
+//
+// The jackpot is reachable ONLY when the whole-session win already
+// happened, and additionally requires a full turkey (three strikes) in
+// the 10th frame of game 3 specifically -- games 1 and 2 are irrelevant
+// to the jackpot regardless of what happened in their 10th frames.
+//
+// Money won (the actual pot/jackpot dollar amounts) isn't something this
+// can compute -- that depends on real-world buy-ins, not shot data -- so
+// this only determines eligibility. Amounts are tracked separately,
+// stored on the session record similar to the existing poker winnings.
+//
+// Fully computable from already-logged shots -- no new data entry needed
+// for the win/eligibility determination itself.
+export function threeSixNineResults(shots,bowler,league,date){
+  const nightShots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date);
+
+  const strikeAt=(game,frameNum)=>nightShots.some(s=>s.game===game&&parseInt(s.frame)===frameNum&&s.result==="Strike");
+
+  const perGame=["1","2","3"].map(game=>({
+    game,frame3:strikeAt(game,3),frame6:strikeAt(game,6),frame9:strikeAt(game,9),
+  }));
+
+  // All 9 specific strikes across all 3 games -- the only way to win.
+  const qualifies=perGame.every(g=>g.frame3&&g.frame6&&g.frame9);
+
+  const tenthShots=nightShots.filter(s=>s.game==="3"&&parseInt(s.frame)===10);
+  const tenthBallStrike=(ballNum)=>tenthShots.some(s=>
+    (ballNum===1?(!s.ballNum||s.ballNum===1):s.ballNum===ballNum)&&s.result==="Strike"
+  );
+  const tenthTripleStrike=tenthBallStrike(1)&&tenthBallStrike(2)&&tenthBallStrike(3);
+
+  // Jackpot requires BOTH the whole-session win AND game 3's 10th-frame
+  // turkey -- never eligible from game 1 or 2's 10th frame under any
+  // circumstances, and never eligible at all without the full 9 strikes.
+  const jackpotEligible=qualifies&&tenthTripleStrike;
+
+  return{perGame,qualifies,tenthTripleStrike,jackpotEligible};
+}

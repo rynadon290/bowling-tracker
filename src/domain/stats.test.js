@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from './stats.js';
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults } from './stats.js';
 
 describe('bowlerHighGame', () => {
   const sessions = [
@@ -426,5 +426,66 @@ describe('histogramBuckets', () => {
 
   it('returns an empty array for no values', () => {
     expect(histogramBuckets([])).toEqual([]);
+  });
+});
+
+describe('threeSixNineResults', () => {
+  function shot(game, frame, result, ballNum) {
+    return { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', game, frame: String(frame), result, ballNum: ballNum ?? null };
+  }
+  function fullNineStrikes() {
+    return ['1', '2', '3'].flatMap(g => [shot(g, 3, 'Strike'), shot(g, 6, 'Strike'), shot(g, 9, 'Strike')]);
+  }
+
+  it('qualifies only with all 9 specific strikes -- frames 3, 6, 9 across ALL of games 1, 2, and 3', () => {
+    const results = threeSixNineResults(fullNineStrikes(), 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(true);
+  });
+
+  it('fails the WHOLE session if even one of the 9 required strikes is missing, regardless of which game', () => {
+    const shots = fullNineStrikes().filter(s => !(s.game === '2' && s.frame === '6')); // remove just one
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(false);
+  });
+
+  it('cannot qualify on a short night where game 3 was never bowled at all', () => {
+    const shots = fullNineStrikes().filter(s => s.game !== '3');
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(false);
+  });
+
+  it('is jackpot-eligible when the full 9-strike win happened AND game 3\'s 10th frame is a complete turkey', () => {
+    const shots = [...fullNineStrikes(), shot('3', 10, 'Strike', 1), shot('3', 10, 'Strike', 2), shot('3', 10, 'Strike', 3)];
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.tenthTripleStrike).toBe(true);
+    expect(results.jackpotEligible).toBe(true);
+  });
+
+  it('never awards jackpot eligibility from a turkey in game 1 or 2\'s 10th frame, even with full qualification -- only game 3 counts', () => {
+    const shots = [
+      ...fullNineStrikes(),
+      shot('1', 10, 'Strike', 1), shot('1', 10, 'Strike', 2), shot('1', 10, 'Strike', 3), // turkey in game 1 -- irrelevant
+      shot('3', 10, 'Strike', 1), shot('3', 10, 'Other Leave', 2), // game 3's 10th is NOT a turkey
+    ];
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(true); // still won the pot
+    expect(results.jackpotEligible).toBe(false); // but no jackpot -- game 1's turkey doesn't count
+  });
+
+  it('never awards jackpot eligibility without the full 9-strike win, even with a real turkey in game 3\'s 10th', () => {
+    const shots = [
+      ...fullNineStrikes().filter(s => !(s.game === '1' && s.frame === '6')), // break the win
+      shot('3', 10, 'Strike', 1), shot('3', 10, 'Strike', 2), shot('3', 10, 'Strike', 3),
+    ];
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(false);
+    expect(results.jackpotEligible).toBe(false);
+    expect(results.tenthTripleStrike).toBe(true); // the turkey fact is still reported, just not eligible
+  });
+
+  it('is scoped to the specific bowler/league/date given -- other bowlers\' shots do not leak in', () => {
+    const shots = [...fullNineStrikes(), { ...shot('1', 3, 'Other Leave'), bowler: 'Aaron' }];
+    const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    expect(results.qualifies).toBe(true);
   });
 });
