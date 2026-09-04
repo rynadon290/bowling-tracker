@@ -40,13 +40,17 @@ describe('categorizeFriendships', () => {
 
 describe('computeLeaderboard', () => {
   const sessions = [
-    { user_id: 'me', average: 200 },
-    { user_id: 'me', average: 210 },
-    { user_id: 'aaron', average: 180 },
-    { user_id: 'aaron', average: 190 },
-    { user_id: 'aaron', average: 200 },
-    { user_id: 'unrelated-person', average: 300 },
-    { user_id: 'rob', average: null },
+    // 'me' has one 3-game night and one 1-game night -- deliberately unequal
+    // sizes. True average across all 4 games: (200+210+190+220)/4 = 205.
+    // The old buggy "average of per-session averages" logic would have
+    // computed ((200+210+190)/3 + 220) / 2 = (200+220)/2 = 210 instead --
+    // wrong, and a good regression check that the fix actually holds.
+    { user_id: 'me', scores: [200, 210, 190] },
+    { user_id: 'me', scores: [220] },
+    { user_id: 'aaron', scores: [180, 190, 200] },
+    { user_id: 'unrelated-person', scores: [300, 300, 300] },
+    { user_id: 'rob', scores: [] },
+    { user_id: 'zack', scores: null },
   ];
   const nameById = { me: 'You', aaron: 'Aaron' };
   const board = computeLeaderboard(sessions, nameById);
@@ -56,8 +60,11 @@ describe('computeLeaderboard', () => {
     expect(board.some(r => r.userId === 'unrelated-person')).toBe(false);
   });
 
-  it('excludes sessions with a null average', () => {
+  it('excludes sessions with no completed games (empty or null scores)', () => {
+    // rob and zack aren't even in nameById here, but this also covers the
+    // case where a real friend has a session with zero valid games logged
     expect(board.some(r => r.userId === 'rob')).toBe(false);
+    expect(board.some(r => r.userId === 'zack')).toBe(false);
   });
 
   it('ranks by overall average, highest first', () => {
@@ -65,14 +72,14 @@ describe('computeLeaderboard', () => {
     expect(board[1].userId).toBe('aaron');
   });
 
-  it('computes the correct average per person', () => {
-    expect(board[0].overallAverage).toBe(205); // (200+210)/2
+  it('computes a true game-weighted average, not an average of per-session averages', () => {
+    expect(board[0].overallAverage).toBe(205); // (200+210+190+220)/4, NOT 210
     expect(board[1].overallAverage).toBe(190); // (180+190+200)/3
   });
 
-  it('tracks the correct session count per person', () => {
-    expect(board[0].sessionCount).toBe(2);
-    expect(board[1].sessionCount).toBe(3);
+  it('tracks the correct GAME count per person, not session/night count', () => {
+    expect(board[0].gameCount).toBe(4); // 3 + 1 games across two nights, not "2 nights"
+    expect(board[1].gameCount).toBe(3);
   });
 
   it('returns an empty leaderboard for no sessions', () => {
