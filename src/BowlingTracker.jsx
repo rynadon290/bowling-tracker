@@ -312,6 +312,8 @@ export default function BowlingTracker(){
   const[editingId,setEditingId]=useState(null);
   const[preEditForm,setPreEditForm]=useState(null);
   const[saved,setSaved]=useState(false);
+  const[sessionSaved,setSessionSaved]=useState(false);
+  const[sessionSaveMessage,setSessionSaveMessage]=useState(null);
   const[filterBall,setFilterBall]=useState("");
   const[filterResult,setFilterResult]=useState("");
   const[filterBowler,setFilterBowler]=useState("");
@@ -1260,7 +1262,15 @@ export default function BowlingTracker(){
   async function submitSession(){
     if(!sessionLeague||!activeBowler)return;
     const scores=[1,2,3].map(g=>getGameStrict(activeBowler,sessionLeague,sessionDate,g)).filter(s=>s!=null);
-    if(!scores.length)return;
+    if(!scores.length){
+      // Previously silently did nothing here — no feedback at all, even
+      // though this is a common, valid state (e.g. only the match points
+      // have been entered so far, no shots logged yet for this night).
+      // Says so plainly instead of leaving the tap looking like it failed.
+      setSessionSaveMessage("No shots logged yet for this night");
+      setTimeout(()=>setSessionSaveMessage(null),2000);
+      return;
+    }
     const ss=shots.filter(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
     // A session is uniquely identified by bowler+league+date. If one already
     // exists (e.g. a double-tap on Save), update it in place rather than
@@ -1278,6 +1288,8 @@ export default function BowlingTracker(){
     const updated=existing?sessions.map(s=>s.id===existing.id?session:s):[...sessions,session];
     await saveSessions(updated);
     setShowSummary(true);
+    setSessionSaved(true);
+    setTimeout(()=>setSessionSaved(false),1500);
   }
 
   // Updates one game's poker winnings on an already-saved session. Local
@@ -1944,7 +1956,7 @@ export default function BowlingTracker(){
                     })()}
 
                     <button style={S.btn("primary")} onClick={submitSession}>
-                      Save Session & View Summary
+                      {sessionSaveMessage?sessionSaveMessage:sessionSaved?"✓ Session Saved":"Save Session & View Summary"}
                     </button>
                   </>
                 )}
