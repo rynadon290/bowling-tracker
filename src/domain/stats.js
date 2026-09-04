@@ -169,3 +169,112 @@ export function cumulativeAvgBeforeDate(sessions,bowler,league,beforeDate){
   if(!all.length)return null;
   return all.reduce((a,b)=>a+b,0)/all.length;
 }
+
+// Counts, per bowler, how many times they were the ONLY non-strike in a
+// frame where 2+ teammates all threw a first ball -- i.e. everyone else
+// struck and this bowler alone got "hung" out to dry needing a spare.
+// Uses first-ball-only shots (ballNum null or 1), grouped by the exact
+// frame (league+date+game+frame) so only genuinely shared frames count.
+export function hungCounts(shots,league){
+  const groups={};
+  shots.filter(s=>(!league||s.league===league)&&(!s.ballNum||s.ballNum===1)).forEach(s=>{
+    const key=`${s.league}|${s.date}|${s.game}|${s.frame}`;
+    (groups[key]=groups[key]||[]).push(s);
+  });
+  const counts={};
+  Object.values(groups).forEach(group=>{
+    if(group.length<2)return;
+    const nonStrikers=group.filter(s=>s.result!=="Strike");
+    if(nonStrikers.length===1){
+      const bowler=nonStrikers[0].bowler;
+      counts[bowler]=(counts[bowler]||0)+1;
+    }
+  });
+  return counts;
+}
+
+// "Beat the high average bowler" -- the giant for a given week is whoever
+// has the highest cumulative average using ONLY data from strictly BEFORE
+// that week (never that week's own results) -- the giant is crowned before
+// the challenge, not decided by the outcome being compared against. This
+// also means the very first week ever logged has no giant at all yet
+// (there's no prior data to crown one from), which is correct: the first
+// week sets the baseline, the challenge starts in week two. Once a week's
+// giant is determined, it's locked in permanently -- if the title changes
+// hands in a later week, earlier weeks are never retroactively recomputed
+// against the new giant.
+export function beatHighBowlerStats(sessions,league){
+  const dates=[...new Set(sessions.filter(s=>s.league===league).map(s=>s.date))].sort();
+  const tally={};
+  function ensure(b){if(!tally[b])tally[b]={won:0,total:0,weeksAsHigh:0};}
+  dates.forEach(date=>{
+    const priorBowlers=[...new Set(sessions.filter(s=>s.league===league&&s.date<date).map(s=>s.bowler))];
+    if(!priorBowlers.length)return; // first week ever — no prior data, no giant yet
+    let highBowler=null,highAvg=-Infinity;
+    priorBowlers.forEach(b=>{
+      const avg=cumulativeAvgBeforeDate(sessions,b,league,date);
+      if(avg!=null&&avg>highAvg){highAvg=avg;highBowler=b;}
+    });
+    if(!highBowler)return;
+    const weekSessions=sessions.filter(s=>s.league===league&&s.date===date);
+    const highSession=weekSessions.find(s=>s.bowler===highBowler);
+    if(!highSession)return; // reigning giant didn't bowl this week — title carries over, no comparison this week
+    ensure(highBowler);
+    tally[highBowler].weeksAsHigh++;
+    weekSessions.forEach(s=>{
+      if(s.bowler===highBowler)return; // don't compare the giant to themselves
+      ensure(s.bowler);
+      for(let i=0;i<3;i++){
+        const mine=s.scores[i],theirs=highSession.scores[i];
+        if(mine!=null&&theirs!=null){
+          tally[s.bowler].total++;
+          if(mine>theirs)tally[s.bowler].won++;
+        }
+      }
+    });
+  });
+  return tally;
+}
+
+// The raw pool of score values Score Consistency computes std. dev./min/max
+// over. Three modes: a specific bowler's own individual games; every
+// individual bowler's games pooled together (pooled=true, for a team-wide
+// per-person consistency figure); or, if neither, the TEAM's combined game
+// totals per night (via teamDateGroups) -- comparing one person's score to
+// a whole team's summed total was never a fair comparison in the first
+// place, so that case intentionally uses team totals instead of raw scores.
+export function scoreValues(sessions,bowler,league,pooled){
+  if(bowler)return sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  if(pooled)return sessions.filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
+  return teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+}
+
+// Standard deviation, min, and max across whichever pool of scores
+// scoreValues resolves to (see above) -- the actual shape behind an
+// average, tightly bunched vs. a long tail of bad nights dragging it down.
+export function scoreConsistency(sessions,bowler,league,pooled){
+  const all=scoreValues(sessions,bowler,league,pooled);
+  if(all.length<2)return null;
+  const mean=all.reduce((a,b)=>a+b,0)/all.length;
+  const variance=all.reduce((a,b)=>a+(b-mean)**2,0)/all.length;
+  return{stdDev:Math.round(Math.sqrt(variance)*10)/10,min:Math.min(...all),max:Math.max(...all),games:all.length};
+}
+
+// Buckets a flat array of numeric values into up to bucketCount roughly-
+// equal-width ranges, for histogram-style charting. Not session/shot-
+// specific at all -- takes any plain array of numbers.
+export function histogramBuckets(values,bucketCount=8){
+  if(!values.length)return[];
+  const min=Math.min(...values),max=Math.max(...values);
+  if(min===max)return[{label:String(min),count:values.length}];
+  const width=Math.max(1,Math.ceil((max-min+1)/bucketCount));
+  const counts={};
+  values.forEach(v=>{
+    const start=min+Math.floor((v-min)/width)*width;
+    counts[start]=(counts[start]||0)+1;
+  });
+  return Object.keys(counts).map(Number).sort((a,b)=>a-b).map(start=>({
+    label:width===1?String(start):`${start}-${start+width-1}`,
+    count:counts[start],
+  }));
+}

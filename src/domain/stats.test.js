@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate } from './stats.js';
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from './stats.js';
 
 describe('bowlerHighGame', () => {
   const sessions = [
@@ -304,5 +304,127 @@ describe('cumulativeAvgBeforeDate', () => {
 
   it('returns null when there is no data before this date (e.g. the very first week)', () => {
     expect(cumulativeAvgBeforeDate(sessions, 'Ryan', 'Thursday House Shot', '2026-08-20')).toBeNull();
+  });
+});
+
+describe('hungCounts', () => {
+  it('counts a bowler as "hung" only when everyone else in a shared frame struck and they alone did not', () => {
+    const shots = [
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Strike', bowler: 'Ryan' },
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Strike', bowler: 'Aaron' },
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Other Leave', bowler: 'Zack' },
+      // A frame where everyone struck -- no one hung
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '6', ballNum: null, result: 'Strike', bowler: 'Ryan' },
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '6', ballNum: null, result: 'Strike', bowler: 'Aaron' },
+    ];
+    expect(hungCounts(shots, 'Thursday House Shot')).toEqual({ Zack: 1 });
+  });
+
+  it('does not count a frame where only one bowler logged at all -- not actually a shared frame', () => {
+    const shots = [
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Other Leave', bowler: 'Ryan' },
+    ];
+    expect(hungCounts(shots, 'Thursday House Shot')).toEqual({});
+  });
+
+  it('does not count a frame where 2+ bowlers all missed -- hung is specifically "everyone else struck"', () => {
+    const shots = [
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Other Leave', bowler: 'Ryan' },
+      { league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: '5', ballNum: null, result: 'Other Leave', bowler: 'Aaron' },
+    ];
+    expect(hungCounts(shots, 'Thursday House Shot')).toEqual({});
+  });
+});
+
+describe('beatHighBowlerStats', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-20', scores: [180, 190, 200], total: 570 },
+    { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-08-20', scores: [150, 160, 170], total: 480 },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-27', scores: [200, 210, 220], total: 630 },
+    { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-08-27', scores: [190, 195, 205], total: 590 },
+  ];
+
+  it('crowns the giant week 2 (Ryan\'s 190 average beats Aaron\'s 160 entering that week), never comparing week 1 (no prior data)', () => {
+    const result = beatHighBowlerStats(sessions, 'Thursday House Shot');
+    expect(result.Ryan.weeksAsHigh).toBe(1);
+  });
+
+  it('tallies the challenger\'s game-by-game wins/losses against the reigning giant, not the giant\'s own record', () => {
+    const result = beatHighBowlerStats(sessions, 'Thursday House Shot');
+    // Aaron lost all 3 games to Ryan in week 2 (190<200, 195<210, 205<220)
+    expect(result.Aaron.won).toBe(0);
+    expect(result.Aaron.total).toBe(3);
+  });
+
+  it('never gives the giant a won/total record against themselves', () => {
+    const result = beatHighBowlerStats(sessions, 'Thursday House Shot');
+    expect(result.Ryan.won).toBe(0);
+    expect(result.Ryan.total).toBe(0);
+  });
+
+  it('returns an empty tally when there is no second week to challenge in yet', () => {
+    const oneWeek = [sessions[0], sessions[1]];
+    expect(beatHighBowlerStats(oneWeek, 'Thursday House Shot')).toEqual({});
+  });
+});
+
+describe('scoreValues / scoreConsistency', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [190, 210, 200], total: 600 },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-27', scores: [170, 230, 190], total: 590 },
+  ];
+
+  it('scoreValues returns a specific bowler\'s own flat game scores when a bowler is given', () => {
+    expect(scoreValues(sessions, 'Ryan', 'Thursday House Shot')).toEqual([190, 210, 200, 170, 230, 190]);
+  });
+
+  it('scoreValues returns TEAM game totals (not raw individual scores) when no bowler and not pooled', () => {
+    const teamSessions = [
+      { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [200, 210, 190], total: 600 },
+      { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-09-03', scores: [220, 230, 200], total: 650 },
+    ];
+    // Team totals per game: [420, 440, 390] -- not the 6 raw individual scores
+    expect(scoreValues(teamSessions, '', 'Thursday House Shot', false)).toEqual([420, 440, 390]);
+  });
+
+  it('scoreValues pooled=true returns every individual game score pooled together, not team totals', () => {
+    const teamSessions = [
+      { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [200, 210, 190], total: 600 },
+      { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-09-03', scores: [220, 230, 200], total: 650 },
+    ];
+    const pooled = scoreValues(teamSessions, '', 'Thursday House Shot', true);
+    expect(pooled).toHaveLength(6);
+    expect(pooled).toContain(200);
+    expect(pooled).toContain(230);
+  });
+
+  it('scoreConsistency computes stdDev/min/max/games from whatever scoreValues resolves to', () => {
+    const result = scoreConsistency(sessions, 'Ryan', 'Thursday House Shot');
+    expect(result.min).toBe(170);
+    expect(result.max).toBe(230);
+    expect(result.games).toBe(6);
+    expect(result.stdDev).toBeCloseTo(18.6, 1);
+  });
+
+  it('scoreConsistency returns null with fewer than 2 games -- standard deviation is meaningless for one value', () => {
+    const oneGame = [{ bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [200], total: 200 }];
+    expect(scoreConsistency(oneGame, 'Ryan', 'Thursday House Shot')).toBeNull();
+  });
+});
+
+describe('histogramBuckets', () => {
+  it('bins values into roughly-equal-width ranges', () => {
+    const buckets = histogramBuckets([180, 190, 200, 210, 220, 150, 160]);
+    expect(buckets.length).toBeGreaterThan(0);
+    const totalCounted = buckets.reduce((a, b) => a + b.count, 0);
+    expect(totalCounted).toBe(7); // every value accounted for exactly once
+  });
+
+  it('collapses to a single bucket when every value is identical', () => {
+    expect(histogramBuckets([200, 200, 200])).toEqual([{ label: '200', count: 3 }]);
+  });
+
+  it('returns an empty array for no values', () => {
+    expect(histogramBuckets([])).toEqual([]);
   });
 });
