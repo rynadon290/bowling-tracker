@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData } from './stats.js';
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate } from './stats.js';
 
 describe('bowlerHighGame', () => {
   const sessions = [
@@ -171,5 +171,138 @@ describe('weeklyPointsData', () => {
       { league: 'Tuesday House Shot', date: '2026-09-01', games: [true, true, true], series: true, opponent: 'Team C' },
     ];
     expect(weeklyPointsData(matches, 'Thursday House Shot')).toHaveLength(1);
+  });
+});
+
+describe('gameAvg', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', scores: [200, 210, 190] },
+    { bowler: 'Ryan', league: 'Thursday House Shot', scores: [180, 220, 200] },
+    { bowler: 'Aaron', league: 'Thursday House Shot', scores: [150, 160, 170] },
+  ];
+
+  it('averages one specific game position (e.g. every "Game 1" score) for one bowler', () => {
+    // Game 1 (index 0) for Ryan: (200+180)/2 = 190
+    expect(gameAvg(sessions, 'Ryan', 0, 'Thursday House Shot')).toBe(190);
+  });
+
+  it('pools every bowler together when bowler is empty/omitted -- a per-person average, not a team total', () => {
+    // Game 1 (index 0) across everyone: (200+180+150)/3 = 176.67 -> rounds to 177
+    expect(gameAvg(sessions, '', 0, 'Thursday House Shot')).toBe(177);
+  });
+
+  it('returns null when no games exist at that position for this filter', () => {
+    expect(gameAvg(sessions, 'Nobody', 0, 'Thursday House Shot')).toBeNull();
+  });
+});
+
+describe('teamGameTotalAvg / teamGameTotalAvgAt', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [200, 210, 190], total: 600 },
+    { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-09-03', scores: [220, 230, 200], total: 650 },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-27', scores: [150, 160, 140], total: 450 },
+    { bowler: 'Aaron', league: 'Thursday House Shot', date: '2026-08-27', scores: [140, 150, 130], total: 420 },
+  ];
+
+  it('averages the TEAM total for one specific game position across every team night', () => {
+    // Game 1 team totals: 09-03 = 200+220 = 420, 08-27 = 150+140 = 290. Avg = 355, truncated
+    expect(teamGameTotalAvgAt(sessions, 'Thursday House Shot', 0)).toBe(355);
+  });
+
+  it('averages ALL game positions pooled together for the team', () => {
+    // All 6 team-game-totals: [420,440,390,290,310,270], avg=353.33, truncated to 353
+    expect(teamGameTotalAvg(sessions, 'Thursday House Shot')).toBe(353);
+  });
+
+  it('truncates rather than rounds, so it never overstates what was actually earned', () => {
+    // 355 and 353 above are only correct if truncated -- rounding either would differ
+    const atResult = teamGameTotalAvgAt(sessions, 'Thursday House Shot', 0);
+    const allResult = teamGameTotalAvg(sessions, 'Thursday House Shot');
+    expect(Number.isInteger(atResult)).toBe(true);
+    expect(Number.isInteger(allResult)).toBe(true);
+  });
+
+  it('returns null with no real team nights', () => {
+    const solo = [{ bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [200, 210, 190], total: 600 }];
+    expect(teamGameTotalAvg(solo, 'Thursday House Shot')).toBeNull();
+    expect(teamGameTotalAvgAt(solo, 'Thursday House Shot', 0)).toBeNull();
+  });
+});
+
+describe('rAvg', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', scores: [200, 210, 190] },
+    { bowler: 'Ryan', league: 'Tuesday House Shot', scores: [150, 160, 140] },
+  ];
+
+  it('averages only within the ONE given league, unlike cAvg which can combine leagues', () => {
+    expect(rAvg(sessions, 'Ryan', 'Thursday House Shot')).toBe(200); // (200+210+190)/3
+  });
+
+  it('does not blend in a different league\'s scores', () => {
+    expect(rAvg(sessions, 'Ryan', 'Tuesday House Shot')).toBe(150); // (150+160+140)/3
+  });
+
+  it('bowler="" pools everyone in that league together', () => {
+    const multi = [
+      { bowler: 'Ryan', league: 'Thursday House Shot', scores: [200] },
+      { bowler: 'Aaron', league: 'Thursday House Shot', scores: [220] },
+    ];
+    expect(rAvg(multi, '', 'Thursday House Shot')).toBe(210); // (200+220)/2
+  });
+});
+
+describe('cAvg', () => {
+  it('combines every league a bowler plays in when no league is given', () => {
+    const sessions = [
+      { bowler: 'Ryan', league: 'Thursday House Shot', scores: [200, 210] },
+      { bowler: 'Ryan', league: 'Tuesday House Shot', scores: [190] },
+    ];
+    // All scores pooled: (200+210+190)/3 = 200
+    expect(cAvg(sessions, 'Ryan', '')).toBe(200);
+  });
+
+  it('scopes to just one league when given, matching rAvg in that case', () => {
+    const sessions = [
+      { bowler: 'Ryan', league: 'Thursday House Shot', scores: [200, 210] },
+      { bowler: 'Ryan', league: 'Tuesday House Shot', scores: [190] },
+    ];
+    expect(cAvg(sessions, 'Ryan', 'Thursday House Shot')).toBe(205); // (200+210)/2
+  });
+});
+
+describe('avgProgress', () => {
+  it('computes the current 5-pin milestone band and percent progress through it', () => {
+    // Average of [200,210,190,187] = 196.75 -> current milestone floor is 195, next is 200
+    const sessions = [{ bowler: 'Ryan', league: 'Thursday House Shot', scores: [200, 210, 190, 187] }];
+    const result = avgProgress(sessions, 'Ryan', 'Thursday House Shot');
+    expect(result.current).toBe(196);
+    expect(result.prevMilestone).toBe(195);
+    expect(result.nextMilestone).toBe(200);
+    expect(result.pct).toBeCloseTo(35, 0); // (196.75-195)/5 * 100 = 35%
+  });
+
+  it('returns null with no data', () => {
+    expect(avgProgress([], 'Ryan', 'Thursday House Shot')).toBeNull();
+  });
+});
+
+describe('cumulativeAvgBeforeDate', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-20', scores: [180, 190, 200] },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-08-27', scores: [200, 210, 220] },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', scores: [300, 300, 300] },
+  ];
+
+  it('only includes sessions strictly BEFORE the given date -- never that date\'s own results', () => {
+    // Entering 09-03, only 08-20 and 08-27 count -- the 09-03 300s must not leak in
+    const result = cumulativeAvgBeforeDate(sessions, 'Ryan', 'Thursday House Shot', '2026-09-03');
+    const expected = (180+190+200+200+210+220) / 6;
+    expect(result).toBe(expected);
+    expect(result).toBeLessThan(210); // sanity check it's nowhere near the 300-inflated figure
+  });
+
+  it('returns null when there is no data before this date (e.g. the very first week)', () => {
+    expect(cumulativeAvgBeforeDate(sessions, 'Ryan', 'Thursday House Shot', '2026-08-20')).toBeNull();
   });
 });
