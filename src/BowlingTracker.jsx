@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import TeamManagement from "./TeamManagement.jsx";
 import Friends from "./Friends.jsx";
+import HistoryView from "./HistoryView.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
@@ -13,6 +14,8 @@ import {
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
+import { C, S, Chip, PinDeck, CollapsibleCard, CompareBadge, resultSym } from "./ui.jsx";
+import { DEFAULT_ARSENAL, SURFACES, RESULTS, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS, DEFAULT_LEAGUES, localDateString } from "./constants.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -38,37 +41,6 @@ if (typeof window !== "undefined" && !window.storage) {
   };
 }
 
-// Seed arsenal for the very first bowler created (preserves continuity with
-// existing logged data). Every bowler added after that starts with an empty
-// arsenal and builds their own list.
-const DEFAULT_ARSENAL = [
-  "Bionic","Ion Max Solid","Ion Max Pearl",
-  "Phaze II Solid","Phaze II Pearl",
-  "Harsh Reality Pearl","Road Warrior Pearl","Equinox Pearl",
-];
-const SURFACES = ["Box","500","1000","1500","2000","3000","4000","Polish","Lane Shine"];
-const RESULTS = ["Strike","Weak 10","Ringing 10","Other Leave"];
-const STRIKE_DESCRIPTIONS = ["Flush","High","Light","Half Pocket","Trip 4","Kick 10","Brooklyn"];
-const RELEASES = ["Good","Acceptable","Bad"];
-const MISSES = ["Left","Right","Fast","Slow","Execution"];
-const BALL_CHANGE_REASONS = [
-  "Too early","Too late","Too round","Too sharp",
-  "Roll out","Poor carry","No miss room","Lane transition","Surface worn",
-];
-const DEFAULT_LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
-
-// Returns today's date as YYYY-MM-DD using LOCAL date components, not UTC.
-// new Date().toISOString() always converts to UTC first -- for anyone west
-// of UTC (all of the US, for instance), bowling in the evening can already
-// be "tomorrow" in UTC while it's still today locally, silently dating a
-// session one day ahead of when it was actually bowled.
-function localDateString(d=new Date()){
-  const y=d.getFullYear();
-  const m=String(d.getMonth()+1).padStart(2,"0");
-  const day=String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
-
 const STORAGE_KEY = "bowling-shots-v2";
 const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
@@ -76,109 +48,6 @@ const ARSENALS_KEY = "bowling-arsenals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
-
-const C = {
-  bg:"#0f1117",surface:"#1a1d27",card:"#22263a",
-  accent:"#4a9eff",accentDim:"#1e3a5f",
-  strike:"#22c55e",spare:"#f59e0b",miss:"#ef4444",
-  text:"#e8eaf0",textMuted:"#8892a4",border:"#2e3347",
-};
-
-const S = {
-  app:{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px"},
-  header:{backgroundColor:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
-  title:{fontSize:"16px",fontWeight:700,letterSpacing:"0.05em",color:C.accent,textTransform:"uppercase"},
-  nav:{display:"flex",gap:"4px"},
-  navBtn:(a)=>({padding:"6px 12px",borderRadius:"6px",border:"none",cursor:"pointer",fontSize:"12px",fontWeight:600,backgroundColor:a?C.accent:"transparent",color:a?"#fff":C.textMuted}),
-  content:{padding:"16px",maxWidth:"480px",margin:"0 auto"},
-  card:{backgroundColor:C.card,borderRadius:"12px",padding:"16px",marginBottom:"12px",border:`1px solid ${C.border}`},
-  label:{fontSize:"10px",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:C.textMuted,marginBottom:"8px"},
-  chips:{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"12px"},
-  chip:(sel,col)=>({padding:"6px 12px",borderRadius:"20px",border:`1px solid ${sel?(col||C.accent):C.border}`,backgroundColor:sel?(col?col+"22":C.accentDim):"transparent",color:sel?(col||C.accent):C.textMuted,cursor:"pointer",fontSize:"12px",fontWeight:sel?600:400,WebkitTapHighlightColor:"transparent"}),
-  row:{display:"flex",gap:"8px",marginBottom:"8px"},
-  input:{width:"100%",backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",padding:"10px 12px",color:C.text,fontSize:"14px",boxSizing:"border-box",outline:"none"},
-  sel:{flex:1,backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",padding:"10px 12px",color:C.text,fontSize:"14px",outline:"none",appearance:"none"},
-  btn:(v)=>({padding:"12px 20px",borderRadius:"10px",border:"none",cursor:"pointer",fontSize:"14px",fontWeight:700,WebkitTapHighlightColor:"transparent",...(v==="primary"?{backgroundColor:C.accent,color:"#fff",width:"100%"}:v==="sm"?{backgroundColor:C.surface,color:C.textMuted,border:`1px solid ${C.border}`,padding:"8px 14px",fontSize:"18px"}:v==="warn"?{backgroundColor:"#ef444422",color:"#ef4444",border:`1px solid #ef444444`,width:"100%"}:{backgroundColor:C.surface,color:C.textMuted,border:`1px solid ${C.border}`})}),
-  divider:{height:"1px",backgroundColor:C.border,margin:"12px 0"},
-  shotCard:{backgroundColor:C.card,borderRadius:"10px",padding:"12px",marginBottom:"8px",border:`1px solid ${C.border}`,display:"flex",gap:"12px",alignItems:"flex-start"},
-  dot:(r)=>({width:"32px",height:"32px",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:700,flexShrink:0,backgroundColor:r==="Strike"?C.strike+"22":r?.includes("10")?C.miss+"22":C.spare+"22",color:r==="Strike"?C.strike:r?.includes("10")?C.miss:C.spare}),
-  tag:(c)=>({display:"inline-block",padding:"2px 8px",borderRadius:"10px",fontSize:"11px",backgroundColor:(c||C.accent)+"22",color:c||C.accent,marginRight:"4px",marginBottom:"4px"}),
-  statBox:{backgroundColor:C.surface,borderRadius:"10px",padding:"12px",textAlign:"center",flex:1,border:`1px solid ${C.border}`},
-  statNum:{fontSize:"24px",fontWeight:700,color:C.accent,lineHeight:1,marginBottom:"4px"},
-  statLbl:{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"},
-};
-
-function Chip({label,selected,onToggle,color,dense}){
-  const style=dense?{...S.chip(selected,color),padding:"5px 9px"}:S.chip(selected,color);
-  return <button style={style} onClick={onToggle}>{label}</button>;
-}
-
-// Renders the ten pins in their actual rack positions — back row (7-10) at
-// top, headpin (1) at bottom — so tapping matches where the pin physically
-// stood, rather than a linear row of numbered chips a bowler has to
-// translate from memory.
-function PinDeck({selected,onToggle}){
-  const rows=[
-    [{n:"7",x:14},{n:"8",x:38},{n:"9",x:62},{n:"10",x:86}],
-    [{n:"4",x:26},{n:"5",x:50},{n:"6",x:74}],
-    [{n:"2",x:38},{n:"3",x:62}],
-    [{n:"1",x:50}],
-  ];
-  const pinSize=52,rowGap=58,topPad=8;
-  return (
-    <div style={{position:"relative",height:`${topPad*2+rowGap*3+pinSize}px`,margin:"12px 0"}}>
-      {rows.map((row,rowIdx)=>row.map(pin=>{
-        const isSelected=Array.isArray(selected)&&selected.includes(pin.n);
-        return (
-          <button key={pin.n} onClick={()=>onToggle(pin.n)}
-            style={{
-              position:"absolute",left:`${pin.x}%`,top:`${rowIdx*rowGap+topPad}px`,
-              transform:"translateX(-50%)",width:`${pinSize}px`,height:`${pinSize}px`,
-              borderRadius:"50%",border:`2px solid ${isSelected?C.spare:C.border}`,
-              backgroundColor:isSelected?C.spare+"33":C.surface,color:isSelected?C.spare:C.textMuted,
-              fontSize:"16px",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",
-              WebkitTapHighlightColor:"transparent",cursor:"pointer",
-            }}>{pin.n}</button>
-        );
-      }))}
-    </div>
-  );
-}
-
-function CollapsibleCard({title,summary,expanded,onToggle,children}){
-  return (
-    <div style={S.card}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",WebkitTapHighlightColor:"transparent"}} onClick={onToggle}>
-        <div style={{...S.label,marginBottom:0}}>
-          {title}
-          {summary&&<span style={{color:C.textMuted,fontWeight:400,textTransform:"none",letterSpacing:"normal"}}> · {summary}</span>}
-        </div>
-        <span style={{color:C.textMuted,fontSize:"12px",transform:expanded?"rotate(180deg)":"none",transition:"transform 0.15s",flexShrink:0,marginLeft:"8px"}}>▾</span>
-      </div>
-      {expanded&&<div style={{marginTop:"12px"}}>{children}</div>}
-    </div>
-  );
-}
-
-function CompareBadge({value,teamValue,lowerIsBetter,label}){
-  if(value==null||teamValue==null||isNaN(value)||isNaN(teamValue))return null;
-  const who=label||"team";
-  const diff=Math.round(value-teamValue);
-  if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {who}</div>;
-  const better=lowerIsBetter?diff<0:diff>0;
-  return (
-    <div style={{fontSize:"10px",color:better?C.strike:C.miss,marginTop:"2px",fontWeight:600}}>
-      {diff>0?"▲":"▼"} {Math.abs(diff)} vs {who}
-    </div>
-  );
-}
-
-function resultSym(r){
-  if(r==="Strike")return"X";
-  if(r==="Weak 10")return"W";
-  if(r==="Ringing 10")return"R";
-  return"L";
-}
 
 // ── Score calculator ──────────────────────────────────────────────────────────
 // Shots: {frame:"1"-"10", ballNum:1-3 (frame 10 only), result, spareMade, pinCount}
@@ -2382,82 +2251,14 @@ export default function BowlingTracker(){
         {/* HISTORY VIEW                                                      */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="history"&&(
-          <>
-            <div style={S.card}>
-              <div style={S.label}>Filter</div>
-              {bowlers.length>1&&(
-                <div style={S.chips}>
-                  {bowlers.map(b=>(
-                    <Chip key={b} label={b} selected={filterBowler===b} onToggle={()=>setFilterBowler(filterBowler===b?"":b)}/>
-                  ))}
-                </div>
-              )}
-              <div style={S.chips}>
-                {leagues.map(l=>(
-                  <Chip key={l} label={l.replace(" House Shot","")}
-                    selected={filterBall==="__"+l} onToggle={()=>setFilterBall(filterBall==="__"+l?"":"__"+l)}/>
-                ))}
-              </div>
-              <div style={S.row}>
-                <select style={S.sel} value={filterBall.startsWith("__")?"":filterBall} onChange={e=>setFilterBall(e.target.value)}>
-                  <option value="">All Balls</option>
-                  {ballUniverse(filterBowler).map(b=><option key={b}>{b}</option>)}
-                </select>
-                <select style={S.sel} value={filterResult} onChange={e=>setFilterResult(e.target.value)}>
-                  <option value="">All Results</option>
-                  {RESULTS.map(r=><option key={r}>{r}</option>)}
-                </select>
-              </div>
-              <div style={{color:C.textMuted,fontSize:"12px"}}>{filtered.length} shots {filterBall||filterResult||filterBowler?"(filtered)":"total"}</div>
-            </div>
-
-            {filtered.length===0&&<div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}>No shots logged yet.</div>}
-
-            {[...filtered].reverse().map(shot=>(
-              <div key={shot.id} style={S.shotCard}>
-                <div style={S.dot(shot.result)}>{resultSym(shot._displayResult||shot.result)}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"4px"}}>
-                    <div style={{fontSize:"12px",fontWeight:600}}>
-                      {bowlers.length>1&&shot.bowler&&<span style={{color:C.accent}}>{shot.bowler} · </span>}
-                      {shot.ball||"—"}
-                      {shot.surface&&<span style={{color:C.textMuted,fontWeight:400}}> · {shot.surface}</span>}
-                    </div>
-                    <div style={{fontSize:"10px",color:C.textMuted,textAlign:"right"}}>
-                      {shot.date}<br/>
-                      G{shot.game} F{shot.frame}{shot.ballNum?` B${shot.ballNum}`:""} L{shot.lane}
-                    </div>
-                  </div>
-                  <div style={{marginBottom:"4px"}}>
-                    {shot.result&&(
-                      <span style={S.tag(shot.result==="Strike"?C.strike:shot.result.includes("10")?C.miss:C.spare)}>
-                        {shot._displayResult||shot.result}
-                        {Array.isArray(shot._displayLeave)&&shot._displayLeave.filter(p=>p!=="9 Pin No-Tap").length>0
-                          ?` (${shot._displayLeave.filter(p=>p!=="9 Pin No-Tap").sort((a,b)=>Number(a)-Number(b)).join("-")})`
-                          :""}
-                      </span>
-                    )}
-                    {shot.strikeDescription&&<span style={S.tag(C.strike)}>{shot.strikeDescription}</span>}
-                    {shot.spareMade&&<span style={S.tag(shot.spareMade==="Yes"?C.strike:C.miss)}>Spare: {shot.spareMade}</span>}
-                    {isSplit(shot)&&<span style={S.tag(C.miss)}>SPLIT</span>}
-                    {shot.pinCount!==""&&shot.pinCount!==undefined&&<span style={S.tag(C.spare)}>{shot.pinCount} pins</span>}
-                  </div>
-                  <div style={{marginBottom:"4px"}}>
-                    {shot.release&&<span style={S.tag(shot.release==="Good"?C.strike:shot.release==="Bad"?C.miss:C.spare)}>{shot.release}</span>}
-                    {Array.isArray(shot.miss)&&shot.miss.length>0&&<span style={S.tag(C.miss)}>Miss: {shot.miss.join(", ")}</span>}
-                  </div>
-                  {shot.startingBoard&&<div style={{fontSize:"11px",color:C.textMuted}}>Board {shot.startingBoard} → Arrow {shot.targetArrows}</div>}
-                  {Array.isArray(shot.ballChangeReason)&&shot.ballChangeReason.length>0&&(
-                    <div style={{fontSize:"11px",color:C.spare,marginTop:"2px"}}>Ball change: {shot.ballChangeReason.join(", ")}</div>
-                  )}
-                  {shot.notes&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px",fontStyle:"italic"}}>{shot.notes}</div>}
-                  <button style={{...S.btn(),padding:"4px 10px",fontSize:"11px",marginTop:"6px"}} onClick={()=>startEdit(shot)}>✏️ Edit</button>
-                </div>
-                <button style={{background:"none",border:"none",color:C.textMuted,cursor:"pointer",fontSize:"16px",padding:"0 0 0 8px",flexShrink:0}} onClick={()=>deleteShot(shot.id)}>×</button>
-              </div>
-            ))}
-            <div style={{height:"32px"}}/>
-          </>
+          <HistoryView
+            bowlers={bowlers} leagues={leagues}
+            filterBowler={filterBowler} setFilterBowler={setFilterBowler}
+            filterBall={filterBall} setFilterBall={setFilterBall}
+            filterResult={filterResult} setFilterResult={setFilterResult}
+            filtered={filtered} ballUniverse={ballUniverse}
+            startEdit={startEdit} deleteShot={deleteShot}
+          />
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
