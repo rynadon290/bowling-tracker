@@ -38,10 +38,11 @@ export function categorizeFriendships(friendships, myUserId, profilesById) {
 // about whose game it actually was. Grouping by user_id alone silently
 // folds anyone else's proxy-logged nights into this account's own total.
 export function computeLeaderboard(sessions, nameById) {
+  const normalize = s => (s || "").trim().toLowerCase();
   const byUser = {};
   sessions.forEach(s => {
     const ownerName = nameById[s.user_id];
-    if (!ownerName || s.bowler_name !== ownerName) return;
+    if (!ownerName || normalize(s.bowler_name) !== normalize(ownerName)) return;
     const games = Array.isArray(s.scores) ? s.scores.filter(x => x != null) : [];
     if (!games.length) return;
     (byUser[s.user_id] = byUser[s.user_id] || []).push(...games);
@@ -85,6 +86,12 @@ export default function Friends() {
 
   const[leaderboard,setLeaderboard]=useState([]);
   const[leaderboardLoading,setLeaderboardLoading]=useState(false);
+  // True if this account has real session rows under its user_id, but none
+  // of them matched its own display_name -- meaning the account's own
+  // games are silently missing from the leaderboard below because
+  // display_name doesn't match the bowler_name sessions are logged under
+  // (most commonly: display_name was never set).
+  const[nameMismatchWarning,setNameMismatchWarning]=useState(false);
 
   async function loadFriendships() {
     setLoading(true);
@@ -121,7 +128,14 @@ export default function Friends() {
     friends.forEach(f=>{nameById[f.userId]=f.displayName;});
 
     const{data,online}=await cloudRead("sessions",q=>q.select("user_id,bowler_name,scores").in("user_id",allIds));
-    if (online && data) setLeaderboard(computeLeaderboard(data,nameById));
+    if (online && data) {
+      setLeaderboard(computeLeaderboard(data,nameById));
+      const normalize=s=>(s||"").trim().toLowerCase();
+      const myOwnName=nameById[user.id];
+      const mySessions=data.filter(s=>s.user_id===user.id);
+      const myMatchedSessions=mySessions.filter(s=>normalize(s.bowler_name)===normalize(myOwnName));
+      setNameMismatchWarning(mySessions.length>0 && myMatchedSessions.length===0);
+    }
     setLeaderboardLoading(false);
   }
 
@@ -241,6 +255,13 @@ export default function Friends() {
           </div>
         ))}
       </div>
+
+      {nameMismatchWarning && (
+        <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
+          <div style={{color:C.spare,fontSize:"13px",fontWeight:600,marginBottom:"4px"}}>⚠️ Your games aren't showing on the leaderboard</div>
+          <div style={{color:C.textMuted,fontSize:"12px"}}>Your account's display name doesn't match the bowler name your sessions are logged under. Set your name in Teams to fix this.</div>
+        </div>
+      )}
 
       <div style={S.card}>
         <div style={S.label}>Leaderboard</div>

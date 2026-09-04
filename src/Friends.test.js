@@ -100,6 +100,16 @@ describe('computeLeaderboard', () => {
     expect(board[1].gameCount).toBe(3);
   });
 
+  it('matches bowler_name to display_name regardless of case or surrounding whitespace, so minor naming inconsistencies do not silently exclude someone\'s own real games', () => {
+    const messySessions = [
+      { user_id: 'me', bowler_name: '  Ryan  ', scores: [200, 210, 190] },
+    ];
+    const messyNameById = { me: 'ryan' };
+    const messyBoard = computeLeaderboard(messySessions, messyNameById);
+    expect(messyBoard).toHaveLength(1);
+    expect(messyBoard[0].gameCount).toBe(3);
+  });
+
   it('returns an empty leaderboard for no sessions', () => {
     expect(computeLeaderboard([], nameById)).toEqual([]);
   });
