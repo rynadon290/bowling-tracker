@@ -44,7 +44,7 @@ const DEFAULT_ARSENAL = [
   "Phaze II Solid","Phaze II Pearl",
   "Harsh Reality Pearl","Road Warrior Pearl","Equinox Pearl",
 ];
-const SURFACES = ["Box","500","1000","1500","2000","3000","4000","Polish"];
+const SURFACES = ["Box","500","1000","1500","2000","3000","4000","Polish","Lane Shine"];
 const RESULTS = ["Strike","Weak 10","Ringing 10","Other Leave"];
 const STRIKE_DESCRIPTIONS = ["Flush","High","Light","Half Pocket","Trip 4","Kick 10","Brooklyn"];
 const RELEASES = ["Good","Acceptable","Bad"];
@@ -263,6 +263,22 @@ export default function BowlingTracker(){
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
+  // The fixed footer's actual height changes depending on which optional
+  // rows are showing (the spare-made warning, the Cancel Edit button) — a
+  // static guess is always wrong in some state, either leaving visible dead
+  // space above it or letting it overlap the last card. Measured live via
+  // ResizeObserver instead, so the spacer above it always matches exactly.
+  const footerRef=useRef(null);
+  const[footerHeight,setFooterHeight]=useState(80);
+  useEffect(()=>{
+    if(!footerRef.current)return;
+    const el=footerRef.current;
+    const measure=()=>setFooterHeight(el.offsetHeight);
+    measure();
+    const ro=new ResizeObserver(measure);
+    ro.observe(el);
+    return()=>ro.disconnect();
+  },[view]);
   const[teams,setTeams]=useState(()=>{
   try{
     const raw=window.localStorage.getItem("bowling-teams-v1");
@@ -297,7 +313,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,grit:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -2358,12 +2374,12 @@ export default function BowlingTracker(){
               );
             })()}
 
-            {/* Grit */}
+            {/* Surface */}
             <CollapsibleCard
-              title="Grit"
+              title="Surface"
               summary={form.surface||""}
-              expanded={editingId?true:expandedSections.grit}
-              onToggle={()=>toggleSection("grit")}>
+              expanded={editingId?true:expandedSections.surface}
+              onToggle={()=>toggleSection("surface")}>
               <div style={S.chips}>
                 {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
               </div>
@@ -2621,14 +2637,14 @@ export default function BowlingTracker(){
             </CollapsibleCard>
 
 
-            <div style={{height:"140px"}}/>
+            <div style={{height:`${footerHeight}px`}}/>
           </>
         )}
 
         {/* Fixed footer, outside the scrollable content flow — always
             visible regardless of scroll position within the Log tab. */}
         {view==="log"&&(
-          <div style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
+          <div ref={footerRef} style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}
             </button>
@@ -3018,21 +3034,9 @@ export default function BowlingTracker(){
                   const leagueBowlers=bowlers.filter(b=>shots.some(s=>s.bowler===b&&(!statsLeague||s.league===statsLeague)));
                   if(!leagueBowlers.length)return null;
                   const sorted=[...leagueBowlers].sort((a,b)=>(cAvg(b,statsLeague)||0)-(cAvg(a,statsLeague)||0));
-                  const chartData=sorted.map(b=>({bowler:b,avg:cAvg(b,statsLeague)||0})).reverse(); // reverse so the highest average plots at the top
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Team Leaderboard</div>
-                      <div style={{height:`${chartData.length*32+20}px`,marginBottom:"12px"}}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData} layout="vertical" margin={{top:0,right:24,left:0,bottom:0}}>
-                            <CartesianGrid stroke={C.border} strokeDasharray="3 3" horizontal={false}/>
-                            <XAxis type="number" tick={{fill:C.textMuted,fontSize:10}}/>
-                            <YAxis type="category" dataKey="bowler" tick={{fill:C.textMuted,fontSize:11}} width={70}/>
-                            <Tooltip contentStyle={{backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",fontSize:"12px"}} labelStyle={{color:C.text}} formatter={(v)=>[v,"Average"]}/>
-                            <Bar dataKey="avg" fill={C.accent} radius={[0,4,4,0]} barSize={16}/>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
                       {sorted.map(b=>{
                         const avg=cAvg(b,statsLeague);
                         const bShots=shots.filter(s=>s.bowler===b&&(!statsLeague||s.league===statsLeague));
@@ -3138,30 +3142,48 @@ export default function BowlingTracker(){
                   });
                   const teamDates=Object.values(byKey).filter(g=>g.entries.length>1).sort((a,b)=>b.date.localeCompare(a.date));
                   if(!teamDates.length)return null;
+
+                  // Rows stay fixed regardless of which night — union of
+                  // every bowler who appears on any of these team nights,
+                  // in lineup order, rather than per-night bowler lists.
+                  const allBowlerNames=[...new Set(teamDates.flatMap(g=>g.entries.map(e=>e.bowler)))];
+                  const rowBowlers=lineupSort(allBowlerNames,statsLeague||teamDates[0]?.league,teams);
+                  const rowH=28,totalRowH=32,colW=62,nameColW=84;
+
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Team Series</div>
-                      {teamDates.map((g,i)=>(
-                        <div key={i} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"10px",marginBottom:"10px"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
-                            <span style={{fontSize:"12px",fontWeight:600}}>{g.league.replace(" House Shot","")}</span>
-                            <span style={{fontSize:"11px",color:C.textMuted}}>{g.date}</span>
-                          </div>
-                          {lineupSort(g.entries.map(e=>e.bowler),g.league,teams).map(bowlerName=>{
-                            const e=g.entries.find(en=>en.bowler===bowlerName);
-                            return(
-                              <div key={e.id} style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
-                                <span style={{color:C.textMuted}}>{e.bowler}</span>
-                                <span style={{fontWeight:600}}>{e.total}</span>
+                      <div style={{display:"flex"}}>
+                        {/* Fixed name column -- stays put while dates scroll */}
+                        <div style={{flexShrink:0,width:`${nameColW}px`}}>
+                          <div style={{height:`${rowH}px`}}/>
+                          {rowBowlers.map(name=>(
+                            <div key={name} style={{height:`${rowH}px`,display:"flex",alignItems:"center",fontSize:"12px",color:C.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+                          ))}
+                          <div style={{height:`${totalRowH}px`,display:"flex",alignItems:"center",fontSize:"12px",fontWeight:700,color:C.accent,borderTop:`1px solid ${C.border}`,marginTop:"4px"}}>Team Total</div>
+                        </div>
+                        {/* Scrollable date columns, most recent on the left */}
+                        <div style={{overflowX:"auto",flex:1}}>
+                          <div style={{display:"flex"}}>
+                            {teamDates.map((g,i)=>(
+                              <div key={i} style={{flexShrink:0,width:`${colW}px`,borderLeft:`1px solid ${C.border}`,paddingLeft:"6px"}}>
+                                <div style={{height:`${rowH}px`,display:"flex",alignItems:"center",fontSize:"10px",color:C.textMuted}}>
+                                  {statsLeague?g.date.slice(5):`${g.league.startsWith("Tuesday")?"Tu":"Th"} ${g.date.slice(5)}`}
+                                </div>
+                                {rowBowlers.map(name=>{
+                                  const e=g.entries.find(en=>en.bowler===name);
+                                  return(
+                                    <div key={name} style={{height:`${rowH}px`,display:"flex",alignItems:"center",fontSize:"12px",fontWeight:600}}>{e?e.total:"—"}</div>
+                                  );
+                                })}
+                                <div style={{height:`${totalRowH}px`,display:"flex",alignItems:"center",fontSize:"13px",fontWeight:700,color:C.accent,borderTop:`1px solid ${C.border}`,marginTop:"4px"}}>
+                                  {g.entries.reduce((a,e)=>a+e.total,0)}
+                                </div>
                               </div>
-                            );
-                          })}
-                          <div style={{display:"flex",justifyContent:"space-between",marginTop:"4px"}}>
-                            <span style={{fontSize:"12px",fontWeight:700,color:C.accent}}>Team Total</span>
-                            <span style={{fontSize:"14px",fontWeight:700,color:C.accent}}>{g.entries.reduce((a,e)=>a+e.total,0)}</span>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
                   );
                 })()}
