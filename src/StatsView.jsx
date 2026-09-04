@@ -4,7 +4,7 @@ import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
   gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress,
-  hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets,
+  hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults,
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
 
@@ -1043,6 +1043,55 @@ export default function StatsView({
                           </ResponsiveContainer>
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {statsBowler&&(()=>{
+                  // Every night this bowler has a logged session for,
+                  // newest first. threeSixNineResults is a single,
+                  // whole-session determination now (all 9 specific
+                  // strikes across games 1, 2, AND 3), not per-game.
+                  const nightSessions=sessions
+                    .filter(s=>s.bowler===statsBowler&&(!statsLeague||s.league===statsLeague))
+                    .sort((a,b)=>b.date.localeCompare(a.date));
+                  if(!nightSessions.length)return null;
+
+                  const nightResults=nightSessions.map(s=>({
+                    session:s,
+                    result:threeSixNineResults(shots,statsBowler,s.league,s.date),
+                  }));
+
+                  const totalWins=nightResults.filter(n=>n.result.qualifies).length;
+                  const totalJackpots=nightResults.filter(n=>n.result.jackpotEligible).length;
+                  const totalMoney=nightSessions.reduce((a,s)=>a+(s.threeSixNineWinnings||0)+(s.jackpotWinnings||0),0);
+
+                  return(
+                    <div style={S.card}>
+                      <div style={S.label}>3-6-9 Tracker</div>
+                      <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                        Strike frames 3, 6, and 9 of every game (games 1, 2, and 3 -- all 9 strikes) to win the pot for the night. Also throw a full turkey in game 3's 10th frame to additionally earn the jackpot.
+                      </div>
+                      <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+                        <div style={S.statBox}><div style={{...S.statNum,color:C.strike}}>{totalWins}</div><div style={S.statLbl}>Wins</div></div>
+                        <div style={S.statBox}><div style={{...S.statNum,color:C.spare}}>{totalJackpots}</div><div style={S.statLbl}>Jackpots</div></div>
+                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>${totalMoney}</div><div style={S.statLbl}>Total Won</div></div>
+                      </div>
+                      {nightResults.map(({session:s,result})=>(
+                        <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"8px",marginBottom:"8px"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
+                            <span style={{fontSize:"12px",fontWeight:600}}>{s.league.replace(" House Shot","")}</span>
+                            <span style={{fontSize:"11px",color:C.textMuted}}>{s.date}</span>
+                          </div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                            <span style={S.tag(result.qualifies?C.strike:C.textMuted)}>{result.qualifies?"✓ Won":"No win"}</span>
+                            {result.jackpotEligible&&<span style={S.tag(C.spare)}>Jackpot</span>}
+                            {(s.threeSixNineWinnings>0||s.jackpotWinnings>0)&&(
+                              <span style={S.tag(C.accent)}>${(s.threeSixNineWinnings||0)+(s.jackpotWinnings||0)}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   );
                 })()}

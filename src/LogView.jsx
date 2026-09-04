@@ -1,6 +1,6 @@
 import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS } from "./constants.js";
-import { rAvg, cAvg } from "./domain/stats.js";
+import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -14,7 +14,7 @@ export default function LogView({
   addBall, addBowler, autoFillLine, calcLane, cancelEdit, cycleGameResult, cycleSeriesResult,
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
-  selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings,
+  selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
 }) {
   return (
@@ -278,6 +278,34 @@ export default function LogView({
                       );
                     })}
                   </div>
+
+                  {(()=>{
+                    // 3-6-9: a single, whole-session win (all 9 specific
+                    // strikes across games 1, 2, AND 3) -- not per-game
+                    // like poker, so this only shows once per session, and
+                    // only when actually qualified. The jackpot input is
+                    // additionally gated on game 3's 10th being a full
+                    // turkey, on top of the win itself.
+                    const r369=threeSixNineResults(shots,cs.bowler,cs.league,cs.date);
+                    if(!r369.qualifies)return null;
+                    return(
+                      <div style={{marginBottom:"12px"}}>
+                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>3-6-9 Winnings ($)</div>
+                        <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                          <div style={{fontSize:"12px",color:C.strike,width:"56px"}}>Pot</div>
+                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
+                            value={cs.threeSixNineWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"pot",e.target.value===""?0:parseFloat(e.target.value))}/>
+                        </div>
+                        {r369.jackpotEligible&&(
+                          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                            <div style={{fontSize:"12px",color:C.spare,width:"56px"}}>Jackpot</div>
+                            <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
+                              value={cs.jackpotWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"jackpot",e.target.value===""?0:parseFloat(e.target.value))}/>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{sr}%</div><div style={S.statLbl}>Strike %</div></div>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{spr}%</div><div style={S.statLbl}>Spare %</div></div>

@@ -1186,6 +1186,24 @@ export default function BowlingTracker(){
     },600);
   }
 
+  // 3-6-9 winnings are a single value per session, not a per-game array
+  // like poker -- the win itself is whole-session (all 9 specific strikes
+  // across games 1, 2, and 3), not something that happens per individual
+  // game. type is "pot" for the regular win or "jackpot" for the bonus.
+  function setThreeSixNineWinnings(sessionId,type,amount){
+    const prevSessions=sessions;
+    const key=type==="jackpot"?"jackpotWinnings":"threeSixNineWinnings";
+    const updatedSessions=sessions.map(s=>s.id!==sessionId?s:{...s,[key]:amount});
+    setSessions(updatedSessions);
+    try{window.storage.set(SESSIONS_KEY,JSON.stringify(updatedSessions));}catch{}
+
+    const debounceKey=`${sessionId}|369|${type}`;
+    clearTimeout(pokerSaveTimers.current[debounceKey]);
+    pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncSessionsToCloud(prevSessions,updatedSessions);
+    },600);
+  }
+
   // Longest run of consecutive strikes for a bowler this season. Strikes
   // carry across game boundaries within the same night (e.g. striking out
   // game 1 and opening game 2 with strikes continues the streak), but reset
@@ -1640,7 +1658,7 @@ export default function BowlingTracker(){
             addBall={addBall} addBowler={addBowler} autoFillLine={autoFillLine} calcLane={calcLane} cancelEdit={cancelEdit} cycleGameResult={cycleGameResult} cycleSeriesResult={cycleSeriesResult}
             getLanePattern={getLanePattern} getMatch={getMatch} handleBallChange={handleBallChange} handleLeaveToggle={handleLeaveToggle} handleLineChange={handleLineChange}
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
-            selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings}
+            selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
           />
         )}
