@@ -11,6 +11,7 @@ import {
   freshRackShots, theoreticalFillBallValue,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
@@ -999,38 +1000,6 @@ export default function BowlingTracker(){
     return m.handicap ?? "";
   }
 
-
-  // Cumulative win/loss record for the season. league==="" combines every league.
-  function seasonRecord(league){
-    const ms=league?matches.filter(m=>m.league===league):matches;
-    let gameWins=0,gameLosses=0,seriesWins=0,seriesLosses=0,pointsWon=0,pointsAvailable=0;
-    ms.forEach(m=>{
-      (m.games||[]).forEach(g=>{
-        if(g===true){gameWins++;pointsWon++;pointsAvailable++;}
-        else if(g===false){gameLosses++;pointsAvailable++;}
-      });
-      if(m.series===true){seriesWins++;pointsWon++;pointsAvailable++;}
-      else if(m.series===false){seriesLosses++;pointsAvailable++;}
-    });
-    return{gameWins,gameLosses,seriesWins,seriesLosses,pointsWon,pointsAvailable};
-  }
-
-  // Points won per week, chronologically — Season Record only shows the
-  // cumulative total, never WHEN those points came. This surfaces momentum
-  // (a hot streak or a slump) that a running total hides.
-  function weeklyPointsData(league){
-    return matches
-      .filter(m=>!league||m.league===league)
-      .map(m=>{
-        const pointsAvailable=m.games.filter(v=>v!==null).length+(m.series!==null?1:0);
-        if(!pointsAvailable)return null;
-        const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
-        return{date:m.date,pointsWon,pointsAvailable,opponent:m.opponent};
-      })
-      .filter(Boolean)
-      .sort((a,b)=>a.date.localeCompare(b.date));
-  }
-
   // Distinct (league,date) pairs that have at least one session logged, newest first.
   function sessionDateGroups(league){
     const seen={};
@@ -1039,63 +1008,6 @@ export default function BowlingTracker(){
       if(!seen[k])seen[k]={league:s.league,date:s.date};
     });
     return Object.values(seen).sort((a,b)=>b.date.localeCompare(a.date));
-  }
-
-  // (league,date) groups where 2+ bowlers logged a session — the only groups
-  // where we actually have a legitimate combined team total. league, if
-  // given, scopes to just that league's sessions.
-  // Filtered by league name, not team_id — for the same reasoning as
-  // compareShots: a session's league is set directly and reliably, while
-  // team_id depends on team-membership resolution that's proven fragile
-  // throughout this project (a bowler not yet recognized as a team member
-  // when a shot was logged, a team recreated afterward, etc.). Grouping by
-  // league+date is sufficient to identify a shared night — team_id was
-  // never actually needed for that, only for the (unreliable) filter.
-  function teamDateGroups(league){
-  const byKey={};
-  sessions.filter(s=>s.league===league).forEach(s=>{
-    const k=`${s.league}__${s.date}`;
-    if(!byKey[k])byKey[k]={league:s.league,date:s.date,entries:[]};
-    byKey[k].entries.push(s);
-  });
-  return Object.values(byKey).filter(g=>g.entries.length>1).map(g=>{
-    const gameTotals=[0,1,2].map(i=>{
-      const vals=g.entries.map(e=>e.scores[i]).filter(v=>v!=null);
-      return vals.length?vals.reduce((a,b)=>a+b,0):null;
-    });
-    const seriesTotal=g.entries.reduce((a,e)=>a+e.total,0);
-    return{...g,gameTotals,seriesTotal};
-  });
-  }
-
-  // High game / high series — auto-derived from logged sessions, always up to date.
-  function bowlerHighGame(bowler){
-    let best=null;
-    sessions.filter(s=>s.bowler===bowler).forEach(s=>s.scores.forEach((v,i)=>{
-      if(best===null||v>best.value)best={value:v,date:s.date,league:s.league,game:i+1};
-    }));
-    return best;
-  }
-  function bowlerHighSeries(bowler){
-    let best=null;
-    sessions.filter(s=>s.bowler===bowler).forEach(s=>{
-      if(best===null||s.total>best.value)best={value:s.total,date:s.date,league:s.league};
-    });
-    return best;
-  }
-  function teamHighGame(league){
-  let best=null;
-  teamDateGroups(league).forEach(g=>g.gameTotals.forEach((v,i)=>{
-      if(v!=null&&(best===null||v>best.value))best={value:v,date:g.date,league:g.league,game:i+1};
-    }));
-    return best;
-  }
-  function teamHighSeries(league){
-  let best=null;
-  teamDateGroups(league).forEach(g=>{
-      if(best===null||g.seriesTotal>best.value)best={value:g.seriesTotal,date:g.date,league:g.league};
-    });
-    return best;
   }
 
   // ── Lane calculation ──────────────────────────────────────────────────────
@@ -1515,7 +1427,7 @@ export default function BowlingTracker(){
   function scoreValues(bowler,league,pooled){
     if(bowler)return sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
     if(pooled)return sessions.filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
-    return teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+    return teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
   }
   function scoreConsistency(bowler,league,pooled){
     const all=scoreValues(bowler,league,pooled);
@@ -1566,14 +1478,14 @@ export default function BowlingTracker(){
   // Truncated rather than rounded — a whole number, but never bumped up past
   // what was actually earned the way rounding up would.
   function teamGameTotalAvgAt(league,gameIdx){
-    const vals=teamDateGroups(league).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
+    const vals=teamDateGroups(sessions,league).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
   // Same idea but pooling all 3 game positions together — the team-total
   // companion to rAvg's per-person combined average.
   function teamGameTotalAvg(league){
-    const vals=teamDateGroups(league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
+    const vals=teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
     if(!vals.length)return null;
     return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
@@ -2894,8 +2806,8 @@ export default function BowlingTracker(){
                       </div>
                     );
                   }
-                  const hg=recordsBowler?bowlerHighGame(recordsBowler):teamHighGame(statsLeague);
-                  const hs=recordsBowler?bowlerHighSeries(recordsBowler):teamHighSeries(statsLeague);
+                  const hg=recordsBowler?bowlerHighGame(sessions,recordsBowler):teamHighGame(sessions,statsLeague);
+                  const hs=recordsBowler?bowlerHighSeries(sessions,recordsBowler):teamHighSeries(sessions,statsLeague);
                   if(!hg&&!hs)return null;
                   return(
                     <div style={S.card}>
@@ -2917,9 +2829,9 @@ export default function BowlingTracker(){
                 })()}
 
                 {!statsBowler&&(()=>{
-                  const rMain=seasonRecord(statsLeague);
+                  const rMain=seasonRecord(matches,statsLeague);
                   if(!rMain.gameWins&&!rMain.gameLosses&&!rMain.seriesWins&&!rMain.seriesLosses)return null;
-                  const otherRecords=leagues.filter(l=>l!==statsLeague).map(league=>({league,record:seasonRecord(league)})).filter(x=>x.record.gameWins+x.record.gameLosses+x.record.seriesWins+x.record.seriesLosses>0);
+                  const otherRecords=leagues.filter(l=>l!==statsLeague).map(league=>({league,record:seasonRecord(matches,league)})).filter(x=>x.record.gameWins+x.record.gameLosses+x.record.seriesWins+x.record.seriesLosses>0);
                   return(
                     <div style={S.card}>
                       <div style={S.label}>{statsLeague?`${statsLeague.replace(" House Shot","")} Season Record`:"Season Record"}</div>
@@ -2939,7 +2851,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {!statsBowler&&(()=>{
-                  const weekly=weeklyPointsData(statsLeague);
+                  const weekly=weeklyPointsData(matches,statsLeague);
                   if(weekly.length<2)return null;
                   return(
                     <div style={S.card}>
