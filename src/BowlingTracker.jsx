@@ -55,6 +55,18 @@ const BALL_CHANGE_REASONS = [
 ];
 const DEFAULT_LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
 
+// Returns today's date as YYYY-MM-DD using LOCAL date components, not UTC.
+// new Date().toISOString() always converts to UTC first -- for anyone west
+// of UTC (all of the US, for instance), bowling in the evening can already
+// be "tomorrow" in UTC while it's still today locally, silently dating a
+// session one day ahead of when it was actually bowled.
+function localDateString(d=new Date()){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
 const STORAGE_KEY = "bowling-shots-v2";
 const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
@@ -308,7 +320,7 @@ export default function BowlingTracker(){
   const[trendScope,setTrendScope]=useState(""); // "" = combined both teams, or a specific league
   const[compareLeague,setCompareLeague]=useState("");
   const[sessionLeague,setSessionLeague]=useState("");
-  const[sessionDate,setSessionDate]=useState(new Date().toISOString().slice(0,10));
+  const[sessionDate,setSessionDate]=useState(localDateString());
   const[startingLane,setStartingLane]=useState("");
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
@@ -2760,7 +2772,7 @@ export default function BowlingTracker(){
                       const url=URL.createObjectURL(blob);
                       const a=document.createElement("a");
                       a.href=url;
-                      a.download=`bowling-backup-${new Date().toISOString().slice(0,10)}.json`;
+                      a.download=`bowling-backup-${localDateString()}.json`;
                       document.body.appendChild(a);
                       a.click();
                       document.body.removeChild(a);
