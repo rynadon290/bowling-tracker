@@ -11,7 +11,7 @@ import {
   freshRackShots, theoreticalFillBallValue,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData } from "./domain/stats.js";
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
@@ -1000,16 +1000,6 @@ export default function BowlingTracker(){
     return m.handicap ?? "";
   }
 
-  // Distinct (league,date) pairs that have at least one session logged, newest first.
-  function sessionDateGroups(league){
-    const seen={};
-    sessions.filter(s=>!league||s.league===league).forEach(s=>{
-      const k=`${s.league}__${s.date}`;
-      if(!seen[k])seen[k]={league:s.league,date:s.date};
-    });
-    return Object.values(seen).sort((a,b)=>b.date.localeCompare(a.date));
-  }
-
   // ── Lane calculation ──────────────────────────────────────────────────────
   function calcLane(sl,game,frame,ballNum){
     if(!sl||!game||!frame)return null;
@@ -1312,182 +1302,6 @@ export default function BowlingTracker(){
     pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
       syncSessionsToCloud(prevSessions,updatedSessions);
     },600);
-  }
-
-  // bowler === "" means combined/team (every bowler's sessions included)
-  function rAvg(bowler,league){
-    const ls=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&s.league===league);
-    if(!ls.length)return null;
-    const all=ls.flatMap(s=>s.scores);
-    return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
-  }
-  function cAvg(bowler,league){
-    const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
-    if(!all.length)return null;
-    return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
-  }
-
-  // Progress toward the next 5-pin average milestone (e.g. 187 -> 190). Uses
-  // the precise, unrounded average for the progress fraction so the bar
-  // moves smoothly game to game, even though the displayed average elsewhere
-  // in the app is rounded/truncated.
-  function avgProgress(bowler,league){
-    const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
-    if(!all.length)return null;
-    const raw=all.reduce((a,b)=>a+b,0)/all.length;
-    const current=Math.trunc(raw);
-    const nextMilestone=current-(current%5)+5;
-    const prevMilestone=nextMilestone-5;
-    const pct=Math.max(0,Math.min(100,((raw-prevMilestone)/5)*100));
-    return{raw,current,prevMilestone,nextMilestone,pct};
-  }
-
-  // "Beat the high average bowler" — the giant for a given week is whoever
-  // has the highest cumulative average using ONLY data from strictly BEFORE
-  // that week (never that week's own results) — the giant is crowned before
-  // the challenge, not decided by the outcome being compared against. This
-  // also means the very first week ever logged has no giant at all yet
-  // (there's no prior data to crown one from), which is correct: the first
-  // week sets the baseline, the challenge starts in week two. Once a week's
-  // giant is determined, it's locked in permanently — if the title changes
-  // hands in a later week, earlier weeks are never retroactively recomputed
-  // against the new giant.
-  function cumulativeAvgBeforeDate(bowler,league,beforeDate){
-    const all=sessions.filter(s=>s.bowler===bowler&&s.league===league&&s.date<beforeDate).flatMap(s=>s.scores);
-    if(!all.length)return null;
-    return all.reduce((a,b)=>a+b,0)/all.length;
-  }
-  function beatHighBowlerStats(league){
-    const dates=[...new Set(sessions.filter(s=>s.league===league).map(s=>s.date))].sort();
-    const tally={};
-    function ensure(b){if(!tally[b])tally[b]={won:0,total:0,weeksAsHigh:0};}
-    dates.forEach(date=>{
-      const priorBowlers=[...new Set(sessions.filter(s=>s.league===league&&s.date<date).map(s=>s.bowler))];
-      if(!priorBowlers.length)return; // first week ever — no prior data, no giant yet
-      let highBowler=null,highAvg=-Infinity;
-      priorBowlers.forEach(b=>{
-        const avg=cumulativeAvgBeforeDate(b,league,date);
-        if(avg!=null&&avg>highAvg){highAvg=avg;highBowler=b;}
-      });
-      if(!highBowler)return;
-      const weekSessions=sessions.filter(s=>s.league===league&&s.date===date);
-      const highSession=weekSessions.find(s=>s.bowler===highBowler);
-      if(!highSession)return; // reigning giant didn't bowl this week — title carries over, no comparison this week
-      ensure(highBowler);
-      tally[highBowler].weeksAsHigh++;
-      weekSessions.forEach(s=>{
-        if(s.bowler===highBowler)return; // don't compare the giant to themselves
-        ensure(s.bowler);
-        for(let i=0;i<3;i++){
-          const mine=s.scores[i],theirs=highSession.scores[i];
-          if(mine!=null&&theirs!=null){
-            tally[s.bowler].total++;
-            if(mine>theirs)tally[s.bowler].won++;
-          }
-        }
-      });
-    });
-    return tally;
-  }
-
-  // "Hung" — in a given (league, date, game, frame), if every bowler who
-  // logged that frame struck except exactly one, that one bowler is hung.
-  function hungCounts(league){
-    const groups={};
-    shots.filter(s=>(!league||s.league===league)&&(!s.ballNum||s.ballNum===1)).forEach(s=>{
-      const key=`${s.league}|${s.date}|${s.game}|${s.frame}`;
-      (groups[key]=groups[key]||[]).push(s);
-    });
-    const counts={};
-    Object.values(groups).forEach(group=>{
-      if(group.length<2)return;
-      const nonStrikers=group.filter(s=>s.result!=="Strike");
-      if(nonStrikers.length===1){
-        const bowler=nonStrikers[0].bowler;
-        counts[bowler]=(counts[bowler]||0)+1;
-      }
-    });
-    return counts;
-  }
-  // Standard deviation of game scores — how consistent a bowler (or team) is
-  // night to night, independent of what the average itself is. Two bowlers
-  // can share a 180 average while one always shoots 170-190 and the other
-  // swings 140-220; this is what tells them apart. Lower = steadier.
-  // For an individual, this uses their own game scores. For a team (bowler
-  // === ""), it uses actual TEAM GAME TOTALS — the combined score across the
-  // whole team for each date+game — not every bowler's individual scores
-  // pooled together, which would measure the spread of individual
-  // performances rather than the team's actual combined-score volatility.
-  // pooled=true returns every bowler's individual game scores pooled
-  // together (fair to compare against a single person's scores) instead of
-  // the team's combined per-game total (fair only against another team's
-  // combined total). Needed specifically for person-vs-team comparisons —
-  // comparing one person's score to a whole team's SUMMED total was never
-  // a fair comparison in the first place.
-  function scoreValues(bowler,league,pooled){
-    if(bowler)return sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
-    if(pooled)return sessions.filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
-    return teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
-  }
-  function scoreConsistency(bowler,league,pooled){
-    const all=scoreValues(bowler,league,pooled);
-    if(all.length<2)return null;
-    const mean=all.reduce((a,b)=>a+b,0)/all.length;
-    const variance=all.reduce((a,b)=>a+(b-mean)**2,0)/all.length;
-    return{stdDev:Math.round(Math.sqrt(variance)*10)/10,min:Math.min(...all),max:Math.max(...all),games:all.length};
-  }
-  // Bins an array of numbers into a fixed number of roughly-equal-width
-  // buckets for a histogram — used to show the actual SHAPE of a score
-  // distribution, which a single std-dev number can't convey (tightly
-  // bunched around the average vs. a long tail of bad nights look the same
-  // in a std-dev figure but very different in a histogram).
-  function histogramBuckets(values,bucketCount=8){
-    if(!values.length)return[];
-    const min=Math.min(...values),max=Math.max(...values);
-    if(min===max)return[{label:String(min),count:values.length}];
-    const width=Math.max(1,Math.ceil((max-min+1)/bucketCount));
-    const counts={};
-    values.forEach(v=>{
-      const start=min+Math.floor((v-min)/width)*width;
-      counts[start]=(counts[start]||0)+1;
-    });
-    return Object.keys(counts).map(Number).sort((a,b)=>a-b).map(start=>({
-      label:width===1?String(start):`${start}-${start+width-1}`,
-      count:counts[start],
-    }));
-  }
-  // Average score at a specific position in the night (gameIdx 0/1/2 = Game
-  // 1/2/3), across every session logged so far this season. bowler==="" pools
-  // every bowler's individual game scores together — this is a per-person
-  // average (e.g. "the average bowler on this team scores 191"), NOT the
-  // team's combined total. See teamGameTotalAvg/teamGameTotalAvgAt below for
-  // the actual team-total companion figure.
-  function gameAvg(bowler,gameIdx,league){
-    const ls=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true));
-    const vals=ls.map(s=>s.scores[gameIdx]).filter(v=>v!=null);
-    if(!vals.length)return null;
-    return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-  }
-
-  // Team's average COMBINED total per game — every bowler's score for that
-  // game, summed, then averaged across nights. This is the companion to
-  // gameAvg's per-person average: gameAvg answers "what does the average
-  // bowler score," this answers "what does the team score together." Built
-  // from the same teamDateGroups concept already used for Team High
-  // Game/Series and Score Consistency, so it stays consistent with those.
-  // Truncated rather than rounded — a whole number, but never bumped up past
-  // what was actually earned the way rounding up would.
-  function teamGameTotalAvgAt(league,gameIdx){
-    const vals=teamDateGroups(sessions,league).map(g=>g.gameTotals[gameIdx]).filter(v=>v!=null);
-    if(!vals.length)return null;
-    return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
-  }
-  // Same idea but pooling all 3 game positions together — the team-total
-  // companion to rAvg's per-person combined average.
-  function teamGameTotalAvg(league){
-    const vals=teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
-    if(!vals.length)return null;
-    return Math.trunc(vals.reduce((a,b)=>a+b,0)/vals.length);
   }
 
   // Longest run of consecutive strikes for a bowler this season. Strikes
@@ -2142,7 +1956,7 @@ export default function BowlingTracker(){
               const cs=curSession;
               const sr=cs.shotCount?Math.round((cs.strikes/cs.shotCount)*100):0;
               const spr=cs.spareAttempts?Math.round((cs.sparesMade/cs.spareAttempts)*100):0;
-              const leagueAs=leagues.map(league=>({league,avg:rAvg(activeBowler,league)})).filter(x=>x.avg!=null),cA=cAvg(activeBowler);
+              const leagueAs=leagues.map(league=>({league,avg:rAvg(sessions,activeBowler,league)})).filter(x=>x.avg!=null),cA=cAvg(sessions,activeBowler);
               const mDist=MISSES.map(m=>({m,c:cs.misses.filter(x=>x===m).length})).filter(x=>x.c>0);
               const gR=cs.releases.filter(r=>r==="Good").length,bR=cs.releases.filter(r=>r==="Bad").length,rT=cs.releases.length;
               return(
@@ -2928,12 +2742,12 @@ export default function BowlingTracker(){
                 {!statsBowler&&bowlers.length>1&&(()=>{
                   const leagueBowlers=bowlers.filter(b=>shots.some(s=>s.bowler===b&&(!statsLeague||s.league===statsLeague)));
                   if(!leagueBowlers.length)return null;
-                  const sorted=[...leagueBowlers].sort((a,b)=>(cAvg(b,statsLeague)||0)-(cAvg(a,statsLeague)||0));
+                  const sorted=[...leagueBowlers].sort((a,b)=>(cAvg(sessions,b,statsLeague)||0)-(cAvg(sessions,a,statsLeague)||0));
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Team Leaderboard</div>
                       {sorted.map(b=>{
-                        const avg=cAvg(b,statsLeague);
+                        const avg=cAvg(sessions,b,statsLeague);
                         const bShots=shots.filter(s=>s.bowler===b&&(!statsLeague||s.league===statsLeague));
                         const bStk=bShots.filter(s=>s.result==="Strike").length;
                         const bStkR=bShots.length?Math.round((bStk/bShots.length)*100):0;
@@ -2959,7 +2773,7 @@ export default function BowlingTracker(){
                       <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — it needs a specific roster to know who's on top.</div>
                     </div>
                   );
-                  const tally=beatHighBowlerStats(statsLeague);
+                  const tally=beatHighBowlerStats(sessions,statsLeague);
                   const rows=Object.entries(tally).map(([b,t])=>({bowler:b,...t,pct:t.total?Math.round((t.won/t.total)*1000)/10:null}))
                     .filter(r=>r.total>0||r.weeksAsHigh>0)
                     .sort((a,b)=>{
@@ -3001,7 +2815,7 @@ export default function BowlingTracker(){
                       <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — it needs a specific roster to know who else was bowling that frame.</div>
                     </div>
                   );
-                  const counts=hungCounts(statsLeague);
+                  const counts=hungCounts(shots,statsLeague);
                   const leagueBowlers=bowlers.filter(b=>shots.some(s=>s.bowler===b&&s.league===statsLeague));
                   const rows=leagueBowlers.map(b=>({bowler:b,count:counts[b]||0})).sort((a,b)=>b.count-a.count);
                   if(!rows.some(r=>r.count>0))return(
@@ -3444,8 +3258,8 @@ export default function BowlingTracker(){
                 )}
 
                 {sessions.length>0&&(()=>{
-                  const leagueAvgs=leagues.map(league=>({league,avg:rAvg(statsBowler,league)})).filter(x=>x.avg!=null);
-                  const combined=cAvg(statsBowler);
+                  const leagueAvgs=leagues.map(league=>({league,avg:rAvg(sessions,statsBowler,league)})).filter(x=>x.avg!=null);
+                  const combined=cAvg(sessions,statsBowler);
                   if(!leagueAvgs.length&&!combined)return null;
                   return(
                     <div style={S.card}>
@@ -3456,11 +3270,11 @@ export default function BowlingTracker(){
                           <div key={league} style={S.statBox}>
                             <div style={S.statNum}>{avg}</div>
                             <div style={S.statLbl}>{league.replace(" House Shot","")}</div>
-                            {isTeamView&&teamGameTotalAvg(league)!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(league)}</div>}
-                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(compareBowler,league):(isTeamView?teamGameTotalAvg(league):rAvg("",league))} label={compareLabel}/>}
+                            {isTeamView&&teamGameTotalAvg(sessions,league)!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(sessions,league)}</div>}
+                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>}
                           </div>
                         ))}
-                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Combined</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(compareBowler)} label={compareLabel}/>}</div>)}
+                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Combined</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>}</div>)}
                       </div>
                       {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}
                     </div>
@@ -3516,7 +3330,7 @@ export default function BowlingTracker(){
 
 
                 {(()=>{
-                  const progress=avgProgress(statsBowler,statsLeague);
+                  const progress=avgProgress(sessions,statsBowler,statsLeague);
                   if(!progress)return null;
                   return(
                     <div style={S.card}>
@@ -3540,9 +3354,9 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const consistency=scoreConsistency(statsBowler,statsLeague);
+                  const consistency=scoreConsistency(sessions,statsBowler,statsLeague);
                   if(!consistency)return null;
-                  const compareConsistency=showTeamCompare?scoreConsistency(compareBowler,compareLeague,!isTeamView):null;
+                  const compareConsistency=showTeamCompare?scoreConsistency(sessions,compareBowler,compareLeague,!isTeamView):null;
                   return(
                     <div style={S.card}>
                       <div style={S.label}>Score Consistency</div>
@@ -3571,7 +3385,7 @@ export default function BowlingTracker(){
                 })()}
 
                 {(()=>{
-                  const values=scoreValues(statsBowler,statsLeague);
+                  const values=scoreValues(sessions,statsBowler,statsLeague);
                   if(values.length<4)return null;
                   const buckets=histogramBuckets(values);
                   return(
@@ -3595,7 +3409,7 @@ export default function BowlingTracker(){
                   );
                 })()}
 
-                {sessions.length>0&&(gameAvg(statsBowler,0,statsLeague)||gameAvg(statsBowler,1,statsLeague)||gameAvg(statsBowler,2,statsLeague))&&(
+                {sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(sessions,statsBowler,1,statsLeague)||gameAvg(sessions,statsBowler,2,statsLeague))&&(
                   <div style={S.card}>
                     <div style={S.label}>Game-by-Game Averages</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
@@ -3604,15 +3418,15 @@ export default function BowlingTracker(){
                     </div>
                     <div style={{display:"flex",gap:"6px"}}>
                       {[0,1,2].map(idx=>{
-                        const v=gameAvg(statsBowler,idx,statsLeague);
+                        const v=gameAvg(sessions,statsBowler,idx,statsLeague);
                         if(v==null)return null;
-                        const teamV=(isTeamView&&statsLeague)?teamGameTotalAvgAt(statsLeague,idx):null;
+                        const teamV=(isTeamView&&statsLeague)?teamGameTotalAvgAt(sessions,statsLeague,idx):null;
                         return(
                           <div key={idx} style={{...S.statBox,padding:"8px 4px",minWidth:0}}>
                             <div style={{...S.statNum,fontSize:"18px"}}>{v}</div>
                             <div style={{...S.statLbl,fontSize:"9px"}}>Game {idx+1}</div>
                             {teamV!=null&&<div style={{fontSize:"10px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamV}</div>}
-                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(compareBowler,idx,compareLeague):(isTeamView?teamGameTotalAvgAt(compareLeague,idx):gameAvg("",idx,compareLeague))} label={compareLabel}/>}
+                            {showTeamCompare&&<CompareBadge value={v} teamValue={compareBowler?gameAvg(sessions,compareBowler,idx,compareLeague):(isTeamView?teamGameTotalAvgAt(sessions,compareLeague,idx):gameAvg(sessions,"",idx,compareLeague))} label={compareLabel}/>}
                           </div>
                         );
                       })}
