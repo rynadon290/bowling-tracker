@@ -1,272 +1,90 @@
-Bowling Tracker
+# Shot Tracker 🎳
 
-A personal bowling tracking and analytics app built with React and Vite. It records detailed bowling data and turns it into bowling, session, team, league, and performance analytics.
+A mobile-first bowling league tracker for logging shots, sessions, and team stats — built for real league play across multiple teams and bowlers, with shot-by-shot detail, session summaries, team standings, and a friends leaderboard.
 
-What it does
+**Live app:** https://rynadon290.github.io/bowling-tracker/
 
-Shot-by-shot logging
+## Features
 
-- Record individual shots by bowler, league, date, game, frame, and ball.
-- Track ball, surface, starting board, target arrows, result, leave, spare result, release, miss, ball-change reason, pin count, and notes.
-- Supports explicit 10th-frame scoring, including bonus balls after strikes and spares.
-- Historical shot data remains available even when a ball is removed from a bowler's current arsenal.
+- **Shot-by-shot logging** — ball, surface, line, result, release, miss direction, tracked per frame including full 10th-frame handling
+- **Live scoring** — strict frame-by-frame scoring that only shows a running total once every bonus ball needed to resolve it is actually known
+- **Session summaries** — per-night strike %, spare %, 10-pin rate, release quality, and match points (game/series win-loss vs. an opponent)
+- **Team stats** — high game/series records, team averages, score consistency, "hung" tracking, and a "beat the high average bowler" weekly challenge
+- **Theoretical scoring** — what a game would have scored if every makeable spare had been converted
+- **Team Management** — roster with lineup order, placeholders for bowlers without an account yet, handedness, and sub status
+- **Friends & leaderboard** — add friends by account, see a shared average leaderboard
+- **Offline-first** — shots and sessions queue locally and sync to Supabase when back online; proxy-logging supported (one signed-in account can log for a teammate or sub)
 
-Session tracking
+## Tech stack
 
-Save bowling sessions with:
+- React 18 + Vite
+- Supabase (Postgres + Auth) for cloud sync and multi-device/multi-user support
+- Recharts for charts
+- Vitest for testing pure domain logic
+- Deployed to GitHub Pages via GitHub Actions
 
-- Three-game scores
-- Series and average
-- Strikes
-- Spare attempts and makes
-- Weak/ringing tens
-- 10-pin leaves and conversions
-- Single-pin leaves
-- Splits and split conversions
-- Balls used
-- Misses and releases
-- Shot-derived statistics
+## Local development
 
-Session history can be filtered by bowler and league.
+```bash
+npm install
+npm run dev
+```
 
-Bowling analytics
+You'll need a `.env` file at the project root with your own Supabase project's credentials:
 
-The Stats view provides analytics including:
-
-- Strike and spare performance
-- 10-pin and single-pin spare performance
-- Split rate and split conversion
-- Clean-frame rate
-- First-ball average and leave average
-- Frame-position performance
-- Ball-by-ball comparisons
-- High game and high series
-- Recurring split and non-split leave breakdowns
-- Comparisons against other bowlers and team/league data
-
-Shot data is kept separate from derived statistics so the same underlying data can support multiple views and analyses.
-
-Leagues and teams
-
-The app supports multiple leagues independently.
-
-You can:
-
-- Create, rename, and delete teams
-- Maintain separate rosters for different leagues
-- Assign lineup positions
-- Reorder team members
-- Add teammates
-- Invite teammates
-- Create name-only roster placeholders
-- Resolve placeholders to registered users
-- Associate bowling data with the appropriate league and team
-
-League identity and team identity are kept separate so a bowler can participate in multiple leagues with different teams.
-
-League-night information
-
-Tonight's Session is the central place for information that applies to the entire bowling night.
-
-It includes:
-
-- League
-- Date
-- Opponent
-- Team handicap
-- Starting lane
-- Lane pair
-- Lane conditions / oil pattern
-- Points won for each game
-- Total points and pinfall information
-
-Opponent and handicap are entered once for the night rather than being duplicated for every bowler or shot.
-
-Historical team and league statistics can then use this information to show things such as:
-
-- Win/loss record against opponents
-- Performance against teams with different handicap levels
-- Team and league results over time
-
-Friends and leaderboard
-
-The app includes social features for comparing bowling performance with other registered users.
-
-Users can:
-
-- Search for other users by display name
-- Send friend requests
-- Accept or decline requests
-- Cancel pending requests
-- Remove friends
-- View friend leaderboard/session averages
-
-Cloud synchronization and offline support
-
-The app uses Supabase for authenticated cloud data and IndexedDB for local persistence and queued writes.
-
-The synchronization architecture is designed to support unreliable connectivity:
-
-- Cloud-first reads with local fallback
-- Failed/unconfirmed writes can be queued locally
-- Queued writes can be retried when connectivity returns
-- Pending-sync counts are exposed in the UI
-- Sync diagnostics are available for troubleshooting
-- JSON export/backup provides an independent backup mechanism
-
-Browser-local data remains important for offline operation. Cloud synchronization should not be considered a substitute for backups.
-
-Architecture
-
-The application separates the UI from reusable domain logic where practical.
-
-src/
-├── BowlingTracker.jsx          Main application and views
-├── TeamManagement.jsx          Team and roster management
-├── Friends.jsx                 Friends and leaderboard
-├── AuthProvider.jsx            Supabase authentication and profile
-├── syncQueue.js                Cloud synchronization and offline queue
-├── supabaseClient.js           Supabase client configuration
-└── domain/
-    ├── scoring.js              Bowling scoring and 10th-frame logic
-    ├── splits.js               Split and leave classification
-    ├── sessions.js             Session statistics and shot lookup
-    ├── leagues.js              League and lineup helpers
-    └── supabaseMapping.js      Local ↔ Supabase data mapping
-
-Keeping deterministic bowling logic in separate domain modules makes it easier to test and reduces the amount of business logic inside the main React component.
-
-Data model
-
-The application uses a combination of local browser data and Supabase cloud data.
-
-Important concepts include:
-
-- User/Profile — authenticated user and display name
-- League — bowling league identity
-- Team — roster belonging to a league
-- Team member — user or roster member assigned to a team and lineup position
-- Pending invite — teammate invitation or roster placeholder
-- Shot — one logged delivery
-- Session — one bowler's bowling-night record
-- Match — opponent, handicap, and league-night result information
-- Lane pattern — lane and oil-pattern information
-- Friendship — connection between users
-- Pending write — cloud operation waiting for synchronization
-
-The client maps between its JavaScript camelCase objects and the Supabase snake_case database representation.
-
-Authentication
-
-Authentication is handled through Supabase Auth.
-
-The browser uses the public Supabase client credentials supplied through Vite environment variables. Secret/service-role credentials must never be included in the client application.
-
-Create a local ".env" file containing:
-
+```
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+```
 
-Do not commit ".env" or any secret/service-role key to the repository.
+Both values come from **Supabase Dashboard → Project Settings → API**. Never put the `service_role`/secret key here — only the anon/publishable key is safe for client-side code.
 
-Local development
+Other commands:
 
-Install dependencies:
+```bash
+npm run build      # production build
+npm run preview    # preview the production build locally
+npm test           # run the test suite
+```
 
-npm install
+## Project structure
 
-Start the Vite development server:
+```
+├── BowlingTracker.jsx   # main app component (Log/History/Stats/Teams/Friends views)
+├── TeamManagement.jsx   # roster management, invites, placeholders
+├── Friends.jsx          # friend requests + leaderboard
+├── AuthProvider.jsx     # Supabase auth context
+├── SignIn.jsx
+├── syncQueue.js         # offline write queue + cloud sync helpers
+├── supabaseClient.js
+└── domain/              # pure, dependency-free business logic — no React,
+    │                     no Supabase calls. Everything here takes plain
+    │                     data in and returns plain data out, which is what
+    │                     makes it independently testable.
+    ├── scoring.js        # frame-by-frame scoring, 10th-frame rules
+    ├── splits.js         # split/washout/makeable-spare detection
+    ├── stats.js          # records, averages, consistency, weekly challenges
+    ├── sessions.js       # session-level aggregation
+    ├── leagues.js        # lineup ordering
+    └── supabaseMapping.js # local <-> Supabase row shape conversion
+```
 
-npm run dev
+Each file in `domain/` has a matching `.test.js` file. If you're adding new business logic, this is where it should live — a plain function that takes data explicitly rather than reading component state directly stays testable and reusable.
 
-Build the production application:
+## Testing
 
-npm run build
-
-Preview the production build:
-
-npm run preview
-
-Tests
-
-The project uses Vitest for automated testing.
-
-Run the test suite with:
-
+```bash
 npm test
+```
 
-Tests currently cover important deterministic and integration-adjacent areas including:
+Runs the full Vitest suite against everything in `domain/`, plus `Friends.jsx`, `TeamManagement.jsx`, and `syncQueue.js`. These test pure logic only — no rendering, no live Supabase calls.
 
-- Bowling scoring
-- 10th-frame state transitions
-- Split and leave classification
-- Session statistics
-- Shot lookup
-- League helpers
-- Local/Supabase data mapping
-- Offline synchronization queue behavior
-- Team roster operations
-- Team invitations and placeholders
-- Friends/leaderboard logic
+## Deployment
 
-The automated suite is intentionally focused on deterministic application logic. Full browser end-to-end testing is a future layer.
+Pushing to `main` or `team-management` triggers `.github/workflows/deploy.yml`, which:
 
-Deployment
+1. Runs the test suite
+2. Builds the production bundle (needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set as repo secrets — **Settings → Secrets and variables → Actions**)
+3. Deploys to GitHub Pages
 
-The application is configured for deployment to GitHub Pages through GitHub Actions.
-
-The deployment workflow builds the Vite production bundle and publishes the resulting "dist/" directory.
-
-The production build uses the configured Supabase URL and public client key supplied through the repository's GitHub Actions configuration.
-
-Design principles
-
-Shot data is the source of truth
-
-Detailed shot records provide the foundation for bowling analytics. Statistics should be derived from the underlying bowling data rather than requiring the same information to be entered repeatedly.
-
-Enter shared information once
-
-Information that applies to an entire league night belongs at the session/night level.
-
-For example, the opponent and team handicap are properties of the night's matchup, not individual bowlers. They are therefore entered once and reused by team and league statistics.
-
-10th-frame scoring is explicit
-
-Frame 10 is treated differently from frames 1–9 because additional balls may be available after strikes and spares.
-
-Ball numbers and frame-10 state are explicitly represented so bonus-ball input cannot accidentally be confused with another frame, game, bowler, or night's data.
-
-League and team identity are separate
-
-A bowler can participate in multiple leagues and different teams. Team-specific data should therefore use the team's identity when one is known rather than assuming that a league name uniquely identifies a team.
-
-Offline writes should be recoverable
-
-A cloud write that cannot be confirmed should not simply disappear. The synchronization system retains pending operations locally so they can be retried.
-
-Historical data should remain stable
-
-Changing a current ball arsenal, team roster, or UI selection should not erase historical bowling data or invalidate previously recorded sessions.
-
-Current hardening areas
-
-The application is functional, but the multi-user/cloud architecture continues to be hardened.
-
-Areas receiving particular attention include:
-
-- Safely distinguishing full-row cloud upserts from partial updates
-- Ensuring targeted synchronization repairs cannot affect unrelated queued writes
-- Strengthening server-side authorization for team/invite claiming and roster linking
-- Converting remaining legacy compatibility behavior into explicit migrations
-- Ensuring team-specific operations consistently use team IDs
-- Handling multiple teams within the same league
-- Adding browser-level end-to-end coverage
-
-These are architecture and reliability improvements rather than reasons to duplicate bowling information in multiple places.
-
-Backup
-
-Use the app's JSON export/backup feature regularly, particularly before major roster, league, or data changes.
-
-Cloud synchronization and browser persistence are designed to work together, but an independent export remains the safest portable backup of the bowling data.
+If dependencies change, `.github/workflows/generate-lockfile.yml` can be run manually from the Actions tab to regenerate and commit `package-lock.json` without needing a local machine — runs `npm install` in the cloud and pushes the resulting lockfile back to the repo.
