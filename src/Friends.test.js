@@ -45,12 +45,18 @@ describe('computeLeaderboard', () => {
     // The old buggy "average of per-session averages" logic would have
     // computed ((200+210+190)/3 + 220) / 2 = (200+220)/2 = 210 instead --
     // wrong, and a good regression check that the fix actually holds.
-    { user_id: 'me', scores: [200, 210, 190] },
-    { user_id: 'me', scores: [220] },
-    { user_id: 'aaron', scores: [180, 190, 200] },
-    { user_id: 'unrelated-person', scores: [300, 300, 300] },
-    { user_id: 'rob', scores: [] },
-    { user_id: 'zack', scores: null },
+    { user_id: 'me', bowler_name: 'You', scores: [200, 210, 190] },
+    { user_id: 'me', bowler_name: 'You', scores: [220] },
+    // This is the proxy-logging bug: same user_id as 'me' above, but a
+    // DIFFERENT bowler_name -- 'me' logged this session on Aaron's behalf.
+    // It must not count toward 'me's own total just because it shares an
+    // account, or every proxy-logged night silently inflates whoever's
+    // signed in, regardless of whose game it actually was.
+    { user_id: 'me', bowler_name: 'Aaron', scores: [150, 160, 140] },
+    { user_id: 'aaron', bowler_name: 'Aaron', scores: [180, 190, 200] },
+    { user_id: 'unrelated-person', bowler_name: 'Unrelated', scores: [300, 300, 300] },
+    { user_id: 'rob', bowler_name: 'Rob', scores: [] },
+    { user_id: 'zack', bowler_name: 'Zack', scores: null },
   ];
   const nameById = { me: 'You', aaron: 'Aaron' };
   const board = computeLeaderboard(sessions, nameById);
@@ -79,6 +85,18 @@ describe('computeLeaderboard', () => {
 
   it('tracks the correct GAME count per person, not session/night count', () => {
     expect(board[0].gameCount).toBe(4); // 3 + 1 games across two nights, not "2 nights"
+    expect(board[1].gameCount).toBe(3);
+  });
+
+  it('excludes a session proxy-logged under this account for someone else -- matching user_id is not enough, bowler_name must match too', () => {
+    // If the bug were present, 'me' would show 7 games (4 own + 3 proxy-logged
+    // for Aaron) and a skewed average blending two different people's scores.
+    expect(board[0].gameCount).toBe(4);
+    expect(board[0].overallAverage).toBe(205);
+    // And that proxy-logged Aaron game must not have been misattributed to
+    // 'aaron's own entry either -- it stays fully excluded either way, since
+    // 'aaron' the real friend has his own separate, correctly-attributed
+    // session with his own real user_id.
     expect(board[1].gameCount).toBe(3);
   });
 

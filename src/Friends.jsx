@@ -29,10 +29,19 @@ export function categorizeFriendships(friendships, myUserId, profilesById) {
 // mis-weights every night equally regardless of how many games it actually
 // contained, which both skews the average and makes "session count" read
 // as something other than what a bowler means by "games bowled."
+//
+// Critically, this also only counts a session toward someone's total if
+// bowler_name matches their own display name — NOT just because the
+// session's user_id matches their account. This app is built entirely
+// around proxy logging (one signed-in account can log a session for a
+// teammate, a sub, anyone), so a session's user_id alone says nothing
+// about whose game it actually was. Grouping by user_id alone silently
+// folds anyone else's proxy-logged nights into this account's own total.
 export function computeLeaderboard(sessions, nameById) {
   const byUser = {};
   sessions.forEach(s => {
-    if (!nameById[s.user_id]) return;
+    const ownerName = nameById[s.user_id];
+    if (!ownerName || s.bowler_name !== ownerName) return;
     const games = Array.isArray(s.scores) ? s.scores.filter(x => x != null) : [];
     if (!games.length) return;
     (byUser[s.user_id] = byUser[s.user_id] || []).push(...games);
@@ -111,7 +120,7 @@ export default function Friends() {
     const nameById={[user.id]:displayName||"You"};
     friends.forEach(f=>{nameById[f.userId]=f.displayName;});
 
-    const{data,online}=await cloudRead("sessions",q=>q.select("user_id,scores").in("user_id",allIds));
+    const{data,online}=await cloudRead("sessions",q=>q.select("user_id,bowler_name,scores").in("user_id",allIds));
     if (online && data) setLeaderboard(computeLeaderboard(data,nameById));
     setLeaderboardLoading(false);
   }
