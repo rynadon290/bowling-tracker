@@ -1,6 +1,12 @@
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
 import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.js";
+import {
+  bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
+  gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress,
+  hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets,
+} from "./domain/stats.js";
+import { lineupSort } from "./domain/leagues.js";
 
 export default function StatsView({
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,

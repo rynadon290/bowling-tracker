@@ -1,5 +1,6 @@
 import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS } from "./constants.js";
+import { rAvg, cAvg } from "./domain/stats.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
