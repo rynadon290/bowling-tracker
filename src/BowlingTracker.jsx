@@ -8,6 +8,7 @@ import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } 
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
   nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots,
+  freshRackShots, theoreticalFillBallValue,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -1779,22 +1780,6 @@ export default function BowlingTracker(){
   // ball 2 exists and wasn't a strike (in which case it's a fill attempt at
   // whatever ball 2 left, not a fresh rack). This is what makes the count
   // range from 30 up to 36 across a 3-game series, matching LaneTalk.
-  function freshRackShots(dataset){
-    const result=[];
-    const groups={};
-    dataset.forEach(s=>{
-      if(!s.ballNum){result.push(s);return;}
-      const key=`${s.bowler}|${s.league}|${s.date}|${s.game}`;
-      if(!groups[key])groups[key]={};
-      groups[key][s.ballNum]=s;
-    });
-    Object.values(groups).forEach(g=>{
-      if(g[1])result.push(g[1]);
-      if(g[2])result.push(g[2]);
-      if(g[3]&&(!g[2]||g[2].result==="Strike"))result.push(g[3]);
-    });
-    return result;
-  }
   const freshRackCount=freshRackShots(statsShots);
 
   // The bowler's average of their most recent N (default 10) fresh-rack
@@ -1810,20 +1795,6 @@ export default function BowlingTracker(){
   // (frames 1-9 plus the 10th frame's own first ball, up to 10 values).
   // If no other games exist yet (this is their very first game), uses
   // only this game's data — there's nothing else to blend with.
-  function theoreticalFillBallValue(bowler,league,date,game){
-    const bowlerShots=shots.filter(s=>s.bowler===bowler);
-    const isThisGame=(s)=>s.league===league&&s.date===date&&s.game===String(game);
-
-    const otherVals=freshRackShots(bowlerShots.filter(s=>!isThisGame(s))).map(firstBallOf).filter(v=>v!=null);
-    const cumulativeAvg=otherVals.length?otherVals.reduce((a,b)=>a+b,0)/otherVals.length:null;
-
-    const thisGameVals=freshRackShots(bowlerShots.filter(isThisGame)).map(firstBallOf).filter(v=>v!=null);
-    const thisGameAvg=thisGameVals.length?thisGameVals.reduce((a,b)=>a+b,0)/thisGameVals.length:null;
-
-    if(cumulativeAvg==null)return thisGameAvg; // no other games at all — only this game's data to go on
-    if(thisGameAvg==null)return cumulativeAvg; // shouldn't normally happen once frames 1-9 are logged, but be safe
-    return (cumulativeAvg+thisGameAvg)/2;
-  }
 
   // Theoretical score for one specific game: what the bowler would have
   // scored had every makeable spare (including the 10th frame's first
@@ -1833,7 +1804,7 @@ export default function BowlingTracker(){
     const gameShots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(game));
     if(!gameShots.length)return null;
     const f10b1=gameShots.find(s=>parseInt(s.frame)===10&&(!s.ballNum||s.ballNum===1));
-    const avgFB=f10b1?theoreticalFillBallValue(bowler,league,date,game):null;
+    const avgFB=f10b1?theoreticalFillBallValue(shots,bowler,league,date,game):null;
     const team=teams.find(t=>t.league===league);
     const isLeftHanded=!!team?.memberHandedness?.[bowler];
     const theoretical=makeTheoreticalShots(gameShots,isLeftHanded,avgFB);
