@@ -306,3 +306,51 @@ export function frameQualityScore(s){
   if(pins==null)return null;
   return Math.round(Math.max(0,Math.min(1,pins/9))*49*10)/10;
 }
+
+// Groups shots by (bowler, league, date, game) and keeps only genuine
+// fresh-rack deliveries: every non-10th-frame ball (ballNum is null), plus
+// the 10th frame's ball 1 always, ball 2 always (it's a fresh rack whether
+// converting a spare or opening a new one after a strike), and ball 3 only
+// when it's ALSO a fresh rack -- meaning either ball 2 didn't exist (a
+// single-ball 10th) or ball 2 was itself a strike. If ball 2 was a spare
+// conversion, ball 3 is a bonus ball on an already-cleared rack, not fresh.
+export function freshRackShots(dataset){
+  const result=[];
+  const groups={};
+  dataset.forEach(s=>{
+    if(!s.ballNum){result.push(s);return;}
+    const key=`${s.bowler}|${s.league}|${s.date}|${s.game}`;
+    if(!groups[key])groups[key]={};
+    groups[key][s.ballNum]=s;
+  });
+  Object.values(groups).forEach(g=>{
+    if(g[1])result.push(g[1]);
+    if(g[2])result.push(g[2]);
+    if(g[3]&&(!g[2]||g[2].result==="Strike"))result.push(g[3]);
+  });
+  return result;
+}
+
+// Estimates a plausible fill-ball value for a 10th-frame theoretical spare
+// conversion, since a never-thrown bonus ball has no real result to fall
+// back on. Blends this bowler's first-ball average across every OTHER
+// logged game (their broader form) with their first-ball average WITHIN
+// this specific game (how they're actually bowling tonight) -- an equal
+// blend of the two, rather than trusting either alone. Falls back to
+// whichever one is available if only one exists (e.g. this is their very
+// first logged game ever, or -- unusual once frames 1-9 are in -- this
+// game has no fresh-rack data yet).
+export function theoreticalFillBallValue(shots,bowler,league,date,game){
+  const bowlerShots=shots.filter(s=>s.bowler===bowler);
+  const isThisGame=(s)=>s.league===league&&s.date===date&&s.game===String(game);
+
+  const otherVals=freshRackShots(bowlerShots.filter(s=>!isThisGame(s))).map(firstBallOf).filter(v=>v!=null);
+  const cumulativeAvg=otherVals.length?otherVals.reduce((a,b)=>a+b,0)/otherVals.length:null;
+
+  const thisGameVals=freshRackShots(bowlerShots.filter(isThisGame)).map(firstBallOf).filter(v=>v!=null);
+  const thisGameAvg=thisGameVals.length?thisGameVals.reduce((a,b)=>a+b,0)/thisGameVals.length:null;
+
+  if(cumulativeAvg==null)return thisGameAvg; // no other games at all -- only this game's data to go on
+  if(thisGameAvg==null)return cumulativeAvg; // shouldn't normally happen once frames 1-9 are logged, but be safe
+  return (cumulativeAvg+thisGameAvg)/2;
+}

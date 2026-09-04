@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots } from './scoring.js';
+import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots, freshRackShots, theoreticalFillBallValue } from './scoring.js';
 
 describe('tenthFrameStatus', () => {
   it('returns [1] for a brand-new 10th frame with no shots yet', () => {
@@ -338,5 +338,131 @@ describe('makeTheoreticalShots', () => {
     const theoreticalScore = strictPartial(theoretical);
     expect(theoreticalScore).not.toBeNull();
     expect(theoreticalScore).toBeGreaterThan(actual);
+  });
+});
+
+describe('freshRackShots', () => {
+  function frame(f, opts) { return { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', game: '1', frame: String(f), ballNum: null, ...opts }; }
+
+  it('includes every regular frame 1-9 delivery (no ballNum)', () => {
+    const shots = [frame(1, { result: 'Strike' }), frame(2, { result: 'Other Leave', pinCount: '8' })];
+    expect(freshRackShots(shots)).toHaveLength(2);
+  });
+
+  it('10th frame, ball 1 open (game over): only ball 1 counts, nothing else exists', () => {
+    const shots = [frame(10, { result: 'Other Leave', spareMade: 'No', pinCount: '7', ballNum: 1 })];
+    const result = freshRackShots(shots);
+    expect(result).toHaveLength(1);
+    expect(result[0].ballNum).toBe(1);
+  });
+
+  it('10th frame, ball 1 strike, ball 2 in progress: ball 2 is always fresh after a strike', () => {
+    const shots = [
+      frame(10, { result: 'Strike', ballNum: 1 }),
+      frame(10, { result: 'Other Leave', spareMade: 'Yes', pinCount: '10', ballNum: 2 }),
+    ];
+    const result = freshRackShots(shots);
+    expect(result).toHaveLength(2);
+  });
+
+  it('10th frame, strike-strike-X: ball 3 is fresh because ball 2 was a strike (rack reset twice)', () => {
+    const shots = [
+      frame(10, { result: 'Strike', ballNum: 1 }),
+      frame(10, { result: 'Strike', ballNum: 2 }),
+      frame(10, { result: 'Weak 10', spareMade: 'No', pinCount: '9', ballNum: 3 }),
+    ];
+    const result = freshRackShots(shots);
+    expect(result).toHaveLength(3);
+  });
+
+  it('10th frame, strike then OPEN on ball 2: ball 3 is a fill attempt, NOT fresh -- excluded', () => {
+    const shots = [
+      frame(10, { result: 'Strike', ballNum: 1 }),
+      frame(10, { result: 'Other Leave', spareMade: 'No', pinCount: '7', ballNum: 2 }),
+      frame(10, { result: 'Other Leave', spareMade: 'No', pinCount: '5', ballNum: 3 }),
+    ];
+    const result = freshRackShots(shots);
+    // Ball 1 and ball 2 count, ball 3 does not (fill, not fresh)
+    expect(result).toHaveLength(2);
+    expect(result.some(s => s.ballNum === 3)).toBe(false);
+  });
+
+  it('10th frame, ball 1 spare conversion (no separate ball 2 record), ball 3 bonus: ball 3 IS fresh -- the spare reset the rack', () => {
+    const shots = [
+      frame(10, { result: 'Other Leave', otherLeave: ['7'], spareMade: 'Yes', pinCount: '10', ballNum: 1 }),
+      frame(10, { result: 'Strike', ballNum: 3 }),
+    ];
+    const result = freshRackShots(shots);
+    expect(result).toHaveLength(2);
+    expect(result.some(s => s.ballNum === 3)).toBe(true);
+  });
+
+  it('mixed regular frames plus a full 10th (strike-strike-strike): total count matches every genuinely fresh delivery', () => {
+    const shots = [
+      frame(1, { result: 'Strike' }), frame(2, { result: 'Strike' }), frame(3, { result: 'Strike' }),
+      frame(10, { result: 'Strike', ballNum: 1 }),
+      frame(10, { result: 'Strike', ballNum: 2 }),
+      frame(10, { result: 'Strike', ballNum: 3 }),
+    ];
+    expect(freshRackShots(shots)).toHaveLength(6);
+  });
+});
+
+describe('theoreticalFillBallValue', () => {
+  const league = 'Thursday House Shot';
+
+  function otherGameShot(date, frameNum, pins) {
+    return { bowler: 'Ryan', league, date, game: '1', frame: String(frameNum), ballNum: null, result: 'Other Leave', otherLeave: [], spareMade: 'No', pinCount: String(pins) };
+  }
+  function thisGameShot(frameNum, pins) {
+    return { bowler: 'Ryan', league, date: '2026-09-03', game: '1', frame: String(frameNum), ballNum: null, result: 'Other Leave', otherLeave: [], spareMade: 'No', pinCount: String(pins) };
+  }
+
+  it('blends cumulative average (other games) with this game\'s average -- an equal split of both, not just one', () => {
+    // Other game: first balls average to 8 (a single 8-count open frame)
+    const otherGame = [otherGameShot('2026-08-27', 1, 8)];
+    // This game: first balls average to 6 (a single 6-count open frame)
+    const thisGame = [thisGameShot(1, 6)];
+    const shots = [...otherGame, ...thisGame];
+    const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBe(7); // (8+6)/2
+  });
+
+  it('falls back to only this game\'s average when no other games exist at all', () => {
+    const shots = [thisGameShot(1, 9)];
+    const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBe(9);
+  });
+
+  it('falls back to only the cumulative average when this game has no fresh-rack data yet (unusual, but handled safely)', () => {
+    const shots = [otherGameShot('2026-08-27', 1, 8), otherGameShot('2026-08-20', 1, 8)];
+    const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBe(8);
+  });
+
+  it('returns null when there is no data anywhere for this bowler', () => {
+    const result = theoreticalFillBallValue([], 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBeNull();
+  });
+
+  it('only considers this specific bowler -- another bowler\'s games in the same dataset do not leak in', () => {
+    const shots = [
+      otherGameShot('2026-08-27', 1, 8),
+      { bowler: 'Aaron', league, date: '2026-08-27', game: '1', frame: '1', ballNum: null, result: 'Strike' },
+      thisGameShot(1, 6),
+    ];
+    const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBe(7); // unaffected by Aaron's strike
+  });
+
+  it('only considers this specific league+date+game as "this game" -- a same-bowler shot from a different game counts toward cumulative, not this-game', () => {
+    // Same bowler, same league, but a DIFFERENT date -- must be treated as
+    // an "other" game, not accidentally folded into "this game"'s average.
+    const shots = [
+      thisGameShot(1, 6),
+      otherGameShot('2026-08-27', 1, 8),
+    ];
+    const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
+    expect(result).toBe(7); // (8 cumulative + 6 this-game) / 2, correctly separated
   });
 });
