@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { convertExtractedGameToShots } from './scorecardImport.js';
-import { strictPartial } from './scoring.js';
+import { strictPartial } from './domain/scoring.js';
 
 const context = { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', teamId: 't1', game: 1 };
 
