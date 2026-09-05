@@ -184,6 +184,7 @@ export default function BowlingTracker(){
   const[saved,setSaved]=useState(false);
   const[sessionSaved,setSessionSaved]=useState(false);
   const[sessionSaveMessage,setSessionSaveMessage]=useState(null);
+  const[winningsSaved,setWinningsSaved]=useState(false);
   const[filterBall,setFilterBall]=useState("");
   const[filterResult,setFilterResult]=useState("");
   const[filterBowler,setFilterBowler]=useState("");
@@ -1153,6 +1154,8 @@ export default function BowlingTracker(){
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
       pokerQuarter:existing?.pokerQuarter||[0,0,0],
       pokerDollar:existing?.pokerDollar||[0,0,0],
+      threeSixNineWinnings:existing?.threeSixNineWinnings||0,
+      jackpotWinnings:existing?.jackpotWinnings||0,
       ...computeSessionStats(ss),
     };
     const updated=existing?sessions.map(s=>s.id===existing.id?session:s):[...sessions,session];
@@ -1184,6 +1187,11 @@ export default function BowlingTracker(){
     pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
       syncSessionsToCloud(prevSessions,updatedSessions);
     },600);
+  }
+
+  function confirmWinningsSaved(){
+    setWinningsSaved(true);
+    setTimeout(()=>setWinningsSaved(false),1500);
   }
 
   // 3-6-9 winnings are a single value per session, not a per-game array
@@ -1658,7 +1666,7 @@ export default function BowlingTracker(){
             addBall={addBall} addBowler={addBowler} autoFillLine={autoFillLine} calcLane={calcLane} cancelEdit={cancelEdit} cycleGameResult={cycleGameResult} cycleSeriesResult={cycleSeriesResult}
             getLanePattern={getLanePattern} getMatch={getMatch} handleBallChange={handleBallChange} handleLeaveToggle={handleLeaveToggle} handleLineChange={handleLineChange}
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
-            selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings}
+            selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
           />
         )}

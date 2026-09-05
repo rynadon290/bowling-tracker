@@ -881,29 +881,6 @@ export default function StatsView({
                 })()}
 
                 {(()=>{
-                  const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
-                  const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
-                  const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
-                  if(!relevantSessions.length)return null;
-                  return(
-                    <div style={S.card}>
-                      <div style={S.label}>{isTeamView?"Team Poker Winnings":"Poker Winnings"}</div>
-                      <div style={{display:"flex",gap:"8px"}}>
-                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
-                          <div style={{...S.statNum,color:C.spare}}>${totalQuarter.toFixed(2)}</div>
-                          <div style={S.statLbl}>Quarter Game</div>
-                        </div>
-                        <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
-                          <div style={{...S.statNum,color:C.strike}}>${totalDollar.toFixed(2)}</div>
-                          <div style={S.statLbl}>Dollar Game</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-
-                {(()=>{
                   const progress=avgProgress(sessions,statsBowler,statsLeague);
                   if(!progress)return null;
                   return(
@@ -1043,6 +1020,28 @@ export default function StatsView({
                           </ResponsiveContainer>
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {(()=>{
+                  const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
+                  const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
+                  const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
+                  if(!relevantSessions.length)return null;
+                  return(
+                    <div style={S.card}>
+                      <div style={S.label}>{isTeamView?"Team Poker Winnings":"Poker Winnings"}</div>
+                      <div style={{display:"flex",gap:"8px"}}>
+                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
+                          <div style={{...S.statNum,color:C.spare}}>${totalQuarter.toFixed(2)}</div>
+                          <div style={S.statLbl}>Quarter Game</div>
+                        </div>
+                        <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
+                          <div style={{...S.statNum,color:C.strike}}>${totalDollar.toFixed(2)}</div>
+                          <div style={S.statLbl}>Dollar Game</div>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
