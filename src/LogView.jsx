@@ -306,6 +306,11 @@ export default function LogView({
                       </div>
                     );
                   })()}
+
+                  <button style={{...S.btn("primary"),marginBottom:"12px"}} onClick={confirmWinningsSaved}>
+                    {winningsSaved?"✓ Winnings Saved":"Save Winnings"}
+                  </button>
+
                   <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{sr}%</div><div style={S.statLbl}>Strike %</div></div>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{spr}%</div><div style={S.statLbl}>Spare %</div></div>
@@ -343,9 +348,6 @@ export default function LogView({
                     {leagueAs.map(({league,avg})=><div key={league} style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{avg}</div><div style={S.statLbl}>{league.replace(" House Shot","")}</div></div>)}
                     {cA&&<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,fontSize:"18px",color:C.accent}}>{cA}</div><div style={S.statLbl}>Combined</div></div>}
                   </div>
-                  <button style={{...S.btn(),width:"100%",marginTop:"12px"}} onClick={confirmWinningsSaved}>
-                    {winningsSaved?"✓ Winnings Saved":"Save Winnings"}
-                  </button>
                 </div>
               );
             })()}
