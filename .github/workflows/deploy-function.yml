@@ -3,8 +3,6 @@ name: Deploy Edge Function
 on:
   push:
     branches: ["Gemini Integration"]
-    paths:
-      - 'supabase/functions/**'
 
 jobs:
   deploy:
