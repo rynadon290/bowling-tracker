@@ -108,12 +108,13 @@ Deno.serve(async (req) => {
 
   try {
     if (!GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured on the server" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+  console.error("GEMINI_API_KEY not configured — secret is missing or empty");
+  return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured on the server" }), {
+    status: 500,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+    
     // Require a real, signed-in user -- this costs API quota, so it
     // shouldn't be callable by anyone who happens to find the URL.
     const authHeader = req.headers.get("Authorization");
