@@ -171,8 +171,9 @@ Deno.serve(async (req) => {
     });
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return new Response(JSON.stringify({ error: "Gemini API error", detail: errText }), {
+  const errText = await geminiRes.text();
+  console.error("GEMINI API ERROR:", errText);
+  return new Response(JSON.stringify({ error: "Gemini API error", detail: errText }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -200,8 +201,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
+ } catch (err) {
+  console.error("UNEXPECTED ERROR:", err);
+  return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
