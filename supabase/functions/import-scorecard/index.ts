@@ -1,7 +1,7 @@
 // Supabase Edge Function: import-scorecard
 //
 // Receives one or more scorecard screenshot images (e.g. from LaneTalk),
-// sends them to Google's Gemini API for vision extraction, and returns
+// sends them to Google's Gemini API for vision extraction and returns
 // structured frame-by-frame data shaped to match this app's own `shots`
 // model as closely as possible -- so the client-side conversion step is
 // close to a direct field mapping, not a translation.
