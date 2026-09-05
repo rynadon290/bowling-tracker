@@ -2,7 +2,7 @@ name: Deploy Bowling Tracker to GitHub Pages
 
 on:
   push:
-    branches: ["Gemini Integration"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
