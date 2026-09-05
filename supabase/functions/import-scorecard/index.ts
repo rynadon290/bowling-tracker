@@ -20,7 +20,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = "gemini-2.5-flash"; // multimodal, on the free tier
+const GEMINI_MODEL = "gemini-3.6-flash"; // multimodal, on the free tier
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // One uniform shape for every frame, 1 through 10. Each frame is just a
