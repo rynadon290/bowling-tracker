@@ -1,6 +1,6 @@
 # Shot Tracker 🎳
 
-A mobile-first bowling league tracker for logging shots, sessions, and team stats — built for real league play across multiple teams and bowlers, with shot-by-shot detail, session summaries, team standings, and a friends leaderboard.
+A mobile-first bowling league tracker for logging shots, sessions and team stats — built for real league play across multiple teams and bowlers, with shot-by-shot detail, session summaries, team standings, and a friends leaderboard.
 
 **Live app:** https://rynadon290.github.io/bowling-tracker/
 

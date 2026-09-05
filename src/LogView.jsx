@@ -14,7 +14,7 @@ export default function LogView({
   addBall, addBowler, autoFillLine, calcLane, cancelEdit, cycleGameResult, cycleSeriesResult,
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
-  selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved,
+  selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
 }) {
   return (
@@ -80,6 +80,11 @@ export default function LogView({
             )}
 
             {/* Session card */}
+            {!editingId&&activeBowler&&(
+              <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
+                📷 Import Scorecard
+              </button>
+            )}
             {!editingId&&activeBowler&&(
               <CollapsibleCard
                 title="Tonight's Session"
