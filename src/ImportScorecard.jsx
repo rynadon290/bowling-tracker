@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
 import { RESULTS, localDateString } from "./constants.js";
-import { convertExtractedGameToShots } from "./domain/scorecardImport.js";
+import { convertExtractedGameToShots } from "./scorecardImport.js";
 import { strictPartial } from "./domain/scoring.js";
 import { supabase } from "./supabaseClient.js";
 
