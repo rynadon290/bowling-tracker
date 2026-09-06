@@ -44,8 +44,8 @@ describe('availableBalls', () => {
   const ballsByBag = { league1: ['A', 'B', 'C'], tourn1: ['D', 'E'], tourn2: ['A', 'F'] };
 
   it('restricts league and tournament to the selected bag', () => {
-    expect(availableBalls('league', ballsByBag, 'league1', all)).toEqual(['A', 'B', 'C']);
-    expect(availableBalls('tournament', ballsByBag, 'tourn1', all)).toEqual(['D', 'E']);
+    expect(availableBalls('league', ballsByBag, 'league1', all, true)).toEqual(['A', 'B', 'C']);
+    expect(availableBalls('tournament', ballsByBag, 'tourn1', all, true)).toEqual(['D', 'E']);
   });
 
   it('gives practice every ball, including unassigned ones', () => {
@@ -55,8 +55,16 @@ describe('availableBalls', () => {
     expect(availableBalls('practice', ballsByBag, 'tourn1', all)).toEqual(all);
   });
 
-  it('returns nothing when a competitive environment has no bag selected', () => {
-    expect(availableBalls('league', ballsByBag, null, all)).toEqual([]);
+  it('falls back to the whole arsenal when no bag is selected', () => {
+    // Bags organise an arsenal; they don't gate it. A bowler who hasn't
+    // picked one -- or hasn't created any -- must still be able to choose
+    // a ball, which is how the app worked before bags existed.
+    expect(availableBalls('league', ballsByBag, null, all, true)).toEqual(all);
+  });
+
+  it('ignores bags entirely for a bowler who has none', () => {
+    expect(availableBalls('league', {}, '', all, false)).toEqual(all);
+    expect(availableBalls('tournament', {}, '', all, false)).toEqual(all);
   });
 });
 

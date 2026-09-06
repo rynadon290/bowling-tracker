@@ -90,13 +90,20 @@ export function describeCapacity(bag) {
 // The balls available to pick from, given the environment and selected bag.
 //
 // Practice sees EVERYTHING -- every ball in every bag plus unassigned ones,
-// deduped. League and tournament see only the chosen bag. This is the whole
-// point of bags: competitive play is constrained, practice isn't.
-export function availableBalls(environment, ballsByBag, selectedBagId, allBalls) {
-  if (environment === "practice") {
-    return [...new Set(allBalls || [])];
-  }
-  if (!selectedBagId) return [];
+// deduped. This is the whole point of bags: competitive play is
+// constrained, practice isn't.
+//
+// League and tournament NARROW to the selected bag -- but only when there
+// is one. Bags are an optional organising tool, not a gate: a bowler who
+// never creates one must still be able to pick a ball, and a bowler who
+// has bags but hasn't chosen one yet shouldn't be stranded either. In both
+// cases we fall back to their whole arsenal, which is what the app did
+// before bags existed.
+export function availableBalls(environment, ballsByBag, selectedBagId, allBalls, hasBagsForEnvironment = true) {
+  const everything = [...new Set(allBalls || [])];
+  if (environment === "practice") return everything;
+  // No bags defined for this environment, or none selected -> no filter.
+  if (!hasBagsForEnvironment || !selectedBagId) return everything;
   return [...new Set(ballsByBag?.[selectedBagId] || [])];
 }
 
