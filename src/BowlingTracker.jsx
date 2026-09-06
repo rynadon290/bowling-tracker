@@ -15,6 +15,7 @@ import {
   freshRackShots, theoreticalFillBallValue,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
+import { normalizeLayout } from "./domain/layouts.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S } from "./ui.jsx";
@@ -48,6 +49,7 @@ const STORAGE_KEY = "bowling-shots-v2";
 const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
+const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -179,6 +181,12 @@ export default function BowlingTracker(){
   const[activeBowler,setActiveBowler]=useState("");
   const[newBowlerName,setNewBowlerName]=useState("");
   const[arsenals,setArsenals]=useState({}); // {bowlerName: [ballName,...]}
+  // Drilling layouts, keyed "bowlerName|ballName" -> {system, values}.
+  // Kept separate from `arsenals` (a plain string array of ball names)
+  // rather than restructuring it, so every existing consumer of arsenals
+  // -- ballUniverse, addBall, removeBall, the cloud sync -- keeps working
+  // unchanged. A ball with no layout recorded simply has no entry here.
+  const[ballLayouts,setBallLayouts]=useState({});
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -311,19 +319,26 @@ export default function BowlingTracker(){
           }
         }
 
-        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball"));
+        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values"));
         if(arsenalsRes.online&&arsenalsRes.data){
           const pendingArsenalRows=await getQueuedRecordsForTable("arsenals");
           const rebuilt={};
+          const rebuiltLayouts={};
           [...arsenalsRes.data,...pendingArsenalRows].forEach(row=>{
             if(!rebuilt[row.bowler_name])rebuilt[row.bowler_name]=[];
             if(!rebuilt[row.bowler_name].includes(row.ball))rebuilt[row.bowler_name].push(row.ball);
+            const normalized=normalizeLayout({system:row.layout_system,values:row.layout_values});
+            if(normalized)rebuiltLayouts[`${row.bowler_name}|${row.ball}`]=normalized;
           });
           setArsenals(rebuilt);
+          setBallLayouts(rebuiltLayouts);
           try{await window.storage.set(ARSENALS_KEY,JSON.stringify(rebuilt));}catch{}
+          try{await window.storage.set(LAYOUTS_KEY,JSON.stringify(rebuiltLayouts));}catch{}
         }else{
           const a=await window.storage.get(ARSENALS_KEY);
           if(a)setArsenals(JSON.parse(a.value));
+          const bl=await window.storage.get(LAYOUTS_KEY);
+          if(bl)setBallLayouts(JSON.parse(bl.value));
         }
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
@@ -618,6 +633,27 @@ export default function BowlingTracker(){
     if(current.includes(name))return;
     await saveArsenals({...arsenals,[activeBowler]:[...current,name]});
     setNewBallName("");
+  }
+
+  // Saves a ball's drilling layout. Local state updates immediately; the
+  // cloud write is debounced because this is typed digit-by-digit and
+  // would otherwise fire a write per keystroke.
+  function setBallLayout(bowlerName,ballName,layout){
+    const key=`${bowlerName}|${ballName}`;
+    const updated={...ballLayouts,[key]:layout};
+    setBallLayouts(updated);
+    try{window.storage.set(LAYOUTS_KEY,JSON.stringify(updated));}catch{}
+
+    clearTimeout(pokerSaveTimers.current[`layout|${key}`]);
+    pokerSaveTimers.current[`layout|${key}`]=setTimeout(()=>{
+      cloudWrite("arsenals",{
+        bowler_name:bowlerName,
+        ball:ballName,
+        layout_system:layout?.system||null,
+        layout_values:layout?.values||null,
+        created_by:user?.id||null,
+      });
+    },600);
   }
 
   async function removeBall(bowlerName,ballName){
@@ -1736,6 +1772,7 @@ export default function BowlingTracker(){
             preferences={preferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
             activeBowlerLeftHanded={activeBowlerLeftHanded}
+            ballLayouts={ballLayouts} setBallLayout={setBallLayout}
           />
         )}
 

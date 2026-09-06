@@ -2,6 +2,7 @@ import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
+import ArsenalList from "./ArsenalList.jsx";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -18,6 +19,7 @@ export default function LogView({
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
+  ballLayouts, setBallLayout,
 }) {
   return (
     <>
@@ -64,20 +66,18 @@ export default function LogView({
                 summary={`${(arsenals[activeBowler]||[]).length} ball${(arsenals[activeBowler]||[]).length===1?"":"s"}`}
                 expanded={expandedSections.arsenal}
                 onToggle={()=>toggleSection("arsenal")}>
-                <div style={S.chips}>
-                  {(arsenals[activeBowler]||[]).map(b=>(
-                    <Chip key={b} label={`${b}  ×`} selected onToggle={()=>removeBall(activeBowler,b)} color={C.accent}/>
-                  ))}
-                </div>
+                <ArsenalList
+                  activeBowler={activeBowler}
+                  balls={arsenals[activeBowler]||[]}
+                  ballLayouts={ballLayouts||{}}
+                  setBallLayout={setBallLayout}
+                  removeBall={removeBall}/>
                 <div style={S.row}>
                   <input style={{...S.input,flex:1}} placeholder="Add a ball (e.g. Storm Phaze II)" value={newBallName}
                     onChange={e=>setNewBallName(e.target.value)}
                     onKeyDown={e=>{if(e.key==="Enter")addBall();}}/>
                   <button style={S.btn("sm")} onClick={addBall}>+</button>
                 </div>
-                {(arsenals[activeBowler]||[]).length===0&&(
-                  <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>Add {activeBowler}'s balls to start logging shots. Tap a ball above to remove it.</div>
-                )}
               </CollapsibleCard>
             )}
 
