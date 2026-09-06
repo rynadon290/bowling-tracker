@@ -60,6 +60,15 @@ export default function Settings({
 
   return (
     <div>
+      {/* Placed at the very top, not the bottom, of what can be a long
+          scrolling page. A confirmation or error tied to a control near
+          the top of a 30-card Settings screen was previously rendered
+          below everything else -- easy to tap something, see nothing
+          happen, and conclude the app is broken when the message was
+          simply off-screen. */}
+      {savedFlash && <div style={{ fontSize: "13px", color: C.strike, textAlign: "center", marginBottom: "10px" }}>✓ Saved</div>}
+      {error && <div style={{ fontSize: "13px", color: C.miss, textAlign: "center", marginBottom: "10px" }}>{error}</div>}
+
       <div style={{ ...S.card, padding: "10px 12px" }}>
         <div style={S.chips}>
           <Chip label="Settings" selected={section === "settings"} onToggle={() => setSection("settings")} />
@@ -414,9 +423,6 @@ export default function Settings({
           Reset to {ENVIRONMENT_LABELS[preferences.environment] || "Default"} Defaults
         </button>
       </div>
-
-      {savedFlash && <div style={{ fontSize: "13px", color: C.strike, textAlign: "center", marginBottom: "12px" }}>✓ Saved</div>}
-      {error && <div style={{ fontSize: "13px", color: C.miss, textAlign: "center", marginBottom: "12px" }}>{error}</div>}
 
       {/* Danger Zone lives here, at the bottom of Settings, rather than on
           the Stats tab -- it's irreversible, so it should take deliberate

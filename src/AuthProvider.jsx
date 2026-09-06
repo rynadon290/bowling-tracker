@@ -43,16 +43,38 @@ export function AuthProvider({ children }) {
       });
   }, [session?.user?.id]);
 
+  const PREFERENCES_KEY = 'bowling-preferences-v1';
+
+  // Loads whatever's cached on this device immediately, before any network
+  // round trip and regardless of sign-in state. This is what lets Settings
+  // work the instant the app opens.
+  useEffect(() => {
+    (async () => {
+      try {
+        const cached = await window.storage.get(PREFERENCES_KEY);
+        if (cached) setPreferences(normalizePreferences(JSON.parse(cached.value)));
+      } catch {}
+    })();
+  }, []);
+
   // Same pattern for preferences -- stored as one JSONB blob per user
   // rather than a fixed set of columns, since the toggle set is expected
   // to keep growing (this is meant to absorb any future "opt in/out of X"
   // setting, not just the four accessory fields it starts with).
+  //
+  // No sign-out reset here (previously this called setPreferences on every
+  // change including sign-out, wiping local Settings back to defaults).
+  // Signing out should not erase choices made on this device.
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!userId) { setPreferences(defaultPreferences()); return; }
+    if (!userId) return;
     cloudRead('user_preferences', q => q.select('preferences').eq('user_id', userId).single())
       .then(({ data, online }) => {
-        if (online && data) setPreferences(normalizePreferences(data.preferences));
+        if (online && data) {
+          const normalized = normalizePreferences(data.preferences);
+          setPreferences(normalized);
+          try { window.storage.set(PREFERENCES_KEY, JSON.stringify(normalized)); } catch {}
+        }
       });
   }, [session?.user?.id]);
 
@@ -84,14 +106,27 @@ export function AuthProvider({ children }) {
   // callers doing a targeted change (e.g. domain/preferences.js's
   // setTrackedField) can pass a function without needing the current
   // value from two places at once.
+  //
+  // Local-first, like every other piece of state in this app (shots,
+  // sessions, bags, tournaments all write to window.storage immediately
+  // and treat the cloud as best-effort). Previously this required a signed
+  // -in session and returned an error with NO local update otherwise --
+  // meaning every Settings toggle, including Environment, silently did
+  // nothing for anyone not currently signed in.
   async function updatePreferences(next) {
-    if (!session?.user?.id) return { error: new Error('Not signed in') };
     const resolved = typeof next === 'function' ? next(preferences) : next;
     const normalized = normalizePreferences(resolved);
-    setPreferences(normalized); // optimistic
+    setPreferences(normalized); // always takes effect on this device
+    try { window.storage.set(PREFERENCES_KEY, JSON.stringify(normalized)); } catch {}
+
+    if (!session?.user?.id) {
+      // Not an error -- the change is saved on this device. It just won't
+      // follow the bowler to another device until they sign in.
+      return { error: null };
+    }
     const result = await cloudWrite('user_preferences', { user_id: session.user.id, preferences: normalized });
     if (!result.synced) {
-      return { error: new Error(`Preferences haven't reached the cloud yet (${result.reason || 'unknown reason'}) — they may not carry over to another device yet.`) };
+      return { error: new Error(`Saved on this device, but hasn't reached the cloud yet (${result.reason || 'unknown reason'}) — it may not carry over to another device yet.`) };
     }
     return { error: null };
   }
