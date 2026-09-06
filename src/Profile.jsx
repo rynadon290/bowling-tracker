@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import ArsenalList from "./ArsenalList.jsx";
+import BagManager from "./BagManager.jsx";
 import {
   emptyProfile, normalizeProfile, addHomeCenter, removeHomeCenter,
   setProfileField, membershipFor,
@@ -11,6 +12,7 @@ export default function Profile({
   profiles, setProfile, teams,
   arsenals, ballLayouts, setBallLayout, removeBall,
   newBallName, setNewBallName, addBall,
+  bags, ballBags, saveBag, deleteBag, assignBallToBag,
 }) {
   const [newCenter, setNewCenter] = useState("");
 
@@ -138,6 +140,15 @@ export default function Profile({
           <button style={S.btn("sm")} onClick={addBall}>+</button>
         </div>
       </div>
+
+      <BagManager
+        activeBowler={activeBowler}
+        bags={bags || []}
+        balls={balls}
+        ballBags={ballBags || {}}
+        saveBag={saveBag}
+        deleteBag={deleteBag}
+        assignBallToBag={assignBallToBag} />
 
       <div style={S.card}>
         <div style={S.label}>Notes</div>

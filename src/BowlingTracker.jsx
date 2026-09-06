@@ -21,6 +21,7 @@ import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/s
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
+import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom } from "./domain/bags.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -58,6 +59,8 @@ const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
+const BAGS_KEY = "bowling-bags-v1";
+const BALL_BAGS_KEY = "bowling-ball-bag-assignments-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -207,6 +210,14 @@ export default function BowlingTracker(){
   // The tournament currently being entered. Kept as one working record
   // rather than a list -- you're filling in one tournament at a time, and
   // saving commits it to the cloud.
+  // Bags are kept alongside `arsenals` rather than restructuring it.
+  // `arsenals` stays the flat {bowler: [ball]} list of everything a bowler
+  // owns -- which ballUniverse, stats, and history all still depend on --
+  // and `ballBags` records which bag each ball is packed in, keyed
+  // "bowler|ball". A ball with no entry is unassigned.
+  const[bags,setBags]=useState([]);
+  const[ballBags,setBallBags]=useState({});
+  const[selectedBagId,setSelectedBagId]=useState("");
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -347,19 +358,23 @@ export default function BowlingTracker(){
           }
         }
 
-        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values"));
+        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values,bag_id"));
         if(arsenalsRes.online&&arsenalsRes.data){
           const pendingArsenalRows=await getQueuedRecordsForTable("arsenals");
           const rebuilt={};
           const rebuiltLayouts={};
+          const rebuiltBallBags={};
           [...arsenalsRes.data,...pendingArsenalRows].forEach(row=>{
             if(!rebuilt[row.bowler_name])rebuilt[row.bowler_name]=[];
             if(!rebuilt[row.bowler_name].includes(row.ball))rebuilt[row.bowler_name].push(row.ball);
             const normalized=normalizeLayout({system:row.layout_system,values:row.layout_values});
             if(normalized)rebuiltLayouts[`${row.bowler_name}|${row.ball}`]=normalized;
+            if(row.bag_id)rebuiltBallBags[`${row.bowler_name}|${row.ball}`]=row.bag_id;
           });
           setArsenals(rebuilt);
           setBallLayouts(rebuiltLayouts);
+          setBallBags(rebuiltBallBags);
+          try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltBallBags));}catch{}
           try{await window.storage.set(ARSENALS_KEY,JSON.stringify(rebuilt));}catch{}
           try{await window.storage.set(LAYOUTS_KEY,JSON.stringify(rebuiltLayouts));}catch{}
         }else{
@@ -367,6 +382,8 @@ export default function BowlingTracker(){
           if(a)setArsenals(JSON.parse(a.value));
           const bl=await window.storage.get(LAYOUTS_KEY);
           if(bl)setBallLayouts(JSON.parse(bl.value));
+          const bb=await window.storage.get(BALL_BAGS_KEY);
+          if(bb)setBallBags(JSON.parse(bb.value));
         }
 
         const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,home_centers,notes"));
@@ -381,6 +398,16 @@ export default function BowlingTracker(){
         }else{
           const pr=await window.storage.get(PROFILES_KEY);
           if(pr)setProfiles(JSON.parse(pr.value));
+        }
+
+        const bagsRes=await cloudRead("bags",q=>q.select("id,bowler_name,name,bag_type,ball_limit,includes_plastic"));
+        if(bagsRes.online&&bagsRes.data){
+          const rebuiltBags=bagsRes.data.map(bagFromRow).filter(Boolean);
+          setBags(rebuiltBags);
+          try{await window.storage.set(BAGS_KEY,JSON.stringify(rebuiltBags));}catch{}
+        }else{
+          const bg=await window.storage.get(BAGS_KEY);
+          if(bg)setBags(JSON.parse(bg.value).map(b=>normalizeBag(b)));
         }
 
         const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score"));
@@ -695,6 +722,50 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Bags ────────────────────────────────────────────────────────────
+  function saveBag(bag){
+    const withId={...normalizeBag(bag,bag.bowlerName||activeBowler),id:bag.id||crypto.randomUUID()};
+    const updated=bags.some(b=>b.id===withId.id)
+      ?bags.map(b=>b.id===withId.id?withId:b)
+      :[...bags,withId];
+    setBags(updated);
+    try{window.storage.set(BAGS_KEY,JSON.stringify(updated));}catch{}
+    clearTimeout(pokerSaveTimers.current[`bag|${withId.id}`]);
+    pokerSaveTimers.current[`bag|${withId.id}`]=setTimeout(()=>{
+      cloudWrite("bags",bagToRow(withId,user?.id||null));
+    },600);
+    return withId;
+  }
+
+  function deleteBag(bagId){
+    setBags(prev=>{
+      const updated=prev.filter(b=>b.id!==bagId);
+      try{window.storage.set(BAGS_KEY,JSON.stringify(updated));}catch{}
+      return updated;
+    });
+    // Balls in a deleted bag become unassigned rather than vanishing --
+    // the bowler still owns them, they're just not packed for anything.
+    setBallBags(prev=>{
+      const updated=Object.fromEntries(Object.entries(prev).filter(([,v])=>v!==bagId));
+      try{window.storage.set(BALL_BAGS_KEY,JSON.stringify(updated));}catch{}
+      return updated;
+    });
+    if(selectedBagId===bagId)setSelectedBagId("");
+    cloudDelete("bags",bagId);
+  }
+
+  function assignBallToBag(bowlerName,ballName,bagId){
+    const key=`${bowlerName}|${ballName}`;
+    const updated={...ballBags};
+    if(bagId)updated[key]=bagId; else delete updated[key];
+    setBallBags(updated);
+    try{window.storage.set(BALL_BAGS_KEY,JSON.stringify(updated));}catch{}
+    clearTimeout(pokerSaveTimers.current[`ballbag|${key}`]);
+    pokerSaveTimers.current[`ballbag|${key}`]=setTimeout(()=>{
+      cloudWrite("arsenals",{bowler_name:bowlerName,ball:ballName,bag_id:bagId||null,created_by:user?.id||null});
+    },600);
+  }
+
   function setBallLayout(bowlerName,ballName,layout){
     const key=`${bowlerName}|${ballName}`;
     const updated={...ballLayouts,[key]:layout};
@@ -1502,6 +1573,19 @@ export default function BowlingTracker(){
   // Profile is the source of truth; the roster value is the fallback for
   // bowlers whose profile hasn't been filled in yet, so existing lefties
   // keep working without needing a data migration.
+  // Which balls the Log tab offers. Practice sees everything the bowler
+  // owns; league and tournament see only the selected bag. Bags for the
+  // current bowler are grouped so the selector can show counts.
+  const bowlerBags=bags.filter(b=>b.bowlerName===activeBowler);
+  const envBags=bagsForEnvironment(bowlerBags,preferences.environment);
+  const bowlerBalls=arsenals[activeBowler]||[];
+  const ballsByBag={};
+  bowlerBalls.forEach(ball=>{
+    const bagId=ballBags[`${activeBowler}|${ball}`];
+    if(bagId)(ballsByBag[bagId]=ballsByBag[bagId]||[]).push(ball);
+  });
+  const logBalls=availableBalls(preferences.environment,ballsByBag,selectedBagId,bowlerBalls);
+
   const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
   const activeBowlerLeftHanded=resolveHandedness(profiles[activeBowler],rosterLeftHanded);
 
@@ -1866,7 +1950,8 @@ export default function BowlingTracker(){
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
-            newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}/>
+            newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}
+            bags={bags} ballBags={ballBags} saveBag={saveBag} deleteBag={deleteBag} assignBallToBag={assignBallToBag}/>
         )}
 
         {view==="settings"&&(
@@ -1916,6 +2001,7 @@ export default function BowlingTracker(){
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
+            envBags={envBags} selectedBagId={selectedBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}
             updatePreferences={updatePreferences}
           />

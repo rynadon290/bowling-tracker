@@ -26,6 +26,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   sessionStartDismissed, dismissSessionStart, updatePreferences,
+  envBags, selectedBagId, setSelectedBagId, logBalls,
 }) {
   return (
     <>
@@ -539,13 +540,38 @@ export default function LogView({
 
             {/* Ball */}
             <div style={S.card}>
+              {/* League and tournament are bag-constrained: you only have
+                  what you carried. Practice isn't, so it shows everything
+                  and the selector is hidden entirely. */}
+              {envBags.length>0&&(
+                <>
+                  <div style={S.label}>Bag</div>
+                  <div style={S.chips}>
+                    {envBags.map(bag=>(
+                      <Chip key={bag.id} label={bag.name} selected={selectedBagId===bag.id}
+                        onToggle={()=>setSelectedBagId(selectedBagId===bag.id?"":bag.id)}/>
+                    ))}
+                  </div>
+                  {!selectedBagId&&(
+                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                      Pick the bag you brought to see its balls.
+                    </div>
+                  )}
+                </>
+              )}
               <div style={S.label}>Ball</div>
               <div style={S.chips}>
-                {(arsenals[form.bowler]||[]).map(b=><Chip key={b} label={b} selected={form.ball===b} onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>)}
+                {logBalls.map(b=><Chip key={b} label={b} selected={form.ball===b} onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>)}
               </div>
-              {(arsenals[form.bowler]||[]).length===0&&(
+              {logBalls.length===0&&(
                 <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-                  {form.bowler?`No balls in ${form.bowler}'s arsenal yet — add some above.`:"Select a bowler to see their arsenal."}
+                  {!form.bowler
+                    ?"Select a bowler to see their arsenal."
+                    :envBags.length>0&&!selectedBagId
+                      ?"Pick a bag above to see its balls."
+                      :envBags.length>0
+                        ?"That bag is empty — add balls to it from the profile screen."
+                        :`No balls in ${form.bowler}'s arsenal yet — add some above.`}
                 </div>
               )}
             </div>
