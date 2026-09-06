@@ -3,6 +3,7 @@ import {
   catalogState, isLocked, canEdit, canVote, approvalsUntilNext,
   stateDescription, clearedSpecsAfterRejection, ballKey, bestEntry,
   APPROVAL_THRESHOLD, VERIFICATION_THRESHOLD, REJECTION_THRESHOLD,
+  rejectedBallsFor,
 } from './ballCatalog.js';
 
 const entry = o => ({ submittedBy: 'u1', approvals: 0, rejections: 0, createdAt: '2026-01-01', ...o });
@@ -19,10 +20,25 @@ describe('state transitions', () => {
     expect(catalogState(entry({ rejections: REJECTION_THRESHOLD }))).toBe('rejected');
   });
 
-  it('lets rejection override even a heavily-approved entry', () => {
-    // If three people say the numbers are wrong, a pile of earlier
-    // approvals doesn't make them right -- the entry needs redoing.
-    expect(catalogState(entry({ approvals: 20, rejections: 3 }))).toBe('rejected');
+  it('treats the two outcomes as a race -- whichever threshold lands first', () => {
+    // Rejection wins only if it got there BEFORE verification. An entry
+    // that reached the verification threshold is already locked and voting
+    // has stopped, so it cannot subsequently accumulate rejections.
+    expect(catalogState(entry({ approvals: 4, rejections: REJECTION_THRESHOLD }))).toBe('rejected');
+    expect(catalogState(entry({ approvals: VERIFICATION_THRESHOLD, rejections: REJECTION_THRESHOLD }))).toBe('verified');
+  });
+
+  it('resolves an even split toward rejection', () => {
+    // Approval and rejection need the same number of people, so a tie is
+    // possible. Wrong specs cost more than missing ones: a bowler can
+    // re-enter specs, but can't easily tell that numbers they trusted
+    // are bad.
+    expect(APPROVAL_THRESHOLD).toBe(REJECTION_THRESHOLD);
+    expect(catalogState(entry({ approvals: 2, rejections: 2 }))).toBe('rejected');
+  });
+
+  it('makes verification terminal', () => {
+    expect(catalogState(entry({ approvals: 20, rejections: 10 }))).toBe('verified');
   });
 });
 
@@ -51,8 +67,11 @@ describe('voting rules', () => {
     expect(canVote(entry({}), 'u2')).toBe(true);
   });
 
-  it('stops voting once an entry is rejected', () => {
+  it('stops voting once an entry is settled either way', () => {
+    // Closing voting on verified entries is what actually makes
+    // verification terminal, rather than just a label.
     expect(canVote(entry({ rejections: REJECTION_THRESHOLD }), 'u2')).toBe(false);
+    expect(canVote(entry({ approvals: VERIFICATION_THRESHOLD }), 'u2')).toBe(false);
   });
 });
 
@@ -105,5 +124,32 @@ describe('bestEntry', () => {
       entry({ submittedBy: 'new', approvals: 2, createdAt: '2026-06-01' }),
     ]);
     expect(out.submittedBy).toBe('old');
+  });
+});
+
+describe('rejectedBallsFor', () => {
+  const e = o => ({ submittedBy: 'u1', approvals: 0, rejections: 0, createdAt: '2026-01-01', ...o });
+
+  it('flags a ball whose only catalog entry was rejected', () => {
+    const entries = { 'phaze ii': [e({ rejections: REJECTION_THRESHOLD })] };
+    expect(rejectedBallsFor(['Phaze II'], entries, [])).toEqual(['Phaze II']);
+  });
+
+  it('stays quiet when another submission for that ball survived', () => {
+    // There are still usable specs, so there's nothing to warn about.
+    const entries = {
+      'phaze ii': [e({ rejections: REJECTION_THRESHOLD }), e({ submittedBy: 'u2', approvals: 2 })],
+    };
+    expect(rejectedBallsFor(['Phaze II'], entries, [])).toEqual([]);
+  });
+
+  it('does not re-notify once acknowledged', () => {
+    const entries = { 'phaze ii': [e({ rejections: REJECTION_THRESHOLD })] };
+    expect(rejectedBallsFor(['Phaze II'], entries, ['phaze ii'])).toEqual([]);
+  });
+
+  it('matches the bowler\'s ball regardless of casing or spacing', () => {
+    const entries = { 'phaze ii': [e({ rejections: REJECTION_THRESHOLD })] };
+    expect(rejectedBallsFor(['PHAZE  ii'], entries, [])).toEqual(['PHAZE  ii']);
   });
 });

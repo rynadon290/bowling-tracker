@@ -32,18 +32,26 @@ export const APPROVAL_THRESHOLD = 2;
 // locking reflects real consensus rather than a couple of agreeable users.
 export const VERIFICATION_THRESHOLD = 5;
 
-// Rejections that remove the entry.
-export const REJECTION_THRESHOLD = 3;
+// Rejections that remove the entry. Matched to the approval threshold: two
+// people disputing an entry is exactly as meaningful as two agreeing with
+// it, and wrong specs are more costly than a missing one -- a bowler can
+// re-enter specs, but can't easily tell that numbers they trusted are bad.
+export const REJECTION_THRESHOLD = 2;
 
 export function catalogState(entry) {
   const approvals = entry?.approvals ?? 0;
   const rejections = entry?.rejections ?? 0;
 
-  // Rejection is checked FIRST and is not outvoted by approvals. If three
-  // people say the numbers are wrong, "but five others agreed" doesn't make
-  // them right -- it means the entry needs re-entering, not defending.
-  if (rejections >= REJECTION_THRESHOLD) return "rejected";
+  // Verification is terminal and checked FIRST. Once an entry reaches the
+  // approval threshold it locks, and voting stops -- so it can never
+  // subsequently accumulate rejections. Checking rejection first would mean
+  // a verified entry could be un-verified by votes that can't be cast.
+  //
+  // The two outcomes are a race: whichever threshold is crossed first wins.
+  // An entry only reaches "rejected" if it collected enough rejections
+  // BEFORE reaching the verification threshold.
   if (approvals >= VERIFICATION_THRESHOLD) return "verified";
+  if (rejections >= REJECTION_THRESHOLD) return "rejected";
   if (approvals >= APPROVAL_THRESHOLD) return "approved";
   return "new";
 }
@@ -63,10 +71,15 @@ export function canEdit(entry, userId) {
 
 // A user can't approve or reject their own submission -- self-confirmation
 // would let one person walk their own entry to verified.
+//
+// Voting also stops once an entry is settled either way. Verified is locked
+// (that's what makes it terminal -- it can't later collect rejections), and
+// a rejected entry is already gone.
 export function canVote(entry, userId) {
   if (!entry || !userId) return false;
   if (entry.submittedBy === userId) return false;
-  if (catalogState(entry) === "rejected") return false;
+  const state = catalogState(entry);
+  if (state === "rejected" || state === "verified") return false;
   return true;
 }
 
@@ -117,6 +130,23 @@ export function clearedSpecsAfterRejection(ballName) {
     diff: "",
     intDiff: "",
   };
+}
+
+// Balls this bowler owns whose catalog specs were rejected by the community
+// AND which they haven't already acknowledged. Drives the notice telling
+// them their specs were removed -- they keep the ball either way.
+export function rejectedBallsFor(bowlerBalls, entriesByKey, acknowledged) {
+  const seen = new Set(acknowledged || []);
+  return (bowlerBalls || []).filter(ball => {
+    const key = ballKey(ball);
+    if (seen.has(key)) return false;
+    const entries = entriesByKey?.[key];
+    if (!entries || !entries.length) return false;
+    // Only notify when EVERY entry for the ball was rejected. If someone
+    // else's submission survived, there are still usable specs and there's
+    // nothing to warn about.
+    return entries.every(e => catalogState(e) === "rejected");
+  });
 }
 
 // Matching key so "Phaze II", "phaze ii", and " Phaze  II " are one ball.
