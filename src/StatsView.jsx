@@ -7,14 +7,14 @@ import {
   hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults,
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
+import { totalMoney } from "./domain/money.js";
 
 export default function StatsView({
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
   statsLeague, setStatsLeague, trendMetric, setTrendMetric, trendScope, setTrendScope,
-  compareLeague, setCompareLeague, confirmClear, setConfirmClear, showBackup, setShowBackup,
-  importText, setImportText, backupStatus, setBackupStatus, matches,
+  compareLeague, setCompareLeague, confirmClear, setConfirmClear, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
   cleanFrameCount, cleanFrameR, compareLabel, firstBallAvg, fivePinAttempts, fivePinMisses,
   framePosition, framePositionGamesLogged, framePositionReliable, frameShots, hideIndividualOnly,
@@ -23,62 +23,11 @@ export default function StatsView({
   splitCount, splitR, statsShots, stk, stkR, teamCleanFrameR, teamFirstBallAvg, teamLeaveAvg,
   teamSinglePinSpareR, teamSpR, teamSplitConvR, teamSplitR, teamStkR, teamTenPinRate,
   teamTenPinSpareR, tenPinAttempts, tenPinLeaveCount, tenPinMade, tenPinSpareR, tot, wk,
-  clearAllData, exportData, handicapMatches, handicapSplit, importData, longestStrikeStreak,
+  clearAllData, handicapMatches, handicapSplit, longestStrikeStreak,
   theoreticalScoreForGame, trendData,
 }) {
   return (
           <>
-            <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
-              <div style={{...S.label,color:C.accent}}>Backup & Restore</div>
-              <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                Save a copy of everything — shots, sessions, bowlers, arsenals, and match results — so your season is safe no matter what. If you ever open this app and your history looks empty, restore it here.
-              </div>
-              {!showBackup?(
-                <button style={S.btn()} onClick={()=>{setShowBackup(true);setBackupStatus("");}}>Open Backup & Restore</button>
-              ):(
-                <>
-                  <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                    <button style={{...S.btn("primary"),flex:1}} onClick={()=>{
-                      const json=exportData();
-                      const blob=new Blob([json],{type:"application/json"});
-                      const url=URL.createObjectURL(blob);
-                      const a=document.createElement("a");
-                      a.href=url;
-                      a.download=`bowling-backup-${localDateString()}.json`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                      setBackupStatus("Backup downloaded.");
-                    }}>Download Backup</button>
-                    <button style={{...S.btn(),flex:1}} onClick={()=>setShowBackup(false)}>Close</button>
-                  </div>
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
-                    If the download doesn't work in this environment, copy the text below instead and save it somewhere safe.
-                  </div>
-                  <textarea readOnly value={exportData()} onClick={e=>e.target.select()}
-                    style={{...S.input,minHeight:"90px",fontFamily:"monospace",fontSize:"11px",marginBottom:"12px"}}/>
-                  <div style={S.divider}/>
-                  <div style={S.label}>Restore From Backup</div>
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
-                    Paste a previously saved backup below. This replaces all current data.
-                  </div>
-                  <textarea value={importText} onChange={e=>setImportText(e.target.value)}
-                    placeholder="Paste backup JSON here..."
-                    style={{...S.input,minHeight:"90px",fontFamily:"monospace",fontSize:"11px",marginBottom:"8px"}}/>
-                  <button style={S.btn("warn")} onClick={async()=>{
-                    try{
-                      await importData(importText);
-                      setBackupStatus("Backup restored successfully.");
-                      setImportText("");
-                    }catch(err){
-                      setBackupStatus("Couldn't restore: "+(err?.message||"invalid backup file"));
-                    }
-                  }}>Restore This Backup</button>
-                  {backupStatus&&<div style={{fontSize:"12px",color:backupStatus.startsWith("Couldn't")?C.miss:C.strike,marginTop:"8px"}}>{backupStatus}</div>}
-                </>
-              )}
-            </div>
             {shots.length===0&&<div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}>No data yet.</div>}
             {shots.length>0&&(
               <>
@@ -1071,22 +1020,50 @@ export default function StatsView({
 
                 {preferences.showMoneyGames&&(()=>{
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
-                  const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
-                  const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
                   if(!relevantSessions.length)return null;
+                  const m=totalMoney(relevantSessions);
+                  const rows=[
+                    {label:"Poker",data:m.poker},
+                    {label:"High Game Pot",data:m.highGame},
+                    {label:"3-6-9",data:m.threeSixNine},
+                  ].filter(r=>r.data.gross!==0||r.data.cost!==0);
+                  const fmt=v=>`${v<0?"−":""}$${Math.abs(v).toFixed(2)}`;
                   return(
                     <div style={S.card}>
-                      <div style={S.label}>{isTeamView?"Team Poker Winnings":"Poker Winnings"}</div>
-                      <div style={{display:"flex",gap:"8px"}}>
-                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
-                          <div style={{...S.statNum,color:C.spare}}>${totalQuarter.toFixed(2)}</div>
-                          <div style={S.statLbl}>Quarter Game</div>
+                      <div style={S.label}>{isTeamView?"Team Money Games":"Money Games"}</div>
+                      <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                        Season totals across every side game — what came in, what it cost to play, and what actually stuck.
+                      </div>
+                      <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
+                        <div style={S.statBox}>
+                          <div style={{...S.statNum,fontSize:"18px",color:C.strike}}>${m.gross.toFixed(2)}</div>
+                          <div style={S.statLbl}>Won</div>
                         </div>
-                        <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
-                          <div style={{...S.statNum,color:C.strike}}>${totalDollar.toFixed(2)}</div>
-                          <div style={S.statLbl}>Dollar Game</div>
+                        <div style={S.statBox}>
+                          <div style={{...S.statNum,fontSize:"18px",color:C.miss}}>${m.cost.toFixed(2)}</div>
+                          <div style={S.statLbl}>Paid In</div>
+                        </div>
+                        <div style={{...S.statBox,border:`1px solid ${m.net>=0?C.strike:C.miss}44`}}>
+                          <div style={{...S.statNum,fontSize:"18px",color:m.net>=0?C.strike:C.miss}}>{fmt(m.net)}</div>
+                          <div style={S.statLbl}>Net</div>
                         </div>
                       </div>
+                      {rows.length>0&&(
+                        <>
+                          <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>By Game</div>
+                          {rows.map(r=>(
+                            <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px",fontSize:"12px"}}>
+                              <span>{r.label}</span>
+                              <div style={{display:"flex",gap:"10px",alignItems:"center"}}>
+                                <span style={{color:C.textMuted}}>${r.data.gross.toFixed(2)} − ${r.data.cost.toFixed(2)}</span>
+                                <span style={{fontWeight:700,minWidth:"64px",textAlign:"right",color:r.data.net>=0?C.strike:C.miss}}>
+                                  {fmt(r.data.net)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </div>
                   );
                 })()}
@@ -1108,7 +1085,7 @@ export default function StatsView({
 
                   const totalWins=nightResults.filter(n=>n.result.qualifies).length;
                   const totalJackpots=nightResults.filter(n=>n.result.jackpotEligible).length;
-                  const totalMoney=nightSessions.reduce((a,s)=>a+(s.threeSixNineWinnings||0)+(s.jackpotWinnings||0),0);
+                  const total369Money=nightSessions.reduce((a,s)=>a+(s.threeSixNineWinnings||0)+(s.jackpotWinnings||0),0);
 
                   return(
                     <div style={S.card}>
@@ -1119,7 +1096,7 @@ export default function StatsView({
                       <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
                         <div style={S.statBox}><div style={{...S.statNum,color:C.strike}}>{totalWins}</div><div style={S.statLbl}>Wins</div></div>
                         <div style={S.statBox}><div style={{...S.statNum,color:C.spare}}>{totalJackpots}</div><div style={S.statLbl}>Jackpots</div></div>
-                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>${totalMoney}</div><div style={S.statLbl}>Total Won</div></div>
+                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>${total369Money}</div><div style={S.statLbl}>Total Won</div></div>
                       </div>
                       {nightResults.map(({session:s,result})=>(
                         <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"8px",marginBottom:"8px"}}>

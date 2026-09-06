@@ -1743,7 +1743,11 @@ export default function BowlingTracker(){
         {/* LOG VIEW                                                          */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="settings"&&(
-          <Settings/>
+          <Settings
+            showBackup={showBackup} setShowBackup={setShowBackup}
+            backupStatus={backupStatus} setBackupStatus={setBackupStatus}
+            importText={importText} setImportText={setImportText}
+            exportData={exportData} importData={importData}/>
         )}
 
         {view==="import"&&(
@@ -1798,8 +1802,8 @@ export default function BowlingTracker(){
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague} trendMetric={trendMetric} setTrendMetric={setTrendMetric} trendScope={trendScope} setTrendScope={setTrendScope}
-            compareLeague={compareLeague} setCompareLeague={setCompareLeague} confirmClear={confirmClear} setConfirmClear={setConfirmClear} showBackup={showBackup} setShowBackup={setShowBackup}
-            importText={importText} setImportText={setImportText} backupStatus={backupStatus} setBackupStatus={setBackupStatus} matches={matches}
+            compareLeague={compareLeague} setCompareLeague={setCompareLeague} confirmClear={confirmClear} setConfirmClear={setConfirmClear}
+            matches={matches}
             FRAME_POSITION_RELIABILITY_THRESHOLD={FRAME_POSITION_RELIABILITY_THRESHOLD} SHOT_SAMPLE_THRESHOLD={SHOT_SAMPLE_THRESHOLD} allFirstBalls={allFirstBalls} bStats={bStats} bowlerLeagueCount={bowlerLeagueCount}
             cleanFrameCount={cleanFrameCount} cleanFrameR={cleanFrameR} compareLabel={compareLabel} firstBallAvg={firstBallAvg} fivePinAttempts={fivePinAttempts} fivePinMisses={fivePinMisses}
             framePosition={framePosition} framePositionGamesLogged={framePositionGamesLogged} framePositionReliable={framePositionReliable} frameShots={frameShots} hideIndividualOnly={hideIndividualOnly}
@@ -1808,7 +1812,7 @@ export default function BowlingTracker(){
             splitCount={splitCount} splitR={splitR} statsShots={statsShots} stk={stk} stkR={stkR} teamCleanFrameR={teamCleanFrameR} teamFirstBallAvg={teamFirstBallAvg} teamLeaveAvg={teamLeaveAvg}
             teamSinglePinSpareR={teamSinglePinSpareR} teamSpR={teamSpR} teamSplitConvR={teamSplitConvR} teamSplitR={teamSplitR} teamStkR={teamStkR} teamTenPinRate={teamTenPinRate}
             teamTenPinSpareR={teamTenPinSpareR} tenPinAttempts={tenPinAttempts} tenPinLeaveCount={tenPinLeaveCount} tenPinMade={tenPinMade} tenPinSpareR={tenPinSpareR} tot={tot} wk={wk}
-            clearAllData={clearAllData} exportData={exportData} handicapMatches={handicapMatches} handicapSplit={handicapSplit} importData={importData} longestStrikeStreak={longestStrikeStreak}
+            clearAllData={clearAllData} handicapMatches={handicapMatches} handicapSplit={handicapSplit} longestStrikeStreak={longestStrikeStreak}
             theoreticalScoreForGame={theoreticalScoreForGame} trendData={trendData}
             preferences={preferences}
           />
