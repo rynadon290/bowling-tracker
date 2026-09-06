@@ -10,7 +10,7 @@ import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -850,7 +850,9 @@ export default function BowlingTracker(){
     try{window.storage.set(BALL_SPECS_KEY,JSON.stringify(updated));}catch{}
     clearTimeout(pokerSaveTimers.current[`spec|${key}`]);
     pokerSaveTimers.current[`spec|${key}`]=setTimeout(()=>{
-      cloudWrite("arsenals",{bowler_name:bowlerName,ball:ballName,created_by:user?.id||null,...specsToRow(normalized)});
+      // Partial update: `arsenals` also holds this ball's drilling layout,
+      // which an upsert would wipe out.
+      cloudUpdate("arsenals",{bowler_name:bowlerName,ball:ballName},specsToRow(normalized));
     },600);
   }
 
@@ -949,12 +951,11 @@ export default function BowlingTracker(){
 
     clearTimeout(pokerSaveTimers.current[`layout|${key}`]);
     pokerSaveTimers.current[`layout|${key}`]=setTimeout(()=>{
-      cloudWrite("arsenals",{
-        bowler_name:bowlerName,
-        ball:ballName,
+      // Partial update for the same reason as specs above -- these two
+      // features write different columns of the same arsenals row.
+      cloudUpdate("arsenals",{bowler_name:bowlerName,ball:ballName},{
         layout_system:layout?.system||null,
         layout_values:layout?.values||null,
-        created_by:user?.id||null,
       });
     },600);
   }
