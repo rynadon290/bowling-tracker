@@ -25,6 +25,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
+import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -69,6 +70,7 @@ const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
 const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const CENTERS_KEY = "bowling-centers-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
+const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -238,6 +240,10 @@ export default function BowlingTracker(){
   // `leagues` (a plain string array) that half the app depends on.
   const[centers,setCenters]=useState([]);
   const[leagueCenters,setLeagueCenters]=useState({});
+  // Leagues this user has hidden. Personal and reversible -- hidden
+  // leagues drop out of pickers but their sessions stay in history and
+  // keep counting toward averages.
+  const[hiddenLeagues,setHiddenLeagues]=useState([]);
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -429,6 +435,16 @@ export default function BowlingTracker(){
           setBallBags(rebuiltMembership);
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
+        }
+
+        const hiddenRes=await cloudRead("hidden_leagues",q=>q.select("league_id"));
+        if(hiddenRes.online&&hiddenRes.data){
+          const ids=hiddenRes.data.map(r=>r.league_id).filter(Boolean);
+          setHiddenLeagues(ids);
+          try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(ids));}catch{}
+        }else{
+          const hl=await window.storage.get(HIDDEN_LEAGUES_KEY);
+          if(hl)setHiddenLeagues(JSON.parse(hl.value));
         }
 
         const centersRes=await cloudRead("bowling_centers",q=>q.select("id,here_id,name,address,city,state,postal_code,country,lat,lng"));
@@ -824,6 +840,30 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Hiding leagues & leaving teams ──────────────────────────────────
+  function toggleLeagueHidden(leagueName){
+    const leagueId=leagueIdsRef.current[leagueName];
+    if(!leagueId)return;
+    const isHidden=hiddenLeagues.includes(leagueId);
+    const updated=isHidden?hiddenLeagues.filter(id=>id!==leagueId):[...hiddenLeagues,leagueId];
+    setHiddenLeagues(updated);
+    try{window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(updated));}catch{}
+    if(isHidden)cloudDelete("hidden_leagues",{user_id:user?.id,league_id:leagueId});
+    else cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:leagueId});
+  }
+
+  // Leaving a team is visible to other people, so the confirmation spells
+  // out exactly what changes -- including that past scores are kept.
+  async function leaveTeam(team,leagueName){
+    const impact=describeLeaveImpact(team,leagueName,teams,activeBowler);
+    if(!window.confirm(leaveConfirmationText(impact)))return;
+    const updatedTeams=teams.map(t=>t.id===team.id
+      ?{...t,members:(t.members||[]).filter(m=>m!==activeBowler)}
+      :t);
+    setTeams(updatedTeams);
+    if(user?.id)cloudDelete("team_members",{team_id:team.id,user_id:user.id});
+  }
+
   // ── Bowling centers ─────────────────────────────────────────────────
   async function searchCenters(query){
     // Needs a location to search near -- HERE has no idea where to look
@@ -1843,6 +1883,10 @@ export default function BowlingTracker(){
   // current bowler are grouped so the selector can show counts.
   // Per-center performance -- sessions resolve through their league to a
   // center, which is why leagues carry the center rather than sessions.
+  // Pickers show only unhidden leagues; stats and history still use the
+  // full list, so hiding never removes anyone's scores from their averages.
+  const activeLeagues=visibleLeagues(leagues,hiddenLeagues,leagueIdsRef.current);
+
   const leaguesWithCenters=leagues.map(name=>({name,centerId:leagueCenters[name]}));
   const centerStats=statsByCenter(sessions,leaguesWithCenters,centers,statsBowler||activeBowler);
 
@@ -2246,7 +2290,9 @@ export default function BowlingTracker(){
             filterResult={filterResult} setFilterResult={setFilterResult}
             filtered={filtered} ballUniverse={ballUniverse}
             startEdit={startEdit} deleteShot={deleteShot}
-            centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}/>
+            centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}
+            hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
+            teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam}/>
         )}
 
         {view==="import"&&(
@@ -2260,7 +2306,7 @@ export default function BowlingTracker(){
 
         {view==="log"&&(
           <LogView
-            shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={leagues}
+            shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={activeLeagues}
             activeBowler={activeBowler} newBowlerName={newBowlerName} setNewBowlerName={setNewBowlerName} arsenals={arsenals} newBallName={newBallName} setNewBallName={setNewBallName}
             form={form} setForm={setForm} editingId={editingId} saved={saved} sessionSaved={sessionSaved} sessionSaveMessage={sessionSaveMessage}
             sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}

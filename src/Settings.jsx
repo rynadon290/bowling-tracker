@@ -4,6 +4,7 @@ import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
 import CenterPicker from "./CenterPicker.jsx";
+import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
 import { localDateString } from "./constants.js";
 import {
   ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
@@ -31,6 +32,7 @@ export default function Settings({
   filterResult, setFilterResult, filtered, ballUniverse,
   startEdit, deleteShot,
   centers, leagueCenters, setLeagueCenter, searchCenters,
+  hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
 }) {
   const { preferences, updatePreferences } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
@@ -128,6 +130,33 @@ export default function Settings({
                   currentCenter={center}
                   onSelect={candidate => setLeagueCenter(league, candidate)}
                   onSearch={searchCenters} />
+
+                {/* Hiding is personal and reversible: the league leaves
+                    YOUR pickers, but teammates, rosters, and every past
+                    score are untouched. */}
+                <div style={{ ...S.chips, marginTop: "8px" }}>
+                  <Chip
+                    label={isLeagueHidden(league, hiddenLeagues || [], leagueIds || {}) ? "Hidden — show again" : "Hide this league"}
+                    dense
+                    selected={isLeagueHidden(league, hiddenLeagues || [], leagueIds || {})}
+                    onToggle={() => toggleLeagueHidden(league)} />
+                </div>
+                {isLeagueHidden(league, hiddenLeagues || [], leagueIds || {}) && (
+                  <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "4px" }}>
+                    Won't appear when logging. Past scores still count toward your averages.
+                  </div>
+                )}
+
+                {/* Leaving a team is different -- other people see it. */}
+                {teamsInLeague(league, teams || [], activeBowler).map(team => (
+                  <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
+                    <span style={{ fontSize: "11px", color: C.textMuted }}>On {team.name}</span>
+                    <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }}
+                      onClick={() => leaveTeam(team, league)}>
+                      Leave team
+                    </button>
+                  </div>
+                ))}
               </div>
             );
           })}
