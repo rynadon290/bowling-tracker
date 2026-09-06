@@ -1,0 +1,270 @@
+import { openDB } from 'idb';
+import { supabase } from './supabaseClient.js';
+
+// Requires the `idb` package (a small, standard Promise wrapper around the
+// browser's IndexedDB API): npm install idb
+
+// Postgres/PostgREST errors carry more than just a message — `hint` in
+// particular often states the exact fix (e.g. "Grant the required
+// privileges with: GRANT SELECT ON public.x TO authenticated;"), and
+// `details`/`code` add further context. Capturing only `.message` (as this
+// file did until now) throws away information Postgres is actively trying
+// to hand back.
+function formatError(err) {
+  const parts = [];
+  if (err?.message) parts.push(err.message);
+  if (err?.hint) parts.push(`Hint: ${err.hint}`);
+  if (err?.details) parts.push(`Details: ${err.details}`);
+  if (err?.code) parts.push(`(${err.code})`);
+  return parts.length ? parts.join(' — ') : String(err);
+}
+
+const DB_NAME = 'bowling-tracker-sync';
+const DB_VERSION = 1;
+const STORE_NAME = 'pending_writes';
+
+let dbPromise = null;
+function getDb() {
+  if (!dbPromise) {
+    dbPromise = openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'queueId', autoIncrement: true });
+        }
+      },
+    });
+  }
+  return dbPromise;
+}
+
+// Races a promise against a timer. If the timer wins, we treat that as "no
+// signal right now" and fall back to the local queue — even if the network
+// call might still succeed later on its own; we just won't wait around for
+// it at the lanes.
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
+
+const listeners = new Set();
+function notifyListeners(count) {
+  listeners.forEach((cb) => cb(count));
+}
+// Lets the UI subscribe to the pending-write count, e.g. to show a small
+// "3 shots pending sync" indicator. Returns an unsubscribe function.
+export function onPendingCountChange(callback) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+export async function getPendingCount() {
+  const db = await getDb();
+  return db.count(STORE_NAME);
+}
+
+// A per-table breakdown of what's actually stuck in the queue, for
+// diagnosing a count that isn't draining — e.g. flushPendingQueue() stops
+// at the first failure to preserve ordering, so one permanently-broken
+// item can freeze everything queued behind it indefinitely.
+export async function inspectPendingQueue() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  const byTable = {};
+  const reasonsByTable = {};
+  all.forEach(item => {
+    byTable[item.table] = (byTable[item.table] || 0) + 1;
+    if (!reasonsByTable[item.table] && item.reason) reasonsByTable[item.table] = item.reason;
+  });
+  return { total: all.length, byTable, reasonsByTable, items: all };
+}
+
+// Discards every queued write without attempting to sync it. Use with real
+// caution — anything only sitting in the queue (never confirmed as having
+// reached Supabase) is gone for good after this. Appropriate right before
+// a full data wipe/re-entry, where that backlog is about to be irrelevant
+// anyway; not appropriate as a routine fix for a slow connection.
+// Discards the ENTIRE backlog. Deliberately blunt and deliberately named:
+// every unsynced shot, session, and match result goes with it, and it
+// cannot be undone. This is a last resort for a queue that's wedged beyond
+// repair -- for one stuck item, use discardQueuedItem instead so the rest
+// of someone's night isn't collateral damage.
+export async function clearPendingQueue() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  for (const item of all) {
+    await db.delete(STORE_NAME, item.queueId);
+  }
+  notifyListeners(await getPendingCount());
+}
+
+// Discards ONE stuck item, leaving everything else queued.
+//
+// This is the fix for the usual failure: a single malformed record that
+// will never succeed (bad data, a since-deleted parent row) blocks the
+// queue, because flushPendingQueue stops at the first failure to preserve
+// ordering. Previously the only remedy was throwing away the whole
+// backlog, which meant losing good writes to get rid of one bad one.
+export async function discardQueuedItem(queueId) {
+  const db = await getDb();
+  await db.delete(STORE_NAME, queueId);
+  notifyListeners(await getPendingCount());
+}
+
+// Discards every queued item for one table, for when a whole feature's
+// writes are wedged (e.g. a table dropped or renamed) but the rest of the
+// queue is fine.
+export async function discardQueuedTable(table) {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  for (const item of all) {
+    if (item.table === table) await db.delete(STORE_NAME, item.queueId);
+  }
+  notifyListeners(await getPendingCount());
+}
+
+async function queueWrite(table, operation, payload, reason) {
+  const db = await getDb();
+  await db.add(STORE_NAME, { table, operation, payload, reason, createdAt: Date.now() });
+  notifyListeners(await getPendingCount());
+}
+
+// Every pending record still needs a stable id the UI can reference before
+// it's ever reached Supabase — so callers of cloudWrite must generate the
+// id client-side (crypto.randomUUID()) and include it in `record`, rather
+// than relying on Supabase's default gen_random_uuid(). That's also what
+// makes retries safe: the same id every time means upsert (not insert) is
+// the right call below, so a write that actually succeeded right as the
+// timeout fired doesn't turn into a duplicate-key error on retry.
+export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
+  try {
+    const { error } = await withTimeout(
+      supabase.from(table).upsert(record),
+      timeoutMs
+    );
+    if (error) throw error;
+    return { synced: true, queued: false };
+  } catch (err) {
+    await queueWrite(table, 'upsert', record, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
+  }
+}
+
+// PARTIAL update: changes only the columns given, leaving every other
+// column on the row untouched.
+//
+// This exists because upsert replaces the WHOLE row. Two features writing
+// different columns of the same record -- a ball's drilling layout and its
+// specs both live on `arsenals` -- would silently erase each other's data
+// if both used cloudWrite. Saving a layout would null out the specs.
+//
+// `match` identifies the row the same way cloudDelete does: a plain id, or
+// an object of column:value pairs for composite keys.
+//
+// Caveat worth knowing: unlike upsert, this does nothing if the row does
+// not exist yet -- it updates, it does not create. Callers must ensure the
+// row was created first (arsenals rows are created when the ball is added,
+// well before any specs or layout edit can be debounced through here).
+export async function cloudUpdate(table, match, changes, { timeoutMs = 6000 } = {}) {
+  const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
+  try {
+    let query = supabase.from(table).update(changes);
+    Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
+    const { error } = await withTimeout(query, timeoutMs);
+    if (error) throw error;
+    return { synced: true, queued: false };
+  } catch (err) {
+    await queueWrite(table, 'update', { match: matchObj, changes }, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
+  }
+}
+
+// `match` is either a plain id (for tables with a single `id` primary key)
+// or an object of column:value pairs to match on — needed for tables like
+// team_members, which use a composite primary key (team_id, user_id) with
+// no single `id` column at all.
+export async function cloudDelete(table, match, { timeoutMs = 6000 } = {}) {
+  const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
+  try {
+    let query = supabase.from(table).delete();
+    Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
+    const { error } = await withTimeout(query, timeoutMs);
+    if (error) throw error;
+    return { synced: true, queued: false };
+  } catch (err) {
+    await queueWrite(table, 'delete', matchObj, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
+  }
+}
+
+// Cloud-first read with a timeout, for the same reason writes need one — no
+// signal at the lanes shouldn't hang the UI. `queryFn` receives the table's
+// query builder so the caller can add .select()/.eq()/etc. however that
+// table needs. On failure or timeout, returns online:false so the caller
+// can fall back to whatever it has cached locally.
+export async function cloudRead(table, queryFn, { timeoutMs = 6000 } = {}) {
+  try {
+    const { data, error } = await withTimeout(queryFn(supabase.from(table)), timeoutMs);
+    if (error) throw error;
+    return { data, online: true };
+  } catch (err) {
+    return { data: null, online: false, reason: formatError(err) };
+  }
+}
+
+// Returns any not-yet-synced records queued for a given table, so a read
+// (e.g. loading shot history) can merge them in — otherwise a shot logged
+// while offline would be invisible until the queue actually flushes.
+export async function getQueuedRecordsForTable(table) {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  return all.filter((item) => item.table === table && item.operation === 'upsert').map((item) => item.payload);
+}
+
+// Flushes the queue in the order items were added. Stops at the first
+// failure rather than skipping ahead — a later write can depend on an
+// earlier one already existing (e.g. editing a shot that hasn't synced
+// yet), so preserving order matters more than clearing whatever happens to
+// succeed fastest.
+export async function flushPendingQueue() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+
+  for (const item of all) {
+    try {
+      let error;
+      if (item.operation === 'delete') {
+        let query = supabase.from(item.table).delete();
+        Object.entries(item.payload).forEach(([k, v]) => { query = query.eq(k, v); });
+        ({ error } = await query);
+      } else if (item.operation === 'update') {
+        // Replay a partial update as a partial update. Retrying it as an
+        // upsert would replace the whole row with just the few columns
+        // that were being changed -- erasing everything else on it.
+        let query = supabase.from(item.table).update(item.payload.changes);
+        Object.entries(item.payload.match).forEach(([k, v]) => { query = query.eq(k, v); });
+        ({ error } = await query);
+      } else {
+        ({ error } = await supabase.from(item.table).upsert(item.payload));
+      }
+      if (error) throw error;
+      await db.delete(STORE_NAME, item.queueId);
+    } catch (err) {
+      // Record why this retry failed too — items queued before reason
+      // tracking existed (or whose failure reason has since changed) still
+      // end up with something useful the next time someone inspects the
+      // queue, without needing to discard and start over.
+      await db.put(STORE_NAME, { ...item, reason: formatError(err) });
+      break; // leave this item and everything after it queued; try again later
+    }
+  }
+  notifyListeners(await getPendingCount());
+}
+
+// Retry triggers. The 'online' event isn't reliable across every
+// browser/network combination, so a periodic poll backs it up.
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', flushPendingQueue);
+  setInterval(flushPendingQueue, 30000);
+}
