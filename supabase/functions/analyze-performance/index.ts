@@ -105,6 +105,16 @@ serve(async (req) => {
       return json({ error: "Not enough data yet to analyse." }, 400);
     }
 
+    // The client gates the payload to a handful of summary figures. A
+    // legitimate one is a few hundred bytes. Anything large is either a
+    // bug or someone deliberately running up the Gemini bill through a
+    // signed-in account -- refuse it before it costs anything.
+    const serialised = JSON.stringify(included);
+    if (serialised.length > 8_000) {
+      console.warn("analyze-performance: oversized payload rejected", serialised.length);
+      return json({ error: "Payload too large." }, 413);
+    }
+
     const userPrompt = [
       `Games logged: ${payload.gameCount ?? "unknown"}`,
       `Ball comparison licensed: ${payload.canCompareBalls ? "yes" : "no"}`,
