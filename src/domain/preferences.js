@@ -10,7 +10,7 @@
 
 export const ENVIRONMENTS = ["practice", "league", "tournament"];
 
-export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss"];
+export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss", "ballSpeed"];
 
 // Stats cards the person can reorder or hide. Order here is the default
 // order; anything not listed in a stored preference falls back to this,
@@ -71,15 +71,15 @@ export const MOVABLE_STATS_CARD_IDS = MOVABLE_STATS_CARDS.map(c => c.id);
 // convention that usually doesn't apply in tournament play.
 export const ENVIRONMENT_PRESETS = {
   practice: {
-    trackedFields: { surface: true, line: true, release: true, miss: true },
+    trackedFields: { surface: true, line: true, release: true, miss: true, ballSpeed: true },
     showMoneyGames: false,
   },
   league: {
-    trackedFields: { surface: false, line: false, release: false, miss: false },
+    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false },
     showMoneyGames: true,
   },
   tournament: {
-    trackedFields: { surface: false, line: false, release: false, miss: false },
+    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false },
     showMoneyGames: false,
   },
 };
