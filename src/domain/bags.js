@@ -52,15 +52,17 @@ export function normalizeBag(raw, bowlerName = "") {
   };
 }
 
-// How many balls this bag may hold. A plastic allowance sits OUTSIDE the
-// stated limit, which is how tournaments actually word the rule.
+// How many balls this bag may hold -- exactly the number entered, with no
+// arithmetic applied. Tournaments state a total ("6 balls"), and the bowler
+// decides how to fill it (5 + a plastic, or 6 strike balls). Adding a
+// hidden +1 for plastic was confusing and made the real limit ambiguous.
 // Returns null when there's no limit at all (the normal league case).
 export function bagCapacity(bag) {
   const limit = bag?.ballLimit;
   if (limit === "" || limit === null || limit === undefined) return null;
   const n = Number(limit);
   if (Number.isNaN(n) || n < 0) return null;
-  return n + (bag.includesPlastic ? 1 : 0);
+  return n;
 }
 
 export function bagBallCount(ballsByBag, bagId) {
@@ -74,13 +76,15 @@ export function bagHasRoom(bag, ballsByBag) {
   return bagBallCount(ballsByBag, bag.id) < capacity;
 }
 
-// Human-readable capacity, e.g. "5 + plastic" or "6 balls" or "No limit".
+// Human-readable capacity, e.g. "6 balls" or "No limit". `includesPlastic`
+// is a note the bowler sets for their own planning -- it does NOT change
+// the number, since the stated limit is already the total.
 export function describeCapacity(bag) {
   const limit = bag?.ballLimit;
   if (limit === "" || limit === null || limit === undefined) return "No limit";
   const n = Number(limit);
   if (Number.isNaN(n)) return "No limit";
-  return bag.includesPlastic ? `${n} + plastic` : `${n} ball${n === 1 ? "" : "s"}`;
+  return `${n} ball${n === 1 ? "" : "s"}`;
 }
 
 // The balls available to pick from, given the environment and selected bag.
@@ -109,6 +113,56 @@ export function bagsForEnvironment(bags, environment) {
 export function unassignedBalls(allBalls, ballsByBag) {
   const assigned = new Set(Object.values(ballsByBag || {}).flat());
   return (allBalls || []).filter(b => !assigned.has(b));
+}
+
+// ── Membership (many-to-many) ───────────────────────────────────────────
+// A ball lives in as many bags as the bowler carries it in -- a benchmark
+// ball might be in the league bag AND every tournament bag. Membership is
+// stored as a set of "bowler|ball|bagId" keys rather than one bag per ball.
+
+export function membershipKey(bowlerName, ball, bagId) {
+  return `${bowlerName}|${ball}|${bagId}`;
+}
+
+export function isBallInBag(membership, bowlerName, ball, bagId) {
+  return !!membership?.[membershipKey(bowlerName, ball, bagId)];
+}
+
+export function toggleBallInBag(membership, bowlerName, ball, bagId) {
+  const key = membershipKey(bowlerName, ball, bagId);
+  const next = { ...membership };
+  if (next[key]) delete next[key];
+  else next[key] = true;
+  return next;
+}
+
+// Removing a bag drops only that bag's memberships; the balls stay in
+// whatever other bags they're packed in.
+export function removeBagMemberships(membership, bagId) {
+  return Object.fromEntries(
+    Object.entries(membership || {}).filter(([k]) => !k.endsWith(`|${bagId}`))
+  );
+}
+
+// Builds {bagId: [ball]} for a bowler from the membership set.
+export function ballsByBagFor(membership, bowlerName, allBalls) {
+  const out = {};
+  for (const key of Object.keys(membership || {})) {
+    const parts = key.split("|");
+    if (parts.length !== 3) continue;
+    const [owner, ball, bagId] = parts;
+    if (owner !== bowlerName) continue;
+    // Only count balls the bowler still owns -- a removed ball shouldn't
+    // linger in a bag.
+    if (allBalls && !allBalls.includes(ball)) continue;
+    (out[bagId] = out[bagId] || []).push(ball);
+  }
+  return out;
+}
+
+// Which bags a given ball is packed in, for showing on the ball itself.
+export function bagsForBall(membership, bowlerName, ball, bags) {
+  return (bags || []).filter(bag => isBallInBag(membership, bowlerName, ball, bag.id));
 }
 
 // ── Supabase mapping ────────────────────────────────────────────────────

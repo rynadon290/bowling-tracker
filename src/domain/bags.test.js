@@ -2,32 +2,36 @@ import { describe, it, expect } from 'vitest';
 import {
   emptyBag, normalizeBag, bagCapacity, bagHasRoom, describeCapacity,
   availableBalls, bagsForEnvironment, unassignedBalls, bagToRow, bagFromRow,
+  toggleBallInBag, isBallInBag, removeBagMemberships, ballsByBagFor, bagsForBall,
 } from './bags.js';
 
 describe('capacity and the plastic rule', () => {
   const fiveBag = { id: 'b1', bowlerName: 'Ryan', name: 'Short 5', bagType: 'tournament', ballLimit: '5', includesPlastic: false };
 
-  it('treats a plastic allowance as sitting OUTSIDE the stated limit', () => {
-    // Tournaments word this as "5 balls plus a plastic" -- the plastic
-    // doesn't count against the 5, so the bag legitimately holds 6.
+  it('uses the stated limit as the exact total, with no hidden arithmetic', () => {
+    // The limit IS the total the tournament allows. A bowler entering 6
+    // decides for themselves whether that's 6 strike balls or 5 plus a
+    // plastic -- adding a hidden +1 made the real limit ambiguous.
     expect(bagCapacity(fiveBag)).toBe(5);
-    expect(bagCapacity({ ...fiveBag, includesPlastic: true })).toBe(6);
+    expect(bagCapacity({ ...fiveBag, includesPlastic: true })).toBe(5);
   });
 
   it('has no capacity limit when none is set', () => {
     expect(bagCapacity({ ballLimit: '' })).toBeNull();
   });
 
-  it('describes capacity the way a bowler would say it', () => {
+  it('describes capacity as a plain total', () => {
     expect(describeCapacity(fiveBag)).toBe('5 balls');
-    expect(describeCapacity({ ...fiveBag, includesPlastic: true })).toBe('5 + plastic');
+    // The plastic note is for the bowler's planning; it doesn't change
+    // the number shown.
+    expect(describeCapacity({ ...fiveBag, includesPlastic: true })).toBe('5 balls');
     expect(describeCapacity({ ballLimit: '' })).toBe('No limit');
   });
 
-  it('leaves room for the plastic when the limit is otherwise full', () => {
+  it('is full at the stated limit regardless of the plastic note', () => {
     const byBag = { b1: ['A', 'B', 'C', 'D', 'E'] };
     expect(bagHasRoom(fiveBag, byBag)).toBe(false);
-    expect(bagHasRoom({ ...fiveBag, includesPlastic: true }, byBag)).toBe(true);
+    expect(bagHasRoom({ ...fiveBag, includesPlastic: true }, byBag)).toBe(false);
   });
 
   it('an unlimited bag always has room', () => {
@@ -100,5 +104,53 @@ describe('normalizeBag robustness', () => {
 
   it('coerces a numeric limit to a string so inputs stay controlled', () => {
     expect(normalizeBag({ ballLimit: 5 }).ballLimit).toBe('5');
+  });
+});
+
+describe('a ball can live in many bags', () => {
+  it('keeps one ball in several bags at once', () => {
+    // A benchmark ball is commonly carried in the league bag AND every
+    // tournament bag -- membership is many-to-many, not a single choice.
+    let m = {};
+    m = toggleBallInBag(m, 'Ryan', 'Phaze II', 'league1');
+    m = toggleBallInBag(m, 'Ryan', 'Phaze II', 'tourn1');
+    expect(isBallInBag(m, 'Ryan', 'Phaze II', 'league1')).toBe(true);
+    expect(isBallInBag(m, 'Ryan', 'Phaze II', 'tourn1')).toBe(true);
+  });
+
+  it('removing a ball from one bag leaves it in the others', () => {
+    let m = {};
+    m = toggleBallInBag(m, 'Ryan', 'Phaze II', 'league1');
+    m = toggleBallInBag(m, 'Ryan', 'Phaze II', 'tourn1');
+    m = toggleBallInBag(m, 'Ryan', 'Phaze II', 'tourn1');
+    expect(isBallInBag(m, 'Ryan', 'Phaze II', 'league1')).toBe(true);
+    expect(isBallInBag(m, 'Ryan', 'Phaze II', 'tourn1')).toBe(false);
+  });
+
+  it('scopes membership per bowler', () => {
+    let m = toggleBallInBag({}, 'Ryan', 'Phaze II', 'league1');
+    expect(isBallInBag(m, 'Aaron', 'Phaze II', 'league1')).toBe(false);
+  });
+
+  it('deleting a bag clears only that bag\'s memberships', () => {
+    let m = {};
+    m = toggleBallInBag(m, 'Ryan', 'A', 'b1');
+    m = toggleBallInBag(m, 'Ryan', 'A', 'b2');
+    const after = removeBagMemberships(m, 'b1');
+    expect(isBallInBag(after, 'Ryan', 'A', 'b1')).toBe(false);
+    expect(isBallInBag(after, 'Ryan', 'A', 'b2')).toBe(true);
+  });
+
+  it('excludes balls the bowler no longer owns', () => {
+    const m = toggleBallInBag({}, 'Ryan', 'Sold', 'b1');
+    expect(ballsByBagFor(m, 'Ryan', ['Kept']).b1).toBeUndefined();
+  });
+
+  it('lists every bag a given ball is packed in', () => {
+    let m = {};
+    m = toggleBallInBag(m, 'Ryan', 'A', 'b1');
+    m = toggleBallInBag(m, 'Ryan', 'A', 'b2');
+    const bags = [{ id: 'b1', name: 'League' }, { id: 'b2', name: 'Short 5' }];
+    expect(bagsForBall(m, 'Ryan', 'A', bags).map(b => b.name)).toEqual(['League', 'Short 5']);
   });
 });
