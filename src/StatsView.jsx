@@ -3,7 +3,7 @@ import { C, S, Chip, CompareBadge } from "./ui.jsx";
 import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
-  gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress,
+  gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, pinsForNextSession,
   hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults,
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
@@ -901,6 +901,50 @@ export default function StatsView({
                         <span style={{fontSize:"20px",fontWeight:700,color:C.accent}}>{progress.raw.toFixed(1)}</span>
                         <span style={{fontSize:"12px",color:C.textMuted,marginLeft:"6px"}}>({Math.round(progress.pct)}% to {progress.nextMilestone})</span>
                       </div>
+
+                      {(()=>{
+                        const next=pinsForNextSession(sessions,statsBowler,statsLeague);
+                        if(!next)return null;
+                        return(
+                          <>
+                            <div style={S.divider}/>
+                            <div style={S.label}>Next Session ({next.gamesPerSession} Games)</div>
+                            <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                              Average currently reads {next.current} (rounded down). Here's what the next set does to it.
+                            </div>
+                            <div style={{display:"flex",gap:"6px"}}>
+                              <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
+                                <div style={{...S.statNum,fontSize:"18px",color:next.gainAchievable?C.strike:C.textMuted}}>
+                                  {next.gainAchievable?next.toGain:"—"}
+                                </div>
+                                <div style={S.statLbl}>Pins to reach {next.current+1}</div>
+                                {next.gainAchievable&&(
+                                  <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{next.gainAvgNeeded}/game</div>
+                                )}
+                              </div>
+                              <div style={{...S.statBox,border:`1px solid ${C.miss}44`}}>
+                                <div style={{...S.statNum,fontSize:"18px",color:next.dropAchievable?C.miss:C.textMuted}}>
+                                  {next.dropAchievable?next.maxToDrop:"—"}
+                                </div>
+                                <div style={S.statLbl}>Drops to {next.current-1} at or below</div>
+                                {next.dropAchievable&&(
+                                  <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>under {next.dropAvgThreshold}/game</div>
+                                )}
+                              </div>
+                            </div>
+                            {!next.gainAchievable&&(
+                              <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px",textAlign:"center"}}>
+                                Gaining a full point isn't reachable in one set at this average.
+                              </div>
+                            )}
+                            {!next.dropAchievable&&(
+                              <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px",textAlign:"center"}}>
+                                No set this session can drop the average a full point.
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
