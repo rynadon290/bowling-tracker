@@ -31,13 +31,18 @@ export function normalizeManualScores(raw) {
 export function setManualScore(scores, bowler, league, date, game, value) {
   const key = scoreKey(bowler, league, date, game);
   const next = { ...scores };
-  if (value === "" || value === null || value === undefined) {
+  const raw = value === null || value === undefined ? "" : String(value).trim();
+  if (raw === "") {
     delete next[key];
     return next;
   }
-  const n = Number(value);
-  if (Number.isNaN(n) || n < 0 || n > 300) return scores;
-  next[key] = Math.round(n);
+  // Number("  ") is 0, so a stray space would silently record a 0 game
+  // and tank the average. Trim first and treat blank as "clear", never as
+  // zero. Round BEFORE the range check so "300.4" lands as 300 rather
+  // than being rejected for exceeding 300.
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n) || n < 0 || n > 300) return scores;
+  next[key] = n;
   return next;
 }
 

@@ -51,9 +51,20 @@ export function emptyTournament() {
 }
 
 function num(v) {
-  if (v === "" || v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isNaN(n) ? null : n;
+  if (v === null || v === undefined) return null;
+  const raw = String(v).trim();
+  if (raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+// A bowling game is 0-300. Anything outside that isn't a score, it's a
+// typo -- and letting it through would corrupt a tournament total.
+function gameScore(v) {
+  const n = num(v);
+  if (n === null) return null;
+  const r = Math.round(n);
+  return r < 0 || r > 300 ? null : r;
 }
 
 export function normalizeTournament(raw) {
@@ -147,13 +158,13 @@ export function updateDay(tournament, dayNumber, updater) {
 // bowled, not a zero -- treating it as zero would make a running total
 // during a block look catastrophic.
 export function dayTotal(day) {
-  const scores = (day?.games || []).map(g => num(g.score)).filter(v => v !== null);
+  const scores = (day?.games || []).map(g => gameScore(g.score)).filter(v => v !== null);
   if (!scores.length) return null;
   return scores.reduce((a, b) => a + b, 0);
 }
 
 export function dayGamesEntered(day) {
-  return (day?.games || []).filter(g => num(g.score) !== null).length;
+  return (day?.games || []).filter(g => gameScore(g.score) !== null).length;
 }
 
 export function dayAverage(day) {

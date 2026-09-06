@@ -138,21 +138,42 @@ export function groupBalls(mode, balls, specsByBall, groups) {
 }
 
 // ── Supabase mapping ────────────────────────────────────────────────────
-function num(v) {
-  if (v === "" || v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isNaN(n) ? null : n;
+function num(v, min, max) {
+  if (v === null || v === undefined) return null;
+  const raw = String(v).trim();
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  // Out-of-range values are typos, not specs. Better to store nothing than
+  // to record a 100lb ball or a negative RG that later reads as fact.
+  if (min !== undefined && n < min) return null;
+  if (max !== undefined && n > max) return null;
+  return n;
 }
 
+// Bounds track the USBC Equipment Specifications and Certifications Manual,
+// verified against bowl.com's published spec rather than assumed:
+//   - Weight: max 16.00 lb, no official minimum (6-16 lb is the commercial
+//     range balls are actually sold in, not a rule)
+//   - RG: 2.447"-2.813" for an individual ball (2.460"-2.800" averaged
+//     across a weight class -- we don't have a weight class here, so the
+//     individual-ball bound is the correct one to use)
+//   - Differential RG: max 0.060", no minimum
+//
+// These are NOT a competition-legality check -- the app doesn't verify a
+// ball is tournament-certified. They exist to catch typos (an extra digit,
+// a misplaced decimal) without rejecting a real ball, so each bound adds a
+// small explicit margin beyond the certified range rather than the
+// certified range itself.
 export function specsToRow(specs) {
   return {
     group_id: specs.groupId || null,
     coverstock: specs.coverstock || null,
     core_type: specs.coreType || null,
-    weight: num(specs.weight),
-    rg: num(specs.rg),
-    diff: num(specs.diff),
-    int_diff: specs.coreType === "asymmetric" ? num(specs.intDiff) : null,
+    weight: num(specs.weight, 6, 16),
+    rg: num(specs.rg, 2.4, 2.85),
+    diff: num(specs.diff, 0, 0.07),
+    int_diff: specs.coreType === "asymmetric" ? num(specs.intDiff, 0, 0.07) : null,
   };
 }
 
