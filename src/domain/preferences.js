@@ -60,6 +60,7 @@ export const STATS_CARDS = [
   { id: "nonSplitLeaves", label: "Non-Split Leaves" },
   { id: "strikeStreak", label: "Longest Strike Streak" },
   { id: "byBall", label: "By Ball" },
+  { id: "byCenter", label: "By Bowling Center" },
   { id: "missDistribution", label: "Miss Distribution" },
   { id: "releaseQuality", label: "Release Quality" },
   { id: "ballChangeTriggers", label: "Ball Change Triggers" },
