@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
 import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.js";
@@ -8,6 +9,7 @@ import {
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
 import { totalMoney } from "./domain/money.js";
+import { visibleStatsCardOrder } from "./domain/preferences.js";
 
 export default function StatsView({
   preferences,
@@ -26,12 +28,22 @@ export default function StatsView({
   clearAllData, handicapMatches, handicapSplit, longestStrikeStreak,
   theoreticalScoreForGame, trendData,
 }) {
+  // Fixed cards keep anchored positions: "Viewing" is the selector that
+  // controls everything below it, and "Danger Zone" holds destructive
+  // actions -- neither should float into the middle of the stats.
+  const renderOrder = ["viewing", ...visibleStatsCardOrder(preferences), "dangerZone"];
+
   return (
           <>
             {shots.length===0&&<div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}>No data yet.</div>}
             {shots.length>0&&(
-              <>
-                {bowlers.length>1&&(
+              (()=>{
+                // Each card is built into a keyed map, then rendered in the
+                // order set in Settings. An entry is a WHOLE card -- the stat
+                // boxes grouped inside it travel with it as one unit.
+                const byId = {};
+                byId["viewing"] = (
+bowlers.length>1&&(
                   <div style={S.card}>
                     <div style={S.label}>Viewing</div>
                     <div style={S.chips}>
@@ -78,9 +90,10 @@ export default function StatsView({
                       </>
                     )}
                   </div>
-                )}
-
-                {showTeamCompare&&(()=>{
+                )
+                );
+                byId["headToHead"] = (
+showTeamCompare&&(()=>{
                   const pctData=[
                     {metric:"Strike %",you:stkR,opp:teamStkR},
                     {metric:"Spare %",you:spR,opp:teamSpR},
@@ -132,9 +145,10 @@ export default function StatsView({
                       )}
                     </div>
                   );
-                })()}
-
-                {(()=>{
+                })()
+                );
+                byId["teamRecords"] = (
+(()=>{
                   const recordsBowler=statsBowler||(!statsLeague&&bowlers.length<=1?(bowlers[0]||""):"");
                   if(!recordsBowler&&!statsLeague&&bowlers.length>1){
                     return(
@@ -164,9 +178,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&(()=>{
+                })()
+                );
+                byId["seasonRecord"] = (
+!statsBowler&&(()=>{
                   const rMain=seasonRecord(matches,statsLeague);
                   if(!rMain.gameWins&&!rMain.gameLosses&&!rMain.seriesWins&&!rMain.seriesLosses)return null;
                   const otherRecords=leagues.filter(l=>l!==statsLeague).map(league=>({league,record:seasonRecord(matches,league)})).filter(x=>x.record.gameWins+x.record.gameLosses+x.record.seriesWins+x.record.seriesLosses>0);
@@ -186,9 +201,10 @@ export default function StatsView({
                       {!statsLeague&&otherRecords.map(({league,record})=><div key={league} style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>{league.replace(" House Shot","")}: {record.pointsWon}/{record.pointsAvailable} points ({record.gameWins}-{record.gameLosses} games, {record.seriesWins}-{record.seriesLosses} pinfall)</div>)}
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&(()=>{
+                })()
+                );
+                byId["weeklyPoints"] = (
+!statsBowler&&(()=>{
                   const weekly=weeklyPointsData(matches,statsLeague);
                   if(weekly.length<2)return null;
                   return(
@@ -214,9 +230,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&(()=>{
+                })()
+                );
+                byId["handicapImpact"] = (
+!statsBowler&&(()=>{
                   if(!statsLeague&&bowlers.length>1){
                     return(
                       <div style={S.card}>
@@ -261,9 +278,10 @@ export default function StatsView({
                       )}
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&bowlers.length>1&&(()=>{
+                })()
+                );
+                byId["teamLeaderboard"] = (
+!statsBowler&&bowlers.length>1&&(()=>{
                   const leagueBowlers=bowlers.filter(b=>shots.some(s=>s.bowler===b&&(!statsLeague||s.league===statsLeague)));
                   if(!leagueBowlers.length)return null;
                   const sorted=[...leagueBowlers].sort((a,b)=>(cAvg(sessions,b,statsLeague)||0)-(cAvg(sessions,a,statsLeague)||0));
@@ -288,9 +306,10 @@ export default function StatsView({
                       })}
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&bowlers.length>1&&(()=>{
+                })()
+                );
+                byId["giantKiller"] = (
+!statsBowler&&bowlers.length>1&&(()=>{
                   if(!statsLeague)return(
                     <div style={S.card}>
                       <div style={S.label}>Giant Killer</div>
@@ -330,9 +349,10 @@ export default function StatsView({
                       ))}
                     </div>
                   );
-                })()}
-
-                {!statsBowler&&bowlers.length>1&&(()=>{
+                })()
+                );
+                byId["hung"] = (
+!statsBowler&&bowlers.length>1&&(()=>{
                   if(!statsLeague)return(
                     <div style={S.card}>
                       <div style={S.label}>🎣 Hung</div>
@@ -362,10 +382,10 @@ export default function StatsView({
                       ))}
                     </div>
                   );
-                })()}
-
-
-                {!statsBowler&&bowlers.length>1&&(()=>{
+                })()
+                );
+                byId["teamSeries"] = (
+!statsBowler&&bowlers.length>1&&(()=>{
                   // Team Series: sum each bowler's session total for dates where 2+ bowlers share a league+date
                   const byKey={};
                   sessions.filter(s=>!statsLeague||s.league===statsLeague).forEach(s=>{
@@ -419,9 +439,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+                })()
+                );
+                byId["headlineStats"] = (
+<div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
                   <div style={S.statBox}><div style={S.statNum}>{tot}</div><div style={S.statLbl}>Shots</div></div>
                   <div style={S.statBox}>
                     <div style={{...S.statNum,color:C.strike}}>{stkR}%</div>
@@ -434,7 +455,9 @@ export default function StatsView({
                     {showTeamCompare&&<CompareBadge value={spR} teamValue={teamSpR} label={compareLabel}/>}
                   </div>
                 </div>
-                <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+                );
+                byId["cleanFrames"] = (
+<div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
                   <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
                     <div style={{...S.statNum,color:C.accent}}>{frameShots.length?`${cleanFrameR}%`:"—"}</div>
                     <div style={S.statLbl}>Clean Frame %</div>
@@ -445,8 +468,9 @@ export default function StatsView({
                     <div style={S.statLbl}>Clean Frames</div>
                   </div>
                 </div>
-
-                {!isTeamView&&framePositionGamesLogged>0&&(()=>{
+                );
+                byId["framePosition"] = (
+!isTeamView&&framePositionGamesLogged>0&&(()=>{
                   const withData=framePosition.filter(f=>f.avgScore!=null);
                   const vals=withData.map(f=>f.avgScore);
                   const minVal=vals.length?Math.min(...vals):null;
@@ -497,9 +521,10 @@ export default function StatsView({
                       )}
                     </div>
                   );
-                })()}
-
-                <div style={S.card}>
+                })()
+                );
+                byId["firstBallAverage"] = (
+<div style={S.card}>
                   <div style={S.label}>First-Ball Average</div>
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Average pins on every fresh-rack delivery — every frame's first ball, plus any 10th-frame bonus ball thrown at a full reset rack — strikes counted as 10. The standard metric, comparable to LaneTalk and other scoring apps.</div>
                   <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
@@ -544,8 +569,9 @@ export default function StatsView({
                     </div>
                   </div>
                 </div>
-
-                <div style={S.card}>
+                );
+                byId["tenPinLeaves"] = (
+<div style={S.card}>
                   <div style={S.label}>Ten Pin Leaves</div>
                   <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
                     {!isTeamView&&(
@@ -572,8 +598,9 @@ export default function StatsView({
                     </div>
                   </div>
                 </div>
-
-                <div style={S.card}>
+                );
+                byId["singlePinSpares"] = (
+<div style={S.card}>
                   <div style={S.label}>Single Pin Spares</div>
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Any leave with exactly one pin standing — 7, 4, 8, 10, or any other single pin.</div>
                   <div style={{display:"flex",gap:"8px"}}>
@@ -588,8 +615,9 @@ export default function StatsView({
                     </div>
                   </div>
                 </div>
-
-                {fivePinAttempts.length>0&&(
+                );
+                byId["splits"] = (
+fivePinAttempts.length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Lone 5-Pin</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>The 5-pin standing completely alone, nothing else in the way.</div>
@@ -604,9 +632,10 @@ export default function StatsView({
                       </div>
                     </div>
                   </div>
-                )}
-
-                <div style={S.card}>
+                )
+                );
+                byId["loneFivePin"] = (
+<div style={S.card}>
                   <div style={S.label}>Splits</div>
                   <div style={{display:"flex",gap:"8px",marginBottom:splitBreakdownList.length?"14px":"0"}}>
                     <div style={S.statBox}><div style={{...S.statNum,color:C.miss,fontSize:"20px"}}>{splitCount}</div><div style={S.statLbl}>Splits Left</div></div>
@@ -648,8 +677,9 @@ export default function StatsView({
                     </>
                   )}
                 </div>
-
-                {!isTeamView&&nonSplitLeaveList.length>0&&(
+                );
+                byId["nonSplitLeaves"] = (
+!isTeamView&&nonSplitLeaveList.length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Non-Split Leaves</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Every recurring leave that isn't a split — how often it happens and how often it gets converted.</div>
@@ -677,9 +707,10 @@ export default function StatsView({
                       <div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>+{nonSplitLeaveList.length-10} more leave{nonSplitLeaveList.length-10===1?"":"s"} not shown</div>
                     )}
                   </div>
-                )}
-
-                {!isTeamView&&(
+                )
+                );
+                byId["strikeStreak"] = (
+!isTeamView&&(
                   <div style={S.card}>
                     <div style={S.label}>Longest Strike Streak</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Consecutive strikes, carrying across games within the same night.</div>
@@ -691,9 +722,10 @@ export default function StatsView({
                       </div>
                     </div>
                   </div>
-                )}
-
-                {!hideIndividualOnly&&(
+                )
+                );
+                byId["byBall"] = (
+!hideIndividualOnly&&(
                   <div style={S.card}>
                     <div style={S.label}>By Ball</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Under {SHOT_SAMPLE_THRESHOLD} shots on a ball isn't enough to trust the rate yet — flagged rather than hidden, so you can watch it firm up.</div>
@@ -716,9 +748,10 @@ export default function StatsView({
                       </div>
                     ))}
                   </div>
-                )}
-
-                {!hideIndividualOnly&&preferences.trackedFields.miss&&mCounts.length>0&&(
+                )
+                );
+                byId["missDistribution"] = (
+!hideIndividualOnly&&preferences.trackedFields.miss&&mCounts.length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Miss Distribution</div>
                     {mCounts.sort((a,b)=>b.count-a.count).map(m=>(
@@ -733,9 +766,10 @@ export default function StatsView({
                       </div>
                     ))}
                   </div>
-                )}
-
-                {!hideIndividualOnly&&preferences.trackedFields.release&&(
+                )
+                );
+                byId["releaseQuality"] = (
+!hideIndividualOnly&&preferences.trackedFields.release&&(
                   <div style={S.card}>
                     <div style={S.label}>Release Quality</div>
                     <div style={{display:"flex",gap:"8px"}}>
@@ -746,9 +780,10 @@ export default function StatsView({
                       })}
                     </div>
                   </div>
-                )}
-
-                {!hideIndividualOnly&&statsShots.filter(s=>s.ballChangeReason&&s.ballChangeReason.length>0).length>0&&(
+                )
+                );
+                byId["ballChangeTriggers"] = (
+!hideIndividualOnly&&statsShots.filter(s=>s.ballChangeReason&&s.ballChangeReason.length>0).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Ball Change Triggers</div>
                     {BALL_CHANGE_REASONS.map(r=>{
@@ -757,9 +792,10 @@ export default function StatsView({
                       return(<div key={r} style={{display:"flex",justifyContent:"space-between",marginBottom:"6px",fontSize:"12px"}}><span>{r}</span><span style={{color:C.spare}}>{count}</span></div>);
                     })}
                   </div>
-                )}
-
-                {!hideIndividualOnly&&statsShots.filter(s=>s.strikeDescription).length>0&&(
+                )
+                );
+                byId["strikeQuality"] = (
+!hideIndividualOnly&&statsShots.filter(s=>s.strikeDescription).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Strike Quality</div>
                     {STRIKE_DESCRIPTIONS.map(d=>{
@@ -779,9 +815,10 @@ export default function StatsView({
                       );
                     })}
                   </div>
-                )}
-
-                {sessions.length>0&&(()=>{
+                )
+                );
+                byId["runningAverages"] = (
+sessions.length>0&&(()=>{
                   const leagueAvgs=leagues.map(league=>({league,avg:rAvg(sessions,statsBowler,league)})).filter(x=>x.avg!=null);
                   const combined=cAvg(sessions,statsBowler);
                   if(!leagueAvgs.length&&!combined)return null;
@@ -803,9 +840,10 @@ export default function StatsView({
                       {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}
                     </div>
                   );
-                })()}
-
-                {(()=>{
+                })()
+                );
+                byId["theoreticalAverage"] = (
+(()=>{
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
                   const theoreticalGameScores=relevantSessions.flatMap(s=>
                     [1,2,3].map(g=>theoreticalScoreForGame(s.bowler,s.league,s.date,g)).filter(v=>v!=null)
@@ -828,9 +866,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                {(()=>{
+                })()
+                );
+                byId["progress"] = (
+(()=>{
                   const progress=avgProgress(sessions,statsBowler,statsLeague);
                   if(!progress)return null;
                   return(
@@ -896,9 +935,10 @@ export default function StatsView({
                       })()}
                     </div>
                   );
-                })()}
-
-                {(()=>{
+                })()
+                );
+                byId["consistency"] = (
+(()=>{
                   const consistency=scoreConsistency(sessions,statsBowler,statsLeague);
                   if(!consistency)return null;
                   const compareConsistency=showTeamCompare?scoreConsistency(sessions,compareBowler,compareLeague,!isTeamView):null;
@@ -927,9 +967,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                {(()=>{
+                })()
+                );
+                byId["scoreDistribution"] = (
+(()=>{
                   const values=scoreValues(sessions,statsBowler,statsLeague);
                   if(values.length<4)return null;
                   const buckets=histogramBuckets(values);
@@ -952,9 +993,10 @@ export default function StatsView({
                       </div>
                     </div>
                   );
-                })()}
-
-                {sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(sessions,statsBowler,1,statsLeague)||gameAvg(sessions,statsBowler,2,statsLeague))&&(
+                })()
+                );
+                byId["gameByGame"] = (
+sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(sessions,statsBowler,1,statsLeague)||gameAvg(sessions,statsBowler,2,statsLeague))&&(
                   <div style={S.card}>
                     <div style={S.label}>Game-by-Game Averages</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
@@ -977,9 +1019,10 @@ export default function StatsView({
                       })}
                     </div>
                   </div>
-                )}
-
-                {sessions.length>0&&(()=>{
+                )
+                );
+                byId["trend"] = (
+sessions.length>0&&(()=>{
                   const data=trendData(statsBowler,trendScope,trendMetric);
                   return(
                     <div style={S.card}>
@@ -1016,9 +1059,10 @@ export default function StatsView({
                       )}
                     </div>
                   );
-                })()}
-
-                {preferences.showMoneyGames&&(()=>{
+                })()
+                );
+                byId["money"] = (
+preferences.showMoneyGames&&(()=>{
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
                   if(!relevantSessions.length)return null;
                   const m=totalMoney(relevantSessions);
@@ -1066,9 +1110,10 @@ export default function StatsView({
                       )}
                     </div>
                   );
-                })()}
-
-                {preferences.showMoneyGames&&statsBowler&&(()=>{
+                })()
+                );
+                byId["threeSixNine"] = (
+preferences.showMoneyGames&&statsBowler&&(()=>{
                   // Every night this bowler has a logged session for,
                   // newest first. threeSixNineResults is a single,
                   // whole-session determination now (all 9 specific
@@ -1115,9 +1160,10 @@ export default function StatsView({
                       ))}
                     </div>
                   );
-                })()}
-
-                {sessions.filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.league===statsLeague)).length>0&&(
+                })()
+                );
+                byId["sessionHistory"] = (
+sessions.filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.league===statsLeague)).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Session History</div>
                     {[...sessions].filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.league===statsLeague)).reverse().map(s=>(
@@ -1140,8 +1186,10 @@ export default function StatsView({
                       </div>
                     ))}
                   </div>
-                )}
-                {shots.length>0&&(
+                )
+                );
+                byId["dangerZone"] = (
+shots.length>0&&(
                   <div style={{...S.card,border:`1px solid ${C.miss}44`}}>
                     <div style={{...S.label,color:C.miss}}>Danger Zone</div>
                     {!confirmClear?(
@@ -1160,8 +1208,10 @@ export default function StatsView({
                       </>
                     )}
                   </div>
-                )}
-              </>
+                )
+                );
+                return (<>{renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}</>);
+              })()
             )}
             <div style={{height:"32px"}}/>
           </>

@@ -3,7 +3,7 @@ import { C, S, Chip } from "./ui.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { localDateString } from "./constants.js";
 import {
-  ENVIRONMENTS, TRACKED_FIELD_KEYS, STATS_CARDS, applyEnvironment,
+  ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
@@ -15,7 +15,7 @@ const ENVIRONMENT_DESCRIPTIONS = {
   tournament: "Same simple logging as League, but money-game tracking is hidden.",
 };
 const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction" };
-const CARD_LABEL_BY_ID = Object.fromEntries(STATS_CARDS.map(c => [c.id, c.label]));
+const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
   showBackup, setShowBackup, backupStatus, setBackupStatus,
