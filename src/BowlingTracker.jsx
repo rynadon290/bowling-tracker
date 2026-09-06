@@ -149,7 +149,7 @@ const LEAGUES_KEY = "bowling-leagues-v1";
 
 
 export default function BowlingTracker(){
-  const{user,preferences}=useAuth();
+  const{user,preferences,updatePreferences}=useAuth();
   // Maps league name -> its Supabase row id. The client keeps `leagues` as
   // plain name strings everywhere (unchanged, to avoid rewriting every call
   // site that compares/filters by league name) — this ref is what lets
