@@ -1,0 +1,39 @@
+name: Deploy Supabase Functions
+
+# Deploys EVERY function under supabase/functions/, rather than naming them
+# one at a time. Naming them individually meant each new function silently
+# didn't deploy until someone remembered to edit this file -- which is what
+# happened with find-centers.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  # Lets you re-run a deploy from the Actions tab without pushing a commit.
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy all functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            # Skip shared code directories, which aren't deployable functions.
+            case "$name" in
+              _*) echo "Skipping $name"; continue ;;
+            esac
+            echo "Deploying $name"
+            supabase functions deploy "$name" --project-ref "$PROJECT_REF"
+          done
