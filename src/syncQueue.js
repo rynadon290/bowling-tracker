@@ -85,11 +85,41 @@ export async function inspectPendingQueue() {
 // reached Supabase) is gone for good after this. Appropriate right before
 // a full data wipe/re-entry, where that backlog is about to be irrelevant
 // anyway; not appropriate as a routine fix for a slow connection.
+// Discards the ENTIRE backlog. Deliberately blunt and deliberately named:
+// every unsynced shot, session, and match result goes with it, and it
+// cannot be undone. This is a last resort for a queue that's wedged beyond
+// repair -- for one stuck item, use discardQueuedItem instead so the rest
+// of someone's night isn't collateral damage.
 export async function clearPendingQueue() {
   const db = await getDb();
   const all = await db.getAll(STORE_NAME);
   for (const item of all) {
     await db.delete(STORE_NAME, item.queueId);
+  }
+  notifyListeners(await getPendingCount());
+}
+
+// Discards ONE stuck item, leaving everything else queued.
+//
+// This is the fix for the usual failure: a single malformed record that
+// will never succeed (bad data, a since-deleted parent row) blocks the
+// queue, because flushPendingQueue stops at the first failure to preserve
+// ordering. Previously the only remedy was throwing away the whole
+// backlog, which meant losing good writes to get rid of one bad one.
+export async function discardQueuedItem(queueId) {
+  const db = await getDb();
+  await db.delete(STORE_NAME, queueId);
+  notifyListeners(await getPendingCount());
+}
+
+// Discards every queued item for one table, for when a whole feature's
+// writes are wedged (e.g. a table dropped or renamed) but the rest of the
+// queue is fine.
+export async function discardQueuedTable(table) {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  for (const item of all) {
+    if (item.table === table) await db.delete(STORE_NAME, item.queueId);
   }
   notifyListeners(await getPendingCount());
 }
@@ -117,6 +147,35 @@ export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
     return { synced: true, queued: false };
   } catch (err) {
     await queueWrite(table, 'upsert', record, formatError(err));
+    return { synced: false, queued: true, reason: formatError(err) };
+  }
+}
+
+// PARTIAL update: changes only the columns given, leaving every other
+// column on the row untouched.
+//
+// This exists because upsert replaces the WHOLE row. Two features writing
+// different columns of the same record -- a ball's drilling layout and its
+// specs both live on `arsenals` -- would silently erase each other's data
+// if both used cloudWrite. Saving a layout would null out the specs.
+//
+// `match` identifies the row the same way cloudDelete does: a plain id, or
+// an object of column:value pairs for composite keys.
+//
+// Caveat worth knowing: unlike upsert, this does nothing if the row does
+// not exist yet -- it updates, it does not create. Callers must ensure the
+// row was created first (arsenals rows are created when the ball is added,
+// well before any specs or layout edit can be debounced through here).
+export async function cloudUpdate(table, match, changes, { timeoutMs = 6000 } = {}) {
+  const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
+  try {
+    let query = supabase.from(table).update(changes);
+    Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
+    const { error } = await withTimeout(query, timeoutMs);
+    if (error) throw error;
+    return { synced: true, queued: false };
+  } catch (err) {
+    await queueWrite(table, 'update', { match: matchObj, changes }, formatError(err));
     return { synced: false, queued: true, reason: formatError(err) };
   }
 }
@@ -178,6 +237,13 @@ export async function flushPendingQueue() {
       if (item.operation === 'delete') {
         let query = supabase.from(item.table).delete();
         Object.entries(item.payload).forEach(([k, v]) => { query = query.eq(k, v); });
+        ({ error } = await query);
+      } else if (item.operation === 'update') {
+        // Replay a partial update as a partial update. Retrying it as an
+        // upsert would replace the whole row with just the few columns
+        // that were being changed -- erasing everything else on it.
+        let query = supabase.from(item.table).update(item.payload.changes);
+        Object.entries(item.payload.match).forEach(([k, v]) => { query = query.eq(k, v); });
         ({ error } = await query);
       } else {
         ({ error } = await supabase.from(item.table).upsert(item.payload));
