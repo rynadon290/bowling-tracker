@@ -3,6 +3,7 @@ import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_R
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import ArsenalList from "./ArsenalList.jsx";
+import TournamentSession from "./TournamentSession.jsx";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -20,6 +21,7 @@ export default function LogView({
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
+  activeTournament, updateTournament, saveTournament, tournamentSaved,
 }) {
   return (
     <>
@@ -87,7 +89,18 @@ export default function LogView({
                 📷 Import Scorecard
               </button>
             )}
-            {!editingId&&activeBowler&&(
+            {/* In a tournament, "Tonight's Session" doesn't fit: game count
+                varies, lane pairs change per game, and there may be several
+                days with their own cut lines. The tournament form replaces
+                it entirely rather than trying to bend one into the other. */}
+            {!editingId&&activeBowler&&preferences.environment==="tournament"&&(
+              <TournamentSession
+                tournament={activeTournament}
+                onChange={updateTournament}
+                onSave={saveTournament}
+                saved={tournamentSaved}/>
+            )}
+            {!editingId&&activeBowler&&preferences.environment!=="tournament"&&(
               <CollapsibleCard
                 title="Tonight's Session"
                 summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${sessionDate}`:""}
@@ -667,6 +680,21 @@ export default function LogView({
                   <input style={{...S.input,flex:1}} placeholder="mph" type="number" step="0.1" inputMode="decimal"
                     value={form.ballSpeed} onChange={e=>set("ballSpeed",e.target.value)}/>
                   <span style={{fontSize:"13px",color:C.textMuted}}>mph</span>
+                </div>
+              </div>
+            )}
+
+            {/* Shoes — heel and sole numbers. Interchangeable soles get
+                swapped for approach conditions, so this isn't constant for
+                a bowler the way shoe size would be. */}
+            {preferences.trackedFields.shoes&&(
+              <div style={S.card}>
+                <div style={S.label}>Shoes</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Heel #"
+                    value={form.heelNumber} onChange={e=>set("heelNumber",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Sole #"
+                    value={form.soleNumber} onChange={e=>set("soleNumber",e.target.value)}/>
                 </div>
               </div>
             )}

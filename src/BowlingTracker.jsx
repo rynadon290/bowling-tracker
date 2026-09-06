@@ -7,6 +7,7 @@ import StatsView from "./StatsView.jsx";
 import ImportScorecard from "./ImportScorecard.jsx";
 import Settings from "./Settings.jsx";
 import Profile from "./Profile.jsx";
+import TournamentSession from "./TournamentSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
@@ -18,6 +19,7 @@ import {
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
+import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
@@ -53,6 +55,7 @@ const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
+const TOURNAMENT_KEY = "bowling-active-tournament-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -197,6 +200,11 @@ export default function BowlingTracker(){
   // delivery, home centers, notes. Team/league membership is deliberately
   // NOT stored here; it's derived from the roster so the two can't drift.
   const[profiles,setProfiles]=useState({});
+  // The tournament currently being entered. Kept as one working record
+  // rather than a list -- you're filling in one tournament at a time, and
+  // saving commits it to the cloud.
+  const[activeTournament,setActiveTournament]=useState(emptyTournament());
+  const[tournamentSaved,setTournamentSaved]=useState(false);
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -682,6 +690,22 @@ export default function BowlingTracker(){
 
   // Saves a bowler's profile. Debounced like other typed fields so a
   // name or note doesn't fire a cloud write per keystroke.
+  function updateTournament(next){
+    const normalized=normalizeTournament(next);
+    setActiveTournament(normalized);
+    try{window.storage.set(TOURNAMENT_KEY,JSON.stringify(normalized));}catch{}
+  }
+
+  async function saveTournament(){
+    if(!activeTournament.name.trim())return;
+    const withIds={...activeTournament,id:activeTournament.id||crypto.randomUUID(),bowler:activeBowler};
+    setActiveTournament(withIds);
+    try{window.storage.set(TOURNAMENT_KEY,JSON.stringify(withIds));}catch{}
+    cloudWrite("tournaments",tournamentToRow(withIds,user?.id||null));
+    setTournamentSaved(true);
+    setTimeout(()=>setTournamentSaved(false),1500);
+  }
+
   function setProfile(bowlerName,profile){
     const normalized=normalizeProfile(profile,bowlerName);
     const updated={...profiles,[bowlerName]:normalized};
@@ -1700,7 +1724,7 @@ export default function BowlingTracker(){
       {/* Header */}
       <div style={S.header}>
         <div>
-          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"10px",paddingRight:"14px"}}>
             <div style={S.title}>🎳 Shot Tracker</div>
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
@@ -1834,6 +1858,7 @@ export default function BowlingTracker(){
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
             activeBowlerLeftHanded={activeBowlerLeftHanded}
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
+            activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
           />
         )}
 
