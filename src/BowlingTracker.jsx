@@ -10,7 +10,7 @@ import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
+import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -575,6 +575,13 @@ export default function BowlingTracker(){
     setSyncBreakdown(inspection);
     setShowSyncDetail(true);
   }
+  async function handleDiscardTable(table){
+    if(!window.confirm(`Discard the queued writes for "${table}"? Everything else stays queued. This can't be undone.`))return;
+    await discardQueuedTable(table);
+    setSyncBreakdown(await inspectPendingQueue());
+    setPendingSyncCount(await getPendingCount());
+  }
+
   async function handleClearPendingQueue(){
     if(!window.confirm(`Discard all ${pendingSyncCount} queued writes without syncing them? This cannot be undone — anything not yet confirmed as reaching the cloud will be lost.`))return;
     await clearPendingQueue();
@@ -2071,6 +2078,13 @@ export default function BowlingTracker(){
                       {syncBreakdown.reasonsByTable[table]}
                     </div>
                   )}
+                  {/* Discarding one table's writes leaves the rest of the
+                      backlog intact -- the usual failure is one wedged
+                      feature blocking otherwise-good writes behind it. */}
+                  <button style={{...S.btn(),padding:"3px 8px",fontSize:"10px",marginTop:"4px"}}
+                    onClick={()=>handleDiscardTable(table)}>
+                    Discard just {table}
+                  </button>
                 </div>
               ))}
             </div>
@@ -2150,6 +2164,7 @@ export default function BowlingTracker(){
         {view==="import"&&(
           <ImportScorecard
             bowlers={bowlers} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots}
+            updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}
           />

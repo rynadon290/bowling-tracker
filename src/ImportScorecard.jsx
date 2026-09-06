@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
 import { RESULTS, localDateString } from "./constants.js";
-import { convertExtractedGameToShots } from "./scorecardImport.js";
+import { convertExtractedGameToShots } from "./domain/scorecardImport.js";
 import { strictPartial } from "./domain/scoring.js";
 import { supabase } from "./supabaseClient.js";
 
@@ -88,14 +88,30 @@ function ShotEditor({shot,onChange}){
 // frames start expanded and visually distinct -- they're the one scenario
 // confirmed unreliable to extract from a scorecard image, so they need
 // eyes-on before saving, not just an easy-to-miss footnote.
-function GameReview({game,onUpdateShot,expandedFrames,onToggleExpanded}){
-  const score=strictPartial(game.shots);
+function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpanded}){
+  const score=game.scoreOnly?game.totalScore:strictPartial(game.shots);
   return(
     <div style={S.card}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
         <div style={{...S.label,marginBottom:0}}>Game {game.gameNumber}{game.ballUsed?` · ${game.ballUsed}`:""}</div>
         <div style={{fontSize:"18px",fontWeight:700,color:score!=null?C.accent:C.textMuted}}>{score??"—"}</div>
       </div>
+
+      {/* This screenshot showed only a total for this game, so there are no
+          shots to review -- just the score, editable in case it was misread. */}
+      {game.scoreOnly&&(
+        <>
+          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+            No frame-by-frame detail on this scorecard — importing the game score only.
+          </div>
+          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+            <div style={{fontSize:"12px",color:C.textMuted,width:"52px"}}>Score</div>
+            <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
+              value={game.totalScore==null?"":String(game.totalScore)}
+              onChange={e=>onUpdateScore(e.target.value===""?null:parseInt(e.target.value))}/>
+          </div>
+        </>
+      )}
       {game.warnings.length>0&&(
         <div style={{backgroundColor:C.spare+"22",border:`1px solid ${C.spare}44`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",fontSize:"12px",color:C.spare}}>
           ⚠️ {game.warnings.length} fill ball{game.warnings.length>1?"s":""} below couldn't be reliably read from the image -- please double-check the pin count.
@@ -124,7 +140,7 @@ function GameReview({game,onUpdateShot,expandedFrames,onToggleExpanded}){
 }
 
 export default function ImportScorecard({
-  bowlers, leagues, teams, shots, saveShots,
+  bowlers, leagues, teams, shots, saveShots, updateManualScore,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
 }){
   const[step,setStep]=useState("setup"); // setup | processing | review | saving
@@ -170,10 +186,23 @@ export default function ImportScorecard({
 
       const context={bowler:contextBowler,league:contextLeague,date:contextDate,teamId};
       const converted=(data.games||[]).map(g=>{
+        // Some scorecards show only game totals with no per-frame detail.
+        // That's a normal case, not a failure -- those import as scores
+        // rather than shots, which is the whole point of supporting them.
+        const hasFrames=Array.isArray(g.frames)&&g.frames.length>0;
+        if(!hasFrames){
+          return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:[],warnings:[],
+                 scoreOnly:true,totalScore:g.totalScore??null};
+        }
         const{shots:gameShots,warnings}=convertExtractedGameToShots(g,{...context,game:g.gameNumber});
-        return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:gameShots,warnings};
+        return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:gameShots,warnings,
+               scoreOnly:false,totalScore:g.totalScore??null};
       });
       if(!converted.length)throw new Error("No games could be read from the image(s). Try a clearer screenshot.");
+      // A game with neither frames nor a total carries no information at all.
+      if(converted.every(g=>g.scoreOnly&&g.totalScore==null)){
+        throw new Error("Found games but couldn't read any scores or frame detail. Try a clearer screenshot.");
+      }
 
       setGames(converted);
       setExpandedByGame(converted.map(g=>new Set(g.warnings.map(w=>`${w.frame}-${w.ballNum??1}`))));
@@ -182,6 +211,10 @@ export default function ImportScorecard({
       setError(e.message||"Something went wrong during extraction.");
       setStep("setup");
     }
+  }
+
+  function updateScore(gameIdx,value){
+    setGames(prev=>prev.map((g,i)=>i!==gameIdx?g:{...g,totalScore:value}));
   }
 
   function updateShot(gameIdx,shotIdx,updatedShot){
@@ -208,7 +241,16 @@ export default function ImportScorecard({
 
     setStep("saving");
     const newShots=games.flatMap(g=>g.shots.map(s=>({...s,id:crypto.randomUUID()})));
-    await saveShots([...shots,...newShots]);
+    if(newShots.length)await saveShots([...shots,...newShots]);
+
+    // Games that came in as totals only are saved as manual scores, which
+    // take precedence over anything derived from shots -- see
+    // domain/manualScores.js. This is what lets a totals-only screenshot,
+    // or a bowler who doesn't log shot by shot, still get averages.
+    const scoreOnlyGames=games.filter(g=>g.scoreOnly&&g.totalScore!=null);
+    scoreOnlyGames.forEach(g=>{
+      updateManualScore(contextBowler,contextLeague,contextDate,g.gameNumber,String(g.totalScore));
+    });
 
     // Hand off to the existing, already-correct Save Session flow rather
     // than re-deriving scores/stats here -- pre-fill its context and let
@@ -217,7 +259,10 @@ export default function ImportScorecard({
     setSessionLeague(contextLeague);
     setSessionDate(contextDate);
     selectBowler(contextBowler);
-    setSessionSaveMessage(`Imported ${newShots.length} shots across ${games.length} game${games.length>1?"s":""} -- tap "Save Session & View Summary" below to finalize.`);
+    const parts=[];
+    if(newShots.length)parts.push(`${newShots.length} shots`);
+    if(scoreOnlyGames.length)parts.push(`${scoreOnlyGames.length} game score${scoreOnlyGames.length>1?"s":""}`);
+    setSessionSaveMessage(`Imported ${parts.join(" and ")} -- tap "Save Session & View Summary" below to finalize.`);
     setTimeout(()=>setSessionSaveMessage(null),6000);
     setView("log");
   }
@@ -274,6 +319,7 @@ export default function ImportScorecard({
           {games.map((g,idx)=>(
             <GameReview key={g.gameNumber} game={g}
               onUpdateShot={(shotIdx,updated)=>updateShot(idx,shotIdx,updated)}
+              onUpdateScore={value=>updateScore(idx,value)}
               expandedFrames={expandedByGame[idx]||new Set()}
               onToggleExpanded={key=>toggleExpanded(idx,key)}/>
           ))}
