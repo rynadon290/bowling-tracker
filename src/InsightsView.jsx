@@ -39,7 +39,7 @@ function DataBasis({ payload }) {
   );
 }
 
-export default function InsightsView({ stats, onAnalyze }) {
+export default function InsightsView({ stats, onAnalyze, bowlerName }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -56,6 +56,18 @@ export default function InsightsView({ stats, onAnalyze }) {
     setLoading(false);
     if (out?.error) { setError(out.error); return; }
     setResult(out);
+  }
+
+  if (!bowlerName) {
+    return (
+      <div style={S.card}>
+        <div style={S.label}>Insights</div>
+        <div style={{ fontSize: "12px", color: C.textMuted }}>
+          Select a bowler on the Log tab first. Insights are about one
+          bowler's game, not everyone's combined.
+        </div>
+      </div>
+    );
   }
 
   if (!eligible) {

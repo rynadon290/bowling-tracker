@@ -34,7 +34,7 @@ export default function Settings({
   centers, leagueCenters, setLeagueCenter, searchCenters,
   hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
 }) {
-  const { preferences, updatePreferences } = useAuth();
+  const { preferences, updatePreferences, displayName } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
   // Settings has two distinct jobs now: configuring the app, and browsing
@@ -147,8 +147,11 @@ export default function Settings({
                   </div>
                 )}
 
-                {/* Leaving a team is different -- other people see it. */}
-                {teamsInLeague(league, teams || [], activeBowler).map(team => (
+                {/* Leaving a team is different -- other people see it. This
+                    is scoped to the SIGNED-IN user, not the active bowler,
+                    since the active bowler may be a proxy-logged teammate
+                    whose membership isn't yours to change. */}
+                {teamsInLeague(league, teams || [], displayName).map(team => (
                   <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
                     <span style={{ fontSize: "11px", color: C.textMuted }}>On {team.name}</span>
                     <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }}

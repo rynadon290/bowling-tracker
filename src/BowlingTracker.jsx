@@ -163,8 +163,39 @@ const LEAGUES_KEY = "bowling-leagues-v1";
 
 
 
+
+// A stable id derived from a natural key, so writes that represent "the
+// same logical row" upsert instead of colliding with a unique constraint.
+// Used where a table has a uniqueness rule the app must respect on retry:
+// one vote per (user, submission), one submission per (user, ball).
+async function stableId(...parts){
+  // Length-prefix each part so no choice of separator inside a value can
+  // make two different inputs hash the same -- ball names are free text.
+  const data=new TextEncoder().encode(parts.map(p=>`${String(p).length}:${p}`).join("|"));
+  const hash=await crypto.subtle.digest("SHA-256",data);
+  const hex=[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  // Format as a UUID so Postgres accepts it in a uuid column.
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`;
+}
+
+
+// Reads a locally cached value and rejects it if it isn't the expected
+// shape. Local storage outlives app versions -- a key written by an old
+// build, or a bad restore, can hold anything. A wrong-shaped value doesn't
+// just render oddly; it crashes the first handler that spreads or maps it.
+async function readCached(key,expect){
+  try{
+    const r=await window.storage.get(key);
+    if(!r)return null;
+    const v=JSON.parse(r.value);
+    if(expect==="array"&&!Array.isArray(v))return null;
+    if(expect==="object"&&(typeof v!=="object"||v===null||Array.isArray(v)))return null;
+    return v;
+  }catch{return null;}
+}
+
 export default function BowlingTracker(){
-  const{user,preferences,updatePreferences}=useAuth();
+  const{user,preferences,updatePreferences,displayName}=useAuth();
   // Maps league name -> its Supabase row id. The client keeps `leagues` as
   // plain name strings everywhere (unchanged, to avoid rewriting every call
   // site that compares/filters by league name) — this ref is what lets
@@ -410,10 +441,10 @@ export default function BowlingTracker(){
           if(a)setArsenals(JSON.parse(a.value));
           const bl=await window.storage.get(LAYOUTS_KEY);
           if(bl)setBallLayouts(JSON.parse(bl.value));
-          const bsp=await window.storage.get(BALL_SPECS_KEY);
-          if(bsp)setBallSpecs(JSON.parse(bsp.value));
-          const bb=await window.storage.get(BALL_BAGS_KEY);
-          if(bb)setBallBags(JSON.parse(bb.value));
+          const bsp=await readCached(BALL_SPECS_KEY,"object");
+          if(bsp)setBallSpecs(bsp);
+          const bb=await readCached(BALL_BAGS_KEY,"object");
+          if(bb)setBallBags(bb);
         }
 
         const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,home_centers,notes"));
@@ -426,8 +457,8 @@ export default function BowlingTracker(){
           setProfiles(rebuiltProfiles);
           try{await window.storage.set(PROFILES_KEY,JSON.stringify(rebuiltProfiles));}catch{}
         }else{
-          const pr=await window.storage.get(PROFILES_KEY);
-          if(pr)setProfiles(JSON.parse(pr.value));
+          const pr=await readCached(PROFILES_KEY,"object");
+          if(pr)setProfiles(Object.fromEntries(Object.entries(pr).map(([k,v])=>[k,normalizeProfile(v,k)])));
         }
 
         const memberRes=await cloudRead("ball_bags",q=>q.select("bowler_name,ball,bag_id"));
@@ -445,8 +476,8 @@ export default function BowlingTracker(){
           setHiddenLeagues(ids);
           try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(ids));}catch{}
         }else{
-          const hl=await window.storage.get(HIDDEN_LEAGUES_KEY);
-          if(hl)setHiddenLeagues(JSON.parse(hl.value));
+          const hl=await readCached(HIDDEN_LEAGUES_KEY,"array");
+          if(hl)setHiddenLeagues(hl.filter(x=>typeof x==="string"));
         }
 
         const centersRes=await cloudRead("bowling_centers",q=>q.select("id,here_id,name,address,city,state,postal_code,country,lat,lng"));
@@ -455,8 +486,8 @@ export default function BowlingTracker(){
           setCenters(rebuilt);
           try{await window.storage.set(CENTERS_KEY,JSON.stringify(rebuilt));}catch{}
         }else{
-          const cs=await window.storage.get(CENTERS_KEY);
-          if(cs)setCenters(JSON.parse(cs.value));
+          const cs=await readCached(CENTERS_KEY,"array");
+          if(cs)setCenters(cs.map(normalizeCenter).filter(c=>c.id&&c.name));
         }
 
         const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id"));
@@ -466,8 +497,8 @@ export default function BowlingTracker(){
           setLeagueCenters(map);
           try{await window.storage.set(LEAGUE_CENTERS_KEY,JSON.stringify(map));}catch{}
         }else{
-          const lc=await window.storage.get(LEAGUE_CENTERS_KEY);
-          if(lc)setLeagueCenters(JSON.parse(lc.value));
+          const lc=await readCached(LEAGUE_CENTERS_KEY,"object");
+          if(lc)setLeagueCenters(lc);
         }
 
         const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at"));
@@ -494,8 +525,8 @@ export default function BowlingTracker(){
         }
 
         try{
-          const ack=await window.storage.get(CATALOG_ACK_KEY);
-          if(ack)setCatalogAck(JSON.parse(ack.value));
+          const ack=await readCached(CATALOG_ACK_KEY,"array");
+          if(ack)setCatalogAck(ack.filter(x=>typeof x==="string"));
         }catch{}
 
         const groupsRes=await cloudRead("ball_groups",q=>q.select("id,bowler_name,name,sort_order"));
@@ -505,8 +536,8 @@ export default function BowlingTracker(){
           setBallGroups(rebuiltGroups);
           try{await window.storage.set(BALL_GROUPS_KEY,JSON.stringify(rebuiltGroups));}catch{}
         }else{
-          const bg2=await window.storage.get(BALL_GROUPS_KEY);
-          if(bg2)setBallGroups(JSON.parse(bg2.value));
+          const bg2=await readCached(BALL_GROUPS_KEY,"array");
+          if(bg2)setBallGroups(bg2.filter(g=>g&&typeof g==="object"&&g.id));
         }
 
         const bagsRes=await cloudRead("bags",q=>q.select("id,bowler_name,name,bag_type,ball_limit,includes_plastic"));
@@ -856,14 +887,23 @@ export default function BowlingTracker(){
 
   // Leaving a team is visible to other people, so the confirmation spells
   // out exactly what changes -- including that past scores are kept.
+  // Leaving acts on the SIGNED-IN user only -- never on activeBowler, which
+  // may be a teammate being proxy-logged. Using activeBowler here would show
+  // the teammate removed while the cloud actually removed the signed-in
+  // user: two different people, silently.
   async function leaveTeam(team,leagueName){
-    const impact=describeLeaveImpact(team,leagueName,teams,activeBowler);
+    if(!user?.id||!displayName)return;
+    if(!(team.members||[]).includes(displayName)){
+      window.alert(`You're not on ${team.name} as ${displayName}, so there's nothing to leave.`);
+      return;
+    }
+    const impact=describeLeaveImpact(team,leagueName,teams,displayName);
     if(!window.confirm(leaveConfirmationText(impact)))return;
     const updatedTeams=teams.map(t=>t.id===team.id
-      ?{...t,members:(t.members||[]).filter(m=>m!==activeBowler)}
+      ?{...t,members:(t.members||[]).filter(m=>m!==displayName)}
       :t);
     setTeams(updatedTeams);
-    if(user?.id)cloudDelete("team_members",{team_id:team.id,user_id:user.id});
+    cloudDelete("team_members",{team_id:team.id,user_id:user.id});
   }
 
   // ── Bowling centers ─────────────────────────────────────────────────
@@ -922,10 +962,12 @@ export default function BowlingTracker(){
   // ── Community ball catalog ──────────────────────────────────────────
   // Publishing specs is opt-in and separate from saving them privately:
   // a bowler's own arsenal is theirs regardless of what the community says.
-  function publishBallSpecs(ballName,specs){
+  async function publishBallSpecs(ballName,specs){
     if(!user?.id)return;
     const key=ballKey(ballName);
-    const id=crypto.randomUUID();
+    // Stable per (user, ball) so "Update Shared" replaces the row rather
+    // than violating unique(submitted_by, ball_key).
+    const id=await stableId("submission",key,user.id);
     const entry={
       id,submittedBy:user.id,ballKey:key,ballName,brand:"",
       createdAt:new Date().toISOString(),approvals:0,rejections:0,myVote:null,
@@ -941,7 +983,7 @@ export default function BowlingTracker(){
     });
   }
 
-  function voteOnEntry(entryKey,entryId,vote){
+  async function voteOnEntry(entryKey,entryId,vote){
     if(!user?.id)return;
     setCatalogEntries(prev=>({
       ...prev,
@@ -958,7 +1000,11 @@ export default function BowlingTracker(){
         };
       }),
     }));
-    cloudWrite("ball_confirmations",{id:crypto.randomUUID(),submission_id:entryId,confirmed_by:user.id,vote});
+    // Same user + same submission must always be the same row, or changing
+    // your vote violates unique(submission_id, confirmed_by) and the write
+    // sits in the sync queue forever.
+    const id=await stableId("vote",entryId,user.id);
+    cloudWrite("ball_confirmations",{id,submission_id:entryId,confirmed_by:user.id,vote});
   }
 
   // Dismissing a rejection notice also clears the now-untrusted specs from
@@ -1132,6 +1178,24 @@ export default function BowlingTracker(){
     if(form.bowler===bowlerName&&form.ball===ballName){
       handleBallChange("");
     }
+
+    // Clean up everything keyed on this ball. Left alone, bag memberships
+    // silently reattach if the same ball is ever re-added, and orphaned
+    // ball_bags rows accumulate in the cloud. Layouts and specs live on
+    // the arsenals row, which saveArsenals already deletes.
+    const key=`${bowlerName}|${ballName}`;
+    const bagIds=Object.keys(ballBags)
+      .filter(k=>k.startsWith(`${key}|`))
+      .map(k=>k.split("|")[2]);
+    if(bagIds.length){
+      const nextBags={...ballBags};
+      bagIds.forEach(bagId=>{delete nextBags[membershipKey(bowlerName,ballName,bagId)];});
+      setBallBags(nextBags);
+      try{window.storage.set(BALL_BAGS_KEY,JSON.stringify(nextBags));}catch{}
+      bagIds.forEach(bagId=>cloudDelete("ball_bags",{bowler_name:bowlerName,ball:ballName,bag_id:bagId}));
+    }
+    setBallLayouts(prev=>{const n={...prev};delete n[key];return n;});
+    setBallSpecs(prev=>{const n={...prev};delete n[key];return n;});
   }
 
   // Ball names to iterate for a given bowler's stats/filters — the union of
@@ -1897,7 +1961,12 @@ export default function BowlingTracker(){
   // invite the model to find patterns it can't properly weigh.
   const insightStats=(()=>{
     const who=statsBowler||activeBowler;
-    const mine=shots.filter(s=>!who||s.bowler===who);
+    // With no bowler selected, "everyone's shots" would be analysed as if
+    // they were one person's game. Return an empty stat block instead so
+    // the Insights tab shows its "pick a bowler" state rather than a
+    // meaningless blended analysis.
+    if(!who)return{gameCount:0,firstBalls:0,balls:[],centers:[]};
+    const mine=shots.filter(s=>s.bowler===who);
     const firstBalls=mine.filter(s=>!s.ballNum||s.ballNum===1);
     const strikes=firstBalls.filter(s=>s.result==="Strike").length;
     const spareAtt=mine.filter(s=>s.result!=="Strike"&&s.spareMade!=="");
@@ -1947,9 +2016,13 @@ export default function BowlingTracker(){
 
   const bowlerBags=bags.filter(b=>b.bowlerName===activeBowler);
   const envBags=bagsForEnvironment(bowlerBags,preferences.environment);
+  // A selected bag from another environment or another bowler isn't in
+  // envBags -- resolve it to "nothing selected" rather than letting the
+  // Log tab silently show zero balls with no way to tell why.
+  const effectiveBagId=envBags.some(b=>b.id===selectedBagId)?selectedBagId:"";
   const bowlerBalls=arsenals[activeBowler]||[];
   const ballsByBag=ballsByBagFor(ballBags,activeBowler,bowlerBalls);
-  const logBalls=availableBalls(preferences.environment,ballsByBag,selectedBagId,bowlerBalls);
+  const logBalls=availableBalls(preferences.environment,ballsByBag,effectiveBagId,bowlerBalls);
 
   const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
   const activeBowlerLeftHanded=resolveHandedness(profiles[activeBowler],rosterLeftHanded);
@@ -2292,7 +2365,7 @@ export default function BowlingTracker(){
       <div style={S.content}>
         
         {view==="insights"&&(
-          <InsightsView stats={insightStats} onAnalyze={analyzePerformance}/>
+          <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}/>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -2385,7 +2458,7 @@ export default function BowlingTracker(){
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
-            envBags={envBags} selectedBagId={selectedBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
+            envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}

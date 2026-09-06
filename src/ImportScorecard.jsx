@@ -252,6 +252,14 @@ export default function ImportScorecard({
       updateManualScore(contextBowler,contextLeague,contextDate,g.gameNumber,String(g.totalScore));
     });
 
+    // Games that came in WITH frame detail replace any manual score for
+    // that game. Manual scores take precedence over shots everywhere else,
+    // so leaving one behind here would mean the newly imported frames are
+    // silently ignored in favour of a number typed earlier.
+    games.filter(g=>!g.scoreOnly&&g.shots.length>0).forEach(g=>{
+      updateManualScore(contextBowler,contextLeague,contextDate,g.gameNumber,"");
+    });
+
     // Hand off to the existing, already-correct Save Session flow rather
     // than re-deriving scores/stats here -- pre-fill its context and let
     // the user's own tap run it, so there's no risk of reading stale
