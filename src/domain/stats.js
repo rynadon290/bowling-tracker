@@ -159,6 +159,60 @@ export function avgProgress(sessions,bowler,league){
   return{raw,current,prevMilestone,nextMilestone,pct};
 }
 
+// How many pins this bowler needs across their NEXT session to move their
+// average by a whole point, in either direction.
+//
+// Average here is truncated (Math.trunc), matching avgProgress and how
+// league averages are actually reported -- so "raise it by one" means
+// making trunc(newAverage) land one higher than trunc(current), not
+// raising the raw decimal by 1.0.
+//
+// Given G games at P total pins, bowling `gamesPerSession` more games for
+// S total pins gives a new truncated average of trunc((P+S)/(G+n)).
+//   - toGain: the SMALLEST S where that lands at current+1.
+//   - toAvoidDrop: the SMALLEST S that keeps it at current (anything less
+//     drops you). Reported alongside the largest S that still drops you,
+//     which is just toAvoidDrop-1.
+//
+// Returns null when there's no history to compute from. Values can exceed
+// what's physically bowlable (max 300/game) -- callers should check
+// `gainAchievable`/`dropAchievable` rather than displaying an impossible
+// target as if it were in reach.
+export function pinsForNextSession(sessions,bowler,league,gamesPerSession=3){
+  const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  if(!all.length)return null;
+
+  const games=all.length;
+  const pins=all.reduce((a,b)=>a+b,0);
+  const current=Math.trunc(pins/games);
+  const totalGames=games+gamesPerSession;
+
+  // Smallest S with trunc((pins+S)/totalGames) >= target is the smallest S
+  // with (pins+S) >= target*totalGames, i.e. S >= target*totalGames - pins.
+  function pinsToReach(targetAvg){
+    return Math.max(0,Math.ceil(targetAvg*totalGames)-pins);
+  }
+
+  const toGain=pinsToReach(current+1);
+  const toAvoidDrop=pinsToReach(current);
+  const maxPossible=300*gamesPerSession;
+
+  return{
+    current,
+    games,
+    gamesPerSession,
+    toGain,
+    toAvoidDrop,
+    // The most pins you could bowl and STILL drop a point. If holding
+    // steady needs 0 pins, dropping isn't possible at all this session.
+    maxToDrop:toAvoidDrop>0?toAvoidDrop-1:null,
+    gainAchievable:toGain<=maxPossible,
+    dropAchievable:toAvoidDrop>0,
+    gainAvgNeeded:Math.ceil(toGain/gamesPerSession),
+    dropAvgThreshold:toAvoidDrop>0?Math.ceil(toAvoidDrop/gamesPerSession):null,
+  };
+}
+
 // This bowler's average using only sessions strictly BEFORE a given date
 // -- i.e. what their average looked like entering a specific night, not
 // including that night's own results. Used for "who was the reigning

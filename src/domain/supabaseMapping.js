@@ -92,6 +92,11 @@ export function sessionToSupabaseRow(session,userId,leagueIdsMap){
     poker_dollar:session.pokerDollar||[0,0,0],
     three_six_nine_winnings:session.threeSixNineWinnings||0,
     jackpot_winnings:session.jackpotWinnings||0,
+    high_game_winnings:session.highGameWinnings||[0,0,0],
+    poker_quarter_cost:session.pokerQuarterCost||[0,0,0],
+    poker_dollar_cost:session.pokerDollarCost||[0,0,0],
+    high_game_cost:session.highGameCost||[0,0,0],
+    three_six_nine_cost:session.threeSixNineCost||0,
   };
 }
 
@@ -123,6 +128,11 @@ export function sessionFromSupabaseRow(row,leagueNameById){
     pokerDollar:row.poker_dollar||[0,0,0],
     threeSixNineWinnings:row.three_six_nine_winnings||0,
     jackpotWinnings:row.jackpot_winnings||0,
+    highGameWinnings:row.high_game_winnings||[0,0,0],
+    pokerQuarterCost:row.poker_quarter_cost||[0,0,0],
+    pokerDollarCost:row.poker_dollar_cost||[0,0,0],
+    highGameCost:row.high_game_cost||[0,0,0],
+    threeSixNineCost:row.three_six_nine_cost||0,
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults } from './stats.js';
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults, pinsForNextSession } from './stats.js';
 
 describe('bowlerHighGame', () => {
   const sessions = [
@@ -487,5 +487,52 @@ describe('threeSixNineResults', () => {
     const shots = [...fullNineStrikes(), { ...shot('1', 3, 'Other Leave'), bowler: 'Aaron' }];
     const results = threeSixNineResults(shots, 'Ryan', 'Thursday House Shot', '2026-09-03');
     expect(results.qualifies).toBe(true);
+  });
+});
+
+describe('pinsForNextSession', () => {
+  const mk = scores => [{ bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-01-01', scores }];
+  const truncAvg = (pins, games) => Math.trunc(pins / games);
+
+  // 3 games at 150 = 450 pins, average exactly 150.
+  const r = pinsForNextSession(mk([150, 150, 150]), 'Ryan', 'Thursday House Shot');
+
+  it('reports the current truncated average and game count', () => {
+    expect(r.current).toBe(150);
+    expect(r.games).toBe(3);
+  });
+
+  it('toGain is the exact threshold to reach the next whole average', () => {
+    expect(r.toGain).toBe(456);
+    // The claim has to actually hold when simulated, not just match arithmetic.
+    expect(truncAvg(450 + r.toGain, 6)).toBe(151);
+    expect(truncAvg(450 + r.toGain - 1, 6)).toBe(150);
+  });
+
+  it('toAvoidDrop is the exact threshold to hold the current average', () => {
+    expect(r.toAvoidDrop).toBe(450);
+    expect(truncAvg(450 + r.toAvoidDrop, 6)).toBe(150);
+  });
+
+  it('maxToDrop is the most pins that still loses a point', () => {
+    expect(r.maxToDrop).toBe(449);
+    expect(truncAvg(450 + r.maxToDrop, 6)).toBe(149);
+  });
+
+  it('handles a non-round raw average by truncating, not rounding', () => {
+    // 601 over 4 games = 150.25 raw, which truncates to 150 (not 151).
+    const r2 = pinsForNextSession(mk([150, 150, 150, 151]), 'Ryan', 'Thursday House Shot');
+    expect(r2.current).toBe(150);
+    expect(truncAvg(601 + r2.toGain, 7)).toBe(151);
+    expect(truncAvg(601 + r2.toGain - 1, 7)).toBe(150);
+  });
+
+  it('flags a gain as unachievable when it would require more than 300/game', () => {
+    const perfect = pinsForNextSession(mk([300, 300, 300]), 'Ryan', 'Thursday House Shot');
+    expect(perfect.gainAchievable).toBe(false);
+  });
+
+  it('returns null when there is no history to compute from', () => {
+    expect(pinsForNextSession([], 'Ryan', 'Thursday House Shot')).toBeNull();
   });
 });
