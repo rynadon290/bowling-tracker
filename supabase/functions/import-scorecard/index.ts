@@ -1,7 +1,7 @@
 // Supabase Edge Function: import-scorecard
 //
 // Receives one or more scorecard screenshot images (e.g. from LaneTalk),
-// sends them to Google's Gemini API for vision extraction and returns
+// sends them to Google's Gemini API for vision extraction, and returns
 // structured frame-by-frame data shaped to match this app's own `shots`
 // model as closely as possible -- so the client-side conversion step is
 // close to a direct field mapping, not a translation.
@@ -19,8 +19,8 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const GEMINI_API_KEY = Deno.env.get("gemini_api_key");
-const GEMINI_MODEL = "gemini-3.6-flash"; // multimodal, on the free tier
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = "gemini-2.5-flash"; // multimodal, on the free tier
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // One uniform shape for every frame, 1 through 10. Each frame is just a
@@ -56,7 +56,7 @@ const FRAME_SCHEMA = {
     balls: {
       type: "array",
       items: BALL_SCHEMA,
-      description: "Every delivery physically thrown in this frame, in order. Frames 1-9: 1 ball if a strike, 2 if not. Frame 10: 2 or 3 balls depending on strikes/spares earned -- only include balls actually shown, never guess or pad to a fixed count.",
+      description: "Every delivery physically thrown in this frame, in order. Frames 1-9: 1 ball if a strike, 2 if not. Frame 10: 2 or 3 balls depending on strikes/spares earned -- only include balls actually shown, never guess or pad to a fixed count. Omit this entirely if the scorecard shows no per-frame detail.",
     },
   },
   required: ["frameNumber", "balls"],
@@ -73,8 +73,12 @@ const RESPONSE_SCHEMA = {
           gameNumber: { type: "integer" },
           ballUsed: { type: "string", nullable: true, description: "The ball name shown for this game, if visible (e.g. 'Bionic'). Null if not shown or not legible." },
           frames: { type: "array", items: FRAME_SCHEMA },
+          // The printed final score for the game, when the scorecard shows
+          // one. Some screenshots show ONLY totals with no pin-deck detail
+          // -- those still import, as scores rather than shots.
+          totalScore: { type: "integer", nullable: true, description: "The game's final score as printed on the scorecard, if visible. Null if not shown or not legible." },
         },
-        required: ["gameNumber", "frames"],
+        required: ["gameNumber"],
       },
     },
   },
@@ -94,6 +98,10 @@ For each ball, read the pin-deck graphic carefully to determine EXACTLY which pi
 
 If a game's ball name is shown as a tag/label near that game, include it. If not visible or you're unsure, use null rather than guessing.
 
+Also record each game's final printed score in totalScore when the scorecard shows one.
+
+IMPORTANT -- some scorecards show only game totals with no per-frame detail at all (no pin-deck graphics, no frame boxes). That is a valid and common case, not a failure. When that happens, return the games with their totalScore and an empty frames array. Do not invent frames to fill the gap.
+
 Respond with valid JSON matching the provided schema exactly. If a screenshot shows partial or cut-off games, only include complete frames you can actually read clearly from the pin-deck graphic -- do not guess or fabricate a frame or ball you can't clearly see.`;
 
 Deno.serve(async (req) => {
@@ -108,13 +116,12 @@ Deno.serve(async (req) => {
 
   try {
     if (!GEMINI_API_KEY) {
-  console.error("GEMINI_API_KEY not configured — secret is missing or empty");
-  return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured on the server" }), {
-    status: 500,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-    
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured on the server" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Require a real, signed-in user -- this costs API quota, so it
     // shouldn't be callable by anyone who happens to find the URL.
     const authHeader = req.headers.get("Authorization");
@@ -172,9 +179,8 @@ Deno.serve(async (req) => {
     });
 
     if (!geminiRes.ok) {
-  const errText = await geminiRes.text();
-  console.error("GEMINI API ERROR:", errText);
-  return new Response(JSON.stringify({ error: "Gemini API error", detail: errText }), {
+      const errText = await geminiRes.text();
+      return new Response(JSON.stringify({ error: "Gemini API error", detail: errText }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -202,9 +208,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify(extracted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
- } catch (err) {
-  console.error("UNEXPECTED ERROR:", err);
-  return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
