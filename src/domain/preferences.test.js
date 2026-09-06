@@ -13,15 +13,26 @@ describe('defaultPreferences', () => {
   it('defaults new users to scores-only tracking', () => {
     // Shot-by-shot is ~30 taps a game. Recreational bowlers bounced off it
     // before finding the features they'd pay for, so it's opt-in.
-    expect(defaultPreferences().trackingMode).toBe('game');
+    expect(defaultPreferences('league').trackingMode).toBe('game');
+  });
+
+  it('opens Practice in shot-by-shot, because that is where its fields live', () => {
+    // Practice enables surface, line, release, miss and ball speed -- all
+    // of which render inside the shot form. Scores-only there would turn
+    // every one of them on and then show none of them.
+    expect(defaultPreferences('practice').trackingMode).toBe('shot');
+    expect(applyEnvironment(defaultPreferences('league'), 'practice').trackingMode).toBe('shot');
   });
 
   it('keeps tracking mode independent of environment', () => {
     // Someone can bowl league by-game and practice shot-by-shot, so
     // switching environment must not silently reset how they log.
+    // League and tournament keep whatever the bowler chose; only practice
+    // and casual carry a mode of their own.
+    const byGame = setTrackingMode(defaultPreferences('practice'), 'game');
+    expect(applyEnvironment(byGame, 'league').trackingMode).toBe('game');
     const byShot = setTrackingMode(defaultPreferences('league'), 'shot');
-    expect(applyEnvironment(byShot, 'practice').trackingMode).toBe('shot');
-    expect(applyEnvironment(byShot, 'practice').trackedFields.surface).toBe(true);
+    expect(applyEnvironment(byShot, 'tournament').trackingMode).toBe('shot');
   });
 
   it('falls back to game mode for an unrecognized stored value', () => {

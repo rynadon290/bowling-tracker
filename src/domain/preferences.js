@@ -121,11 +121,12 @@ export function defaultPreferences(environment = "league") {
   const preset = presetFor(safeEnvironment);
   return {
     environment: safeEnvironment,
-    // New users start with scores-only. Shot-by-shot is the richer path,
-    // but it's ~30 taps a game and recreational bowlers bounced off it
-    // before finding the features they'd actually pay for. It's one tap
-    // away in Settings and the session-start prompt for anyone who wants it.
-    trackingMode: "game",
+    // New users start with scores-only -- shot-by-shot is ~30 taps a game
+    // and recreational bowlers bounced off it before finding the features
+    // they'd pay for. Practice is the exception: its whole purpose is
+    // examining your game, and all its accessory fields live in the shot
+    // form, so scores-only there would show an empty screen.
+    trackingMode: ENVIRONMENT_TRACKING_MODE[safeEnvironment] ?? "game",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
@@ -196,6 +197,13 @@ export function visibleStatsCardOrder(prefs) {
 // showMoneyGames -- not a partial nudge -- since the whole point is "start
 // fresh for this context." Anything else stored on the preferences object
 // (future settings) is left untouched.
+// Each environment carries the tracking mode that matches its purpose.
+// Practice exists to examine your game, so it opens in shot-by-shot;
+// casual exists to hide detail, so it forces scores-only. League and
+// tournament keep whatever the bowler chose, since both are legitimate
+// there and it's their call.
+const ENVIRONMENT_TRACKING_MODE = { practice: "shot", casual: "game" };
+
 export function applyEnvironment(prefs, environment) {
   // Casual is scores-only by definition -- the point is to hide the depth.
   if (environment === "casual") {
@@ -208,6 +216,11 @@ export function applyEnvironment(prefs, environment) {
   return {
     ...prefs,
     environment: safeEnvironment,
+    // Practice turns shot logging back on: its accessory fields (surface,
+    // line, release, miss, ball speed) all live inside the shot form, so
+    // leaving it in scores-only mode would enable them and then show none
+    // of them.
+    trackingMode: ENVIRONMENT_TRACKING_MODE[safeEnvironment] ?? prefs.trackingMode,
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
   };
