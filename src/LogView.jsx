@@ -657,10 +657,10 @@ export default function LogView({
               </div>
             )}
 
-            {/* Ball Speed — Practice only. Speed varies delivery to
-                delivery, and comparing it against outcomes is exactly what
-                practice is for; in league it's another tap mid-frame. */}
-            {preferences.environment==="practice"&&(
+            {/* Ball Speed — an accessory field like the others: on by
+                default in Practice (where comparing speed against outcomes
+                is the point), off elsewhere, but opt-in either way. */}
+            {preferences.trackedFields.ballSpeed&&(
               <div style={S.card}>
                 <div style={S.label}>Ball Speed</div>
                 <div style={{display:"flex",alignItems:"center",gap:"8px"}}>

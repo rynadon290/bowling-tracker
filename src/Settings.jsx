@@ -14,7 +14,7 @@ const ENVIRONMENT_DESCRIPTIONS = {
   league: "Fast, simple logging. Accessory fields off, money games front and center.",
   tournament: "Same simple logging as League, but money-game tracking is hidden.",
 };
-const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction" };
+const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction", ballSpeed: "Ball Speed" };
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
