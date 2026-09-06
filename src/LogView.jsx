@@ -623,11 +623,50 @@ export default function LogView({
             {preferences.trackedFields.line&&(
               <div style={S.card}>
                 <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
+                <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"4px"}}>Target</div>
                 <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number"
+                  <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number" inputMode="decimal"
                     value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
-                  <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number"
+                  <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number" inputMode="decimal"
                     value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
+                </div>
+                <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"4px",marginTop:"8px"}}>Actual</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Actual Board" type="number" inputMode="decimal"
+                    value={form.actualBoard} onChange={e=>set("actualBoard",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Actual Arrow" type="number" inputMode="decimal"
+                    value={form.actualArrows} onChange={e=>set("actualArrows",e.target.value)}/>
+                </div>
+                {(()=>{
+                  // The gap between target and actual is the whole point of
+                  // recording both: consistently missing the same direction
+                  // is an execution problem, which is a different fix from
+                  // having picked the wrong line to begin with.
+                  const t=parseFloat(form.targetArrows), a=parseFloat(form.actualArrows);
+                  if(Number.isNaN(t)||Number.isNaN(a))return null;
+                  const diff=a-t;
+                  if(diff===0)return(
+                    <div style={{fontSize:"12px",color:C.strike,fontWeight:600,marginTop:"6px",textAlign:"center"}}>✓ Hit the target</div>
+                  );
+                  return(
+                    <div style={{fontSize:"12px",color:C.spare,fontWeight:600,marginTop:"6px",textAlign:"center"}}>
+                      {Math.abs(diff)} board{Math.abs(diff)===1?"":"s"} {diff>0?"right":"left"} of target
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Ball Speed — Practice only. Speed varies delivery to
+                delivery, and comparing it against outcomes is exactly what
+                practice is for; in league it's another tap mid-frame. */}
+            {preferences.environment==="practice"&&(
+              <div style={S.card}>
+                <div style={S.label}>Ball Speed</div>
+                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                  <input style={{...S.input,flex:1}} placeholder="mph" type="number" step="0.1" inputMode="decimal"
+                    value={form.ballSpeed} onChange={e=>set("ballSpeed",e.target.value)}/>
+                  <span style={{fontSize:"13px",color:C.textMuted}}>mph</span>
                 </div>
               </div>
             )}
