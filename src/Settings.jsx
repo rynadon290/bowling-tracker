@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { C, S, Chip } from "./ui.jsx";
+import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
@@ -46,6 +46,20 @@ export default function Settings({
   const [section, setSection] = useState("settings");
   const [historyTab, setHistoryTab] = useState("sessions");
   const [shareStatus, setShareStatus] = useState("");
+
+  // Every settings card is collapsible, keyed by section id. Environment
+  // defaults open since it's the one setting almost everyone touches first;
+  // the rest default closed so the screen reads as a scannable list of
+  // headings, each with a summary, rather than every toggle laid bare at
+  // once. Danger Zone and Backup default closed too, on top of their own
+  // internal confirmation steps -- collapsing them is an extra deliberate
+  // step before reaching something destructive or data-heavy.
+  const [expanded, setExpanded] = useState({
+    environment: true, whereYouBowl: false, trackingDetail: false,
+    accessoryFields: false, moneyGames: false, statsLayout: false,
+    backup: false, reset: false, dangerZone: false,
+  });
+  function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
   async function apply(next) {
     setError(null);
@@ -197,8 +211,8 @@ export default function Settings({
       )}
 
       {section === "settings" && (<>
-      <div style={S.card}>
-        <div style={S.label}>Environment</div>
+      <CollapsibleCard title="Environment" summary={ENVIRONMENT_LABELS[preferences.environment]}
+        expanded={expanded.environment} onToggle={() => toggle("environment")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Sets sensible defaults for the toggles below — you can still adjust any of them afterward.
         </div>
@@ -213,14 +227,14 @@ export default function Settings({
             {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
           </div>
         )}
-      </div>
+      </CollapsibleCard>
 
       {/* Centers attach to LEAGUES, not sessions -- a league bowls at one
           house for a season, so this is one entry per season instead of a
           tap every night. */}
       {(leagues || []).length > 0 && (
-        <div style={S.card}>
-          <div style={S.label}>Where You Bowl</div>
+        <CollapsibleCard title="Where You Bowl" summary={`${leagues.length} league${leagues.length === 1 ? "" : "s"}`}
+          expanded={expanded.whereYouBowl} onToggle={() => toggle("whereYouBowl")}>
           <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
             Set each league's center once and the app can compare how you score house to house.
           </div>
@@ -298,11 +312,11 @@ export default function Settings({
               </div>
             );
           })}
-        </div>
+        </CollapsibleCard>
       )}
 
-      <div style={S.card}>
-        <div style={S.label}>Tracking Detail</div>
+      <CollapsibleCard title="Tracking Detail" summary={TRACKING_MODE_LABELS[preferences.trackingMode]}
+        expanded={expanded.trackingDetail} onToggle={() => toggle("trackingDetail")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Independent of environment — you can bowl league by-game and practice shot-by-shot.
         </div>
@@ -316,10 +330,11 @@ export default function Settings({
         <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px" }}>
           {TRACKING_MODE_DESCRIPTIONS[preferences.trackingMode]}
         </div>
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Accessory Fields</div>
+      <CollapsibleCard title="Accessory Fields"
+        summary={`${TRACKED_FIELD_KEYS.filter(k => preferences.trackedFields[k]).length} of ${TRACKED_FIELD_KEYS.length} on`}
+        expanded={expanded.accessoryFields} onToggle={() => toggle("accessoryFields")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Extra detail per shot. Off by default outside Practice — turn on whichever you actually want to track.
         </div>
@@ -330,10 +345,10 @@ export default function Settings({
               color={C.spare} />
           ))}
         </div>
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Money Games</div>
+      <CollapsibleCard title="Money Games" summary={preferences.showMoneyGames ? "Shown" : "Hidden"}
+        expanded={expanded.moneyGames} onToggle={() => toggle("moneyGames")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Poker, 3-6-9, and High Game Pot tracking cards on the Log and Stats tabs.
         </div>
@@ -341,10 +356,10 @@ export default function Settings({
           <Chip label="Shown" selected={preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, true))} color={C.strike} />
           <Chip label="Hidden" selected={!preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, false))} color={C.miss} />
         </div>
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Stats Card Layout</div>
+      <CollapsibleCard title="Stats Card Layout" summary={`${cardOrder.length - hidden.size} of ${cardOrder.length} visible`}
+        expanded={expanded.statsLayout} onToggle={() => toggle("statsLayout")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Reorder or hide whole cards on the Stats tab. Each card moves as one unit — the stats grouped inside it stay together.
         </div>
@@ -368,10 +383,11 @@ export default function Settings({
             </div>
           );
         })}
-      </div>
+      </CollapsibleCard>
 
-      <div style={{ ...S.card, border: `1px solid ${C.accent}44` }}>
-        <div style={{ ...S.label, color: C.accent }}>Backup &amp; Restore</div>
+      <CollapsibleCard title="Backup &amp; Restore" summary={hasData ? "" : "No data yet"}
+        expanded={expanded.backup} onToggle={() => toggle("backup")}
+        cardStyle={{ ...S.card, border: `1px solid ${C.accent}44` }}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Save a copy of everything — shots, sessions, bowlers, arsenals, and match results — so your season is safe no matter what. If you ever open this app and your history looks empty, restore it here.
         </div>
@@ -412,24 +428,27 @@ export default function Settings({
             )}
           </>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Reset</div>
+      <CollapsibleCard title="Reset" summary={ENVIRONMENT_LABELS[preferences.environment] || "Default"}
+        expanded={expanded.reset} onToggle={() => toggle("reset")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Made a mess of your own toggles or card order? Restore {ENVIRONMENT_LABELS[preferences.environment] || "this environment"}'s defaults — including the Stats card layout — without picking through everything by hand.
         </div>
         <button style={{ ...S.btn(), width: "100%" }} onClick={() => apply(prev => resetToEnvironmentDefaults(prev))}>
           Reset to {ENVIRONMENT_LABELS[preferences.environment] || "Default"} Defaults
         </button>
-      </div>
+      </CollapsibleCard>
 
       {/* Danger Zone lives here, at the bottom of Settings, rather than on
           the Stats tab -- it's irreversible, so it should take deliberate
-          effort to reach rather than sitting where someone scrolls daily. */}
+          effort to reach rather than sitting where someone scrolls daily.
+          Collapsed by default is an extra deliberate step on top of that,
+          before Clear All Data is even visible to tap. */}
       {hasData && (
-        <div style={{ ...S.card, border: `1px solid ${C.miss}44` }}>
-          <div style={{ ...S.label, color: C.miss }}>Danger Zone</div>
+        <CollapsibleCard title="Danger Zone" summary=""
+          expanded={expanded.dangerZone} onToggle={() => toggle("dangerZone")}
+          cardStyle={{ ...S.card, border: `1px solid ${C.miss}44` }}>
           {!confirmClear ? (
             <button style={S.btn("warn")} onClick={() => setConfirmClear(true)}>Clear All Data</button>
           ) : (
@@ -445,7 +464,7 @@ export default function Settings({
               </div>
             </>
           )}
-        </div>
+        </CollapsibleCard>
       )}
       </>)}
     </div>

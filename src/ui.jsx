@@ -74,9 +74,9 @@ export function PinDeck({selected,onToggle}){
   );
 }
 
-export function CollapsibleCard({title,summary,expanded,onToggle,children}){
+export function CollapsibleCard({title,summary,expanded,onToggle,children,cardStyle}){
   return (
-    <div style={S.card}>
+    <div style={cardStyle||S.card}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",WebkitTapHighlightColor:"transparent"}} onClick={onToggle}>
         <div style={{...S.label,marginBottom:0}}>
           {title}

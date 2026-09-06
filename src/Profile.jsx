@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { C, S, Chip } from "./ui.jsx";
+import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
 import ArsenalList from "./ArsenalList.jsx";
 import BagManager from "./BagManager.jsx";
 import BallNameInput from "./BallNameInput.jsx";
@@ -22,6 +22,18 @@ export default function Profile({
 }) {
   const [addingCenter, setAddingCenter] = useState(false);
 
+  // Every card on this screen is collapsible, keyed by section id. The
+  // bowler switcher and identity card default open since they're the
+  // first thing worth seeing; everything else defaults closed so the
+  // screen reads as a list of headings rather than a wall of forms --
+  // each one still shows a useful summary while closed.
+  const [expanded, setExpanded] = useState({
+    whoseProfile: true, identity: true,
+    bookAverage: false, homeCenters: false, teamsLeagues: false,
+    arsenal: false, bags: false, notes: false,
+  });
+  function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+
   if (!bowlers.length) {
     return (
       <div style={S.card}>
@@ -37,6 +49,7 @@ export default function Profile({
   const membership = membershipFor(activeBowler, teams);
   const balls = arsenals[activeBowler] || [];
   const resolvedHomeCenters = resolveHomeCenters(profile, centers || []);
+  const bowlerBagCount = (bags || []).filter(b => b.bowlerName === activeBowler).length;
 
   function update(next) {
     setProfile(activeBowler, next);
@@ -45,20 +58,20 @@ export default function Profile({
   return (
     <div>
       {bowlers.length > 1 && (
-        <div style={S.card}>
-          <div style={S.label}>Whose Profile</div>
+        <CollapsibleCard title="Whose Profile" summary={activeBowler}
+          expanded={expanded.whoseProfile} onToggle={() => toggle("whoseProfile")}>
           <div style={S.chips}>
             {bowlers.map(b => (
               <Chip key={b} label={b} selected={activeBowler === b} onToggle={() => selectBowler(b)} />
             ))}
           </div>
-        </div>
+        </CollapsibleCard>
       )}
 
-      <div style={S.card}>
-        <div style={S.label}>{activeBowler}</div>
-
-        <div style={{ ...S.label, marginTop: "10px" }}>Handedness</div>
+      <CollapsibleCard title={activeBowler}
+        summary={`${profile.leftHanded ? "Left" : "Right"}-handed · ${profile.twoHanded ? "Two-handed" : "One-handed"}`}
+        expanded={expanded.identity} onToggle={() => toggle("identity")}>
+        <div style={S.label}>Handedness</div>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           A lefty's corner pin is the 7, not the 10 — this flips the result chips on the Log tab to match.
         </div>
@@ -79,10 +92,11 @@ export default function Profile({
           <Chip label="Two-handed / no thumb" selected={profile.twoHanded}
             onToggle={() => update(setProfileField(profile, "twoHanded", true))} />
         </div>
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Book Average</div>
+      <CollapsibleCard title="Book Average"
+        summary={profile.bookAverage ? `${profile.bookAverage}${profile.bookGames ? ` (${profile.bookGames}g)` : ""}` : "Not set"}
+        expanded={expanded.bookAverage} onToggle={() => toggle("bookAverage")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           Your official average from last season. Shown until enough games are
           logged here, then blended out — weighted by how many games sit
@@ -96,10 +110,11 @@ export default function Profile({
         </div>
         <input style={{ ...S.input, marginTop: "6px" }} placeholder="Season (e.g. 2025-26 Winter)"
           value={profile.bookSeason} onChange={e => update(setProfileField(profile, "bookSeason", e.target.value))} />
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Home Centers</div>
+      <CollapsibleCard title="Home Centers"
+        summary={resolvedHomeCenters.length ? `${resolvedHomeCenters.length} set` : "None yet"}
+        expanded={expanded.homeCenters} onToggle={() => toggle("homeCenters")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           The houses this bowler plays regularly. Looked up so they match the
           same centers your leagues use.
@@ -136,12 +151,13 @@ export default function Profile({
             + Add a Center
           </button>
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Teams &amp; Leagues</div>
+      <CollapsibleCard title="Teams &amp; Leagues"
+        summary={membership.teams.length ? `${membership.teams.length} team${membership.teams.length === 1 ? "" : "s"}` : "Not on a team"}
+        expanded={expanded.teamsLeagues} onToggle={() => toggle("teamsLeagues")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-          Taken from the roster on the Teams tab — change it there and it updates here.
+          Taken from the roster on the Social tab — change it there and it updates here.
         </div>
         {membership.teams.length === 0 ? (
           <div style={{ fontSize: "12px", color: C.textMuted }}>Not on any team yet.</div>
@@ -153,10 +169,11 @@ export default function Profile({
             </div>
           ))
         )}
-      </div>
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Arsenal</div>
+      <CollapsibleCard title="Arsenal"
+        summary={`${balls.length} ball${balls.length === 1 ? "" : "s"}`}
+        expanded={expanded.arsenal} onToggle={() => toggle("arsenal")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           Balls and their drilling layouts.
         </div>
@@ -182,25 +199,30 @@ export default function Profile({
           onAdd={addBall}
           catalogEntries={catalogEntries || {}}
           existingBalls={balls} />
-      </div>
+      </CollapsibleCard>
 
-      <BagManager
-        activeBowler={activeBowler}
-        bags={bags || []}
-        balls={balls}
-        ballBags={ballBags || {}}
-        ballLayouts={ballLayouts || {}}
-        saveBag={saveBag}
-        deleteBag={deleteBag}
-        toggleBallBag={toggleBallBag} />
+      <CollapsibleCard title="Bags"
+        summary={`${bowlerBagCount} bag${bowlerBagCount === 1 ? "" : "s"}`}
+        expanded={expanded.bags} onToggle={() => toggle("bags")}>
+        <BagManager
+          activeBowler={activeBowler}
+          bags={bags || []}
+          balls={balls}
+          ballBags={ballBags || {}}
+          ballLayouts={ballLayouts || {}}
+          saveBag={saveBag}
+          deleteBag={deleteBag}
+          toggleBallBag={toggleBallBag} />
+      </CollapsibleCard>
 
-      <div style={S.card}>
-        <div style={S.label}>Notes</div>
+      <CollapsibleCard title="Notes"
+        summary={profile.notes ? (profile.notes.length > 28 ? profile.notes.slice(0, 28) + "…" : profile.notes) : ""}
+        expanded={expanded.notes} onToggle={() => toggle("notes")}>
         <textarea style={{ ...S.input, minHeight: "60px", resize: "vertical" }}
           placeholder="Anything worth remembering — grip changes, thumb tape, injuries…"
           value={profile.notes}
           onChange={e => update(setProfileField(profile, "notes", e.target.value))} />
-      </div>
+      </CollapsibleCard>
 
       <div style={{ height: "32px" }} />
     </div>

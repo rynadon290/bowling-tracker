@@ -288,6 +288,16 @@ export default function BowlingTracker(){
   const[activeDrill,setActiveDrill]=useState(null);
   const[drillSaved,setDrillSaved]=useState(false);
   const[practiceMode,setPracticeMode]=useState("games");
+  // Practice/Drill is gated to preferences.environment==="practice" in
+  // LogView, so switching to another environment mid-drill hides it from
+  // view without warning -- the state (still "drill", still holding
+  // whatever was in progress) survives in memory. Returning to Practice
+  // later would silently resume that old drill instead of starting fresh.
+  // Resetting on every environment change means Practice always opens on
+  // Games, which is the expected default rather than "wherever I left it."
+  useEffect(() => {
+    if (preferences.environment !== "practice") setPracticeMode("games");
+  }, [preferences.environment]);
   // Practice/casual partners. Deliberately NEVER written to the cloud --
   // these are names typed about people who aren't users of this app and
   // haven't agreed to anything. Local storage only.

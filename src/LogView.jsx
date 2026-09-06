@@ -7,7 +7,7 @@ import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
-import { allowsOtherBowlers, otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
+import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -55,18 +55,15 @@ export default function LogView({
             {/* Whose game is being recorded. Renamed from "Who's Bowling",
                 which read as "who is here tonight" rather than "whose shot
                 am I logging" -- and the answer differs by environment:
-                league keeps the team book, tournaments are yours alone,
-                practice partners are local-only guests. */}
-            {!editingId&&(
+                league keeps the team book, practice partners are
+                local-only guests. Tournaments don't get this card at all --
+                a tournament bowler is always logging their own results, so
+                a card that could only ever say "it's you" adds nothing. */}
+            {!editingId&&preferences.environment!=="tournament"&&(
               <div style={S.card}>
                 <div style={S.label}>Keeping Score For</div>
 
-                {!allowsOtherBowlers(preferences.environment)?(
-                  <div style={{fontSize:"12px",color:C.textMuted}}>
-                    Your own squad — {ownerName||"you"}. Tournament results are recorded under your name only.
-                  </div>
-                ):(
-                  <>
+                <>
                     <div style={{...S.chips,gap:"4px"}}>
                       <Chip label={`${ownerName||"Me"} (me)`} selected={activeBowler===ownerName}
                         onToggle={()=>selectBowler(ownerName)} color={C.accent} dense/>
@@ -121,7 +118,6 @@ export default function LogView({
                       </>
                     )}
                   </>
-                )}
               </div>
             )}
 

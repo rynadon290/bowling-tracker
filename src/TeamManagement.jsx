@@ -176,7 +176,7 @@ export default function TeamManagement({
   const leagueIdsRef = useRef({});
   const[teams, setTeams] = useState([]);
   const[loading, setLoading] = useState(true);
-  const[selectedLeague, setSelectedLeague] = useState(leagues[0] || "Tuesday House Shot");
+  const[selectedLeague, setSelectedLeague] = useState((leagues || [])[0] || "Tuesday House Shot");
   const[newTeamName, setNewTeamName] = useState("");
   const[editingTeamId, setEditingTeamId] = useState(null);
   const[editingName, setEditingName] = useState("");
@@ -194,12 +194,12 @@ export default function TeamManagement({
   // {[inviteId]: {term, results, searching}}
   const[linkSearchState, setLinkSearchState] = useState({});
   const linkSearchTimers = useRef({});
-  // Self-claim: a brand-new person searching across every team's unclaimed
-  // placeholders to find their own name.
-  const[claimTerm, setClaimTerm] = useState("");
-  const[claimResults, setClaimResults] = useState([]);
-  const[claimSearching, setClaimSearching] = useState(false);
-  const claimSearchTimer = useRef(null);
+  // Self-claim: invites addressed to this account's own verified email,
+  // loaded automatically rather than searched by typed name -- RLS now
+  // only returns rows actually meant for this signed-in user, so there's
+  // no free-text search surface that could leak or let someone claim a
+  // spot that isn't theirs.
+  const[myPendingInvites, setMyPendingInvites] = useState([]);
   // QR code for the sign-in URL, generated once on mount
   const[qrDataUrl, setQrDataUrl] = useState("");
 
@@ -257,6 +257,32 @@ export default function TeamManagement({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadMyPendingInvites() {
+    if (!user?.email) { setMyPendingInvites([]); return; }
+    const { data, online } = await cloudRead("pending_invites", q =>
+      q.select("id,team_id,invited_name,lineup_position").is("accepted_at", null).eq("invited_email", user.email)
+    );
+    if (!online || !data || !data.length) { setMyPendingInvites([]); return; }
+
+    const teamIds = [...new Set(data.map(inv => inv.team_id))];
+    const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id").in("id", teamIds));
+    const teamById = Object.fromEntries((teamsRes.data || []).map(t => [t.id, t]));
+    const leagueIds = [...new Set(Object.values(teamById).map(t => t.league_id).filter(Boolean))];
+    const leaguesRes = leagueIds.length ? await cloudRead("leagues", q => q.select("id,name").in("id", leagueIds)) : { data: [] };
+    const leagueNameById = Object.fromEntries((leaguesRes.data || []).map(l => [l.id, l.name]));
+
+    setMyPendingInvites(data.map(inv => ({
+      id: inv.id, teamId: inv.team_id, name: inv.invited_name, lineupPosition: inv.lineup_position,
+      teamName: teamById[inv.team_id]?.name || "Unknown team",
+      leagueName: leagueNameById[teamById[inv.team_id]?.league_id] || "",
+    })));
+  }
+
+  useEffect(() => {
+    loadMyPendingInvites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email]);
+
   // Tells the parent about the current teams whenever they change, in the
   // SAME shape it always used (members as plain display-name strings) —
   // BowlingTracker.jsx's existing team-membership checks (e.g.
@@ -298,7 +324,7 @@ export default function TeamManagement({
       .catch(() => setQrDataUrl(""));
   }, []);
 
-  const leagueList = leagues.length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
+  const leagueList = (leagues || []).length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
   const leagueTeams = teams.filter(team => team.league === selectedLeague);
 
   async function createTeam() {
@@ -477,41 +503,9 @@ export default function TeamManagement({
     cloudWrite("pending_invites", { id: inviteId, accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
   }
 
-  // Self-claim: search across EVERY team's unclaimed placeholders, not just
-  // ones you already belong to — you aren't a team member of anything yet,
-  // that's the whole point.
-  function handleClaimSearch(term) {
-    setClaimTerm(term);
-    clearTimeout(claimSearchTimer.current);
-    if (!term.trim()) { setClaimResults([]); setClaimSearching(false); return; }
-    setClaimSearching(true);
-    claimSearchTimer.current = setTimeout(async () => {
-      const { data, online } = await cloudRead("pending_invites", q =>
-        q.select("id,team_id,invited_name,lineup_position").is("accepted_at", null).ilike("invited_name", `%${term.trim()}%`).limit(8)
-      );
-      if (!online || !data || !data.length) { setClaimResults([]); setClaimSearching(false); return; }
-
-      const teamIds = [...new Set(data.map(inv => inv.team_id))];
-      const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id").in("id", teamIds));
-      const teamById = Object.fromEntries((teamsRes.data || []).map(t => [t.id, t]));
-      const leagueIds = [...new Set(Object.values(teamById).map(t => t.league_id).filter(Boolean))];
-      const leaguesRes = leagueIds.length ? await cloudRead("leagues", q => q.select("id,name").in("id", leagueIds)) : { data: [] };
-      const leagueNameById = Object.fromEntries((leaguesRes.data || []).map(l => [l.id, l.name]));
-
-      const enriched = data.map(inv => ({
-        id: inv.id, teamId: inv.team_id, name: inv.invited_name, lineupPosition: inv.lineup_position,
-        teamName: teamById[inv.team_id]?.name || "Unknown team",
-        leagueName: leagueNameById[teamById[inv.team_id]?.league_id] || "",
-      }));
-      setClaimResults(enriched);
-      setClaimSearching(false);
-    }, 300);
-  }
-
   async function claimPlaceholder(invite) {
     if (!user?.id) return;
-    setClaimResults(prev => prev.filter(r => r.id !== invite.id));
-    setClaimTerm("");
+    setMyPendingInvites(prev => prev.filter(r => r.id !== invite.id));
     await cloudWrite("team_members", { team_id: invite.teamId, user_id: user.id, lineup_position: invite.lineupPosition ?? 0 });
     const acceptedAt = new Date().toISOString();
     await cloudWrite("pending_invites", { id: invite.id, accepted_at: acceptedAt, accepted_user_id: user.id });
@@ -589,31 +583,20 @@ export default function TeamManagement({
       <div style={S.card}>
         <div style={S.label}>Is a Teammate Already Tracking Your Scores?</div>
         <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-          If someone added you to a roster before you signed up, search for your name below to claim your spot — no need to wait on them.
+          If someone added you to a roster before you signed up, any spot waiting for your email shows up here automatically.
         </div>
-        <input
-          value={claimTerm}
-          onChange={e=>handleClaimSearch(e.target.value)}
-          placeholder="Search for your name…"
-          style={S.input}
-        />
-        {claimSearching && <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>Searching…</div>}
-        {!claimSearching && claimResults.length>0 && (
-          <div style={{marginTop:"8px"}}>
-            {claimResults.map(r=>(
-              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
-                <div>
-                  <div style={{color:C.text}}>{r.name}</div>
-                  <div style={{color:C.textMuted,fontSize:"10px"}}>{r.teamName}{r.leagueName?` · ${r.leagueName}`:""}</div>
-                </div>
-                <button style={S.primary} onClick={()=>claimPlaceholder(r)}>This is me</button>
-              </div>
-            ))}
+        {myPendingInvites.length===0 && (
+          <div style={{fontSize:"12px",color:C.textMuted}}>Nothing waiting for you right now.</div>
+        )}
+        {myPendingInvites.map(r=>(
+          <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+            <div>
+              <div style={{color:C.text}}>{r.name}</div>
+              <div style={{color:C.textMuted,fontSize:"10px"}}>{r.teamName}{r.leagueName?` · ${r.leagueName}`:""}</div>
+            </div>
+            <button style={S.primary} onClick={()=>claimPlaceholder(r)}>This is me</button>
           </div>
-        )}
-        {!claimSearching && claimTerm && claimResults.length===0 && (
-          <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>No unclaimed spot found with that name.</div>
-        )}
+        ))}
       </div>
 
       <div style={S.card}>
