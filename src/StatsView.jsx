@@ -16,7 +16,7 @@ export default function StatsView({
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
   statsLeague, setStatsLeague, trendMetric, setTrendMetric, trendScope, setTrendScope,
-  compareLeague, setCompareLeague, confirmClear, setConfirmClear, matches,
+  compareLeague, setCompareLeague, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
   cleanFrameCount, cleanFrameR, compareLabel, firstBallAvg, fivePinAttempts, fivePinMisses,
   framePosition, framePositionGamesLogged, framePositionReliable, frameShots, hideIndividualOnly,
@@ -25,13 +25,13 @@ export default function StatsView({
   splitCount, splitR, statsShots, stk, stkR, teamCleanFrameR, teamFirstBallAvg, teamLeaveAvg,
   teamSinglePinSpareR, teamSpR, teamSplitConvR, teamSplitR, teamStkR, teamTenPinRate,
   teamTenPinSpareR, tenPinAttempts, tenPinLeaveCount, tenPinMade, tenPinSpareR, tot, wk,
-  clearAllData, handicapMatches, handicapSplit, longestStrikeStreak,
+  handicapMatches, handicapSplit, longestStrikeStreak,
   theoreticalScoreForGame, trendData,
 }) {
   // Fixed cards keep anchored positions: "Viewing" is the selector that
   // controls everything below it, and "Danger Zone" holds destructive
   // actions -- neither should float into the middle of the stats.
-  const renderOrder = ["viewing", ...visibleStatsCardOrder(preferences), "dangerZone"];
+  const renderOrder = ["viewing", ...visibleStatsCardOrder(preferences)];
 
   return (
           <>
@@ -1185,28 +1185,6 @@ sessions.filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.leag
                         </div>
                       </div>
                     ))}
-                  </div>
-                )
-                );
-                byId["dangerZone"] = (
-shots.length>0&&(
-                  <div style={{...S.card,border:`1px solid ${C.miss}44`}}>
-                    <div style={{...S.label,color:C.miss}}>Danger Zone</div>
-                    {!confirmClear?(
-                      <button style={S.btn("warn")} onClick={()=>setConfirmClear(true)}>Clear All Data</button>
-                    ):(
-                      <>
-                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                          This deletes every logged shot, session, match result (opponents, handicaps, win/loss), and lane condition note. This can't be undone.
-                        </div>
-                        <div style={{display:"flex",gap:"8px"}}>
-                          <button style={{...S.btn("warn"),flex:1}} onClick={async()=>{await clearAllData();setConfirmClear(false);}}>
-                            Yes, Delete Everything
-                          </button>
-                          <button style={{...S.btn(),flex:1}} onClick={()=>setConfirmClear(false)}>Cancel</button>
-                        </div>
-                      </>
-                    )}
                   </div>
                 )
                 );

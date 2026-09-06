@@ -20,6 +20,7 @@ const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, 
 export default function Settings({
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
+  confirmClear, setConfirmClear, clearAllData, hasData,
 }) {
   const { preferences, updatePreferences } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
@@ -164,6 +165,30 @@ export default function Settings({
 
       {savedFlash && <div style={{ fontSize: "13px", color: C.strike, textAlign: "center", marginBottom: "12px" }}>✓ Saved</div>}
       {error && <div style={{ fontSize: "13px", color: C.miss, textAlign: "center", marginBottom: "12px" }}>{error}</div>}
+
+      {/* Danger Zone lives here, at the bottom of Settings, rather than on
+          the Stats tab -- it's irreversible, so it should take deliberate
+          effort to reach rather than sitting where someone scrolls daily. */}
+      {hasData && (
+        <div style={{ ...S.card, border: `1px solid ${C.miss}44` }}>
+          <div style={{ ...S.label, color: C.miss }}>Danger Zone</div>
+          {!confirmClear ? (
+            <button style={S.btn("warn")} onClick={() => setConfirmClear(true)}>Clear All Data</button>
+          ) : (
+            <>
+              <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
+                This deletes every logged shot, session, match result (opponents, handicaps, win/loss), and lane condition note. This can't be undone. Consider downloading a backup above first.
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button style={{ ...S.btn("warn"), flex: 1 }} onClick={async () => { await clearAllData(); setConfirmClear(false); }}>
+                  Yes, Delete Everything
+                </button>
+                <button style={{ ...S.btn(), flex: 1 }} onClick={() => setConfirmClear(false)}>Cancel</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
