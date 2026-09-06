@@ -38,10 +38,11 @@ describe('defaultPreferences', () => {
   });
 
   it('excludes fixed cards from the reorderable set', () => {
+    // "Viewing" is the selector that controls every card below it, so it
+    // stays anchored at the top and can't be moved or hidden.
     expect(MOVABLE_STATS_CARD_IDS).not.toContain('viewing');
-    expect(MOVABLE_STATS_CARD_IDS).not.toContain('dangerZone');
     expect(STATS_CARD_IDS).toContain('viewing');
-    expect(STATS_CARD_IDS).toContain('dangerZone');
+    expect(STATS_CARD_IDS.length).toBe(MOVABLE_STATS_CARD_IDS.length + 1);
   });
 
   it('an unrecognized environment falls back to league defaults', () => {

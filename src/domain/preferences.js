@@ -17,10 +17,9 @@ export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss"];
 // so adding a new card later doesn't require migrating anyone's saved
 // layout -- it just appears at its default position.
 //
-// `fixed: true` marks cards that stay put regardless of ordering. "Viewing"
-// is the bowler/league selector that controls everything below it, and
-// "Danger Zone" is destructive actions -- both would be confusing or
-// hazardous to relocate into the middle of the stats.
+// `fixed: true` marks cards that stay put regardless of ordering.
+// "Viewing" is the bowler/league selector that controls everything below
+// it, so it always sits at the top.
 export const STATS_CARDS = [
   { id: "viewing", label: "Viewing", fixed: true },
   { id: "headToHead", label: "Head-to-Head" },
@@ -57,7 +56,6 @@ export const STATS_CARDS = [
   { id: "money", label: "Money Games" },
   { id: "threeSixNine", label: "3-6-9 Tracker" },
   { id: "sessionHistory", label: "Session History" },
-  { id: "dangerZone", label: "Danger Zone", fixed: true },
 ];
 
 export const STATS_CARD_IDS = STATS_CARDS.map(c => c.id);
