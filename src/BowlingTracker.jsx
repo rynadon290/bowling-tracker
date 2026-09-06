@@ -9,6 +9,7 @@ import Settings from "./Settings.jsx";
 import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
+import InsightsView from "./InsightsView.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
@@ -1891,6 +1892,59 @@ export default function BowlingTracker(){
   const leaguesWithCenters=leagues.map(name=>({name,centerId:leagueCenters[name]}));
   const centerStats=statsByCenter(sessions,leaguesWithCenters,centers,statsBowler||activeBowler);
 
+  // Pre-computed statistics for Insights. Deliberately assembled here and
+  // sent as summary figures -- raw shot rows would be 8x the tokens and
+  // invite the model to find patterns it can't properly weigh.
+  const insightStats=(()=>{
+    const who=statsBowler||activeBowler;
+    const mine=shots.filter(s=>!who||s.bowler===who);
+    const firstBalls=mine.filter(s=>!s.ballNum||s.ballNum===1);
+    const strikes=firstBalls.filter(s=>s.result==="Strike").length;
+    const spareAtt=mine.filter(s=>s.result!=="Strike"&&s.spareMade!=="");
+    const spareMade=spareAtt.filter(s=>s.spareMade==="Yes").length;
+    const tenPins=mine.filter(s=>s.result==="Weak 10"||s.result==="Ringing 10");
+    const tenMade=tenPins.filter(s=>s.spareMade==="Yes").length;
+    const splits=firstBalls.filter(s=>isSplit(s.otherLeave||[])).length;
+    const mySessions=sessions.filter(s=>!who||s.bowler===who);
+    const gameCount=mySessions.reduce((n,s)=>n+(s.scores?.length||0),0);
+
+    const ballRows=[...new Set(mine.map(s=>s.ball).filter(Boolean))].map(name=>{
+      const bs=firstBalls.filter(s=>s.ball===name);
+      const spec=ballSpecs[`${who}|${name}`]||{};
+      return{
+        name,
+        firstBalls:bs.length,
+        strikeRate:bs.length?bs.filter(s=>s.result==="Strike").length/bs.length:null,
+        coverstock:spec.coverstock||"",
+        coreType:spec.coreType||"",
+      };
+    });
+
+    return{
+      gameCount,
+      firstBalls:firstBalls.length,
+      strikeRate:firstBalls.length?strikes/firstBalls.length:null,
+      spareAttempts:spareAtt.length,
+      spareConversion:spareAtt.length?spareMade/spareAtt.length:null,
+      tenPinAttempts:tenPins.length,
+      tenPinRate:tenPins.length?tenMade/tenPins.length:null,
+      splitRate:firstBalls.length?splits/firstBalls.length:null,
+      sessionCount:mySessions.length,
+      recentAverages:mySessions.slice(-8).map(s=>s.average).filter(v=>typeof v==="number"),
+      balls:ballRows,
+      centers:centerStats.map(c=>({name:c.center.name,average:c.average,games:c.games})),
+    };
+  })();
+
+  async function analyzePerformance(payload){
+    try{
+      const{data,error}=await supabase.functions.invoke("analyze-performance",{body:{payload}});
+      if(error)return{error:error.message||"Analysis failed."};
+      if(data?.error)return{error:data.error};
+      return data;
+    }catch(e){return{error:e.message||"Couldn't generate insights right now."};}
+  }
+
   const bowlerBags=bags.filter(b=>b.bowlerName===activeBowler);
   const envBags=bagsForEnvironment(bowlerBags,preferences.environment);
   const bowlerBalls=arsenals[activeBowler]||[];
@@ -2181,9 +2235,9 @@ export default function BowlingTracker(){
           )}
         </div>
         <div style={S.nav}>
-          {["log","stats","social"].map(v=>(
+          {["log","stats","insights","social"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="stats"?"Stats":"Social"}
+    {v==="log"?"Log":v==="stats"?"Stats":v==="insights"?"Insights":"Social"}
   </button>
 ))}
         </div>
@@ -2237,6 +2291,10 @@ export default function BowlingTracker(){
 
       <div style={S.content}>
         
+        {view==="insights"&&(
+          <InsightsView stats={insightStats} onAnalyze={analyzePerformance}/>
+        )}
+
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* SOCIAL VIEW — Teams + Friends share one nav slot                  */}
         {/* ══════════════════════════════════════════════════════════════════ */}
