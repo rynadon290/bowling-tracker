@@ -608,11 +608,9 @@ export default function LogView({
                 <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
                   {!form.bowler
                     ?"Select a bowler to see their arsenal."
-                    :envBags.length>0&&!selectedBagId
-                      ?"Pick a bag above to see its balls."
-                      :envBags.length>0
-                        ?"That bag is empty — add balls to it from the profile screen."
-                        :`No balls in ${form.bowler}'s arsenal yet — add them on the Profile screen.`}
+                    :envBags.length>0&&selectedBagId
+                      ?"That bag is empty — add balls to it on the Profile screen."
+                      :`No balls in ${form.bowler}'s arsenal yet — add them on the Profile screen.`}
                 </div>
               )}
             </CollapsibleCard>

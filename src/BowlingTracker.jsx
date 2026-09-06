@@ -415,14 +415,24 @@ export default function BowlingTracker(){
           const pendingBowlers=await getQueuedRecordsForTable("bowler_names");
           const names=[...new Set([...bowlersRes.data.map(r=>r.name),...pendingBowlers.map(r=>r.name)])];
           setBowlers(names);
-          if(names.length)setActiveBowler(names[0]);
+          // Keep form.bowler in step with the chip that renders selected.
+          // Setting activeBowler alone left the shot form with bowler:""
+          // from emptyShot(), so the Ball card reported "no bowler" even
+          // though a chip looked chosen.
+          if(names.length){
+            setActiveBowler(names[0]);
+            setForm(f=>f.bowler?f:{...f,bowler:names[0]});
+          }
           try{await window.storage.set(BOWLERS_KEY,JSON.stringify(names));}catch{}
         }else{
           const b=await window.storage.get(BOWLERS_KEY);
           if(b){
             const list=JSON.parse(b.value);
             setBowlers(list);
-            if(list.length)setActiveBowler(list[0]);
+            if(list.length){
+              setActiveBowler(list[0]);
+              setForm(f=>f.bowler?f:{...f,bowler:list[0]});
+            }
           }
         }
 
@@ -2062,7 +2072,10 @@ export default function BowlingTracker(){
   const effectiveBagId=envBags.some(b=>b.id===selectedBagId)?selectedBagId:"";
   const bowlerBalls=arsenals[activeBowler]||[];
   const ballsByBag=ballsByBagFor(ballBags,activeBowler,bowlerBalls);
-  const logBalls=availableBalls(preferences.environment,ballsByBag,effectiveBagId,bowlerBalls);
+  // envBags.length tells availableBalls whether this bowler has any bags
+  // for this environment at all -- with none, the arsenal is unfiltered
+  // rather than empty.
+  const logBalls=availableBalls(preferences.environment,ballsByBag,effectiveBagId,bowlerBalls,envBags.length>0);
 
   const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
   const activeBowlerLeftHanded=resolveHandedness(profiles[activeBowler],rosterLeftHanded);
