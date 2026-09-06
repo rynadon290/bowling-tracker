@@ -29,6 +29,7 @@ export default function LogView({
   sessionStartDismissed, dismissSessionStart, updatePreferences,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
+  catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
   return (
     <>
@@ -91,7 +92,13 @@ export default function LogView({
                   ballSpecs={ballSpecs||{}}
                   setBallSpec={setBallSpec}
                   ballGroups={ballGroups||[]}
-                  seedDefaultGroups={seedDefaultGroups}/>
+                  seedDefaultGroups={seedDefaultGroups}
+                  catalogEntries={catalogEntries||{}}
+                  catalogAck={catalogAck||[]}
+                  userId={userId}
+                  publishBallSpecs={publishBallSpecs}
+                  voteOnEntry={voteOnEntry}
+                  acknowledgeRejection={acknowledgeRejection}/>
                 <div style={S.row}>
                   <input style={{...S.input,flex:1}} placeholder="Add a ball (e.g. Storm Phaze II)" value={newBallName}
                     onChange={e=>setNewBallName(e.target.value)}

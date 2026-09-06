@@ -23,6 +23,7 @@ import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHa
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
+import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -64,6 +65,7 @@ const BAGS_KEY = "bowling-bags-v1";
 const BALL_BAGS_KEY = "bowling-ball-bag-assignments-v1";
 const BALL_SPECS_KEY = "bowling-ball-specs-v1";
 const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
+const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -224,6 +226,10 @@ export default function BowlingTracker(){
   // Ball specs keyed "bowler|ball", and the bowler's own ball groups.
   const[ballSpecs,setBallSpecs]=useState({});
   const[ballGroups,setBallGroups]=useState([]);
+  // Community ball catalog: every submission, grouped by normalized ball
+  // name, plus which rejection notices this user has already dismissed.
+  const[catalogEntries,setCatalogEntries]=useState({});
+  const[catalogAck,setCatalogAck]=useState([]);
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -416,6 +422,34 @@ export default function BowlingTracker(){
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
         }
+
+        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at"));
+        const votesRes=await cloudRead("ball_confirmations",q=>q.select("submission_id,confirmed_by,vote"));
+        if(subsRes.online&&subsRes.data){
+          const tally={};
+          (votesRes.data||[]).forEach(v=>{
+            const t=tally[v.submission_id]=tally[v.submission_id]||{approvals:0,rejections:0,mine:null};
+            if(v.vote==="reject")t.rejections++; else t.approvals++;
+            if(v.confirmed_by===user?.id)t.mine=v.vote;
+          });
+          const byKey={};
+          subsRes.data.forEach(row=>{
+            const t=tally[row.id]||{approvals:0,rejections:0,mine:null};
+            const entry={
+              id:row.id,submittedBy:row.submitted_by,ballKey:row.ball_key,ballName:row.ball_name,
+              brand:row.brand||"",createdAt:row.created_at,
+              approvals:t.approvals,rejections:t.rejections,myVote:t.mine,
+              specs:specsFromRow(row),
+            };
+            (byKey[row.ball_key]=byKey[row.ball_key]||[]).push(entry);
+          });
+          setCatalogEntries(byKey);
+        }
+
+        try{
+          const ack=await window.storage.get(CATALOG_ACK_KEY);
+          if(ack)setCatalogAck(JSON.parse(ack.value));
+        }catch{}
 
         const groupsRes=await cloudRead("ball_groups",q=>q.select("id,bowler_name,name,sort_order"));
         if(groupsRes.online&&groupsRes.data){
@@ -750,6 +784,59 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Community ball catalog ──────────────────────────────────────────
+  // Publishing specs is opt-in and separate from saving them privately:
+  // a bowler's own arsenal is theirs regardless of what the community says.
+  function publishBallSpecs(ballName,specs){
+    if(!user?.id)return;
+    const key=ballKey(ballName);
+    const id=crypto.randomUUID();
+    const entry={
+      id,submittedBy:user.id,ballKey:key,ballName,brand:"",
+      createdAt:new Date().toISOString(),approvals:0,rejections:0,myVote:null,
+      specs:normalizeBallSpecs(specs),
+    };
+    setCatalogEntries(prev=>{
+      const existing=(prev[key]||[]).filter(e=>e.submittedBy!==user.id);
+      return{...prev,[key]:[...existing,entry]};
+    });
+    cloudWrite("ball_submissions",{
+      id,submitted_by:user.id,ball_key:key,ball_name:ballName,
+      ...specsToRow(normalizeBallSpecs(specs)),
+    });
+  }
+
+  function voteOnEntry(entryKey,entryId,vote){
+    if(!user?.id)return;
+    setCatalogEntries(prev=>({
+      ...prev,
+      [entryKey]:(prev[entryKey]||[]).map(e=>{
+        if(e.id!==entryId)return e;
+        // Replace this user's previous vote rather than stacking a second.
+        const hadApprove=e.myVote==="approve";
+        const hadReject=e.myVote==="reject";
+        return{
+          ...e,
+          approvals:e.approvals-(hadApprove?1:0)+(vote==="approve"?1:0),
+          rejections:e.rejections-(hadReject?1:0)+(vote==="reject"?1:0),
+          myVote:vote,
+        };
+      }),
+    }));
+    cloudWrite("ball_confirmations",{id:crypto.randomUUID(),submission_id:entryId,confirmed_by:user.id,vote});
+  }
+
+  // Dismissing a rejection notice also clears the now-untrusted specs from
+  // this bowler's own arsenal -- but keeps the ball itself, since they know
+  // they own it and only the numbers were disputed.
+  function acknowledgeRejection(ballName){
+    const key=ballKey(ballName);
+    const updated=[...catalogAck,key];
+    setCatalogAck(updated);
+    try{window.storage.set(CATALOG_ACK_KEY,JSON.stringify(updated));}catch{}
+    if(activeBowler)setBallSpec(activeBowler,ballName,clearedSpecsAfterRejection(ballName));
+  }
+
   // ── Ball specs & groups ─────────────────────────────────────────────
   function setBallSpec(bowlerName,ballName,specs){
     const key=`${bowlerName}|${ballName}`;
@@ -2033,7 +2120,8 @@ export default function BowlingTracker(){
             newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}
             bags={bags} ballBags={ballBags} saveBag={saveBag} deleteBag={deleteBag} toggleBallBag={toggleBallBag}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups}
-            saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}/>
+            saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
+            catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}/>
         )}
 
         {view==="settings"&&(
@@ -2085,6 +2173,7 @@ export default function BowlingTracker(){
             manualScores={manualScores} updateManualScore={updateManualScore}
             envBags={envBags} selectedBagId={selectedBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
+            catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}
             updatePreferences={updatePreferences}
           />

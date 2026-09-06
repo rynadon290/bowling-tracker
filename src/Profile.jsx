@@ -14,6 +14,7 @@ export default function Profile({
   newBallName, setNewBallName, addBall,
   bags, ballBags, saveBag, deleteBag, toggleBallBag,
   ballSpecs, setBallSpec, ballGroups, saveBallGroup, deleteBallGroup, seedDefaultGroups,
+  catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
   const [newCenter, setNewCenter] = useState("");
 
@@ -136,7 +137,13 @@ export default function Profile({
           ballSpecs={ballSpecs || {}}
           setBallSpec={setBallSpec}
           ballGroups={ballGroups || []}
-          seedDefaultGroups={seedDefaultGroups} />
+          seedDefaultGroups={seedDefaultGroups}
+          catalogEntries={catalogEntries || {}}
+          catalogAck={catalogAck || []}
+          userId={userId}
+          publishBallSpecs={publishBallSpecs}
+          voteOnEntry={voteOnEntry}
+          acknowledgeRejection={acknowledgeRejection} />
         <div style={S.row}>
           <input style={{ ...S.input, flex: 1 }} placeholder="Add a ball (e.g. Storm Phaze II)"
             value={newBallName}

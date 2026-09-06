@@ -5,6 +5,8 @@ import {
   emptyLayout, normalizeLayout, formatLayout, layoutFieldErrors,
   setLayoutSystem, setLayoutValue,
 } from "./domain/layouts.js";
+import BallCatalogPanel from "./BallCatalogPanel.jsx";
+import { rejectedBallsFor, ballKey } from "./domain/ballCatalog.js";
 import {
   COVERSTOCKS, CORE_TYPES, COVERSTOCK_LABELS, CORE_TYPE_LABELS,
   GROUP_MODES, GROUP_MODE_LABELS, normalizeBallSpecs,
@@ -122,6 +124,7 @@ function LayoutEditor({ layout, onChange }) {
 export default function ArsenalList({
   activeBowler, balls, ballLayouts, setBallLayout, removeBall,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
+  catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
   const [openBall, setOpenBall] = useState(null);
   const [openTab, setOpenTab] = useState("specs");
@@ -183,8 +186,20 @@ export default function ArsenalList({
               <Chip label="Layout" dense selected={openTab === "layout"} onToggle={() => setOpenTab("layout")} />
             </div>
             {openTab === "specs" ? (
-              <SpecEditor specs={specsByBall[ball]} groups={groups}
-                onChange={next => setBallSpec(activeBowler, ball, next)} />
+              <>
+                <SpecEditor specs={specsByBall[ball]} groups={groups}
+                  onChange={next => setBallSpec(activeBowler, ball, next)} />
+                {publishBallSpecs && (
+                  <BallCatalogPanel
+                    ballName={ball}
+                    userId={userId}
+                    entries={catalogEntries?.[ballKey(ball)] || []}
+                    myOwnSpecs={specsByBall[ball]}
+                    onApply={specs => setBallSpec(activeBowler, ball, specs)}
+                    onPublish={publishBallSpecs}
+                    onVote={voteOnEntry} />
+                )}
+              </>
             ) : (
               <LayoutEditor layout={ballLayouts?.[key]}
                 onChange={next => setBallLayout(activeBowler, ball, next)} />
@@ -195,8 +210,25 @@ export default function ArsenalList({
     );
   }
 
+  const rejected = rejectedBallsFor(balls, catalogEntries || {}, catalogAck || []);
+
   return (
     <div style={{ marginBottom: "10px" }}>
+      {/* Community specs for a ball this bowler owns were disputed and
+          removed. The ball itself stays -- they know they own it; only the
+          numbers were in question. */}
+      {rejected.map(ball => (
+        <div key={ball} style={{ ...S.card, border: `1px solid ${C.miss}44`, marginBottom: "10px" }}>
+          <div style={{ ...S.label, color: C.miss }}>Specs Removed</div>
+          <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "8px" }}>
+            Other bowlers reported the shared specs for <strong style={{ color: C.text }}>{ball}</strong> as incorrect, so they've been removed. You still have the ball — just re-enter its details when you get a chance.
+          </div>
+          <button style={{ ...S.btn(), width: "100%" }} onClick={() => acknowledgeRejection?.(ball)}>
+            Got it
+          </button>
+        </div>
+      ))}
+
       {/* Grouping only appears once the list is long enough to need it --
           sorting four balls into buckets is more work than scanning them. */}
       {balls.length > 4 && (
