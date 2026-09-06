@@ -124,9 +124,12 @@ export async function discardQueuedTable(table) {
   notifyListeners(await getPendingCount());
 }
 
-async function queueWrite(table, operation, payload, reason) {
+async function queueWrite(table, operation, payload, reason, onConflict) {
   const db = await getDb();
-  await db.add(STORE_NAME, { table, operation, payload, reason, createdAt: Date.now() });
+  // onConflict is stored with the item so the retry resolves against the
+  // same column as the original attempt -- replaying without it would hit
+  // the exact primary-key mismatch the original call was avoiding.
+  await db.add(STORE_NAME, { table, operation, payload, reason, onConflict, createdAt: Date.now() });
   notifyListeners(await getPendingCount());
 }
 
@@ -137,16 +140,28 @@ async function queueWrite(table, operation, payload, reason) {
 // makes retries safe: the same id every time means upsert (not insert) is
 // the right call below, so a write that actually succeeded right as the
 // timeout fired doesn't turn into a duplicate-key error on retry.
-export async function cloudWrite(table, record, { timeoutMs = 6000 } = {}) {
+// `onConflict` names the column(s) that identify an existing row, when
+// that isn't the primary key.
+//
+// Without it, PostgREST resolves conflicts against the PRIMARY KEY. For a
+// table like user_preferences -- PK `id uuid default gen_random_uuid()`,
+// but genuinely keyed by `user_id` -- a record with no id generates a new
+// one every time, so nothing ever conflicts on the PK, Postgres attempts
+// a plain INSERT, and that collides with unique(user_id). The first write
+// succeeds and every subsequent one fails: settings appear to save once
+// and then freeze.
+export async function cloudWrite(table, record, { timeoutMs = 6000, onConflict } = {}) {
   try {
     const { error } = await withTimeout(
-      supabase.from(table).upsert(record),
+      onConflict
+        ? supabase.from(table).upsert(record, { onConflict })
+        : supabase.from(table).upsert(record),
       timeoutMs
     );
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
-    await queueWrite(table, 'upsert', record, formatError(err));
+    await queueWrite(table, 'upsert', record, formatError(err), onConflict);
     return { synced: false, queued: true, reason: formatError(err) };
   }
 }
@@ -246,7 +261,9 @@ export async function flushPendingQueue() {
         Object.entries(item.payload.match).forEach(([k, v]) => { query = query.eq(k, v); });
         ({ error } = await query);
       } else {
-        ({ error } = await supabase.from(item.table).upsert(item.payload));
+        ({ error } = item.onConflict
+          ? await supabase.from(item.table).upsert(item.payload, { onConflict: item.onConflict })
+          : await supabase.from(item.table).upsert(item.payload));
       }
       if (error) throw error;
       await db.delete(STORE_NAME, item.queueId);

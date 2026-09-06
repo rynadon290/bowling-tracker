@@ -1204,7 +1204,9 @@ export default function BowlingTracker(){
 
     clearTimeout(pokerSaveTimers.current[`profile|${bowlerName}`]);
     pokerSaveTimers.current[`profile|${bowlerName}`]=setTimeout(()=>{
-      cloudWrite("bowler_profiles",profileToRow(normalized,user?.id||null));
+      // Keyed by (created_by, bowler_name), not by the generated id --
+      // without this, editing a profile fails on every save after the first.
+      cloudWrite("bowler_profiles",profileToRow(normalized,user?.id||null),{onConflict:"created_by,bowler_name"});
     },600);
   }
 
@@ -1746,7 +1748,9 @@ export default function BowlingTracker(){
     pokerSaveTimers.current[`manual|${bowler}|${date}|${game}`]=setTimeout(()=>{
       const score=getManualScore(updated,bowler,league,date,game);
       if(score===null)cloudDelete("manual_scores",{bowler_name:bowler,league_id:leagueId,date,game});
-      else cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null));
+      // Same: keyed by the natural (user, bowler, league, date, game)
+      // tuple, so correcting a typed score updates instead of colliding.
+      else cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null),{onConflict:"user_id,bowler_name,league_id,date,game"});
     },600);
   }
 

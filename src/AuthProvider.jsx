@@ -124,7 +124,8 @@ export function AuthProvider({ children }) {
       // follow the bowler to another device until they sign in.
       return { error: null };
     }
-    const result = await cloudWrite('user_preferences', { user_id: session.user.id, preferences: normalized });
+    // Keyed by user_id, not by the table's generated primary key.
+    const result = await cloudWrite('user_preferences', { user_id: session.user.id, preferences: normalized }, { onConflict: 'user_id' });
     if (!result.synced) {
       return { error: new Error(`Saved on this device, but hasn't reached the cloud yet (${result.reason || 'unknown reason'}) — it may not carry over to another device yet.`) };
     }
