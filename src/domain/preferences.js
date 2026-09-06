@@ -8,9 +8,15 @@
 // mechanism doing double duty, rather than two systems that could drift
 // out of sync with each other.
 
-export const ENVIRONMENTS = ["practice", "league", "tournament"];
+// "casual" is the fourth: bowling with friends or the kids, where nothing
+// but the score matters. It exists for the league bowler's off night, not
+// as a bid for the party-bowling market -- it just hides the depth.
+export const ENVIRONMENTS = ["practice", "league", "tournament", "casual"];
 
-export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss", "ballSpeed", "shoes"];
+// revRate and axisRotation are self-reported estimates -- a bowler has no
+// way to measure them without a sensor -- and are labelled as such in the
+// UI. Off everywhere by default; the bowlers who want them will find them.
+export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss", "ballSpeed", "shoes", "revRate", "axisRotation"];
 
 // How much detail the person wants to log. "shot" is the full frame-by-frame
 // flow the app was built around; "game" is just final scores per game, for
@@ -89,15 +95,19 @@ export const MOVABLE_STATS_CARD_IDS = MOVABLE_STATS_CARDS.map(c => c.id);
 // convention that usually doesn't apply in tournament play.
 export const ENVIRONMENT_PRESETS = {
   practice: {
-    trackedFields: { surface: true, line: true, release: true, miss: true, ballSpeed: true, shoes: true },
+    trackedFields: { surface: true, line: true, release: true, miss: true, ballSpeed: true, shoes: true, revRate: false, axisRotation: false },
     showMoneyGames: false,
   },
   league: {
-    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false },
+    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false, revRate: false, axisRotation: false },
     showMoneyGames: true,
   },
   tournament: {
-    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: true },
+    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: true, revRate: false, axisRotation: false },
+    showMoneyGames: false,
+  },
+  casual: {
+    trackedFields: { surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false, revRate: false, axisRotation: false },
     showMoneyGames: false,
   },
 };
@@ -111,7 +121,11 @@ export function defaultPreferences(environment = "league") {
   const preset = presetFor(safeEnvironment);
   return {
     environment: safeEnvironment,
-    trackingMode: "shot",
+    // New users start with scores-only. Shot-by-shot is the richer path,
+    // but it's ~30 taps a game and recreational bowlers bounced off it
+    // before finding the features they'd actually pay for. It's one tap
+    // away in Settings and the session-start prompt for anyone who wants it.
+    trackingMode: "game",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
@@ -183,6 +197,12 @@ export function visibleStatsCardOrder(prefs) {
 // fresh for this context." Anything else stored on the preferences object
 // (future settings) is left untouched.
 export function applyEnvironment(prefs, environment) {
+  // Casual is scores-only by definition -- the point is to hide the depth.
+  if (environment === "casual") {
+    const safe = { ...prefs, environment: "casual", trackingMode: "game" };
+    const preset = presetFor("casual");
+    return { ...safe, trackedFields: { ...preset.trackedFields }, showMoneyGames: preset.showMoneyGames };
+  }
   const safeEnvironment = ENVIRONMENTS.includes(environment) ? environment : "league";
   const preset = presetFor(safeEnvironment);
   return {

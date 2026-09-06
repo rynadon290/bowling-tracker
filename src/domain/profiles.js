@@ -10,6 +10,17 @@
 // working unchanged while profiles get filled in over time, instead of
 // requiring a risky one-shot data migration.
 
+function numOrNull(v, min, max) {
+  if (v === null || v === undefined) return null;
+  const raw = String(v).trim();
+  if (raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (min !== undefined && n < min) return null;
+  if (max !== undefined && n > max) return null;
+  return n;
+}
+
 export function emptyProfile(bowlerName = "") {
   return {
     bowlerName,
@@ -17,6 +28,10 @@ export function emptyProfile(bowlerName = "") {
     twoHanded: false,
     homeCenters: [],
     notes: "",
+    // Book average seed -- see blendedAverage below.
+    bookAverage: "",
+    bookGames: "",
+    bookSeason: "",
   };
 }
 
@@ -33,6 +48,42 @@ export function normalizeProfile(raw, bowlerName = "") {
       ? raw.homeCenters.filter(c => typeof c === "string" && c.trim()).map(c => c.trim())
       : [],
     notes: typeof raw.notes === "string" ? raw.notes : "",
+    bookAverage: raw.bookAverage === null || raw.bookAverage === undefined ? "" : String(raw.bookAverage),
+    bookGames: raw.bookGames === null || raw.bookGames === undefined ? "" : String(raw.bookGames),
+    bookSeason: typeof raw.bookSeason === "string" ? raw.bookSeason : "",
+  };
+}
+
+// The average to show, blending a book average with logged games.
+//
+// A book average is real data from a lot of games -- usually 60-100 -- so
+// it shouldn't vanish the moment three nights are logged, and three nights
+// shouldn't be treated as equal to a whole season. Weighted by game count
+// on each side: (book * bookGames + logged * loggedGames) / total. As
+// logged games accumulate the book naturally fades out.
+//
+// Returns null with no data at all; returns the book alone with no logged
+// games; ignores the book if it's blank or nonsensical.
+export function blendedAverage(profile, loggedGames) {
+  const games = (loggedGames || []).filter(g => typeof g === "number");
+  const book = Number(profile?.bookAverage);
+  const bookN = Math.round(Number(profile?.bookGames));
+  const bookValid = Number.isFinite(book) && book >= 0 && book <= 300 && Number.isFinite(bookN) && bookN > 0;
+
+  if (!games.length && !bookValid) return null;
+  if (!games.length) return { average: Math.round(book * 10) / 10, source: "book", loggedGames: 0, bookGames: bookN };
+
+  const loggedSum = games.reduce((a, b) => a + b, 0);
+  if (!bookValid) {
+    return { average: Math.round((loggedSum / games.length) * 10) / 10, source: "logged", loggedGames: games.length, bookGames: 0 };
+  }
+  const blended = (book * bookN + loggedSum) / (bookN + games.length);
+  return {
+    average: Math.round(blended * 10) / 10,
+    source: "blended",
+    loggedGames: games.length,
+    bookGames: bookN,
+    loggedOnly: Math.round((loggedSum / games.length) * 10) / 10,
   };
 }
 
@@ -92,6 +143,12 @@ export function profileToRow(profile, userId) {
     two_handed: !!profile.twoHanded,
     home_centers: profile.homeCenters || [],
     notes: profile.notes || null,
+    // Guard against undefined as well as "" -- a profile object built
+    // before these fields existed has neither, and Number(undefined) is
+    // NaN, which Postgres rejects.
+    book_average: numOrNull(profile.bookAverage, 0, 300),
+    book_games: (() => { const n = numOrNull(profile.bookGames, 1, 10000); return n === null ? null : Math.round(n); })(),
+    book_season: profile.bookSeason || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -104,6 +161,9 @@ export function profileFromRow(row) {
     twoHanded: !!row.two_handed,
     homeCenters: row.home_centers || [],
     notes: row.notes || "",
+    bookAverage: row.book_average,
+    bookGames: row.book_games,
+    bookSeason: row.book_season,
   });
 }
 

@@ -10,31 +10,33 @@ describe('defaultPreferences', () => {
     expect(defaultPreferences().environment).toBe('league');
   });
 
-  it('defaults to shot-by-shot tracking', () => {
-    expect(defaultPreferences().trackingMode).toBe('shot');
+  it('defaults new users to scores-only tracking', () => {
+    // Shot-by-shot is ~30 taps a game. Recreational bowlers bounced off it
+    // before finding the features they'd pay for, so it's opt-in.
+    expect(defaultPreferences().trackingMode).toBe('game');
   });
 
   it('keeps tracking mode independent of environment', () => {
     // Someone can bowl league by-game and practice shot-by-shot, so
     // switching environment must not silently reset how they log.
-    const byGame = setTrackingMode(defaultPreferences('league'), 'game');
-    expect(applyEnvironment(byGame, 'practice').trackingMode).toBe('game');
-    expect(applyEnvironment(byGame, 'practice').trackedFields.surface).toBe(true);
+    const byShot = setTrackingMode(defaultPreferences('league'), 'shot');
+    expect(applyEnvironment(byShot, 'practice').trackingMode).toBe('shot');
+    expect(applyEnvironment(byShot, 'practice').trackedFields.surface).toBe(true);
   });
 
-  it('falls back to shot mode for an unrecognized stored value', () => {
-    expect(normalizePreferences({ trackingMode: 'nonsense' }).trackingMode).toBe('shot');
+  it('falls back to game mode for an unrecognized stored value', () => {
+    expect(normalizePreferences({ trackingMode: 'nonsense' }).trackingMode).toBe('game');
   });
 
   it('league starts with every accessory field off, money games shown', () => {
     const p = defaultPreferences('league');
-    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false });
+    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false, revRate: false, axisRotation: false });
     expect(p.showMoneyGames).toBe(true);
   });
 
   it('practice starts with every accessory field on, money games hidden', () => {
     const p = defaultPreferences('practice');
-    expect(p.trackedFields).toEqual({ surface: true, line: true, release: true, miss: true, ballSpeed: true, shoes: true });
+    expect(p.trackedFields).toEqual({ surface: true, line: true, release: true, miss: true, ballSpeed: true, shoes: true, revRate: false, axisRotation: false });
     expect(p.showMoneyGames).toBe(false);
   });
 
@@ -44,7 +46,7 @@ describe('defaultPreferences', () => {
     // unfamiliar house. Money games are league side-pot conventions that
     // don't apply in tournament play.
     const p = defaultPreferences('tournament');
-    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: true });
+    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: true, revRate: false, axisRotation: false });
     expect(p.showMoneyGames).toBe(false);
   });
 
@@ -73,7 +75,7 @@ describe('defaultPreferences', () => {
 describe('normalizePreferences', () => {
   it('fills in missing tracked-field keys rather than dropping them', () => {
     const result = normalizePreferences({ environment: 'league', trackedFields: { surface: true } });
-    expect(result.trackedFields).toEqual({ surface: true, line: false, release: false, miss: false, ballSpeed: false, shoes: false });
+    expect(result.trackedFields).toEqual({ surface: true, line: false, release: false, miss: false, ballSpeed: false, shoes: false, revRate: false, axisRotation: false });
   });
 
   it('returns full defaults for null/undefined input', () => {
@@ -115,7 +117,7 @@ describe('setTrackedField / setShowMoneyGames', () => {
   it('setTrackedField only touches the one field named', () => {
     const p = defaultPreferences('league');
     const updated = setTrackedField(p, 'release', true);
-    expect(updated.trackedFields).toEqual({ surface: false, line: false, release: true, miss: false, ballSpeed: false, shoes: false });
+    expect(updated.trackedFields).toEqual({ surface: false, line: false, release: true, miss: false, ballSpeed: false, shoes: false, revRate: false, axisRotation: false });
   });
 
   it('setShowMoneyGames toggles independently of trackedFields', () => {
@@ -123,5 +125,20 @@ describe('setTrackedField / setShowMoneyGames', () => {
     const updated = setShowMoneyGames(p, false);
     expect(updated.showMoneyGames).toBe(false);
     expect(updated.trackedFields).toEqual(p.trackedFields);
+  });
+});
+
+describe('casual environment', () => {
+  it('forces scores-only regardless of the previous tracking mode', () => {
+    // The whole point of "Just Bowling" is to hide the depth. Carrying
+    // shot-by-shot into it would defeat that.
+    const shot = setTrackingMode(defaultPreferences('practice'), 'shot');
+    expect(applyEnvironment(shot, 'casual').trackingMode).toBe('game');
+  });
+
+  it('hides money games and every accessory field', () => {
+    const p = applyEnvironment(defaultPreferences('league'), 'casual');
+    expect(p.showMoneyGames).toBe(false);
+    expect(Object.values(p.trackedFields).every(v => v === false)).toBe(true);
   });
 });

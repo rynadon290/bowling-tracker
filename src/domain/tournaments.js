@@ -28,6 +28,10 @@ export function emptyTournamentDay(dayNumber = 1) {
     date: "",
     blockNumber: "",
     startTime: "",
+    // Squad scheduling: which squad and where you're assigned. startTime
+    // above is when it begins; these say which one and which pair.
+    squad: "",
+    startingLanes: "",
     oilPattern: "",
     games: [emptyTournamentGame(1)],
     cutLine: "",
@@ -100,6 +104,8 @@ export function normalizeTournamentDay(raw, dayNumber = 1) {
     date: raw.date || "",
     blockNumber: raw.blockNumber ?? "",
     startTime: raw.startTime || "",
+    squad: raw.squad || "",
+    startingLanes: raw.startingLanes || "",
     oilPattern: raw.oilPattern || "",
     games,
     cutLine: raw.cutLine ?? "",
