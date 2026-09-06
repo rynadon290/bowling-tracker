@@ -1162,32 +1162,6 @@ preferences.showMoneyGames&&statsBowler&&(()=>{
                   );
                 })()
                 );
-                byId["sessionHistory"] = (
-sessions.filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.league===statsLeague)).length>0&&(
-                  <div style={S.card}>
-                    <div style={S.label}>Session History</div>
-                    {[...sessions].filter(s=>(!statsBowler||s.bowler===statsBowler)&&(!statsLeague||s.league===statsLeague)).reverse().map(s=>(
-                      <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"10px",marginBottom:"10px"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
-                          <span style={{fontSize:"12px",fontWeight:600}}>{!statsBowler&&s.bowler?`${s.bowler} · `:""}{s.league.replace(" House Shot","")}</span>
-                          <span style={{fontSize:"11px",color:C.textMuted}}>{s.date}</span>
-                        </div>
-                        <div style={{display:"flex",gap:"6px",marginBottom:"4px"}}>
-                          {s.scores.map((sc,i)=><span key={i} style={{fontSize:"13px",fontWeight:600}}>{sc}</span>)}
-                          <span style={{fontSize:"13px",color:C.textMuted}}>·</span>
-                          <span style={{fontSize:"13px",fontWeight:700,color:C.accent}}>{s.total}</span>
-                        </div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
-                          <span style={S.tag(C.strike)}>{s.shotCount?Math.round((s.strikes/s.shotCount)*100):0}% strikes</span>
-                          <span style={S.tag(C.miss)}>{s.tenPinLeaves??(s.weakTens+s.ringingTens)} ten pins</span>
-                          {s.spareAttempts>0&&<span style={S.tag(C.spare)}>{Math.round((s.sparesMade/s.spareAttempts)*100)}% spares</span>}
-                          {s.splits>0&&<span style={S.tag(C.miss)}>{s.splits} splits</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-                );
                 return (<>{renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}</>);
               })()
             )}

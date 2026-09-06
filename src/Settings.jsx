@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import { useAuth } from "./AuthProvider.jsx";
+import HistoryView from "./HistoryView.jsx";
+import SessionHistory from "./SessionHistory.jsx";
 import { localDateString } from "./constants.js";
 import {
   ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
@@ -22,10 +24,20 @@ export default function Settings({
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
   confirmClear, setConfirmClear, clearAllData, hasData,
+  sessions, bowlers, leagues,
+  statsBowler, setStatsBowler, statsLeague, setStatsLeague,
+  filterBowler, setFilterBowler, filterBall, setFilterBall,
+  filterResult, setFilterResult, filtered, ballUniverse,
+  startEdit, deleteShot,
 }) {
   const { preferences, updatePreferences } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
+  // Settings has two distinct jobs now: configuring the app, and browsing
+  // history. History is long reference data, so it lives behind its own
+  // section rather than padding out the settings scroll.
+  const [section, setSection] = useState("settings");
+  const [historyTab, setHistoryTab] = useState("sessions");
 
   async function apply(next) {
     setError(null);
@@ -40,6 +52,40 @@ export default function Settings({
 
   return (
     <div>
+      <div style={{ ...S.card, padding: "10px 12px" }}>
+        <div style={S.chips}>
+          <Chip label="Settings" selected={section === "settings"} onToggle={() => setSection("settings")} />
+          <Chip label="History" selected={section === "history"} onToggle={() => setSection("history")} />
+        </div>
+      </div>
+
+      {section === "history" && (
+        <>
+          <div style={{ ...S.card, padding: "10px 12px" }}>
+            <div style={S.chips}>
+              <Chip label="Sessions" selected={historyTab === "sessions"} onToggle={() => setHistoryTab("sessions")} />
+              <Chip label="Shots" selected={historyTab === "shots"} onToggle={() => setHistoryTab("shots")} />
+            </div>
+          </div>
+          {historyTab === "sessions" && (
+            <SessionHistory
+              sessions={sessions || []} bowlers={bowlers || []} leagues={leagues || []}
+              statsBowler={statsBowler} setStatsBowler={setStatsBowler}
+              statsLeague={statsLeague} setStatsLeague={setStatsLeague} />
+          )}
+          {historyTab === "shots" && (
+            <HistoryView
+              bowlers={bowlers || []} leagues={leagues || []}
+              filterBowler={filterBowler} setFilterBowler={setFilterBowler}
+              filterBall={filterBall} setFilterBall={setFilterBall}
+              filterResult={filterResult} setFilterResult={setFilterResult}
+              filtered={filtered || []} ballUniverse={ballUniverse}
+              startEdit={startEdit} deleteShot={deleteShot} />
+          )}
+        </>
+      )}
+
+      {section === "settings" && (<>
       <div style={S.card}>
         <div style={S.label}>Environment</div>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
@@ -207,6 +253,7 @@ export default function Settings({
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 }

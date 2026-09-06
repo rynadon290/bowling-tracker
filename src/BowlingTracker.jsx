@@ -1786,9 +1786,9 @@ export default function BowlingTracker(){
           )}
         </div>
         <div style={S.nav}>
-          {["log","history","stats","social"].map(v=>(
+          {["log","stats","social"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":"Social"}
+    {v==="log"?"Log":v==="stats"?"Stats":"Social"}
   </button>
 ))}
         </div>
@@ -1876,7 +1876,15 @@ export default function BowlingTracker(){
             importText={importText} setImportText={setImportText}
             exportData={exportData} importData={importData}
             confirmClear={confirmClear} setConfirmClear={setConfirmClear}
-            clearAllData={clearAllData} hasData={shots.length>0}/>
+            clearAllData={clearAllData} hasData={shots.length>0}
+            sessions={sessions} bowlers={bowlers} leagues={leagues}
+            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            filterBowler={filterBowler} setFilterBowler={setFilterBowler}
+            filterBall={filterBall} setFilterBall={setFilterBall}
+            filterResult={filterResult} setFilterResult={setFilterResult}
+            filtered={filtered} ballUniverse={ballUniverse}
+            startEdit={startEdit} deleteShot={deleteShot}/>
         )}
 
         {view==="import"&&(
@@ -1916,17 +1924,6 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* HISTORY VIEW                                                      */}
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {view==="history"&&(
-          <HistoryView
-            bowlers={bowlers} leagues={leagues}
-            filterBowler={filterBowler} setFilterBowler={setFilterBowler}
-            filterBall={filterBall} setFilterBall={setFilterBall}
-            filterResult={filterResult} setFilterResult={setFilterResult}
-            filtered={filtered} ballUniverse={ballUniverse}
-            startEdit={startEdit} deleteShot={deleteShot}
-          />
-        )}
-
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* STATS VIEW                                                        */}
         {/* ══════════════════════════════════════════════════════════════════ */}
