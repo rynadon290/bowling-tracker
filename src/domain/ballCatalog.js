@@ -170,3 +170,40 @@ export function bestEntry(entries) {
     return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
   })[0];
 }
+
+// Autocomplete over the catalog, for someone typing a ball name they
+// haven't added yet. Returns one suggestion per distinct ball -- the best
+// entry for each -- so a ball five people submitted appears once, not five
+// times.
+//
+// Ranking puts prefix matches above mid-string ones ("Phaze" should surface
+// "Phaze II" before "Storm Phaze"), then trusted entries above unproven
+// ones, so the first suggestion is the one most likely to be right.
+export function searchCatalog(query, entriesByKey, limit = 6) {
+  const q = ballKey(query);
+  if (q.length < 2) return [];
+
+  const out = [];
+  for (const entries of Object.values(entriesByKey || {})) {
+    const best = bestEntry(entries);
+    if (!best) continue;
+    const key = ballKey(best.ballName);
+    const idx = key.indexOf(q);
+    if (idx === -1) continue;
+    out.push({ entry: best, isPrefix: idx === 0 });
+  }
+
+  return out
+    .sort((a, b) => {
+      if (a.isPrefix !== b.isPrefix) return a.isPrefix ? -1 : 1;
+      const av = catalogState(a.entry) === "verified" ? 1 : 0;
+      const bv = catalogState(b.entry) === "verified" ? 1 : 0;
+      if (av !== bv) return bv - av;
+      const ad = a.entry.approvals ?? 0;
+      const bd = b.entry.approvals ?? 0;
+      if (ad !== bd) return bd - ad;
+      return a.entry.ballName.localeCompare(b.entry.ballName);
+    })
+    .slice(0, limit)
+    .map(x => x.entry);
+}

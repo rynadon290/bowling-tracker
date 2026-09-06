@@ -3,7 +3,7 @@ import {
   catalogState, isLocked, canEdit, canVote, approvalsUntilNext,
   stateDescription, clearedSpecsAfterRejection, ballKey, bestEntry,
   APPROVAL_THRESHOLD, VERIFICATION_THRESHOLD, REJECTION_THRESHOLD,
-  rejectedBallsFor,
+  rejectedBallsFor, searchCatalog,
 } from './ballCatalog.js';
 
 const entry = o => ({ submittedBy: 'u1', approvals: 0, rejections: 0, createdAt: '2026-01-01', ...o });
@@ -151,5 +151,38 @@ describe('rejectedBallsFor', () => {
   it('matches the bowler\'s ball regardless of casing or spacing', () => {
     const entries = { 'phaze ii': [e({ rejections: REJECTION_THRESHOLD })] };
     expect(rejectedBallsFor(['PHAZE  ii'], entries, [])).toEqual(['PHAZE  ii']);
+  });
+});
+
+describe('searchCatalog', () => {
+  const e = (name, o = {}) => ({
+    id: name, submittedBy: 'u1', ballName: name, approvals: 0, rejections: 0,
+    createdAt: '2026-01-01', specs: {}, ...o,
+  });
+  const db = {
+    'phaze ii': [e('Phaze II', { approvals: VERIFICATION_THRESHOLD })],
+    'storm phaze': [e('Storm Phaze')],
+    'gone': [e('Gone', { rejections: REJECTION_THRESHOLD })],
+  };
+  const names = q => searchCatalog(q, db).map(x => x.ballName);
+
+  it('needs at least two characters before suggesting', () => {
+    expect(names('p')).toEqual([]);
+  });
+
+  it('ranks prefix matches above mid-string ones', () => {
+    // Typing "phaze" should surface "Phaze II" before "Storm Phaze".
+    expect(names('phaze')[0]).toBe('Phaze II');
+  });
+
+  it('never suggests a rejected entry', () => {
+    expect(names('gone')).toEqual([]);
+  });
+
+  it('returns one suggestion per ball, not one per submission', () => {
+    const multi = { 'phaze ii': [e('Phaze II', { id: 'a' }), e('Phaze II', { id: 'b', approvals: 3 })] };
+    const out = searchCatalog('phaze', multi);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('b'); // the better-supported submission
   });
 });
