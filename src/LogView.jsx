@@ -28,6 +28,7 @@ export default function LogView({
   manualScores, updateManualScore,
   sessionStartDismissed, dismissSessionStart, updatePreferences,
   envBags, selectedBagId, setSelectedBagId, logBalls,
+  ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
 }) {
   return (
     <>
@@ -86,7 +87,11 @@ export default function LogView({
                   balls={arsenals[activeBowler]||[]}
                   ballLayouts={ballLayouts||{}}
                   setBallLayout={setBallLayout}
-                  removeBall={removeBall}/>
+                  removeBall={removeBall}
+                  ballSpecs={ballSpecs||{}}
+                  setBallSpec={setBallSpec}
+                  ballGroups={ballGroups||[]}
+                  seedDefaultGroups={seedDefaultGroups}/>
                 <div style={S.row}>
                   <input style={{...S.input,flex:1}} placeholder="Add a ball (e.g. Storm Phaze II)" value={newBallName}
                     onChange={e=>setNewBallName(e.target.value)}

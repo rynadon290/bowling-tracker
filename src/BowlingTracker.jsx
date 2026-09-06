@@ -22,6 +22,7 @@ import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
+import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -61,6 +62,8 @@ const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
 const BAGS_KEY = "bowling-bags-v1";
 const BALL_BAGS_KEY = "bowling-ball-bag-assignments-v1";
+const BALL_SPECS_KEY = "bowling-ball-specs-v1";
+const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -218,6 +221,9 @@ export default function BowlingTracker(){
   const[bags,setBags]=useState([]);
   const[ballBags,setBallBags]=useState({});
   const[selectedBagId,setSelectedBagId]=useState("");
+  // Ball specs keyed "bowler|ball", and the bowler's own ball groups.
+  const[ballSpecs,setBallSpecs]=useState({});
+  const[ballGroups,setBallGroups]=useState([]);
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -358,19 +364,23 @@ export default function BowlingTracker(){
           }
         }
 
-        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values"));
+        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values,group_id,coverstock,core_type,weight,rg,diff,int_diff"));
         if(arsenalsRes.online&&arsenalsRes.data){
           const pendingArsenalRows=await getQueuedRecordsForTable("arsenals");
           const rebuilt={};
           const rebuiltLayouts={};
+          const rebuiltSpecs={};
           [...arsenalsRes.data,...pendingArsenalRows].forEach(row=>{
             if(!rebuilt[row.bowler_name])rebuilt[row.bowler_name]=[];
             if(!rebuilt[row.bowler_name].includes(row.ball))rebuilt[row.bowler_name].push(row.ball);
             const normalized=normalizeLayout({system:row.layout_system,values:row.layout_values});
             if(normalized)rebuiltLayouts[`${row.bowler_name}|${row.ball}`]=normalized;
+            rebuiltSpecs[`${row.bowler_name}|${row.ball}`]=specsFromRow(row);
           });
           setArsenals(rebuilt);
           setBallLayouts(rebuiltLayouts);
+          setBallSpecs(rebuiltSpecs);
+          try{await window.storage.set(BALL_SPECS_KEY,JSON.stringify(rebuiltSpecs));}catch{}
           try{await window.storage.set(ARSENALS_KEY,JSON.stringify(rebuilt));}catch{}
           try{await window.storage.set(LAYOUTS_KEY,JSON.stringify(rebuiltLayouts));}catch{}
         }else{
@@ -378,6 +388,8 @@ export default function BowlingTracker(){
           if(a)setArsenals(JSON.parse(a.value));
           const bl=await window.storage.get(LAYOUTS_KEY);
           if(bl)setBallLayouts(JSON.parse(bl.value));
+          const bsp=await window.storage.get(BALL_SPECS_KEY);
+          if(bsp)setBallSpecs(JSON.parse(bsp.value));
           const bb=await window.storage.get(BALL_BAGS_KEY);
           if(bb)setBallBags(JSON.parse(bb.value));
         }
@@ -403,6 +415,17 @@ export default function BowlingTracker(){
           setBallBags(rebuiltMembership);
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
+        }
+
+        const groupsRes=await cloudRead("ball_groups",q=>q.select("id,bowler_name,name,sort_order"));
+        if(groupsRes.online&&groupsRes.data){
+          const rebuiltGroups=groupsRes.data.map(groupFromRow).filter(Boolean)
+            .sort((a,b)=>a.sortOrder-b.sortOrder);
+          setBallGroups(rebuiltGroups);
+          try{await window.storage.set(BALL_GROUPS_KEY,JSON.stringify(rebuiltGroups));}catch{}
+        }else{
+          const bg2=await window.storage.get(BALL_GROUPS_KEY);
+          if(bg2)setBallGroups(JSON.parse(bg2.value));
         }
 
         const bagsRes=await cloudRead("bags",q=>q.select("id,bowler_name,name,bag_type,ball_limit,includes_plastic"));
@@ -727,6 +750,62 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Ball specs & groups ─────────────────────────────────────────────
+  function setBallSpec(bowlerName,ballName,specs){
+    const key=`${bowlerName}|${ballName}`;
+    const normalized=normalizeBallSpecs(specs);
+    const updated={...ballSpecs,[key]:normalized};
+    setBallSpecs(updated);
+    try{window.storage.set(BALL_SPECS_KEY,JSON.stringify(updated));}catch{}
+    clearTimeout(pokerSaveTimers.current[`spec|${key}`]);
+    pokerSaveTimers.current[`spec|${key}`]=setTimeout(()=>{
+      cloudWrite("arsenals",{bowler_name:bowlerName,ball:ballName,created_by:user?.id||null,...specsToRow(normalized)});
+    },600);
+  }
+
+  function saveBallGroup(group){
+    const withId={...group,id:group.id||crypto.randomUUID(),bowlerName:group.bowlerName||activeBowler};
+    const updated=ballGroups.some(g=>g.id===withId.id)
+      ?ballGroups.map(g=>g.id===withId.id?withId:g)
+      :[...ballGroups,withId];
+    setBallGroups(updated);
+    try{window.storage.set(BALL_GROUPS_KEY,JSON.stringify(updated));}catch{}
+    clearTimeout(pokerSaveTimers.current[`bgroup|${withId.id}`]);
+    pokerSaveTimers.current[`bgroup|${withId.id}`]=setTimeout(()=>{
+      cloudWrite("ball_groups",groupToRow(withId,user?.id||null));
+    },600);
+    return withId;
+  }
+
+  function deleteBallGroup(groupId){
+    setBallGroups(prev=>{
+      const updated=prev.filter(g=>g.id!==groupId);
+      try{window.storage.set(BALL_GROUPS_KEY,JSON.stringify(updated));}catch{}
+      return updated;
+    });
+    // Balls in a deleted group become ungrouped rather than disappearing.
+    setBallSpecs(prev=>{
+      const updated={};
+      for(const[k,v]of Object.entries(prev))updated[k]=v.groupId===groupId?{...v,groupId:""}:v;
+      try{window.storage.set(BALL_SPECS_KEY,JSON.stringify(updated));}catch{}
+      return updated;
+    });
+    cloudDelete("ball_groups",groupId);
+  }
+
+  // Seeds the seven standard groups the first time a bowler opens grouping.
+  // They're ordinary rows from that point on -- renameable and deletable.
+  function seedDefaultGroups(bowlerName){
+    if(ballGroups.some(g=>g.bowlerName===bowlerName))return;
+    const seeded=DEFAULT_BALL_GROUPS.map((name,i)=>({
+      id:crypto.randomUUID(),bowlerName,name,sortOrder:i,
+    }));
+    const updated=[...ballGroups,...seeded];
+    setBallGroups(updated);
+    try{window.storage.set(BALL_GROUPS_KEY,JSON.stringify(updated));}catch{}
+    seeded.forEach(g=>cloudWrite("ball_groups",groupToRow(g,user?.id||null)));
+  }
+
   // ── Bags ────────────────────────────────────────────────────────────
   function saveBag(bag){
     const withId={...normalizeBag(bag,bag.bowlerName||activeBowler),id:bag.id||crypto.randomUUID()};
@@ -1952,7 +2031,9 @@ export default function BowlingTracker(){
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
             newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}
-            bags={bags} ballBags={ballBags} saveBag={saveBag} deleteBag={deleteBag} toggleBallBag={toggleBallBag}/>
+            bags={bags} ballBags={ballBags} saveBag={saveBag} deleteBag={deleteBag} toggleBallBag={toggleBallBag}
+            ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups}
+            saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}/>
         )}
 
         {view==="settings"&&(
@@ -2003,6 +2084,7 @@ export default function BowlingTracker(){
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             envBags={envBags} selectedBagId={selectedBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
+            ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}
             updatePreferences={updatePreferences}
           />

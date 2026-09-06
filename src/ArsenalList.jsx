@@ -5,6 +5,72 @@ import {
   emptyLayout, normalizeLayout, formatLayout, layoutFieldErrors,
   setLayoutSystem, setLayoutValue,
 } from "./domain/layouts.js";
+import {
+  COVERSTOCKS, CORE_TYPES, COVERSTOCK_LABELS, CORE_TYPE_LABELS,
+  GROUP_MODES, GROUP_MODE_LABELS, normalizeBallSpecs,
+  setSpecField, describeSpecs, groupBalls,
+} from "./domain/ballSpecs.js";
+
+function SpecEditor({ specs, groups, onChange }) {
+  const s = normalizeBallSpecs(specs);
+  const numField = (key, label, placeholder, step) => (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "3px" }}>{label}</div>
+      <input style={{ ...S.input, fontSize: "13px", padding: "6px 8px" }}
+        type="number" step={step} inputMode="decimal" placeholder={placeholder}
+        value={s[key]} onChange={e => onChange(setSpecField(s, key, e.target.value))} />
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: "8px" }}>
+      {groups.length > 0 && (
+        <>
+          <div style={{ ...S.label, marginBottom: "6px" }}>Group</div>
+          <div style={S.chips}>
+            <Chip label="Ungrouped" dense selected={!s.groupId}
+              onToggle={() => onChange(setSpecField(s, "groupId", ""))} />
+            {groups.map(g => (
+              <Chip key={g.id} label={g.name} dense selected={s.groupId === g.id}
+                onToggle={() => onChange(setSpecField(s, "groupId", g.id))} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{ ...S.label, marginTop: "10px", marginBottom: "6px" }}>Coverstock</div>
+      <div style={S.chips}>
+        {COVERSTOCKS.map(cs => (
+          <Chip key={cs} label={COVERSTOCK_LABELS[cs]} dense selected={s.coverstock === cs}
+            onToggle={() => onChange(setSpecField(s, "coverstock", s.coverstock === cs ? "" : cs))} />
+        ))}
+      </div>
+
+      <div style={{ ...S.label, marginTop: "10px", marginBottom: "6px" }}>Core</div>
+      <div style={S.chips}>
+        {CORE_TYPES.map(ct => (
+          <Chip key={ct} label={CORE_TYPE_LABELS[ct]} dense selected={s.coreType === ct}
+            onToggle={() => onChange(setSpecField(s, "coreType", s.coreType === ct ? "" : ct))} />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+        {numField("weight", "Weight (lb)", "15", "1")}
+        {numField("rg", "RG", "2.50", "0.001")}
+        {numField("diff", "Diff", "0.045", "0.001")}
+      </div>
+
+      {/* Intermediate differential exists only on asymmetric balls, so the
+          field appears only when it is meaningful. Switching back to
+          symmetric clears any value rather than leaving a stale one. */}
+      {s.coreType === "asymmetric" && (
+        <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+          {numField("intDiff", "Int. Diff (asymmetric only)", "0.020", "0.001")}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Editor for one ball's drilling layout. The three systems each get their
 // own labeled fields, because their numbers measure different reference
@@ -53,9 +119,18 @@ function LayoutEditor({ layout, onChange }) {
 // because a ball now carries a layout worth showing at a glance -- and
 // because removal deserves an explicit button rather than "tapping the
 // ball itself deletes it", which is easy to do by accident on a phone.
-export default function ArsenalList({ activeBowler, balls, ballLayouts, setBallLayout, removeBall }) {
+export default function ArsenalList({
+  activeBowler, balls, ballLayouts, setBallLayout, removeBall,
+  ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
+}) {
   const [openBall, setOpenBall] = useState(null);
+  const [openTab, setOpenTab] = useState("specs");
   const [confirmRemove, setConfirmRemove] = useState(null);
+  const [groupMode, setGroupMode] = useState("none");
+
+  const groups = (ballGroups || []).filter(g => g.bowlerName === activeBowler);
+  const specsByBall = {};
+  balls.forEach(b => { specsByBall[b] = normalizeBallSpecs(ballSpecs?.[`${activeBowler}|${b}`]); });
 
   if (!balls.length) {
     return (
@@ -65,52 +140,90 @@ export default function ArsenalList({ activeBowler, balls, ballLayouts, setBallL
     );
   }
 
-  return (
-    <div style={{ marginBottom: "10px" }}>
-      {balls.map(ball => {
-        const key = `${activeBowler}|${ball}`;
-        const layout = ballLayouts[key];
-        const summary = formatLayout(layout);
-        const isOpen = openBall === ball;
-        return (
-          <div key={ball} style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: "8px", marginBottom: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "13px", fontWeight: 600 }}>{ball}</div>
-                <div style={{ fontSize: "11px", color: summary ? C.accent : C.textMuted, marginTop: "2px" }}>
-                  {summary || "No layout recorded"}
-                </div>
-              </div>
-              <button style={{ ...S.btn(), padding: "4px 10px", fontSize: "11px" }}
-                onClick={() => setOpenBall(isOpen ? null : ball)}>
-                {isOpen ? "Done" : summary ? "Edit" : "Add Layout"}
-              </button>
-              {confirmRemove === ball ? (
-                <>
-                  <button style={{ ...S.btn("warn"), padding: "4px 10px", fontSize: "11px", width: "auto" }}
-                    onClick={() => { removeBall(activeBowler, ball); setConfirmRemove(null); }}>
-                    Remove
-                  </button>
-                  <button style={{ ...S.btn(), padding: "4px 8px", fontSize: "11px" }}
-                    onClick={() => setConfirmRemove(null)}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "16px", padding: "0 4px" }}
-                  onClick={() => setConfirmRemove(ball)} aria-label={`Remove ${ball}`}>
-                  ×
-                </button>
-              )}
+  const sections = groupBalls(groupMode, balls, specsByBall, groups);
+
+  function renderBall(ball) {
+    const key = `${activeBowler}|${ball}`;
+    const layout = formatLayout(ballLayouts?.[key]);
+    const specText = describeSpecs(specsByBall[ball]);
+    const isOpen = openBall === ball;
+    return (
+      <div key={ball} style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: "8px", marginBottom: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "13px", fontWeight: 600 }}>{ball}</div>
+            {specText && (
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>{specText}</div>
+            )}
+            <div style={{ fontSize: "11px", color: layout ? C.accent : C.textMuted, marginTop: "2px" }}>
+              {layout || "No layout recorded"}
             </div>
-            {isOpen && (
-              <LayoutEditor
-                layout={layout}
+          </div>
+          <button style={{ ...S.btn(), padding: "4px 10px", fontSize: "11px" }}
+            onClick={() => setOpenBall(isOpen ? null : ball)}>
+            {isOpen ? "Done" : "Details"}
+          </button>
+          {confirmRemove === ball ? (
+            <>
+              <button style={{ ...S.btn("warn"), padding: "4px 10px", fontSize: "11px", width: "auto" }}
+                onClick={() => { removeBall(activeBowler, ball); setConfirmRemove(null); }}>Remove</button>
+              <button style={{ ...S.btn(), padding: "4px 8px", fontSize: "11px" }}
+                onClick={() => setConfirmRemove(null)}>Cancel</button>
+            </>
+          ) : (
+            <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "16px", padding: "0 4px" }}
+              onClick={() => setConfirmRemove(ball)} aria-label={`Remove ${ball}`}>×</button>
+          )}
+        </div>
+
+        {isOpen && (
+          <>
+            <div style={{ ...S.chips, marginTop: "8px" }}>
+              <Chip label="Specs" dense selected={openTab === "specs"} onToggle={() => setOpenTab("specs")} />
+              <Chip label="Layout" dense selected={openTab === "layout"} onToggle={() => setOpenTab("layout")} />
+            </div>
+            {openTab === "specs" ? (
+              <SpecEditor specs={specsByBall[ball]} groups={groups}
+                onChange={next => setBallSpec(activeBowler, ball, next)} />
+            ) : (
+              <LayoutEditor layout={ballLayouts?.[key]}
                 onChange={next => setBallLayout(activeBowler, ball, next)} />
             )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: "10px" }}>
+      {/* Grouping only appears once the list is long enough to need it --
+          sorting four balls into buckets is more work than scanning them. */}
+      {balls.length > 4 && (
+        <>
+          <div style={{ ...S.label, marginBottom: "6px" }}>Group by</div>
+          <div style={{ ...S.chips, marginBottom: "10px" }}>
+            {GROUP_MODES.map(mode => (
+              <Chip key={mode} label={GROUP_MODE_LABELS[mode]} dense selected={groupMode === mode}
+                onToggle={() => {
+                  if (mode === "group" && groups.length === 0) seedDefaultGroups?.(activeBowler);
+                  setGroupMode(mode);
+                }} />
+            ))}
           </div>
-        );
-      })}
+        </>
+      )}
+
+      {sections.map(section => (
+        <div key={section.key} style={{ marginBottom: groupMode === "none" ? 0 : "14px" }}>
+          {groupMode !== "none" && (
+            <div style={{ fontSize: "11px", fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>
+              {section.label} · {section.balls.length}
+            </div>
+          )}
+          {section.balls.map(renderBall)}
+        </div>
+      ))}
     </div>
   );
 }

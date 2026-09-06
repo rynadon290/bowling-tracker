@@ -13,6 +13,7 @@ export default function Profile({
   arsenals, ballLayouts, setBallLayout, removeBall,
   newBallName, setNewBallName, addBall,
   bags, ballBags, saveBag, deleteBag, toggleBallBag,
+  ballSpecs, setBallSpec, ballGroups, saveBallGroup, deleteBallGroup, seedDefaultGroups,
 }) {
   const [newCenter, setNewCenter] = useState("");
 
@@ -131,7 +132,11 @@ export default function Profile({
           balls={balls}
           ballLayouts={ballLayouts || {}}
           setBallLayout={setBallLayout}
-          removeBall={removeBall} />
+          removeBall={removeBall}
+          ballSpecs={ballSpecs || {}}
+          setBallSpec={setBallSpec}
+          ballGroups={ballGroups || []}
+          seedDefaultGroups={seedDefaultGroups} />
         <div style={S.row}>
           <input style={{ ...S.input, flex: 1 }} placeholder="Add a ball (e.g. Storm Phaze II)"
             value={newBallName}
