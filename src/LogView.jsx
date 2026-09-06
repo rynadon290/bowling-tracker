@@ -2,8 +2,6 @@ import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
-import ArsenalList from "./ArsenalList.jsx";
-import BallNameInput from "./BallNameInput.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
@@ -44,28 +42,6 @@ export default function LogView({
                 onDismiss={dismissSessionStart}/>
             )}
 
-            {/* In Practice, a night can be games OR a drill. A drill is a
-                focused repetition scored as a rate -- it's kept out of the
-                game flow entirely so it can never touch an average. */}
-            {!editingId&&activeBowler&&preferences.environment==="practice"&&(
-              <div style={{...S.card,padding:"10px 12px"}}>
-                <div style={S.chips}>
-                  <Chip label="Games" selected={practiceMode==="games"} onToggle={()=>setPracticeMode("games")}/>
-                  <Chip label="Drill" selected={practiceMode==="drill"} onToggle={()=>{setPracticeMode("drill");if(!activeDrill)startDrill();}}/>
-                </div>
-              </div>
-            )}
-            {!editingId&&activeBowler&&preferences.environment==="practice"&&practiceMode==="drill"&&activeDrill&&(
-              <DrillSession
-                drill={activeDrill}
-                onChange={setActiveDrill}
-                onSave={saveDrill}
-                saved={drillSaved}
-                balls={logBalls}
-                drills={drills}
-                bowler={activeBowler}/>
-            )}
-
             {/* Edit banner */}
             {editingId&&(
               <div style={{backgroundColor:C.spare+"22",border:`1px solid ${C.spare}44`,borderRadius:"10px",padding:"12px 16px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -101,40 +77,36 @@ export default function LogView({
               </div>
             )}
 
-            {/* Arsenal card */}
-            {!editingId&&activeBowler&&(
-              <CollapsibleCard
-                title={`${activeBowler}'s Arsenal`}
-                summary={`${(arsenals[activeBowler]||[]).length} ball${(arsenals[activeBowler]||[]).length===1?"":"s"}`}
-                expanded={expandedSections.arsenal}
-                onToggle={()=>toggleSection("arsenal")}>
-                <ArsenalList
-                  activeBowler={activeBowler}
-                  balls={arsenals[activeBowler]||[]}
-                  ballLayouts={ballLayouts||{}}
-                  setBallLayout={setBallLayout}
-                  removeBall={removeBall}
-                  ballSpecs={ballSpecs||{}}
-                  setBallSpec={setBallSpec}
-                  ballGroups={ballGroups||[]}
-                  seedDefaultGroups={seedDefaultGroups}
-                  catalogEntries={catalogEntries||{}}
-                  catalogAck={catalogAck||[]}
-                  userId={userId}
-                  publishBallSpecs={publishBallSpecs}
-                  voteOnEntry={voteOnEntry}
-                  acknowledgeRejection={acknowledgeRejection}/>
-                <BallNameInput
-                  value={newBallName}
-                  onChange={setNewBallName}
-                  onAdd={addBall}
-                  catalogEntries={catalogEntries||{}}
-                  existingBalls={arsenals[activeBowler]||[]}/>
-              </CollapsibleCard>
+            {/* In Practice, a night can be games OR a drill. A drill is a
+                focused repetition scored as a rate -- it's kept out of the
+                game flow entirely so it can never touch an average. */}
+            {!editingId&&activeBowler&&preferences.environment==="practice"&&(
+              <div style={{...S.card,padding:"10px 12px"}}>
+                <div style={S.chips}>
+                  <Chip label="Games" selected={practiceMode==="games"} onToggle={()=>setPracticeMode("games")}/>
+                  <Chip label="Drill" selected={practiceMode==="drill"} onToggle={()=>{setPracticeMode("drill");if(!activeDrill)startDrill();}}/>
+                </div>
+              </div>
+            )}
+            {!editingId&&activeBowler&&preferences.environment==="practice"&&practiceMode==="drill"&&activeDrill&&(
+              <DrillSession
+                drill={activeDrill}
+                onChange={setActiveDrill}
+                onSave={saveDrill}
+                saved={drillSaved}
+                balls={logBalls}
+                drills={drills}
+                bowler={activeBowler}/>
             )}
 
+            {/* The arsenal lives on the Profile screen, not here. Managing
+                equipment mid-session was a second place to do the same
+                thing, and the Log tab is for logging. */}
+
             {/* Session card */}
-            {!editingId&&activeBowler&&(
+            {/* Importing a scorecard has nothing to do with a drill -- a drill
+                isn't a game and produces no scorecard. */}
+            {!editingId&&activeBowler&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
               <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
                 📷 Import Scorecard
               </button>
@@ -193,7 +165,23 @@ export default function LogView({
                 onSave={saveTournament}
                 saved={tournamentSaved}/>
             )}
-            {!editingId&&activeBowler&&preferences.environment!=="tournament"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
+            {/* "Tonight's Session" is league framing -- series, money games,
+                match points. Practice has none of that, so it gets a plain
+                date header instead of a card promising things that aren't
+                there. */}
+            {!editingId&&activeBowler&&(preferences.environment==="practice"||preferences.environment==="casual")&&practiceMode!=="drill"&&(
+              <div style={{...S.card,padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{...S.label,marginBottom:0}}>
+                    {preferences.environment==="practice"?"Practice":"Bowling"}
+                  </div>
+                  <input style={{...S.input,width:"auto",fontSize:"12px",padding:"4px 8px"}} type="date"
+                    value={sessionDate} onChange={e=>setSessionDate(e.target.value)}/>
+                </div>
+              </div>
+            )}
+
+            {!editingId&&activeBowler&&preferences.environment!=="tournament"&&preferences.environment!=="practice"&&preferences.environment!=="casual"&&(
               <CollapsibleCard
                 title="Tonight's Session"
                 summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${sessionDate}`:""}
@@ -576,8 +564,14 @@ export default function LogView({
 
             {!editingId&&<div style={S.divider}/>}
 
-            {/* Ball */}
-            <div style={S.card}>
+            {/* Ball — collapsible. Once a bowler settles on a ball they may
+                throw it for a dozen frames, so a permanently-expanded grid
+                of every ball in the bag is wasted screen. */}
+            <CollapsibleCard
+              title={form.ball?`Ball · ${form.ball}`:"Ball"}
+              summary={form.ball?(formatLayout(ballLayouts?.[`${form.bowler}|${form.ball}`])||""):`${logBalls.length} available`}
+              expanded={expandedSections.ballPick}
+              onToggle={()=>toggleSection("ballPick")}>
               {/* League and tournament are bag-constrained: you only have
                   what you carried. Practice isn't, so it shows everything
                   and the selector is hidden entirely. */}
@@ -618,10 +612,10 @@ export default function LogView({
                       ?"Pick a bag above to see its balls."
                       :envBags.length>0
                         ?"That bag is empty — add balls to it from the profile screen."
-                        :`No balls in ${form.bowler}'s arsenal yet — add some above.`}
+                        :`No balls in ${form.bowler}'s arsenal yet — add them on the Profile screen.`}
                 </div>
               )}
-            </div>
+            </CollapsibleCard>
 
             {/* Ball Change Reason — only relevant when the ball actually
                 changed from the previous shot; collapsed by default. */}

@@ -317,7 +317,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false,ballPick:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
