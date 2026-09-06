@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   defaultPreferences, normalizePreferences, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
-  STATS_CARD_IDS, reconcileCardOrder, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
+  STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -28,10 +28,20 @@ describe('defaultPreferences', () => {
     expect(p.showMoneyGames).toBe(false);
   });
 
-  it('starts with every stats card visible in default order', () => {
+  it('starts with every MOVABLE stats card visible in default order', () => {
+    // statsCardOrder covers only the cards a person can actually reorder.
+    // Fixed cards ("Viewing", "Danger Zone") are anchored by StatsView and
+    // deliberately excluded, so this is 34 of the 36 total cards.
     const p = defaultPreferences();
-    expect(p.statsCardOrder).toEqual(STATS_CARD_IDS);
+    expect(p.statsCardOrder).toEqual(MOVABLE_STATS_CARD_IDS);
     expect(p.hiddenStatsCards).toEqual([]);
+  });
+
+  it('excludes fixed cards from the reorderable set', () => {
+    expect(MOVABLE_STATS_CARD_IDS).not.toContain('viewing');
+    expect(MOVABLE_STATS_CARD_IDS).not.toContain('dangerZone');
+    expect(STATS_CARD_IDS).toContain('viewing');
+    expect(STATS_CARD_IDS).toContain('dangerZone');
   });
 
   it('an unrecognized environment falls back to league defaults', () => {
