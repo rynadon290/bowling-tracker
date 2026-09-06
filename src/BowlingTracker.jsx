@@ -20,6 +20,7 @@ import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/s
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
+import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
@@ -56,6 +57,7 @@ const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
+const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -205,6 +207,9 @@ export default function BowlingTracker(){
   // saving commits it to the cloud.
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
+  // Manually-entered game scores, keyed bowler|league|date|game. These take
+  // precedence over scores computed from shots -- see domain/manualScores.js.
+  const[manualScores,setManualScores]=useState({});
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -228,7 +233,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -371,6 +376,16 @@ export default function BowlingTracker(){
         }else{
           const pr=await window.storage.get(PROFILES_KEY);
           if(pr)setProfiles(JSON.parse(pr.value));
+        }
+
+        const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score"));
+        if(manualRes.online&&manualRes.data){
+          const rebuilt=manualScoresFromRows(manualRes.data,leagueNameById);
+          setManualScores(rebuilt);
+          try{await window.storage.set(MANUAL_SCORES_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const ms=await window.storage.get(MANUAL_SCORES_KEY);
+          if(ms)setManualScores(normalizeManualScores(JSON.parse(ms.value)));
         }
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
@@ -1221,7 +1236,25 @@ export default function BowlingTracker(){
 
   function getGameStrict(bowler,league,date,game){
     const gs=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(game));
-    return strictPartial(gs);
+    // A manually-entered score wins over the shot-derived one. Every score
+    // path in the app funnels through here, so overriding at this single
+    // point covers live scores, session totals, averages, and stats alike.
+    return resolveGameScore(manualScores,bowler,league,date,game,strictPartial(gs));
+  }
+
+  function updateManualScore(bowler,league,date,game,value){
+    const updated=setManualScoreIn(manualScores,bowler,league,date,game,value);
+    setManualScores(updated);
+    try{window.storage.set(MANUAL_SCORES_KEY,JSON.stringify(updated));}catch{}
+
+    const leagueId=leagueIdsRef.current[league];
+    if(!leagueId)return;
+    clearTimeout(pokerSaveTimers.current[`manual|${bowler}|${date}|${game}`]);
+    pokerSaveTimers.current[`manual|${bowler}|${date}|${game}`]=setTimeout(()=>{
+      const score=getManualScore(updated,bowler,league,date,game);
+      if(score===null)cloudDelete("manual_scores",{bowler_name:bowler,league_id:leagueId,date,game});
+      else cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null));
+    },600);
   }
 
   function getSessionTotal(){
@@ -1859,6 +1892,7 @@ export default function BowlingTracker(){
             activeBowlerLeftHanded={activeBowlerLeftHanded}
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
+            manualScores={manualScores} updateManualScore={updateManualScore}
           />
         )}
 

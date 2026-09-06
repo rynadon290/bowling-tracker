@@ -4,6 +4,7 @@ import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import ArsenalList from "./ArsenalList.jsx";
 import TournamentSession from "./TournamentSession.jsx";
+import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -22,6 +23,7 @@ export default function LogView({
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
   activeTournament, updateTournament, saveTournament, tournamentSaved,
+  manualScores, updateManualScore,
 }) {
   return (
     <>
@@ -89,6 +91,49 @@ export default function LogView({
                 📷 Import Scorecard
               </button>
             )}
+            {/* Enter game scores directly, without shot-by-shot logging.
+                Two cases: a screenshot that only showed game totals, and
+                bowlers who want score tracking without logging 30 shots a
+                night. A score entered here overrides whatever the shots
+                would have computed -- see domain/manualScores.js. */}
+            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&(()=>{
+              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,sessionLeague,sessionDate,g));
+              const total=seriesTotal(entered);
+              return(
+                <CollapsibleCard
+                  title="Enter Game Scores"
+                  summary={total!=null?`${total} series`:""}
+                  expanded={expandedSections.manualScores}
+                  onToggle={()=>toggleSection("manualScores")}>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                    Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
+                  </div>
+                  {[1,2,3].map(g=>(
+                    <div key={g} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                      <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
+                      <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
+                        value={entered[g-1]==null?"":String(entered[g-1])}
+                        onChange={e=>updateManualScore(activeBowler,sessionLeague,sessionDate,g,e.target.value)}/>
+                    </div>
+                  ))}
+                  {total!=null&&(
+                    <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
+                      <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
+                        <div style={{...S.statNum,fontSize:"20px",color:C.accent}}>{total}</div>
+                        <div style={S.statLbl}>Series</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={{...S.statNum,fontSize:"20px"}}>
+                          {Math.round(total/entered.filter(v=>v!=null).length)}
+                        </div>
+                        <div style={S.statLbl}>Average</div>
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleCard>
+              );
+            })()}
+
             {/* In a tournament, "Tonight's Session" doesn't fit: game count
                 varies, lane pairs change per game, and there may be several
                 days with their own cut lines. The tournament form replaces
