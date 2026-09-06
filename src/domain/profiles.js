@@ -46,14 +46,30 @@ export function resolveHandedness(profile, rosterLeftHanded) {
   return !!rosterLeftHanded;
 }
 
-export function addHomeCenter(profile, center) {
-  const clean = (center || "").trim();
-  if (!clean) return profile;
+// Home centers are stored as shared bowling_centers ids, so a bowler's home
+// house is the same row every other bowler references -- which is what makes
+// per-center stats aggregate instead of fragmenting across spellings.
+export function addHomeCenter(profile, centerId) {
+  const id = (centerId || "").trim();
+  if (!id) return profile;
   const existing = profile.homeCenters || [];
-  // Case-insensitive dedupe -- "Bowlero Pittsburgh" and "bowlero pittsburgh"
-  // are the same house, and having both would split that house's stats.
-  if (existing.some(c => c.toLowerCase() === clean.toLowerCase())) return profile;
-  return { ...profile, homeCenters: [...existing, clean] };
+  if (existing.includes(id)) return profile;
+  return { ...profile, homeCenters: [...existing, id] };
+}
+
+// Turns the stored ids into center objects for rendering. An id with no
+// matching center (deleted, or centers not loaded yet) is dropped rather
+// than rendered as a raw uuid.
+export function resolveHomeCenters(profile, centers) {
+  const byId = {};
+  (centers || []).forEach(c => { byId[c.id] = c; });
+  return (profile?.homeCenters || [])
+    .map(id => byId[id])
+    .filter(Boolean);
+}
+
+export function hasHomeCenter(profile, centerId) {
+  return (profile?.homeCenters || []).includes(centerId);
 }
 
 export function removeHomeCenter(profile, center) {

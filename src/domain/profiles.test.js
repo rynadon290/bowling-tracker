@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   emptyProfile, normalizeProfile, resolveHandedness, addHomeCenter,
   removeHomeCenter, profileToRow, profileFromRow, membershipFor,
+  resolveHomeCenters,
 } from './profiles.js';
 
 describe('normalizeProfile', () => {
@@ -43,23 +44,41 @@ describe('resolveHandedness', () => {
 });
 
 describe('home centers', () => {
-  it('adds a center', () => {
-    expect(addHomeCenter(emptyProfile('Ryan'), 'Bowlero').homeCenters).toEqual(['Bowlero']);
+  const centers = [
+    { id: 'c1', name: 'Arsenal Bowl', city: 'Pittsburgh', state: 'PA' },
+    { id: 'c2', name: 'Bowlero Pittsburgh', city: 'Pittsburgh', state: 'PA' },
+  ];
+
+  it('stores centers by shared id, not by name', () => {
+    // Storing the id means a bowler's home house is the same row every
+    // other bowler references, so per-center stats aggregate instead of
+    // fragmenting across spellings.
+    expect(addHomeCenter(emptyProfile('Ryan'), 'c1').homeCenters).toEqual(['c1']);
   });
 
-  it('dedupes case-insensitively so one house does not split into two', () => {
-    let p = addHomeCenter(emptyProfile('Ryan'), 'Bowlero Pittsburgh');
-    p = addHomeCenter(p, 'bowlero pittsburgh');
-    expect(p.homeCenters).toEqual(['Bowlero Pittsburgh']);
+  it('will not add the same center twice', () => {
+    const p = addHomeCenter(addHomeCenter(emptyProfile('Ryan'), 'c1'), 'c1');
+    expect(p.homeCenters).toEqual(['c1']);
   });
 
-  it('ignores blank input', () => {
-    expect(addHomeCenter(emptyProfile('Ryan'), '   ').homeCenters).toEqual([]);
+  it('ignores a blank id', () => {
+    expect(addHomeCenter(emptyProfile('Ryan'), '').homeCenters).toEqual([]);
   });
 
   it('removes a center', () => {
-    let p = addHomeCenter(emptyProfile('Ryan'), 'Bowlero');
-    expect(removeHomeCenter(p, 'Bowlero').homeCenters).toEqual([]);
+    const p = addHomeCenter(emptyProfile('Ryan'), 'c1');
+    expect(removeHomeCenter(p, 'c1').homeCenters).toEqual([]);
+  });
+
+  it('resolves stored ids to real centers', () => {
+    const p = addHomeCenter(addHomeCenter(emptyProfile('Ryan'), 'c1'), 'c2');
+    expect(resolveHomeCenters(p, centers).map(c => c.name))
+      .toEqual(['Arsenal Bowl', 'Bowlero Pittsburgh']);
+  });
+
+  it('drops an id with no matching center rather than showing a raw uuid', () => {
+    const p = addHomeCenter(emptyProfile('Ryan'), 'deleted-id');
+    expect(resolveHomeCenters(p, centers)).toEqual([]);
   });
 });
 
