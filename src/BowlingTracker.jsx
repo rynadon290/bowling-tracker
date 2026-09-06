@@ -10,6 +10,7 @@ import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import InsightsView from "./InsightsView.jsx";
+import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
@@ -27,6 +28,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
+import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
@@ -73,6 +75,7 @@ const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const CENTERS_KEY = "bowling-centers-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
+const DRILLS_KEY = "bowling-drills-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -277,6 +280,12 @@ export default function BowlingTracker(){
   // leagues drop out of pickers but their sessions stay in history and
   // keep counting toward averages.
   const[hiddenLeagues,setHiddenLeagues]=useState([]);
+  // Practice drills: focused repetition scored as a rate, kept apart from
+  // games so 30 shots at the 10 pin never distort an average.
+  const[drills,setDrills]=useState([]);
+  const[activeDrill,setActiveDrill]=useState(null);
+  const[drillSaved,setDrillSaved]=useState(false);
+  const[practiceMode,setPracticeMode]=useState("games");
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -468,6 +477,16 @@ export default function BowlingTracker(){
           setBallBags(rebuiltMembership);
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
+        }
+
+        const drillsRes=await cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,ball,made,missed,notes"));
+        if(drillsRes.online&&drillsRes.data){
+          const rebuilt=drillsRes.data.map(drillFromRow).filter(Boolean);
+          setDrills(rebuilt);
+          try{await window.storage.set(DRILLS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const dr=await readCached(DRILLS_KEY,"array");
+          if(dr)setDrills(dr.map(normalizeDrill));
         }
 
         const hiddenRes=await cloudRead("hidden_leagues",q=>q.select("league_id"));
@@ -873,6 +892,23 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Practice drills ─────────────────────────────────────────────────
+  function startDrill(){
+    setActiveDrill(emptyDrill(activeBowler,sessionDate));
+    setDrillSaved(false);
+  }
+  function saveDrill(){
+    if(!activeDrill||!activeBowler)return;
+    const withId={...normalizeDrill(activeDrill),id:activeDrill.id||crypto.randomUUID(),bowler:activeBowler};
+    const updated=[...drills.filter(d=>d.id!==withId.id),withId];
+    setDrills(updated);
+    try{window.storage.set(DRILLS_KEY,JSON.stringify(updated));}catch{}
+    cloudWrite("drills",drillToRow(withId,user?.id||null));
+    setActiveDrill(withId);
+    setDrillSaved(true);
+    setTimeout(()=>setDrillSaved(false),1500);
+  }
+
   // ── Hiding leagues & leaving teams ──────────────────────────────────
   function toggleLeagueHidden(leagueName){
     const leagueId=leagueIdsRef.current[leagueName];
@@ -2299,12 +2335,15 @@ export default function BowlingTracker(){
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
+          {/* "3 pending" made people wonder if their night was saved. It is --
+              locally, always, the moment they tap Save. The cloud copy is
+              the only thing in flight. Say that plainly. */}
           {pendingSyncCount>0?(
             <button onClick={openSyncDetail} style={{background:"none",border:"none",padding:0,fontSize:"10px",fontWeight:600,color:C.spare,marginTop:"2px",cursor:"pointer",textDecoration:"underline"}}>
-              ⏳ {pendingSyncCount} syncing… (tap for details)
+              ✓ Saved on this phone · backing up to cloud…
             </button>
           ):(
-            <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ All synced</div>
+            <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ Saved &amp; backed up</div>
           )}
         </div>
         <div style={S.nav}>
@@ -2425,6 +2464,7 @@ export default function BowlingTracker(){
             startEdit={startEdit} deleteShot={deleteShot}
             centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}
             hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
+            shots={shots}
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam}/>
         )}
 
@@ -2458,6 +2498,7 @@ export default function BowlingTracker(){
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
+            practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}

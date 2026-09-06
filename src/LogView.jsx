@@ -6,6 +6,7 @@ import ArsenalList from "./ArsenalList.jsx";
 import BallNameInput from "./BallNameInput.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
+import DrillSession from "./DrillSession.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 
@@ -28,6 +29,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   sessionStartDismissed, dismissSessionStart, updatePreferences,
+  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
@@ -40,6 +42,28 @@ export default function LogView({
                 preferences={preferences}
                 onApply={updatePreferences}
                 onDismiss={dismissSessionStart}/>
+            )}
+
+            {/* In Practice, a night can be games OR a drill. A drill is a
+                focused repetition scored as a rate -- it's kept out of the
+                game flow entirely so it can never touch an average. */}
+            {!editingId&&activeBowler&&preferences.environment==="practice"&&(
+              <div style={{...S.card,padding:"10px 12px"}}>
+                <div style={S.chips}>
+                  <Chip label="Games" selected={practiceMode==="games"} onToggle={()=>setPracticeMode("games")}/>
+                  <Chip label="Drill" selected={practiceMode==="drill"} onToggle={()=>{setPracticeMode("drill");if(!activeDrill)startDrill();}}/>
+                </div>
+              </div>
+            )}
+            {!editingId&&activeBowler&&preferences.environment==="practice"&&practiceMode==="drill"&&activeDrill&&(
+              <DrillSession
+                drill={activeDrill}
+                onChange={setActiveDrill}
+                onSave={saveDrill}
+                saved={drillSaved}
+                balls={logBalls}
+                drills={drills}
+                bowler={activeBowler}/>
             )}
 
             {/* Edit banner */}
@@ -120,7 +144,7 @@ export default function LogView({
                 bowlers who want score tracking without logging 30 shots a
                 night. A score entered here overrides whatever the shots
                 would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&(()=>{
+            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
               const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,sessionLeague,sessionDate,g));
               const total=seriesTotal(entered);
               return(
@@ -169,7 +193,7 @@ export default function LogView({
                 onSave={saveTournament}
                 saved={tournamentSaved}/>
             )}
-            {!editingId&&activeBowler&&preferences.environment!=="tournament"&&(
+            {!editingId&&activeBowler&&preferences.environment!=="tournament"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
               <CollapsibleCard
                 title="Tonight's Session"
                 summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${sessionDate}`:""}
@@ -639,7 +663,7 @@ export default function LogView({
                 above -- showing both would imply you need to do both.
                 Editing an existing shot always shows the form, since
                 that's how a logged shot gets corrected. */}
-            {(editingId||preferences.trackingMode==="shot")&&(<>
+            {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(<>
             {/* Shot Context */}
             <div style={S.card}>
               <div style={S.label}>
@@ -789,6 +813,28 @@ export default function LogView({
                   <input style={{...S.input,flex:1}} placeholder="mph" type="number" step="0.1" inputMode="decimal"
                     value={form.ballSpeed} onChange={e=>set("ballSpeed",e.target.value)}/>
                   <span style={{fontSize:"13px",color:C.textMuted}}>mph</span>
+                </div>
+              </div>
+            )}
+
+            {/* Rev rate and axis rotation are self-reported estimates -- there's
+                no way to measure them without a sensor -- so they're labelled
+                as such rather than presented as data. Off by default. */}
+            {(preferences.trackedFields.revRate||preferences.trackedFields.axisRotation)&&(
+              <div style={S.card}>
+                <div style={S.label}>Release Estimates</div>
+                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                  Your best guess — these can't be measured without a sensor.
+                </div>
+                <div style={S.row}>
+                  {preferences.trackedFields.revRate&&(
+                    <input style={{...S.input,flex:1}} placeholder="Rev rate (rpm)" type="number" inputMode="numeric"
+                      value={form.revRate} onChange={e=>set("revRate",e.target.value)}/>
+                  )}
+                  {preferences.trackedFields.axisRotation&&(
+                    <input style={{...S.input,flex:1}} placeholder="Axis rotation (°)" type="number" inputMode="numeric"
+                      value={form.axisRotation} onChange={e=>set("axisRotation",e.target.value)}/>
+                  )}
                 </div>
               </div>
             )}
@@ -967,7 +1013,7 @@ export default function LogView({
             <div style={{height:`${footerHeight}px`}}/>
             </>)}
           </>
-          {(editingId||preferences.trackingMode==="shot")&&(
+          {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(
           <div ref={footerRef} style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}

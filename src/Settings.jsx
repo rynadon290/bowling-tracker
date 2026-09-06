@@ -5,6 +5,8 @@ import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
 import CenterPicker from "./CenterPicker.jsx";
 import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
+import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
+import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
 import {
   ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
@@ -13,13 +15,13 @@ import {
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
 
-const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament" };
+const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
 const ENVIRONMENT_DESCRIPTIONS = {
   practice: "More detail, no scoring pressure. Every accessory field is on by default.",
   league: "Fast, simple logging. Accessory fields off, money games front and center.",
   tournament: "Same simple logging as League, but money-game tracking is hidden.",
 };
-const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction", ballSpeed: "Ball Speed", shoes: "Shoes (Heel & Sole)" };
+const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction", ballSpeed: "Ball Speed", shoes: "Shoes (Heel & Sole)", revRate: "Rev Rate (estimate)", axisRotation: "Axis Rotation (estimate)" };
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
@@ -33,6 +35,7 @@ export default function Settings({
   startEdit, deleteShot,
   centers, leagueCenters, setLeagueCenter, searchCenters,
   hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
+  shots,
 }) {
   const { preferences, updatePreferences, displayName } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
@@ -42,6 +45,7 @@ export default function Settings({
   // section rather than padding out the settings scroll.
   const [section, setSection] = useState("settings");
   const [historyTab, setHistoryTab] = useState("sessions");
+  const [shareStatus, setShareStatus] = useState("");
 
   async function apply(next) {
     setError(null);
@@ -69,6 +73,7 @@ export default function Settings({
             <div style={S.chips}>
               <Chip label="Sessions" selected={historyTab === "sessions"} onToggle={() => setHistoryTab("sessions")} />
               <Chip label="Shots" selected={historyTab === "shots"} onToggle={() => setHistoryTab("shots")} />
+              <Chip label="Season" selected={historyTab === "season"} onToggle={() => setHistoryTab("season")} />
             </div>
           </div>
           {historyTab === "sessions" && (
@@ -77,6 +82,99 @@ export default function Settings({
               statsBowler={statsBowler} setStatsBowler={setStatsBowler}
               statsLeague={statsLeague} setStatsLeague={setStatsLeague} />
           )}
+          {historyTab === "season" && (() => {
+            const bowler = statsBowler || activeBowler;
+            const sum = seasonSummary(sessions || [], shots || [], bowler, statsLeague);
+            function download(name, text) {
+              const blob = new Blob([text], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = name; a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+            async function share() {
+              const text = summaryToText(sum);
+              try {
+                if (navigator.share) { await navigator.share({ text }); setShareStatus("Shared"); }
+                else { await navigator.clipboard.writeText(text); setShareStatus("Copied to clipboard"); }
+              } catch { setShareStatus(""); }
+              setTimeout(() => setShareStatus(""), 2000);
+            }
+            return (
+              <>
+                {sum ? (
+                  <div style={{ ...S.card, border: `1px solid ${C.accent}44` }}>
+                    <div style={{ ...S.label, color: C.accent }}>
+                      {sum.bowler}{sum.league ? ` · ${sum.league.replace(" House Shot", "")}` : ""}
+                    </div>
+                    <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+                      {sum.firstDate} to {sum.lastDate} · {sum.sessions} night{sum.sessions === 1 ? "" : "s"}, {sum.games} game{sum.games === 1 ? "" : "s"}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                      <div style={{ ...S.statBox, border: `1px solid ${C.accent}44` }}>
+                        <div style={{ ...S.statNum, color: C.accent }}>{sum.average}</div>
+                        <div style={S.statLbl}>Average</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={S.statNum}>{sum.highGame}</div>
+                        <div style={S.statLbl}>High Game</div>
+                      </div>
+                      {sum.highSeries && (
+                        <div style={S.statBox}>
+                          <div style={S.statNum}>{sum.highSeries}</div>
+                          <div style={S.statLbl}>High Series</div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                      <div style={S.statBox}>
+                        <div style={{ ...S.statNum, fontSize: "18px", color: C.strike }}>{sum.gamesOver200}</div>
+                        <div style={S.statLbl}>200+ Games</div>
+                      </div>
+                      {sum.strikeRate !== null && (
+                        <div style={S.statBox}>
+                          <div style={{ ...S.statNum, fontSize: "18px", color: C.strike }}>{sum.strikeRate}%</div>
+                          <div style={S.statLbl}>Strikes</div>
+                        </div>
+                      )}
+                      {(sum.won || sum.paid) ? (
+                        <div style={S.statBox}>
+                          <div style={{ ...S.statNum, fontSize: "18px", color: sum.net >= 0 ? C.strike : C.miss }}>
+                            {sum.net < 0 ? "−" : "+"}${Math.abs(sum.net).toFixed(0)}
+                          </div>
+                          <div style={S.statLbl}>Net</div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <button style={S.btn("primary")} onClick={share}>
+                      {shareStatus || "Share Summary"}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={S.card}>
+                    <div style={{ fontSize: "12px", color: C.textMuted }}>No sessions yet for this bowler and league.</div>
+                  </div>
+                )}
+
+                <div style={S.card}>
+                  <div style={S.label}>Export</div>
+                  <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+                    Your data, as spreadsheets. Sessions is one row per night; shots is every delivery.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button style={{ ...S.btn(), flex: 1 }}
+                      onClick={() => download(`sessions-${bowler || "all"}.csv`, sessionsToCsv(sessions || [], bowler))}>
+                      Sessions CSV
+                    </button>
+                    <button style={{ ...S.btn(), flex: 1 }}
+                      onClick={() => download(`shots-${bowler || "all"}.csv`, shotsToCsv(shots || [], bowler))}>
+                      Shots CSV
+                    </button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
           {historyTab === "shots" && (
             <HistoryView
               bowlers={bowlers || []} leagues={leagues || []}
@@ -146,6 +244,34 @@ export default function Settings({
                     Won't appear when logging. Past scores still count toward your averages.
                   </div>
                 )}
+
+                {/* Reminder: a recurring calendar event with an alarm. The
+                    league's night is inferred from logged sessions. Push
+                    notifications need the native app wrapper, so this is
+                    the delivery a web app can offer today -- and it keeps
+                    working even if the app is closed. */}
+                {(() => {
+                  const day = inferLeagueDay(sessions || [], league);
+                  if (day === null) return null;
+                  const centerId = leagueCenters?.[league];
+                  const center = (centers || []).find(c => c.id === centerId);
+                  function addToCalendar() {
+                    const ics = reminderToIcs(reminderSpec(league, day, 60, "19:00"), center?.name);
+                    const blob = new Blob([ics], { type: "text/calendar" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `${league.replace(/\W+/g, "-").toLowerCase()}-reminder.ics`; a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  }
+                  return (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                      <span style={{ fontSize: "11px", color: C.textMuted }}>Bowls on {dayName(day)}s</span>
+                      <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }} onClick={addToCalendar}>
+                        Add weekly reminder
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Leaving a team is different -- other people see it. This
                     is scoped to the SIGNED-IN user, not the active bowler,

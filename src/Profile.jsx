@@ -82,6 +82,23 @@ export default function Profile({
       </div>
 
       <div style={S.card}>
+        <div style={S.label}>Book Average</div>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+          Your official average from last season. Shown until enough games are
+          logged here, then blended out — weighted by how many games sit
+          behind each number.
+        </div>
+        <div style={S.row}>
+          <input style={{ ...S.input, flex: 1 }} type="number" inputMode="decimal" placeholder="e.g. 213"
+            value={profile.bookAverage} onChange={e => update(setProfileField(profile, "bookAverage", e.target.value))} />
+          <input style={{ ...S.input, flex: 1 }} type="number" inputMode="numeric" placeholder="over how many games"
+            value={profile.bookGames} onChange={e => update(setProfileField(profile, "bookGames", e.target.value))} />
+        </div>
+        <input style={{ ...S.input, marginTop: "6px" }} placeholder="Season (e.g. 2025-26 Winter)"
+          value={profile.bookSeason} onChange={e => update(setProfileField(profile, "bookSeason", e.target.value))} />
+      </div>
+
+      <div style={S.card}>
         <div style={S.label}>Home Centers</div>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           The houses this bowler plays regularly. Looked up so they match the

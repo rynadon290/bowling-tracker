@@ -47,6 +47,19 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
 
       <div style={{ ...S.row, marginTop: "8px" }}>
         <div style={{ flex: 1 }}>
+          {fieldLabel("Squad")}
+          <input style={S.input} placeholder="e.g. A, 2, Sat AM" value={day.squad}
+            onChange={e => update({ ...day, squad: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          {fieldLabel("Starting Lanes")}
+          <input style={S.input} placeholder="e.g. 13-14" value={day.startingLanes}
+            onChange={e => update({ ...day, startingLanes: e.target.value })} />
+        </div>
+      </div>
+
+      <div style={{ ...S.row, marginTop: "8px" }}>
+        <div style={{ flex: 1 }}>
           {fieldLabel("Block #")}
           <input style={S.input} placeholder="e.g. 2" value={day.blockNumber}
             onChange={e => update({ ...day, blockNumber: e.target.value })} />

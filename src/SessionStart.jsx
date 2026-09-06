@@ -4,11 +4,12 @@ import {
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
 
-const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament" };
+const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
 const ENVIRONMENT_DESCRIPTIONS = {
   practice: "Working on your game. Every detail field on by default.",
   league: "Your regular night. Fast logging, money games ready.",
   tournament: "Squad play. Variable games, lane pairs, and cut lines.",
+  casual: "With friends or the kids. Just the scores, nothing else.",
 };
 
 // Asked once per day rather than once ever: what you're bowling changes

@@ -28,11 +28,35 @@ function DataBasis({ payload }) {
         ))}
       </div>
       {ballsWaiting.length > 0 && (
-        <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "10px" }}>
-          Not enough data yet on {ballsWaiting.length === 1 ? "this ball" : "these balls"}:{" "}
-          {ballsWaiting.map(w => `${w.key.replace("ball:", "")} (${w.shortBy} more shots)`).join(", ")}.
-          Comparing balls needs a bigger sample than overall stats, because the
-          uncertainty in each one adds up.
+        <div style={{ marginTop: "10px" }}>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+            Ball comparisons unlock as each ball builds up its own sample.
+            They need more than overall stats because comparing two
+            percentages doubles the uncertainty.
+          </div>
+          {ballsWaiting.map(w => {
+            const name = w.key.replace("ball:", "");
+            const pct = Math.min(100, Math.round((w.have / w.need) * 100));
+            // ~10 first balls a game, so "shots remaining / 10" is the
+            // honest estimate of how many more games it takes.
+            const gamesLeft = Math.ceil(w.shortBy / 10);
+            return (
+              <div key={w.key} style={{ marginBottom: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "3px" }}>
+                  <span style={{ color: C.text, fontWeight: 600 }}>{name}</span>
+                  <span style={{ color: C.textMuted }}>{w.have} of {w.need} · ~{gamesLeft} more {gamesLeft === 1 ? "game" : "games"}</span>
+                </div>
+                <div style={{ height: "6px", backgroundColor: C.surface, borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, backgroundColor: pct >= 75 ? C.strike : pct >= 40 ? C.spare : C.accent, borderRadius: "3px", transition: "width 0.3s" }} />
+                </div>
+              </div>
+            );
+          })}
+          {ballsWaiting.some(w => (w.have / w.need) >= 0.75) && (
+            <div style={{ fontSize: "11px", color: C.strike, marginTop: "6px" }}>
+              You're close on {ballsWaiting.filter(w => (w.have / w.need) >= 0.75).map(w => w.key.replace("ball:", "")).join(" and ")} — a couple more nights and it unlocks.
+            </div>
+          )}
         </div>
       )}
     </div>
