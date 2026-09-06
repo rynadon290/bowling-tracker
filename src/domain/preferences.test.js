@@ -22,9 +22,13 @@ describe('defaultPreferences', () => {
     expect(p.showMoneyGames).toBe(false);
   });
 
-  it('tournament matches league\'s simple fields but also hides money games', () => {
+  it('tournament keeps logging simple but tracks shoes and hides money games', () => {
+    // Shoes are ON here even though everything else is off: interchangeable
+    // soles get swapped for approach conditions, which matters most at an
+    // unfamiliar house. Money games are league side-pot conventions that
+    // don't apply in tournament play.
     const p = defaultPreferences('tournament');
-    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: false });
+    expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false, ballSpeed: false, shoes: true });
     expect(p.showMoneyGames).toBe(false);
   });
 
