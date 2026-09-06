@@ -13,6 +13,28 @@ export const DEFAULT_ARSENAL = [
 ];
 export const SURFACES = ["Box","500","1000","1500","2000","3000","4000","Polish","Lane Shine"];
 export const RESULTS = ["Strike","Weak 10","Ringing 10","Other Leave"];
+
+// A left-handed bowler's ball hooks the opposite way, so the corner pin
+// they characteristically leave is the 7, not the 10. The two failure
+// modes are the same (weak = missed light/early, ringing = hit slightly
+// high) -- only which pin survives differs. These are display labels; the
+// underlying stored result values stay "Weak 10"/"Ringing 10" so all
+// existing scoring, stats, and history logic keeps working unchanged.
+export function resultsForHandedness(leftHanded){
+  if(!leftHanded)return RESULTS;
+  return RESULTS.map(r=>
+    r==="Weak 10"?"Weak 7":r==="Ringing 10"?"Ringing 7":r
+  );
+}
+
+// Maps a displayed label back to the stored result value, so a lefty
+// tapping "Weak 7" still saves the same "Weak 10" record everything else
+// already understands.
+export function storedResultFor(label){
+  if(label==="Weak 7")return"Weak 10";
+  if(label==="Ringing 7")return"Ringing 10";
+  return label;
+}
 export const STRIKE_DESCRIPTIONS = ["Flush","High","Light","Half Pocket","Trip 4","Kick 10","Brooklyn"];
 export const RELEASES = ["Good","Acceptable","Bad"];
 export const MISSES = ["Left","Right","Fast","Slow","Execution"];

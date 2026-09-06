@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
 import { cloudRead, cloudWrite } from './syncQueue.js';
+import { normalizePreferences, defaultPreferences } from './domain/preferences.js';
 
 const AuthContext = createContext(null);
 
@@ -8,6 +9,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState('');
+  const [preferences, setPreferences] = useState(defaultPreferences());
 
   useEffect(() => {
     // Check for an existing session on first load (e.g. returning visitor
@@ -41,6 +43,19 @@ export function AuthProvider({ children }) {
       });
   }, [session?.user?.id]);
 
+  // Same pattern for preferences -- stored as one JSONB blob per user
+  // rather than a fixed set of columns, since the toggle set is expected
+  // to keep growing (this is meant to absorb any future "opt in/out of X"
+  // setting, not just the four accessory fields it starts with).
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) { setPreferences(defaultPreferences()); return; }
+    cloudRead('user_preferences', q => q.select('preferences').eq('user_id', userId).single())
+      .then(({ data, online }) => {
+        if (online && data) setPreferences(normalizePreferences(data.preferences));
+      });
+  }, [session?.user?.id]);
+
   async function signInWithMagicLink(email) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -64,14 +79,33 @@ export function AuthProvider({ children }) {
     return { error: null };
   }
 
+  // Accepts either a full preferences object or an updater function
+  // (prevPrefs => newPrefs), matching React's own setState convention --
+  // callers doing a targeted change (e.g. domain/preferences.js's
+  // setTrackedField) can pass a function without needing the current
+  // value from two places at once.
+  async function updatePreferences(next) {
+    if (!session?.user?.id) return { error: new Error('Not signed in') };
+    const resolved = typeof next === 'function' ? next(preferences) : next;
+    const normalized = normalizePreferences(resolved);
+    setPreferences(normalized); // optimistic
+    const result = await cloudWrite('user_preferences', { user_id: session.user.id, preferences: normalized });
+    if (!result.synced) {
+      return { error: new Error(`Preferences haven't reached the cloud yet (${result.reason || 'unknown reason'}) — they may not carry over to another device yet.`) };
+    }
+    return { error: null };
+  }
+
   const value = {
     session,
     user: session?.user ?? null,
     displayName,
+    preferences,
     loading,
     signInWithMagicLink,
     signOut,
     updateDisplayName,
+    updatePreferences,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

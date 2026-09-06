@@ -5,6 +5,7 @@ import HistoryView from "./HistoryView.jsx";
 import LogView from "./LogView.jsx";
 import StatsView from "./StatsView.jsx";
 import ImportScorecard from "./ImportScorecard.jsx";
+import Settings from "./Settings.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
@@ -136,7 +137,7 @@ const LEAGUES_KEY = "bowling-leagues-v1";
 
 
 export default function BowlingTracker(){
-  const{user}=useAuth();
+  const{user,preferences}=useAuth();
   // Maps league name -> its Supabase row id. The client keeps `leagues` as
   // plain name strings everywhere (unchanged, to avoid rewriting every call
   // site that compares/filters by league name) — this ref is what lets
@@ -1157,6 +1158,11 @@ export default function BowlingTracker(){
       pokerDollar:existing?.pokerDollar||[0,0,0],
       threeSixNineWinnings:existing?.threeSixNineWinnings||0,
       jackpotWinnings:existing?.jackpotWinnings||0,
+      highGameWinnings:existing?.highGameWinnings||[0,0,0],
+      pokerQuarterCost:existing?.pokerQuarterCost||[0,0,0],
+      pokerDollarCost:existing?.pokerDollarCost||[0,0,0],
+      highGameCost:existing?.highGameCost||[0,0,0],
+      threeSixNineCost:existing?.threeSixNineCost||0,
       ...computeSessionStats(ss),
     };
     const updated=existing?sessions.map(s=>s.id===existing.id?session:s):[...sessions,session];
@@ -1184,6 +1190,43 @@ export default function BowlingTracker(){
     try{window.storage.set(SESSIONS_KEY,JSON.stringify(updatedSessions));}catch{}
 
     const debounceKey=`${sessionId}|${type}`;
+    clearTimeout(pokerSaveTimers.current[debounceKey]);
+    pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncSessionsToCloud(prevSessions,updatedSessions);
+    },600);
+  }
+
+  // Generalized per-game money entry, covering High Game Pot winnings plus
+  // every buy-in cost array. Same optimistic-then-debounced-sync shape as
+  // setPokerWinnings -- factored to one function because these all behave
+  // identically and only differ by which field they write.
+  function setSessionMoneyArray(sessionId,field,gameIdx,amount){
+    const prevSessions=sessions;
+    const updatedSessions=sessions.map(s=>{
+      if(s.id!==sessionId)return s;
+      const arr=[...(s[field]||[0,0,0])];
+      arr[gameIdx]=amount;
+      return{...s,[field]:arr};
+    });
+    setSessions(updatedSessions);
+    try{window.storage.set(SESSIONS_KEY,JSON.stringify(updatedSessions));}catch{}
+
+    const debounceKey=`${sessionId}|${field}|${gameIdx}`;
+    clearTimeout(pokerSaveTimers.current[debounceKey]);
+    pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
+      syncSessionsToCloud(prevSessions,updatedSessions);
+    },600);
+  }
+
+  // Single-value money entry (3-6-9's session-wide buy-in), as opposed to
+  // the per-game arrays above.
+  function setSessionMoneyValue(sessionId,field,amount){
+    const prevSessions=sessions;
+    const updatedSessions=sessions.map(s=>s.id!==sessionId?s:{...s,[field]:amount});
+    setSessions(updatedSessions);
+    try{window.storage.set(SESSIONS_KEY,JSON.stringify(updatedSessions));}catch{}
+
+    const debounceKey=`${sessionId}|${field}`;
     clearTimeout(pokerSaveTimers.current[debounceKey]);
     pokerSaveTimers.current[debounceKey]=setTimeout(()=>{
       syncSessionsToCloud(prevSessions,updatedSessions);
@@ -1306,6 +1349,12 @@ export default function BowlingTracker(){
 
   const curSession=[...sessions].reverse().find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
   const currentLane=calcLane(startingLane,form.game,form.frame,form.ballNum);
+  // Handedness comes from the team roster (set in Team Management). A
+  // lefty's mechanics mirror a righty's, so their weak/ringing corner pin
+  // is the 7, not the 10 -- the logging chips flip to match rather than
+  // asking them to mentally translate every shot.
+  const activeBowlerLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
+
   const inTenth=parseInt(form.frame)===10;
 
   // Which 10th-frame ball numbers are legitimately selectable right now.
@@ -1573,7 +1622,10 @@ export default function BowlingTracker(){
       {/* Header */}
       <div style={S.header}>
         <div>
-          <div style={S.title}>🎳 Shot Tracker</div>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <div style={S.title}>🎳 Shot Tracker</div>
+            <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
+          </div>
           {pendingSyncCount>0?(
             <button onClick={openSyncDetail} style={{background:"none",border:"none",padding:0,fontSize:"10px",fontWeight:600,color:C.spare,marginTop:"2px",cursor:"pointer",textDecoration:"underline"}}>
               ⏳ {pendingSyncCount} syncing… (tap for details)
@@ -1654,6 +1706,10 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* LOG VIEW                                                          */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="settings"&&(
+          <Settings/>
+        )}
+
         {view==="import"&&(
           <ImportScorecard
             bowlers={bowlers} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots}
@@ -1677,6 +1733,9 @@ export default function BowlingTracker(){
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
+            preferences={preferences}
+            setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
+            activeBowlerLeftHanded={activeBowlerLeftHanded}
           />
         )}
 
@@ -1714,6 +1773,7 @@ export default function BowlingTracker(){
             teamTenPinSpareR={teamTenPinSpareR} tenPinAttempts={tenPinAttempts} tenPinLeaveCount={tenPinLeaveCount} tenPinMade={tenPinMade} tenPinSpareR={tenPinSpareR} tot={tot} wk={wk}
             clearAllData={clearAllData} exportData={exportData} handicapMatches={handicapMatches} handicapSplit={handicapSplit} importData={importData} longestStrikeStreak={longestStrikeStreak}
             theoreticalScoreForGame={theoreticalScoreForGame} trendData={trendData}
+            preferences={preferences}
           />
         )}
       </div>

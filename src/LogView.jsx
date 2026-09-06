@@ -1,6 +1,7 @@
 import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
-import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS } from "./constants.js";
+import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
+import { sessionMoney } from "./domain/money.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -16,6 +17,7 @@ export default function LogView({
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
+  preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
 }) {
   return (
     <>
@@ -266,55 +268,129 @@ export default function LogView({
                     );
                   })()}
 
-                  <div style={{marginBottom:"12px"}}>
-                    <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Poker Winnings ($)</div>
-                    {[0,1,2].map(gameIdx=>{
-                      if(cs.scores[gameIdx]==null)return null;
-                      const quarterVal=(cs.pokerQuarter||[0,0,0])[gameIdx]??0;
-                      const dollarVal=(cs.pokerDollar||[0,0,0])[gameIdx]??0;
-                      return(
-                        <div key={gameIdx} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
-                          <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{gameIdx+1}</div>
-                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="0.25" placeholder="Quarter $"
-                            value={quarterVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"quarter",e.target.value===""?0:parseFloat(e.target.value))}/>
-                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Dollar $"
-                            value={dollarVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"dollar",e.target.value===""?0:parseFloat(e.target.value))}/>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {(()=>{
-                    // 3-6-9: a single, whole-session win (all 9 specific
-                    // strikes across games 1, 2, AND 3) -- not per-game
-                    // like poker, so this only shows once per session, and
-                    // only when actually qualified. The jackpot input is
-                    // additionally gated on game 3's 10th being a full
-                    // turkey, on top of the win itself.
-                    const r369=threeSixNineResults(shots,cs.bowler,cs.league,cs.date);
-                    if(!r369.qualifies)return null;
-                    return(
+                  {preferences.showMoneyGames&&(
+                    <>
                       <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>3-6-9 Winnings ($)</div>
-                        <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
-                          <div style={{fontSize:"12px",color:C.strike,width:"56px"}}>Pot</div>
-                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
-                            value={cs.threeSixNineWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"pot",e.target.value===""?0:parseFloat(e.target.value))}/>
-                        </div>
-                        {r369.jackpotEligible&&(
-                          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-                            <div style={{fontSize:"12px",color:C.spare,width:"56px"}}>Jackpot</div>
-                            <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
-                              value={cs.jackpotWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"jackpot",e.target.value===""?0:parseFloat(e.target.value))}/>
-                          </div>
-                        )}
+                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Poker Winnings ($)</div>
+                        {[0,1,2].map(gameIdx=>{
+                          if(cs.scores[gameIdx]==null)return null;
+                          const quarterVal=(cs.pokerQuarter||[0,0,0])[gameIdx]??0;
+                          const dollarVal=(cs.pokerDollar||[0,0,0])[gameIdx]??0;
+                          return(
+                            <div key={gameIdx} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                              <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{gameIdx+1}</div>
+                              <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="0.25" placeholder="Quarter $"
+                                value={quarterVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"quarter",e.target.value===""?0:parseFloat(e.target.value))}/>
+                              <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Dollar $"
+                                value={dollarVal||""} onChange={e=>setPokerWinnings(cs.id,gameIdx,"dollar",e.target.value===""?0:parseFloat(e.target.value))}/>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })()}
 
-                  <button style={{...S.btn("primary"),marginBottom:"12px"}} onClick={confirmWinningsSaved}>
-                    {winningsSaved?"✓ Winnings Saved":"Save Winnings"}
-                  </button>
+                      <div style={{marginBottom:"12px"}}>
+                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>High Game Pot ($)</div>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
+                          Highest game in the league takes it — enter what you won, if anything.
+                        </div>
+                        {[0,1,2].map(gameIdx=>{
+                          if(cs.scores[gameIdx]==null)return null;
+                          const val=(cs.highGameWinnings||[0,0,0])[gameIdx]??0;
+                          return(
+                            <div key={gameIdx} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                              <div style={{fontSize:"12px",color:C.textMuted,width:"64px"}}>G{gameIdx+1} · {cs.scores[gameIdx]}</div>
+                              <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Won $"
+                                value={val||""} onChange={e=>setSessionMoneyArray(cs.id,"highGameWinnings",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {(()=>{
+                        // 3-6-9: a single, whole-session win (all 9 specific
+                        // strikes across games 1, 2, AND 3) -- not per-game
+                        // like poker, so this only shows once per session, and
+                        // only when actually qualified. The jackpot input is
+                        // additionally gated on game 3's 10th being a full
+                        // turkey, on top of the win itself.
+                        const r369=threeSixNineResults(shots,cs.bowler,cs.league,cs.date);
+                        if(!r369.qualifies)return null;
+                        return(
+                          <div style={{marginBottom:"12px"}}>
+                            <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>3-6-9 Winnings ($)</div>
+                            <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                              <div style={{fontSize:"12px",color:C.strike,width:"56px"}}>Pot</div>
+                              <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
+                                value={cs.threeSixNineWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"pot",e.target.value===""?0:parseFloat(e.target.value))}/>
+                            </div>
+                            {r369.jackpotEligible&&(
+                              <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                                <div style={{fontSize:"12px",color:C.spare,width:"56px"}}>Jackpot</div>
+                                <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
+                                  value={cs.jackpotWinnings||""} onChange={e=>setThreeSixNineWinnings(cs.id,"jackpot",e.target.value===""?0:parseFloat(e.target.value))}/>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      <div style={{marginBottom:"12px"}}>
+                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Buy-ins ($)</div>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
+                          What it cost to enter — so the totals below show what you actually cleared.
+                        </div>
+                        {[0,1,2].map(gameIdx=>{
+                          if(cs.scores[gameIdx]==null)return null;
+                          const qc=(cs.pokerQuarterCost||[0,0,0])[gameIdx]??0;
+                          const dc=(cs.pokerDollarCost||[0,0,0])[gameIdx]??0;
+                          const hc=(cs.highGameCost||[0,0,0])[gameIdx]??0;
+                          return(
+                            <div key={gameIdx} style={{display:"flex",gap:"6px",alignItems:"center",marginBottom:"6px"}}>
+                              <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{gameIdx+1}</div>
+                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="0.25" placeholder="Qtr"
+                                value={qc||""} onChange={e=>setSessionMoneyArray(cs.id,"pokerQuarterCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
+                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="1" placeholder="Dollar"
+                                value={dc||""} onChange={e=>setSessionMoneyArray(cs.id,"pokerDollarCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
+                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="1" placeholder="High"
+                                value={hc||""} onChange={e=>setSessionMoneyArray(cs.id,"highGameCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
+                            </div>
+                          );
+                        })}
+                        <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                          <div style={{fontSize:"12px",color:C.textMuted,width:"56px"}}>3-6-9</div>
+                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Buy-in $"
+                            value={cs.threeSixNineCost||""} onChange={e=>setSessionMoneyValue(cs.id,"threeSixNineCost",e.target.value===""?0:parseFloat(e.target.value))}/>
+                        </div>
+                      </div>
+
+                      {(()=>{
+                        const m=sessionMoney(cs);
+                        if(!m)return null;
+                        return(
+                          <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
+                            <div style={S.statBox}>
+                              <div style={{...S.statNum,fontSize:"18px",color:C.strike}}>${m.gross.toFixed(2)}</div>
+                              <div style={S.statLbl}>Won</div>
+                            </div>
+                            <div style={S.statBox}>
+                              <div style={{...S.statNum,fontSize:"18px",color:C.miss}}>${m.cost.toFixed(2)}</div>
+                              <div style={S.statLbl}>Paid In</div>
+                            </div>
+                            <div style={{...S.statBox,border:`1px solid ${m.net>=0?C.strike:C.miss}44`}}>
+                              <div style={{...S.statNum,fontSize:"18px",color:m.net>=0?C.strike:C.miss}}>
+                                {m.net<0?"−":""}${Math.abs(m.net).toFixed(2)}
+                              </div>
+                              <div style={S.statLbl}>Net</div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <button style={{...S.btn("primary"),marginBottom:"12px"}} onClick={confirmWinningsSaved}>
+                        {winningsSaved?"✓ Winnings Saved":"Save Winnings"}
+                      </button>
+                    </>
+                  )}
 
                   <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
                     <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{sr}%</div><div style={S.statLbl}>Strike %</div></div>
@@ -395,15 +471,17 @@ export default function LogView({
             })()}
 
             {/* Surface */}
-            <CollapsibleCard
-              title="Surface"
-              summary={form.surface||""}
-              expanded={editingId?true:expandedSections.surface}
-              onToggle={()=>toggleSection("surface")}>
-              <div style={S.chips}>
-                {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
-              </div>
-            </CollapsibleCard>
+            {preferences.trackedFields.surface&&(
+              <CollapsibleCard
+                title="Surface"
+                summary={form.surface||""}
+                expanded={editingId?true:expandedSections.surface}
+                onToggle={()=>toggleSection("surface")}>
+                <div style={S.chips}>
+                  {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
+                </div>
+              </CollapsibleCard>
+            )}
 
             {/* Shot Context */}
             <div style={S.card}>
@@ -507,37 +585,45 @@ export default function LogView({
             </div>
 
             {/* Line */}
-            <div style={S.card}>
-              <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
-              <div style={S.row}>
-                <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number"
-                  value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
-                <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number"
-                  value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
+            {preferences.trackedFields.line&&(
+              <div style={S.card}>
+                <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number"
+                    value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number"
+                    value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Result */}
             <div style={S.card}>
               <div style={S.label}>Result</div>
               <div style={S.chips}>
-                {RESULTS.map(r=>(
-                  <Chip key={r} label={r} selected={form.result===r}
-                    onToggle={()=>{
-                      const newResult=form.result===r?"":r;
-                      setForm(f=>({
-                        ...f,
-                        result:newResult,
-                        otherLeave:newResult==="Other Leave"?f.otherLeave:[],
-                        spareMade:"",
-                        // Weak 10 / Ringing 10 always leave a single pin (the ten-pin):
-                        // first ball = 9, and if missed, adds 0 — so the frame total is
-                        // deterministic and doesn't need a manual pin-count entry.
-                        pinCount:(newResult==="Weak 10"||newResult==="Ringing 10")?"9":"",
-                      }));
-                    }}
-                    color={r==="Strike"?C.strike:r.includes("10")?C.miss:C.spare}/>
-                ))}
+                {resultsForHandedness(activeBowlerLeftHanded).map(label=>{
+                  // `label` is what the bowler sees (e.g. "Weak 7" for a
+                  // lefty); `stored` is what actually gets saved, which is
+                  // always the canonical "Weak 10"/"Ringing 10" value.
+                  const stored=storedResultFor(label);
+                  return(
+                    <Chip key={label} label={label} selected={form.result===stored}
+                      onToggle={()=>{
+                        const newResult=form.result===stored?"":stored;
+                        setForm(f=>({
+                          ...f,
+                          result:newResult,
+                          otherLeave:newResult==="Other Leave"?f.otherLeave:[],
+                          spareMade:"",
+                          // Weak/Ringing always leave a single corner pin:
+                          // first ball = 9, and if missed, adds 0 — so the frame total is
+                          // deterministic and doesn't need a manual pin-count entry.
+                          pinCount:(newResult==="Weak 10"||newResult==="Ringing 10")?"9":"",
+                        }));
+                      }}
+                      color={stored==="Strike"?C.strike:stored.includes("10")?C.miss:C.spare}/>
+                  );
+                })}
               </div>
 
               {form.result==="Other Leave"&&(
@@ -625,26 +711,36 @@ export default function LogView({
             </div>
 
             {/* Release & Miss */}
-            <CollapsibleCard
-              title="Release & Miss"
-              summary={[form.release,form.miss.length?`${form.miss.length} miss`:""].filter(Boolean).join(", ")}
-              expanded={editingId?true:expandedSections.releaseMiss}
-              onToggle={()=>toggleSection("releaseMiss")}>
-              <div style={S.label}>Release</div>
-              <div style={S.chips}>
-                {RELEASES.map(r=>(
-                  <Chip key={r} label={r} selected={form.release===r} onToggle={()=>toggle("release",r)}
-                    color={r==="Good"?C.strike:r==="Bad"?C.miss:C.spare}/>
-                ))}
-              </div>
-              <div style={S.divider}/>
-              <div style={S.label}>Miss</div>
-              <div style={S.chips}>
-                {MISSES.map(m=>(
-                  <Chip key={m} label={m} selected={form.miss.includes(m)} onToggle={()=>toggleMulti("miss",m)} color={C.miss}/>
-                ))}
-              </div>
-            </CollapsibleCard>
+            {(preferences.trackedFields.release||preferences.trackedFields.miss)&&(
+              <CollapsibleCard
+                title={preferences.trackedFields.release&&preferences.trackedFields.miss?"Release & Miss":preferences.trackedFields.release?"Release":"Miss"}
+                summary={[preferences.trackedFields.release?form.release:"",preferences.trackedFields.miss&&form.miss.length?`${form.miss.length} miss`:""].filter(Boolean).join(", ")}
+                expanded={editingId?true:expandedSections.releaseMiss}
+                onToggle={()=>toggleSection("releaseMiss")}>
+                {preferences.trackedFields.release&&(
+                  <>
+                    <div style={S.label}>Release</div>
+                    <div style={S.chips}>
+                      {RELEASES.map(r=>(
+                        <Chip key={r} label={r} selected={form.release===r} onToggle={()=>toggle("release",r)}
+                          color={r==="Good"?C.strike:r==="Bad"?C.miss:C.spare}/>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {preferences.trackedFields.release&&preferences.trackedFields.miss&&<div style={S.divider}/>}
+                {preferences.trackedFields.miss&&(
+                  <>
+                    <div style={S.label}>Miss</div>
+                    <div style={S.chips}>
+                      {MISSES.map(m=>(
+                        <Chip key={m} label={m} selected={form.miss.includes(m)} onToggle={()=>toggleMulti("miss",m)} color={C.miss}/>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CollapsibleCard>
+            )}
 
             {/* Notes */}
             <CollapsibleCard

@@ -9,6 +9,7 @@ import {
 import { lineupSort } from "./domain/leagues.js";
 
 export default function StatsView({
+  preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
   statsLeague, setStatsLeague, trendMetric, setTrendMetric, trendScope, setTrendScope,
@@ -768,7 +769,7 @@ export default function StatsView({
                   </div>
                 )}
 
-                {!hideIndividualOnly&&mCounts.length>0&&(
+                {!hideIndividualOnly&&preferences.trackedFields.miss&&mCounts.length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Miss Distribution</div>
                     {mCounts.sort((a,b)=>b.count-a.count).map(m=>(
@@ -785,7 +786,7 @@ export default function StatsView({
                   </div>
                 )}
 
-                {!hideIndividualOnly&&(
+                {!hideIndividualOnly&&preferences.trackedFields.release&&(
                   <div style={S.card}>
                     <div style={S.label}>Release Quality</div>
                     <div style={{display:"flex",gap:"8px"}}>
@@ -1024,7 +1025,7 @@ export default function StatsView({
                   );
                 })()}
 
-                {(()=>{
+                {preferences.showMoneyGames&&(()=>{
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
                   const totalQuarter=relevantSessions.reduce((sum,s)=>sum+(s.pokerQuarter||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
                   const totalDollar=relevantSessions.reduce((sum,s)=>sum+(s.pokerDollar||[0,0,0]).reduce((a,b)=>a+(b||0),0),0);
@@ -1046,7 +1047,7 @@ export default function StatsView({
                   );
                 })()}
 
-                {statsBowler&&(()=>{
+                {preferences.showMoneyGames&&statsBowler&&(()=>{
                   // Every night this bowler has a logged session for,
                   // newest first. threeSixNineResults is a single,
                   // whole-session determination now (all 9 specific
