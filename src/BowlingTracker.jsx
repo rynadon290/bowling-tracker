@@ -2270,6 +2270,7 @@ export default function BowlingTracker(){
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
             newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}
             bags={bags} ballBags={ballBags} saveBag={saveBag} deleteBag={deleteBag} toggleBallBag={toggleBallBag}
+            centers={centers} ensureCenter={ensureCenter} searchCenters={searchCenters}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups}
             saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}/>

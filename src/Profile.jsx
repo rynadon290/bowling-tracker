@@ -3,9 +3,11 @@ import { C, S, Chip } from "./ui.jsx";
 import ArsenalList from "./ArsenalList.jsx";
 import BagManager from "./BagManager.jsx";
 import BallNameInput from "./BallNameInput.jsx";
+import CenterPicker from "./CenterPicker.jsx";
+import { centerLabel } from "./domain/centers.js";
 import {
   emptyProfile, normalizeProfile, addHomeCenter, removeHomeCenter,
-  setProfileField, membershipFor,
+  setProfileField, membershipFor, resolveHomeCenters,
 } from "./domain/profiles.js";
 
 export default function Profile({
@@ -14,10 +16,11 @@ export default function Profile({
   arsenals, ballLayouts, setBallLayout, removeBall,
   newBallName, setNewBallName, addBall,
   bags, ballBags, saveBag, deleteBag, toggleBallBag,
+  centers, ensureCenter, searchCenters,
   ballSpecs, setBallSpec, ballGroups, saveBallGroup, deleteBallGroup, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
-  const [newCenter, setNewCenter] = useState("");
+  const [addingCenter, setAddingCenter] = useState(false);
 
   if (!bowlers.length) {
     return (
@@ -33,6 +36,7 @@ export default function Profile({
   const profile = normalizeProfile(profiles[activeBowler], activeBowler) || emptyProfile(activeBowler);
   const membership = membershipFor(activeBowler, teams);
   const balls = arsenals[activeBowler] || [];
+  const resolvedHomeCenters = resolveHomeCenters(profile, centers || []);
 
   function update(next) {
     setProfile(activeBowler, next);
@@ -80,31 +84,41 @@ export default function Profile({
       <div style={S.card}>
         <div style={S.label}>Home Centers</div>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-          The houses this bowler plays regularly.
+          The houses this bowler plays regularly. Looked up so they match the
+          same centers your leagues use.
         </div>
-        {profile.homeCenters.length > 0 && (
+        {resolvedHomeCenters.length > 0 && (
           <div style={{ ...S.chips, marginBottom: "8px" }}>
-            {profile.homeCenters.map(center => (
-              <Chip key={center} label={`${center}  ×`} selected color={C.accent}
-                onToggle={() => update(removeHomeCenter(profile, center))} />
+            {resolvedHomeCenters.map(center => (
+              <Chip key={center.id} label={`${centerLabel(center)}  ×`} selected color={C.accent}
+                onToggle={() => update(removeHomeCenter(profile, center.id))} />
             ))}
           </div>
         )}
-        <div style={S.row}>
-          <input style={{ ...S.input, flex: 1 }} placeholder="Add a center (e.g. Bowlero Pittsburgh)"
-            value={newCenter}
-            onChange={e => setNewCenter(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter" && newCenter.trim()) {
-                update(addHomeCenter(profile, newCenter));
-                setNewCenter("");
-              }
-            }} />
-          <button style={S.btn("sm")}
-            onClick={() => { if (newCenter.trim()) { update(addHomeCenter(profile, newCenter)); setNewCenter(""); } }}>
-            +
+        {addingCenter ? (
+          <>
+            <CenterPicker
+              leagueName=""
+              currentCenter={null}
+              onSelect={candidate => {
+                if (!candidate) { setAddingCenter(false); return; }
+                // ensureCenter dedupes against the shared table, so picking
+                // a house someone else already added reuses their row.
+                const saved = ensureCenter(candidate);
+                update(addHomeCenter(profile, saved.id));
+                setAddingCenter(false);
+              }}
+              onSearch={searchCenters} />
+            <button style={{ ...S.btn(), width: "100%", marginTop: "8px", fontSize: "12px" }}
+              onClick={() => setAddingCenter(false)}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button style={{ ...S.btn(), width: "100%" }} onClick={() => setAddingCenter(true)}>
+            + Add a Center
           </button>
-        </div>
+        )}
       </div>
 
       <div style={S.card}>
