@@ -772,12 +772,16 @@ export default function BowlingTracker(){
     if(compareBowler===name)setCompareBowler("");
   }
 
-  async function addBall(){
-    const name=newBallName.trim();
+  // Called with no arguments from the text field, or with a name and specs
+  // when someone picks a community catalog suggestion -- which adds the
+  // ball and fills its specs in one step.
+  async function addBall(presetName,presetSpecs){
+    const name=(presetName??newBallName).trim();
     if(!name||!activeBowler)return;
     const current=arsenals[activeBowler]||[];
-    if(current.includes(name))return;
+    if(current.includes(name)){setNewBallName("");return;}
     await saveArsenals({...arsenals,[activeBowler]:[...current,name]});
+    if(presetSpecs)setBallSpec(activeBowler,name,presetSpecs);
     setNewBallName("");
   }
 

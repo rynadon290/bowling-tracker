@@ -3,6 +3,7 @@ import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_R
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import ArsenalList from "./ArsenalList.jsx";
+import BallNameInput from "./BallNameInput.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
@@ -99,12 +100,12 @@ export default function LogView({
                   publishBallSpecs={publishBallSpecs}
                   voteOnEntry={voteOnEntry}
                   acknowledgeRejection={acknowledgeRejection}/>
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Add a ball (e.g. Storm Phaze II)" value={newBallName}
-                    onChange={e=>setNewBallName(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter")addBall();}}/>
-                  <button style={S.btn("sm")} onClick={addBall}>+</button>
-                </div>
+                <BallNameInput
+                  value={newBallName}
+                  onChange={setNewBallName}
+                  onAdd={addBall}
+                  catalogEntries={catalogEntries||{}}
+                  existingBalls={arsenals[activeBowler]||[]}/>
               </CollapsibleCard>
             )}
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import ArsenalList from "./ArsenalList.jsx";
 import BagManager from "./BagManager.jsx";
+import BallNameInput from "./BallNameInput.jsx";
 import {
   emptyProfile, normalizeProfile, addHomeCenter, removeHomeCenter,
   setProfileField, membershipFor,
@@ -144,13 +145,12 @@ export default function Profile({
           publishBallSpecs={publishBallSpecs}
           voteOnEntry={voteOnEntry}
           acknowledgeRejection={acknowledgeRejection} />
-        <div style={S.row}>
-          <input style={{ ...S.input, flex: 1 }} placeholder="Add a ball (e.g. Storm Phaze II)"
-            value={newBallName}
-            onChange={e => setNewBallName(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") addBall(); }} />
-          <button style={S.btn("sm")} onClick={addBall}>+</button>
-        </div>
+        <BallNameInput
+          value={newBallName}
+          onChange={setNewBallName}
+          onAdd={addBall}
+          catalogEntries={catalogEntries || {}}
+          existingBalls={balls} />
       </div>
 
       <BagManager
