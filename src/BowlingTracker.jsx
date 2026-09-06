@@ -8,6 +8,7 @@ import ImportScorecard from "./ImportScorecard.jsx";
 import Settings from "./Settings.jsx";
 import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
+import SessionStart from "./SessionStart.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
@@ -58,6 +59,7 @@ const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
+const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -210,6 +212,9 @@ export default function BowlingTracker(){
   // Manually-entered game scores, keyed bowler|league|date|game. These take
   // precedence over scores computed from shots -- see domain/manualScores.js.
   const[manualScores,setManualScores]=useState({});
+  // The launch prompt is shown once per day, not once ever -- what you're
+  // bowling changes night to night. Stores the date it was last dismissed.
+  const[sessionStartDismissed,setSessionStartDismissed]=useState(true);
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -387,6 +392,11 @@ export default function BowlingTracker(){
           const ms=await window.storage.get(MANUAL_SCORES_KEY);
           if(ms)setManualScores(normalizeManualScores(JSON.parse(ms.value)));
         }
+
+        try{
+          const dismissed=await window.storage.get(SESSION_START_KEY);
+          setSessionStartDismissed(dismissed?.value===localDateString());
+        }catch{setSessionStartDismissed(false);}
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
         if(matchesRes.online&&matchesRes.data){
@@ -705,6 +715,11 @@ export default function BowlingTracker(){
 
   // Saves a bowler's profile. Debounced like other typed fields so a
   // name or note doesn't fire a cloud write per keystroke.
+  function dismissSessionStart(){
+    setSessionStartDismissed(true);
+    try{window.storage.set(SESSION_START_KEY,localDateString());}catch{}
+  }
+
   function updateTournament(next){
     const normalized=normalizeTournament(next);
     setActiveTournament(normalized);
@@ -1893,6 +1908,8 @@ export default function BowlingTracker(){
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
+            sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}
+            updatePreferences={updatePreferences}
           />
         )}
 

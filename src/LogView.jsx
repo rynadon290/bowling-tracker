@@ -4,6 +4,7 @@ import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import ArsenalList from "./ArsenalList.jsx";
 import TournamentSession from "./TournamentSession.jsx";
+import SessionStart from "./SessionStart.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 
 export default function LogView({
@@ -24,10 +25,18 @@ export default function LogView({
   ballLayouts, setBallLayout,
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
+  sessionStartDismissed, dismissSessionStart, updatePreferences,
 }) {
   return (
     <>
           <>
+            {!editingId&&!sessionStartDismissed&&(
+              <SessionStart
+                preferences={preferences}
+                onApply={updatePreferences}
+                onDismiss={dismissSessionStart}/>
+            )}
+
             {/* Edit banner */}
             {editingId&&(
               <div style={{backgroundColor:C.spare+"22",border:`1px solid ${C.spare}44`,borderRadius:"10px",padding:"12px 16px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -96,7 +105,7 @@ export default function LogView({
                 bowlers who want score tracking without logging 30 shots a
                 night. A score entered here overrides whatever the shots
                 would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&(()=>{
+            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&(()=>{
               const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,sessionLeague,sessionDate,g));
               const total=seriesTotal(entered);
               return(
@@ -576,6 +585,12 @@ export default function LogView({
               </CollapsibleCard>
             )}
 
+            {/* The whole shot-logging form only appears in shot-by-shot
+                mode. In game mode it's replaced by the score entry card
+                above -- showing both would imply you need to do both.
+                Editing an existing shot always shows the form, since
+                that's how a logged shot gets corrected. */}
+            {(editingId||preferences.trackingMode==="shot")&&(<>
             {/* Shot Context */}
             <div style={S.card}>
               <div style={S.label}>
@@ -901,7 +916,9 @@ export default function LogView({
 
 
             <div style={{height:`${footerHeight}px`}}/>
+            </>)}
           </>
+          {(editingId||preferences.trackingMode==="shot")&&(
           <div ref={footerRef} style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}
@@ -913,6 +930,7 @@ export default function LogView({
               <button style={{...S.btn("warn"),marginTop:"8px"}} onClick={cancelEdit}>Cancel Edit</button>
             )}
           </div>
+          )}
     </>
   );
 }

@@ -3,7 +3,8 @@ import { C, S, Chip } from "./ui.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { localDateString } from "./constants.js";
 import {
-  ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, applyEnvironment,
+  ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
+  TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS, setTrackingMode, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
@@ -55,6 +56,23 @@ export default function Settings({
             {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
           </div>
         )}
+      </div>
+
+      <div style={S.card}>
+        <div style={S.label}>Tracking Detail</div>
+        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
+          Independent of environment — you can bowl league by-game and practice shot-by-shot.
+        </div>
+        <div style={S.chips}>
+          {TRACKING_MODES.map(mode => (
+            <Chip key={mode} label={TRACKING_MODE_LABELS[mode]}
+              selected={preferences.trackingMode === mode}
+              onToggle={() => apply(prev => setTrackingMode(prev, mode))} />
+          ))}
+        </div>
+        <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px" }}>
+          {TRACKING_MODE_DESCRIPTIONS[preferences.trackingMode]}
+        </div>
       </div>
 
       <div style={S.card}>
