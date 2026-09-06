@@ -12,7 +12,7 @@ export default function Profile({
   profiles, setProfile, teams,
   arsenals, ballLayouts, setBallLayout, removeBall,
   newBallName, setNewBallName, addBall,
-  bags, ballBags, saveBag, deleteBag, assignBallToBag,
+  bags, ballBags, saveBag, deleteBag, toggleBallBag,
 }) {
   const [newCenter, setNewCenter] = useState("");
 
@@ -146,9 +146,10 @@ export default function Profile({
         bags={bags || []}
         balls={balls}
         ballBags={ballBags || {}}
+        ballLayouts={ballLayouts || {}}
         saveBag={saveBag}
         deleteBag={deleteBag}
-        assignBallToBag={assignBallToBag} />
+        toggleBallBag={toggleBallBag} />
 
       <div style={S.card}>
         <div style={S.label}>Notes</div>

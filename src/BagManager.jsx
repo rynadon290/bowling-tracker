@@ -2,8 +2,9 @@ import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   BAG_TYPES, BAG_TYPE_LABELS, emptyBag, describeCapacity, bagCapacity,
-  bagHasRoom, unassignedBalls,
+  bagHasRoom, unassignedBalls, isBallInBag, ballsByBagFor,
 } from "./domain/bags.js";
+import { formatLayout } from "./domain/layouts.js";
 
 function BagEditor({ bag, onChange, onSave, onCancel }) {
   return (
@@ -54,18 +55,14 @@ function BagEditor({ bag, onChange, onSave, onCancel }) {
 }
 
 export default function BagManager({
-  activeBowler, bags, balls, ballBags,
-  saveBag, deleteBag, assignBallToBag,
+  activeBowler, bags, balls, ballBags, ballLayouts,
+  saveBag, deleteBag, toggleBallBag,
 }) {
   const [editing, setEditing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const bowlerBags = bags.filter(b => b.bowlerName === activeBowler);
-  const ballsByBag = {};
-  balls.forEach(ball => {
-    const bagId = ballBags[`${activeBowler}|${ball}`];
-    if (bagId) (ballsByBag[bagId] = ballsByBag[bagId] || []).push(ball);
-  });
+  const ballsByBag = ballsByBagFor(ballBags, activeBowler, balls);
   const loose = unassignedBalls(balls, ballsByBag);
 
   function startNew(type) {
@@ -135,10 +132,14 @@ export default function BagManager({
               <div style={{ fontSize: "12px", color: C.textMuted }}>Empty. Add balls from below.</div>
             ) : (
               <div style={S.chips}>
-                {inBag.map(ball => (
-                  <Chip key={ball} label={`${ball}  ×`} selected color={C.accent}
-                    onToggle={() => assignBallToBag(activeBowler, ball, null)} />
-                ))}
+                {inBag.map(ball => {
+                  const layout = formatLayout(ballLayouts?.[`${activeBowler}|${ball}`]);
+                  return (
+                    <Chip key={ball} label={layout ? `${ball} · ${layout}  ×` : `${ball}  ×`}
+                      selected color={C.accent}
+                      onToggle={() => toggleBallBag(activeBowler, ball, bag.id)} />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -154,20 +155,25 @@ export default function BagManager({
               : "Every ball is packed. Practice always shows every ball regardless."}
           </div>
           {balls.map(ball => {
-            const currentBagId = ballBags[`${activeBowler}|${ball}`] || "";
+            const layout = formatLayout(ballLayouts?.[`${activeBowler}|${ball}`]);
+            const inAny = bowlerBags.some(bag => isBallInBag(ballBags, activeBowler, ball, bag.id));
             return (
-              <div key={ball} style={{ marginBottom: "10px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>{ball}</div>
+              <div key={ball} style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600 }}>{ball}</div>
+                <div style={{ fontSize: "11px", color: layout ? C.accent : C.textMuted, marginBottom: "4px" }}>
+                  {layout || "No layout recorded"}
+                  {!inAny && <span style={{ color: C.textMuted }}> · not in any bag</span>}
+                </div>
                 <div style={S.chips}>
-                  <Chip label="Unassigned" dense selected={!currentBagId}
-                    onToggle={() => assignBallToBag(activeBowler, ball, null)} />
+                  {/* A ball can be in several bags at once -- these are
+                      independent toggles, not a single choice. */}
                   {bowlerBags.map(bag => {
-                    const isIn = currentBagId === bag.id;
+                    const isIn = isBallInBag(ballBags, activeBowler, ball, bag.id);
                     const noRoom = !isIn && !bagHasRoom(bag, ballsByBag);
                     return (
                       <Chip key={bag.id} label={noRoom ? `${bag.name} (full)` : bag.name} dense
                         selected={isIn}
-                        onToggle={() => { if (!noRoom || isIn) assignBallToBag(activeBowler, ball, isIn ? null : bag.id); }}
+                        onToggle={() => { if (!noRoom || isIn) toggleBallBag(activeBowler, ball, bag.id); }}
                         color={noRoom ? C.textMuted : C.accent} />
                     );
                   })}

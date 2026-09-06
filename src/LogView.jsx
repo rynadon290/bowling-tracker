@@ -6,6 +6,7 @@ import ArsenalList from "./ArsenalList.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
+import { formatLayout } from "./domain/layouts.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -561,7 +562,16 @@ export default function LogView({
               )}
               <div style={S.label}>Ball</div>
               <div style={S.chips}>
-                {logBalls.map(b=><Chip key={b} label={b} selected={form.ball===b} onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>)}
+                {/* Layout shown alongside the name -- picking a ball is
+                    exactly when its drilling matters, and it saves a trip
+                    to the profile screen to remember what's what. */}
+                {logBalls.map(b=>{
+                  const layout=formatLayout(ballLayouts?.[`${form.bowler}|${b}`]);
+                  return(
+                    <Chip key={b} label={layout?`${b} · ${layout}`:b} selected={form.ball===b}
+                      onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>
+                  );
+                })}
               </div>
               {logBalls.length===0&&(
                 <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
