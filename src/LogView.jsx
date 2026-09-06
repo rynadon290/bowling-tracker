@@ -7,6 +7,7 @@ import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
+import { allowsOtherBowlers, otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
 export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
@@ -28,6 +29,7 @@ export default function LogView({
   manualScores, updateManualScore,
   sessionStartDismissed, dismissSessionStart, updatePreferences,
   practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
+  ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
@@ -50,29 +52,75 @@ export default function LogView({
               </div>
             )}
 
-            {/* Session card */}
+            {/* Whose game is being recorded. Renamed from "Who's Bowling",
+                which read as "who is here tonight" rather than "whose shot
+                am I logging" -- and the answer differs by environment:
+                league keeps the team book, tournaments are yours alone,
+                practice partners are local-only guests. */}
             {!editingId&&(
               <div style={S.card}>
-                <div style={S.label}>Who's Bowling</div>
-                <div style={{...S.chips,gap:"4px"}}>
-                  {bowlers.map(b=>(
-                    <Chip key={b} label={b} selected={activeBowler===b} onToggle={()=>selectBowler(b)} color={C.accent} dense/>
-                  ))}
-                </div>
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Add a bowler's name" value={newBowlerName}
-                    onChange={e=>setNewBowlerName(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter")addBowler();}}/>
-                  <button style={S.btn("sm")} onClick={addBowler}>+</button>
-                </div>
-                {activeBowler&&bowlers.length>0&&(
-                  <div style={{marginTop:"8px"}}>
-                    <button style={{...S.btn(),padding:"4px 10px",fontSize:"11px",color:C.miss,borderColor:C.miss+"44"}}
-                      onClick={()=>removeBowler(activeBowler)}>Remove "{activeBowler}"</button>
+                <div style={S.label}>Keeping Score For</div>
+
+                {!allowsOtherBowlers(preferences.environment)?(
+                  <div style={{fontSize:"12px",color:C.textMuted}}>
+                    Your own squad — {ownerName||"you"}. Tournament results are recorded under your name only.
                   </div>
-                )}
-                {!activeBowler&&(
-                  <div style={{fontSize:"12px",color:C.textMuted,marginTop:"8px"}}>Add and select a bowler to start logging shots.</div>
+                ):(
+                  <>
+                    <div style={{...S.chips,gap:"4px"}}>
+                      <Chip label={`${ownerName||"Me"} (me)`} selected={activeBowler===ownerName}
+                        onToggle={()=>selectBowler(ownerName)} color={C.accent} dense/>
+                      {scoringForOthers&&scoreOptions.filter(n=>n!==ownerName).map(b=>(
+                        <Chip key={b} label={b} selected={activeBowler===b}
+                          onToggle={()=>selectBowler(b)} color={C.accent} dense/>
+                      ))}
+                    </div>
+
+                    <div style={{...S.chips,marginTop:"4px"}}>
+                      <Chip label={scoringForOthers?"✓ Also scoring for others":"Also scoring for others"}
+                        dense selected={scoringForOthers}
+                        onToggle={()=>{
+                          const next=!scoringForOthers;
+                          setScoringForOthers(next);
+                          // Turning it off must not leave the form pointed
+                          // at someone who's no longer selectable.
+                          if(!next&&activeBowler!==ownerName)selectBowler(ownerName);
+                        }}/>
+                    </div>
+
+                    {scoringForOthers&&(
+                      <>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
+                          {scorekeepingHelp(preferences.environment)}
+                        </div>
+
+                        {otherBowlerSource(preferences.environment)==="freetext"&&(
+                          <>
+                            <div style={{...S.row,marginTop:"8px"}}>
+                              <input style={{...S.input,flex:1}} placeholder="Add someone bowling with you"
+                                value={newGuestName} onChange={e=>setNewGuestName(e.target.value)}
+                                onKeyDown={e=>{if(e.key==="Enter")addGuestBowler();}}/>
+                              <button style={S.btn("sm")} onClick={addGuestBowler}>+</button>
+                            </div>
+                            {(guests||[]).length>0&&(
+                              <div style={{...S.chips,marginTop:"6px"}}>
+                                {guests.map(g=>(
+                                  <Chip key={g} label={`${g}  ×`} dense selected color={C.textMuted}
+                                    onToggle={()=>removeGuestBowler(g)}/>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {otherBowlerSource(preferences.environment)==="roster"&&scoreOptions.length<=1&&(
+                          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
+                            No teammates on this league's roster yet — add them on the Social tab.
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             )}

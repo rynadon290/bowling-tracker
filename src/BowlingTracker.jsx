@@ -29,6 +29,7 @@ import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, sp
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
+import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
@@ -76,6 +77,7 @@ const CENTERS_KEY = "bowling-centers-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
 const DRILLS_KEY = "bowling-drills-v1";
+const GUESTS_KEY = "bowling-practice-guests-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -286,6 +288,15 @@ export default function BowlingTracker(){
   const[activeDrill,setActiveDrill]=useState(null);
   const[drillSaved,setDrillSaved]=useState(false);
   const[practiceMode,setPracticeMode]=useState("games");
+  // Practice/casual partners. Deliberately NEVER written to the cloud --
+  // these are names typed about people who aren't users of this app and
+  // haven't agreed to anything. Local storage only.
+  const[guests,setGuests]=useState([]);
+  const[newGuestName,setNewGuestName]=useState("");
+  // Ref so syncShotsToCloud always reads the current list, not a stale
+  // closure -- a guest added mid-session must be excluded immediately.
+  const guestsRef=useRef([]);
+  const[scoringForOthers,setScoringForOthers]=useState(false);
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -488,6 +499,9 @@ export default function BowlingTracker(){
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
         }
+
+        const cachedGuests=await readCached(GUESTS_KEY,"array");
+        if(cachedGuests){const g=normalizeGuests(cachedGuests);setGuests(g);guestsRef.current=g;}
 
         const drillsRes=await cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,ball,made,missed,notes"));
         if(drillsRes.online&&drillsRes.data){
@@ -902,6 +916,24 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Practice guests (local only) ────────────────────────────────────
+  function addGuestBowler(){
+    const updated=addGuest(guests,newGuestName);
+    if(updated===guests){setNewGuestName("");return;}
+    setGuests(updated);
+    guestsRef.current=updated;
+    setNewGuestName("");
+    // No cloudWrite here, on purpose -- see the state declaration.
+    try{window.storage.set(GUESTS_KEY,JSON.stringify(updated));}catch{}
+  }
+  function removeGuestBowler(name){
+    const updated=removeGuest(guests,name);
+    setGuests(updated);
+    guestsRef.current=updated;
+    try{window.storage.set(GUESTS_KEY,JSON.stringify(updated));}catch{}
+    if(activeBowler===name)selectBowler(displayName||bowlers[0]||"");
+  }
+
   // ── Practice drills ─────────────────────────────────────────────────
   function startDrill(){
     setActiveDrill(emptyDrill(activeBowler,sessionDate));
@@ -1332,8 +1364,20 @@ export default function BowlingTracker(){
   // only what actually changed gets pushed to Supabase, rather than
   // rewriting every shot on every save.
   async function syncShotsToCloud(prevShots,nextShots){
-    const prevById=new Map(prevShots.map(s=>[s.id,s]));
-    const nextById=new Map(nextShots.map(s=>[s.id,s]));
+    // A shot logged for a practice guest carries their name in
+    // shot.bowler. Guests are people who never agreed to be in this app,
+    // and the UI promises their scores stay on the device -- so their
+    // shots are excluded from the upload, not just their names. They
+    // remain in local state and in every on-device stat.
+    // Two checks, because the guest LIST can change. A shot is marked
+    // localOnly when it's logged, so removing someone from the list later
+    // can't retroactively make their past shots uploadable. The list check
+    // is the belt to that braces, covering any shot logged before this.
+    const guestSet=new Set(guestsRef.current||[]);
+    const isGuestShot=s=>s?.localOnly===true||(s?.bowler&&guestSet.has(s.bowler));
+
+    const prevById=new Map(prevShots.filter(s=>!isGuestShot(s)).map(s=>[s.id,s]));
+    const nextById=new Map(nextShots.filter(s=>!isGuestShot(s)).map(s=>[s.id,s]));
     for(const id of prevById.keys()){
       if(!nextById.has(id))await cloudDelete("shots",id);
     }
@@ -1598,6 +1642,11 @@ export default function BowlingTracker(){
   }
 
   // ── Submit shot ───────────────────────────────────────────────────────────
+  // True when the shot being logged belongs to a local-only guest.
+  function shotIsGuest(bowlerName){
+    return (guestsRef.current||[]).includes(bowlerName);
+  }
+
   async function submitShot(){
     if(!form.result||!form.bowler)return;
     const effectiveResult=isNoTap?"Strike":form.result;
@@ -1622,6 +1671,10 @@ export default function BowlingTracker(){
       const toSave={
         ...form,
         id:existingSlot?existingSlot.id:crypto.randomUUID(),
+        // Stamped at log time so it survives the guest being removed from
+        // the list later -- the promise was that their scores stay on this
+        // device, and that has to hold permanently.
+        localOnly:shotIsGuest(form.bowler)||undefined,
         result:effectiveResult,
         _displayResult:form.result,
         _displayLeave:[...(form.otherLeave||[])],
@@ -2063,6 +2116,17 @@ export default function BowlingTracker(){
       return data;
     }catch(e){return{error:e.message||"Couldn't generate insights right now."};}
   }
+
+  // Whose game can be recorded here. Tournaments are always the owner
+  // alone; league draws on the roster; practice/casual on local guests.
+  const ownerName=displayName||bowlers[0]||"";
+  const scoreOptions=scorekeepingOptions({
+    environment:preferences.environment,
+    owner:ownerName,
+    league:sessionLeague,
+    teams,
+    guests,
+  });
 
   const bowlerBags=bags.filter(b=>b.bowlerName===activeBowler);
   const envBags=bagsForEnvironment(bowlerBags,preferences.environment);
@@ -2515,6 +2579,9 @@ export default function BowlingTracker(){
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
+            ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
+            scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
+            addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
