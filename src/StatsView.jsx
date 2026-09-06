@@ -12,6 +12,7 @@ import { totalMoney } from "./domain/money.js";
 import { visibleStatsCardOrder } from "./domain/preferences.js";
 
 export default function StatsView({
+  centerStats,
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
@@ -1161,6 +1162,29 @@ preferences.showMoneyGames&&statsBowler&&(()=>{
                     </div>
                   );
                 })()
+                );
+                byId["byCenter"] = (
+                  (centerStats||[]).length > 1 && (
+                  <div style={S.card}>
+                    <div style={S.label}>By Bowling Center</div>
+                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                      How you score house to house. Only leagues with a center set are included — set them in Settings.
+                    </div>
+                    {(centerStats||[]).map(cs=>(
+                      <div key={cs.centerId} style={{marginBottom:"10px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
+                          <span style={{fontSize:"13px",fontWeight:600}}>{cs.center.name}</span>
+                          <span style={{fontSize:"13px",fontWeight:700,color:C.accent}}>{cs.average}</span>
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:"4px"}}>
+                          <span style={S.tag()}>{cs.games} games</span>
+                          <span style={S.tag(C.textMuted)}>{cs.sessions} sessions</span>
+                          {cs.high!=null&&<span style={S.tag(C.strike)}>High {cs.high}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  )
                 );
                 return (<>{renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}</>);
               })()

@@ -3,6 +3,7 @@ import { C, S, Chip } from "./ui.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
+import CenterPicker from "./CenterPicker.jsx";
 import { localDateString } from "./constants.js";
 import {
   ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
@@ -29,6 +30,7 @@ export default function Settings({
   filterBowler, setFilterBowler, filterBall, setFilterBall,
   filterResult, setFilterResult, filtered, ballUniverse,
   startEdit, deleteShot,
+  centers, leagueCenters, setLeagueCenter, searchCenters,
 }) {
   const { preferences, updatePreferences } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
@@ -103,6 +105,34 @@ export default function Settings({
           </div>
         )}
       </div>
+
+      {/* Centers attach to LEAGUES, not sessions -- a league bowls at one
+          house for a season, so this is one entry per season instead of a
+          tap every night. */}
+      {(leagues || []).length > 0 && (
+        <div style={S.card}>
+          <div style={S.label}>Where You Bowl</div>
+          <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
+            Set each league's center once and the app can compare how you score house to house.
+          </div>
+          {(leagues || []).map((league, i) => {
+            const centerId = leagueCenters?.[league];
+            const center = (centers || []).find(c => c.id === centerId) || null;
+            return (
+              <div key={league} style={{ paddingBottom: "10px", marginBottom: "10px", borderBottom: i < leagues.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                  {league.replace(" House Shot", "")}
+                </div>
+                <CenterPicker
+                  leagueName={league.replace(" House Shot", "")}
+                  currentCenter={center}
+                  onSelect={candidate => setLeagueCenter(league, candidate)}
+                  onSearch={searchCenters} />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div style={S.card}>
         <div style={S.label}>Tracking Detail</div>

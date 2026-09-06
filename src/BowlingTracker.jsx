@@ -24,6 +24,7 @@ import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRo
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
+import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -66,6 +67,8 @@ const BALL_BAGS_KEY = "bowling-ball-bag-assignments-v1";
 const BALL_SPECS_KEY = "bowling-ball-specs-v1";
 const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
 const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
+const CENTERS_KEY = "bowling-centers-v1";
+const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 const MATCHES_KEY = "bowling-matches-v1";
@@ -230,6 +233,11 @@ export default function BowlingTracker(){
   // name, plus which rejection notices this user has already dismissed.
   const[catalogEntries,setCatalogEntries]=useState({});
   const[catalogAck,setCatalogAck]=useState([]);
+  // Bowling centers are shared across users; `leagueCenters` maps a league
+  // NAME to a center id. Kept as a parallel map rather than restructuring
+  // `leagues` (a plain string array) that half the app depends on.
+  const[centers,setCenters]=useState([]);
+  const[leagueCenters,setLeagueCenters]=useState({});
   const[activeTournament,setActiveTournament]=useState(emptyTournament());
   const[tournamentSaved,setTournamentSaved]=useState(false);
   // Manually-entered game scores, keyed bowler|league|date|game. These take
@@ -421,6 +429,27 @@ export default function BowlingTracker(){
           setBallBags(rebuiltMembership);
           try{await window.storage.set(BALL_BAGS_KEY,JSON.stringify(rebuiltMembership));}catch{}
         }else{
+        }
+
+        const centersRes=await cloudRead("bowling_centers",q=>q.select("id,here_id,name,address,city,state,postal_code,country,lat,lng"));
+        if(centersRes.online&&centersRes.data){
+          const rebuilt=centersRes.data.map(centerFromRow).filter(Boolean);
+          setCenters(rebuilt);
+          try{await window.storage.set(CENTERS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const cs=await window.storage.get(CENTERS_KEY);
+          if(cs)setCenters(JSON.parse(cs.value));
+        }
+
+        const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id"));
+        if(leagueCentersRes.online&&leagueCentersRes.data){
+          const map={};
+          leagueCentersRes.data.forEach(r=>{if(r.center_id)map[r.name]=r.center_id;});
+          setLeagueCenters(map);
+          try{await window.storage.set(LEAGUE_CENTERS_KEY,JSON.stringify(map));}catch{}
+        }else{
+          const lc=await window.storage.get(LEAGUE_CENTERS_KEY);
+          if(lc)setLeagueCenters(JSON.parse(lc.value));
         }
 
         const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at"));
@@ -795,6 +824,59 @@ export default function BowlingTracker(){
   // Saves a ball's drilling layout. Local state updates immediately; the
   // cloud write is debounced because this is typed digit-by-digit and
   // would otherwise fire a write per keystroke.
+  // ── Bowling centers ─────────────────────────────────────────────────
+  async function searchCenters(query){
+    // Needs a location to search near -- HERE has no idea where to look
+    // otherwise. Falls back to the bowler's last known center if geolocation
+    // is refused, so the picker still works without location permission.
+    const coords=await new Promise(resolve=>{
+      if(!navigator?.geolocation)return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),
+        ()=>resolve(null),
+        {timeout:8000,maximumAge:600000}
+      );
+    });
+    const fallback=centers.find(c=>c.lat!=null);
+    const at=coords||(fallback?{lat:fallback.lat,lng:fallback.lng}:null);
+    if(!at)return{error:"Location is needed to find nearby centers. Allow location access, or add the center by name."};
+
+    try{
+      const{data,error}=await supabase.functions.invoke("find-centers",{
+        body:{query,lat:at.lat,lng:at.lng},
+      });
+      if(error)return{error:error.message||"Center search failed."};
+      if(data?.error)return{error:data.error};
+      return{centers:data?.centers||[]};
+    }catch(e){
+      return{error:e.message||"Couldn't search for centers right now."};
+    }
+  }
+
+  // Saves a center if it's new, or returns the existing row for the same
+  // venue -- so picking the same house twice never creates a duplicate.
+  function ensureCenter(candidate){
+    const existing=findExistingCenter(candidate,centers);
+    if(existing)return existing;
+    const created={...normalizeCenter(candidate),id:crypto.randomUUID()};
+    const updated=[...centers,created];
+    setCenters(updated);
+    try{window.storage.set(CENTERS_KEY,JSON.stringify(updated));}catch{}
+    cloudWrite("bowling_centers",centerToRow(created,user?.id||null));
+    return created;
+  }
+
+  function setLeagueCenter(leagueName,candidate){
+    const center=candidate?ensureCenter(candidate):null;
+    const updated={...leagueCenters};
+    if(center)updated[leagueName]=center.id; else delete updated[leagueName];
+    setLeagueCenters(updated);
+    try{window.storage.set(LEAGUE_CENTERS_KEY,JSON.stringify(updated));}catch{}
+
+    const leagueId=leagueIdsRef.current[leagueName];
+    if(leagueId)cloudUpdate("leagues",{id:leagueId},{center_id:center?center.id:null});
+  }
+
   // ── Community ball catalog ──────────────────────────────────────────
   // Publishing specs is opt-in and separate from saving them privately:
   // a bowler's own arsenal is theirs regardless of what the community says.
@@ -1759,6 +1841,11 @@ export default function BowlingTracker(){
   // Which balls the Log tab offers. Practice sees everything the bowler
   // owns; league and tournament see only the selected bag. Bags for the
   // current bowler are grouped so the selector can show counts.
+  // Per-center performance -- sessions resolve through their league to a
+  // center, which is why leagues carry the center rather than sessions.
+  const leaguesWithCenters=leagues.map(name=>({name,centerId:leagueCenters[name]}));
+  const centerStats=statsByCenter(sessions,leaguesWithCenters,centers,statsBowler||activeBowler);
+
   const bowlerBags=bags.filter(b=>b.bowlerName===activeBowler);
   const envBags=bagsForEnvironment(bowlerBags,preferences.environment);
   const bowlerBalls=arsenals[activeBowler]||[];
@@ -2158,7 +2245,8 @@ export default function BowlingTracker(){
             filterBall={filterBall} setFilterBall={setFilterBall}
             filterResult={filterResult} setFilterResult={setFilterResult}
             filtered={filtered} ballUniverse={ballUniverse}
-            startEdit={startEdit} deleteShot={deleteShot}/>
+            startEdit={startEdit} deleteShot={deleteShot}
+            centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}/>
         )}
 
         {view==="import"&&(
@@ -2207,6 +2295,7 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="stats"&&(
           <StatsView
+            centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague} trendMetric={trendMetric} setTrendMetric={setTrendMetric} trendScope={trendScope} setTrendScope={setTrendScope}
