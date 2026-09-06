@@ -20,7 +20,7 @@ import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
-import { C, S } from "./ui.jsx";
+import { C, S, Chip } from "./ui.jsx";
 import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString } from "./constants.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
@@ -151,6 +151,9 @@ export default function BowlingTracker(){
   // that league, since teams.league_id references leagues.id).
   const leagueIdsRef=useRef({});
   const[view,setView]=useState("log");
+  // Teams and Friends share one nav slot. Which of the two is showing is
+  // its own bit of state so switching between them doesn't disturb `view`.
+  const[socialTab,setSocialTab]=useState("teams");
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
@@ -1711,9 +1714,9 @@ export default function BowlingTracker(){
           )}
         </div>
         <div style={S.nav}>
-          {["log","history","stats","teams","friends"].map(v=>(
+          {["log","history","stats","social"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":v==="teams"?"Teams":"Friends"}
+    {v==="log"?"Log":v==="history"?"History":v==="stats"?"Stats":"Social"}
   </button>
 ))}
         </div>
@@ -1761,26 +1764,30 @@ export default function BowlingTracker(){
       <div style={S.content}>
         
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* TEAMS VIEW                                                        */}
+        {/* SOCIAL VIEW — Teams + Friends share one nav slot                  */}
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {view==="teams"&&(
-          <TeamManagement
-            leagues={leagues}
-            onTeamsChange={setTeams}
-            onLeagueAdd={addLeague}
-            onLeagueRename={renameLeague}
-          />
+        {view==="social"&&(
+          <>
+            <div style={{...S.card,padding:"10px 12px"}}>
+              <div style={S.chips}>
+                <Chip label="Teams" selected={socialTab==="teams"} onToggle={()=>setSocialTab("teams")}/>
+                <Chip label="Friends" selected={socialTab==="friends"} onToggle={()=>setSocialTab("friends")}/>
+              </div>
+            </div>
+            {socialTab==="teams"&&(
+              <TeamManagement
+                leagues={leagues}
+                onTeamsChange={setTeams}
+                onLeagueAdd={addLeague}
+                onLeagueRename={renameLeague}
+              />
+            )}
+            {socialTab==="friends"&&<Friends/>}
+          </>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* FRIENDS VIEW                                                      */}
-        {/* ══════════════════════════════════════════════════════════════════ */}
-        {view==="friends"&&(
-          <Friends/>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════ */}
-        {/* LOG VIEW                                                          */}
+        {/* PROFILE + SETTINGS                                                */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="profile"&&(
           <Profile
