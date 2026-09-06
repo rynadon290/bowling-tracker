@@ -84,8 +84,22 @@ describe('home centers', () => {
 
 describe('supabase round trip', () => {
   it('preserves every field in both directions', () => {
-    const full = { bowlerName: 'Ryan', leftHanded: true, twoHanded: true, homeCenters: ['Bowlero'], notes: 'thumb tape' };
+    const full = {
+      bowlerName: 'Ryan', leftHanded: true, twoHanded: true, homeCenters: ['Bowlero'], notes: 'thumb tape',
+      bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter',
+    };
     expect(profileFromRow(profileToRow(full, 'user-1'))).toEqual(full);
+  });
+
+  it('round-trips a profile with no book average as blanks, not NaN', () => {
+    // A profile built before these fields existed has them undefined.
+    // Number(undefined) is NaN, which Postgres rejects -- so the row must
+    // carry null, and the round trip must come back as "".
+    const legacy = { bowlerName: 'Ryan', leftHanded: false, twoHanded: false, homeCenters: [], notes: '' };
+    const row = profileToRow(legacy, 'user-1');
+    expect(row.book_average).toBeNull();
+    expect(row.book_games).toBeNull();
+    expect(profileFromRow(row).bookAverage).toBe('');
   });
 
   it('returns null for a missing row', () => {
