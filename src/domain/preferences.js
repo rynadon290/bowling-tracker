@@ -73,7 +73,6 @@ export const STATS_CARDS = [
   { id: "trend", label: "Trend" },
   { id: "money", label: "Money Games" },
   { id: "threeSixNine", label: "3-6-9 Tracker" },
-  { id: "sessionHistory", label: "Session History" },
 ];
 
 export const STATS_CARD_IDS = STATS_CARDS.map(c => c.id);
