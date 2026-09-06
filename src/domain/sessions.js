@@ -5,6 +5,7 @@ export function emptyShot(){
     id:crypto.randomUUID(),bowler:"",teamId:"",league:"",date:new Date().toISOString().slice(0,10),
     lane:"",game:"1",frame:"1",ballNum:null,
     ball:"",surface:"",startingBoard:"",targetArrows:"",
+    actualBoard:"",actualArrows:"",ballSpeed:"",
     result:"",otherLeave:[],spareMade:"",strikeDescription:"",
     release:"",miss:[],ballChangeReason:[],pinCount:"",notes:"",
   };
