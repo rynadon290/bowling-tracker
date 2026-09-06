@@ -2,12 +2,28 @@ import { describe, it, expect } from 'vitest';
 import {
   defaultPreferences, normalizePreferences, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
-  STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
+  STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, setTrackingMode, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
   it('defaults to league if no environment given', () => {
     expect(defaultPreferences().environment).toBe('league');
+  });
+
+  it('defaults to shot-by-shot tracking', () => {
+    expect(defaultPreferences().trackingMode).toBe('shot');
+  });
+
+  it('keeps tracking mode independent of environment', () => {
+    // Someone can bowl league by-game and practice shot-by-shot, so
+    // switching environment must not silently reset how they log.
+    const byGame = setTrackingMode(defaultPreferences('league'), 'game');
+    expect(applyEnvironment(byGame, 'practice').trackingMode).toBe('game');
+    expect(applyEnvironment(byGame, 'practice').trackedFields.surface).toBe(true);
+  });
+
+  it('falls back to shot mode for an unrecognized stored value', () => {
+    expect(normalizePreferences({ trackingMode: 'nonsense' }).trackingMode).toBe('shot');
   });
 
   it('league starts with every accessory field off, money games shown', () => {

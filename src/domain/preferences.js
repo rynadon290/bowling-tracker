@@ -12,6 +12,24 @@ export const ENVIRONMENTS = ["practice", "league", "tournament"];
 
 export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss", "ballSpeed", "shoes"];
 
+// How much detail the person wants to log. "shot" is the full frame-by-frame
+// flow the app was built around; "game" is just final scores per game, for
+// bowlers who want averages and trends without 30 taps a night (and for
+// screenshots that only show totals). This is separate from `environment`
+// because they're independent: someone can bowl league by-game and practice
+// shot-by-shot, or the reverse.
+export const TRACKING_MODES = ["shot", "game"];
+
+export const TRACKING_MODE_LABELS = {
+  shot: "Shot by shot",
+  game: "Game scores only",
+};
+
+export const TRACKING_MODE_DESCRIPTIONS = {
+  shot: "Log every delivery — unlocks leaves, spare conversion, and per-ball stats.",
+  game: "Just the final score for each game. Fast, and still tracks averages and trends.",
+};
+
 // Stats cards the person can reorder or hide. Order here is the default
 // order; anything not listed in a stored preference falls back to this,
 // so adding a new card later doesn't require migrating anyone's saved
@@ -93,6 +111,7 @@ export function defaultPreferences(environment = "league") {
   const preset = presetFor(safeEnvironment);
   return {
     environment: safeEnvironment,
+    trackingMode: "shot",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
@@ -122,6 +141,7 @@ export function normalizePreferences(raw) {
   if (!raw || typeof raw !== "object") return base;
   return {
     environment: ENVIRONMENTS.includes(raw.environment) ? raw.environment : base.environment,
+    trackingMode: TRACKING_MODES.includes(raw.trackingMode) ? raw.trackingMode : base.trackingMode,
     trackedFields: { ...base.trackedFields, ...(raw.trackedFields || {}) },
     showMoneyGames: typeof raw.showMoneyGames === "boolean" ? raw.showMoneyGames : base.showMoneyGames,
     statsCardOrder: reconcileCardOrder(raw.statsCardOrder),
@@ -183,4 +203,9 @@ export function setTrackedField(prefs, field, value) {
 
 export function setShowMoneyGames(prefs, value) {
   return { ...prefs, showMoneyGames: value };
+}
+
+export function setTrackingMode(prefs, mode) {
+  if (!TRACKING_MODES.includes(mode)) return prefs;
+  return { ...prefs, trackingMode: mode };
 }
