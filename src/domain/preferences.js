@@ -16,23 +16,55 @@ export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss"];
 // order; anything not listed in a stored preference falls back to this,
 // so adding a new card later doesn't require migrating anyone's saved
 // layout -- it just appears at its default position.
+//
+// `fixed: true` marks cards that stay put regardless of ordering. "Viewing"
+// is the bowler/league selector that controls everything below it, and
+// "Danger Zone" is destructive actions -- both would be confusing or
+// hazardous to relocate into the middle of the stats.
 export const STATS_CARDS = [
-  { id: "averages", label: "Averages & Records" },
-  { id: "progress", label: "Progress to Next Milestone" },
-  { id: "consistency", label: "Score Consistency" },
-  { id: "strikeSpare", label: "Strike & Spare Rates" },
-  { id: "tenPin", label: "Ten Pin Leaves" },
+  { id: "viewing", label: "Viewing", fixed: true },
+  { id: "headToHead", label: "Head-to-Head" },
+  { id: "teamRecords", label: "Team Records" },
+  { id: "seasonRecord", label: "Season Record" },
+  { id: "weeklyPoints", label: "Weekly Points" },
+  { id: "handicapImpact", label: "Handicap Impact" },
+  { id: "teamLeaderboard", label: "Team Leaderboard" },
+  { id: "giantKiller", label: "Giant Killer" },
+  { id: "hung", label: "Hung" },
+  { id: "teamSeries", label: "Team Series" },
+  { id: "headlineStats", label: "Shots / Strike % / Spare %" },
+  { id: "cleanFrames", label: "Clean Frames" },
+  { id: "framePosition", label: "Frame Position" },
+  { id: "firstBallAverage", label: "First-Ball Average" },
+  { id: "tenPinLeaves", label: "Ten Pin Leaves" },
+  { id: "singlePinSpares", label: "Single Pin Spares" },
   { id: "splits", label: "Splits" },
+  { id: "loneFivePin", label: "Lone 5-Pin" },
+  { id: "nonSplitLeaves", label: "Non-Split Leaves" },
+  { id: "strikeStreak", label: "Longest Strike Streak" },
   { id: "byBall", label: "By Ball" },
   { id: "missDistribution", label: "Miss Distribution" },
   { id: "releaseQuality", label: "Release Quality" },
-  { id: "framePosition", label: "Frame Position" },
+  { id: "ballChangeTriggers", label: "Ball Change Triggers" },
+  { id: "strikeQuality", label: "Strike Quality" },
+  { id: "runningAverages", label: "Running Averages" },
+  { id: "theoreticalAverage", label: "Theoretical Average" },
+  { id: "progress", label: "Progress to Next Milestone" },
+  { id: "consistency", label: "Score Consistency" },
+  { id: "scoreDistribution", label: "Score Distribution" },
+  { id: "gameByGame", label: "Game-by-Game Averages" },
+  { id: "trend", label: "Trend" },
   { id: "money", label: "Money Games" },
   { id: "threeSixNine", label: "3-6-9 Tracker" },
   { id: "sessionHistory", label: "Session History" },
+  { id: "dangerZone", label: "Danger Zone", fixed: true },
 ];
 
 export const STATS_CARD_IDS = STATS_CARDS.map(c => c.id);
+
+// Only these can be reordered or hidden by the person.
+export const MOVABLE_STATS_CARDS = STATS_CARDS.filter(c => !c.fixed);
+export const MOVABLE_STATS_CARD_IDS = MOVABLE_STATS_CARDS.map(c => c.id);
 
 // Practice: no scoring pressure, more time between throws to enter detail --
 // this is exactly when the extra diagnostic fields earn their keep.
@@ -65,7 +97,7 @@ export function defaultPreferences(environment = "league") {
     environment: safeEnvironment,
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
-    statsCardOrder: [...STATS_CARD_IDS],
+    statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
     hiddenStatsCards: [],
   };
 }
@@ -77,9 +109,9 @@ export function defaultPreferences(environment = "league") {
 // card would make it invisible to every existing user.
 export function reconcileCardOrder(storedOrder) {
   const stored = Array.isArray(storedOrder) ? storedOrder : [];
-  const known = stored.filter(id => STATS_CARD_IDS.includes(id));
+  const known = stored.filter(id => MOVABLE_STATS_CARD_IDS.includes(id));
   const seen = new Set(known);
-  const missing = STATS_CARD_IDS.filter(id => !seen.has(id));
+  const missing = MOVABLE_STATS_CARD_IDS.filter(id => !seen.has(id));
   return [...known, ...missing];
 }
 
@@ -96,7 +128,7 @@ export function normalizePreferences(raw) {
     showMoneyGames: typeof raw.showMoneyGames === "boolean" ? raw.showMoneyGames : base.showMoneyGames,
     statsCardOrder: reconcileCardOrder(raw.statsCardOrder),
     hiddenStatsCards: Array.isArray(raw.hiddenStatsCards)
-      ? raw.hiddenStatsCards.filter(id => STATS_CARD_IDS.includes(id))
+      ? raw.hiddenStatsCards.filter(id => MOVABLE_STATS_CARD_IDS.includes(id))
       : [],
   };
 }
