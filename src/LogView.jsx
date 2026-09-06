@@ -253,6 +253,19 @@ export default function LogView({
                     const theoreticalScores=[1,2,3].map(g=>theoreticalScoreForGame(cs.bowler,cs.league,cs.date,g));
                     const anyTheoretical=theoreticalScores.some(v=>v!=null);
                     if(!anyTheoretical)return null;
+
+                    // Theory Total covers the WHOLE series so it lines up
+                    // directly against the real series. A game with no
+                    // theoretical value (nothing makeable was missed, or it
+                    // isn't computable) contributes its real score, since
+                    // that game genuinely couldn't have gone any better.
+                    const played=cs.scores
+                      .map((real,i)=>({real,theory:theoreticalScores[i]}))
+                      .filter(x=>typeof x.real==="number");
+                    const theoryTotal=played.reduce((a,x)=>a+(x.theory??x.real),0);
+                    const realTotal=played.reduce((a,x)=>a+x.real,0);
+                    const leftOnTable=theoryTotal-realTotal;
+
                     return(
                       <div style={{marginBottom:"12px"}}>
                         <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>If every makeable spare had been made</div>
@@ -263,7 +276,29 @@ export default function LogView({
                               <div style={S.statLbl}>G{i+1} Theory</div>
                             </div>
                           ))}
+                          {played.length>0&&(
+                            <div style={{...S.statBox,border:`1px solid ${C.spare}`}}>
+                              <div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{theoryTotal}</div>
+                              <div style={S.statLbl}>Theory Series</div>
+                            </div>
+                          )}
                         </div>
+                        {played.length>0&&(
+                          <div style={{textAlign:"center",marginTop:"8px",fontSize:"12px"}}>
+                            {leftOnTable>0?(
+                              <span style={{color:C.miss,fontWeight:600}}>
+                                ▼ {leftOnTable} pins left on the table
+                              </span>
+                            ):(
+                              <span style={{color:C.strike,fontWeight:600}}>
+                                ✓ Converted every makeable spare
+                              </span>
+                            )}
+                            <span style={{color:C.textMuted,fontWeight:400,marginLeft:"6px"}}>
+                              ({realTotal} actual vs {theoryTotal} possible)
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
