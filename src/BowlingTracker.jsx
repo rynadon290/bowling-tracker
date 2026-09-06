@@ -6,6 +6,7 @@ import LogView from "./LogView.jsx";
 import StatsView from "./StatsView.jsx";
 import ImportScorecard from "./ImportScorecard.jsx";
 import Settings from "./Settings.jsx";
+import Profile from "./Profile.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
@@ -16,6 +17,7 @@ import {
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { normalizeLayout } from "./domain/layouts.js";
+import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S } from "./ui.jsx";
@@ -50,6 +52,7 @@ const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
+const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -187,6 +190,10 @@ export default function BowlingTracker(){
   // -- ballUniverse, addBall, removeBall, the cloud sync -- keeps working
   // unchanged. A ball with no layout recorded simply has no entry here.
   const[ballLayouts,setBallLayouts]=useState({});
+  // Per-bowler profiles, keyed by bowler name -- handedness, two-handed
+  // delivery, home centers, notes. Team/league membership is deliberately
+  // NOT stored here; it's derived from the roster so the two can't drift.
+  const[profiles,setProfiles]=useState({});
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -339,6 +346,20 @@ export default function BowlingTracker(){
           if(a)setArsenals(JSON.parse(a.value));
           const bl=await window.storage.get(LAYOUTS_KEY);
           if(bl)setBallLayouts(JSON.parse(bl.value));
+        }
+
+        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,home_centers,notes"));
+        if(profilesRes.online&&profilesRes.data){
+          const rebuiltProfiles={};
+          profilesRes.data.forEach(row=>{
+            const p=profileFromRow(row);
+            if(p&&p.bowlerName)rebuiltProfiles[p.bowlerName]=p;
+          });
+          setProfiles(rebuiltProfiles);
+          try{await window.storage.set(PROFILES_KEY,JSON.stringify(rebuiltProfiles));}catch{}
+        }else{
+          const pr=await window.storage.get(PROFILES_KEY);
+          if(pr)setProfiles(JSON.parse(pr.value));
         }
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
@@ -653,6 +674,20 @@ export default function BowlingTracker(){
         layout_values:layout?.values||null,
         created_by:user?.id||null,
       });
+    },600);
+  }
+
+  // Saves a bowler's profile. Debounced like other typed fields so a
+  // name or note doesn't fire a cloud write per keystroke.
+  function setProfile(bowlerName,profile){
+    const normalized=normalizeProfile(profile,bowlerName);
+    const updated={...profiles,[bowlerName]:normalized};
+    setProfiles(updated);
+    try{window.storage.set(PROFILES_KEY,JSON.stringify(updated));}catch{}
+
+    clearTimeout(pokerSaveTimers.current[`profile|${bowlerName}`]);
+    pokerSaveTimers.current[`profile|${bowlerName}`]=setTimeout(()=>{
+      cloudWrite("bowler_profiles",profileToRow(normalized,user?.id||null));
     },600);
   }
 
@@ -1389,7 +1424,11 @@ export default function BowlingTracker(){
   // lefty's mechanics mirror a righty's, so their weak/ringing corner pin
   // is the 7, not the 10 -- the logging chips flip to match rather than
   // asking them to mentally translate every shot.
-  const activeBowlerLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
+  // Profile is the source of truth; the roster value is the fallback for
+  // bowlers whose profile hasn't been filled in yet, so existing lefties
+  // keep working without needing a data migration.
+  const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
+  const activeBowlerLeftHanded=resolveHandedness(profiles[activeBowler],rosterLeftHanded);
 
   const inTenth=parseInt(form.frame)===10;
 
@@ -1660,6 +1699,7 @@ export default function BowlingTracker(){
         <div>
           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
             <div style={S.title}>🎳 Shot Tracker</div>
+            <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
           {pendingSyncCount>0?(
@@ -1742,6 +1782,14 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* LOG VIEW                                                          */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="profile"&&(
+          <Profile
+            bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
+            profiles={profiles} setProfile={setProfile} teams={teams}
+            arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
+            newBallName={newBallName} setNewBallName={setNewBallName} addBall={addBall}/>
+        )}
+
         {view==="settings"&&(
           <Settings
             showBackup={showBackup} setShowBackup={setShowBackup}
