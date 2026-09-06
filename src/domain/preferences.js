@@ -12,6 +12,28 @@ export const ENVIRONMENTS = ["practice", "league", "tournament"];
 
 export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss"];
 
+// Stats cards the person can reorder or hide. Order here is the default
+// order; anything not listed in a stored preference falls back to this,
+// so adding a new card later doesn't require migrating anyone's saved
+// layout -- it just appears at its default position.
+export const STATS_CARDS = [
+  { id: "averages", label: "Averages & Records" },
+  { id: "progress", label: "Progress to Next Milestone" },
+  { id: "consistency", label: "Score Consistency" },
+  { id: "strikeSpare", label: "Strike & Spare Rates" },
+  { id: "tenPin", label: "Ten Pin Leaves" },
+  { id: "splits", label: "Splits" },
+  { id: "byBall", label: "By Ball" },
+  { id: "missDistribution", label: "Miss Distribution" },
+  { id: "releaseQuality", label: "Release Quality" },
+  { id: "framePosition", label: "Frame Position" },
+  { id: "money", label: "Money Games" },
+  { id: "threeSixNine", label: "3-6-9 Tracker" },
+  { id: "sessionHistory", label: "Session History" },
+];
+
+export const STATS_CARD_IDS = STATS_CARDS.map(c => c.id);
+
 // Practice: no scoring pressure, more time between throws to enter detail --
 // this is exactly when the extra diagnostic fields earn their keep.
 // League/Tournament: default to the fast, simple logging flow. Tournament
@@ -43,7 +65,22 @@ export function defaultPreferences(environment = "league") {
     environment: safeEnvironment,
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
+    statsCardOrder: [...STATS_CARD_IDS],
+    hiddenStatsCards: [],
   };
+}
+
+// Reconciles a stored card order against the CURRENT set of known cards.
+// Two things have to hold: ids that no longer exist get dropped (a removed
+// card shouldn't leave a hole), and cards added since the order was saved
+// get appended rather than disappearing -- otherwise shipping a new stats
+// card would make it invisible to every existing user.
+export function reconcileCardOrder(storedOrder) {
+  const stored = Array.isArray(storedOrder) ? storedOrder : [];
+  const known = stored.filter(id => STATS_CARD_IDS.includes(id));
+  const seen = new Set(known);
+  const missing = STATS_CARD_IDS.filter(id => !seen.has(id));
+  return [...known, ...missing];
 }
 
 // Normalizes whatever's stored (which may be missing keys if it predates a
@@ -57,7 +94,38 @@ export function normalizePreferences(raw) {
     environment: ENVIRONMENTS.includes(raw.environment) ? raw.environment : base.environment,
     trackedFields: { ...base.trackedFields, ...(raw.trackedFields || {}) },
     showMoneyGames: typeof raw.showMoneyGames === "boolean" ? raw.showMoneyGames : base.showMoneyGames,
+    statsCardOrder: reconcileCardOrder(raw.statsCardOrder),
+    hiddenStatsCards: Array.isArray(raw.hiddenStatsCards)
+      ? raw.hiddenStatsCards.filter(id => STATS_CARD_IDS.includes(id))
+      : [],
   };
+}
+
+// Moves a card up or down by one position. Out-of-range moves are no-ops
+// rather than errors, so the UI can render the buttons unconditionally.
+export function moveStatsCard(prefs, cardId, direction) {
+  const order = reconcileCardOrder(prefs.statsCardOrder);
+  const from = order.indexOf(cardId);
+  if (from === -1) return prefs;
+  const to = from + (direction === "up" ? -1 : 1);
+  if (to < 0 || to >= order.length) return prefs;
+  const next = [...order];
+  [next[from], next[to]] = [next[to], next[from]];
+  return { ...prefs, statsCardOrder: next };
+}
+
+export function toggleStatsCardHidden(prefs, cardId) {
+  const hidden = Array.isArray(prefs.hiddenStatsCards) ? prefs.hiddenStatsCards : [];
+  const next = hidden.includes(cardId)
+    ? hidden.filter(id => id !== cardId)
+    : [...hidden, cardId];
+  return { ...prefs, hiddenStatsCards: next };
+}
+
+// The order to actually render, with hidden cards removed.
+export function visibleStatsCardOrder(prefs) {
+  const hidden = new Set(Array.isArray(prefs?.hiddenStatsCards) ? prefs.hiddenStatsCards : []);
+  return reconcileCardOrder(prefs?.statsCardOrder).filter(id => !hidden.has(id));
 }
 
 // Switching environments is a full preset swap for trackedFields/
@@ -65,10 +133,11 @@ export function normalizePreferences(raw) {
 // fresh for this context." Anything else stored on the preferences object
 // (future settings) is left untouched.
 export function applyEnvironment(prefs, environment) {
-  const preset = presetFor(environment);
+  const safeEnvironment = ENVIRONMENTS.includes(environment) ? environment : "league";
+  const preset = presetFor(safeEnvironment);
   return {
     ...prefs,
-    environment,
+    environment: safeEnvironment,
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
   };

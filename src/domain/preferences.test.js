@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   defaultPreferences, normalizePreferences, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
+  STATS_CARD_IDS, reconcileCardOrder, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -25,6 +26,12 @@ describe('defaultPreferences', () => {
     const p = defaultPreferences('tournament');
     expect(p.trackedFields).toEqual({ surface: false, line: false, release: false, miss: false });
     expect(p.showMoneyGames).toBe(false);
+  });
+
+  it('starts with every stats card visible in default order', () => {
+    const p = defaultPreferences();
+    expect(p.statsCardOrder).toEqual(STATS_CARD_IDS);
+    expect(p.hiddenStatsCards).toEqual([]);
   });
 
   it('an unrecognized environment falls back to league defaults', () => {
