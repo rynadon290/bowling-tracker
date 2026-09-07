@@ -1,0 +1,151 @@
+import { useState } from "react";
+// Only the recharts exports already proven in StatsView.jsx. A dashed
+// average reference line would have been nice here, but ReferenceLine
+// isn't used anywhere else in this app and there's no way to verify it
+// against the installed package from the build environment -- the average
+// is shown in the stat boxes below the chart instead.
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { C, S, Chip } from "./ui.jsx";
+import {
+  TREND_METRICS, trendMetric, seriesFor, trendDirection, describeTrend, seriesReliability,
+} from "./domain/trends.js";
+
+export default function TrendsView({
+  sessions, shots, bowlers, leagues,
+  statsBowler, setStatsBowler, statsLeague, setStatsLeague,
+  isSplit,
+}) {
+  const [metricId, setMetricId] = useState("average");
+  const metric = trendMetric(metricId);
+
+  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit });
+  const direction = trendDirection(points);
+  const reliability = seriesReliability(metricId, points);
+  const summary = describeTrend(metricId, points);
+
+  // Shot-sourced metrics need shot-by-shot data. A bowler tracking game
+  // scores only has none, and saying so beats an empty chart that looks
+  // broken.
+  const noShotData = metric?.source === "shots" && shots.length === 0;
+
+  const dirColor = direction.direction === "up" ? C.strike
+    : direction.direction === "down" ? C.miss
+    : C.textMuted;
+
+  const avgValue = points.length
+    ? points.reduce((a, p) => a + p.value, 0) / points.length
+    : null;
+
+  return (
+    <>
+      {bowlers.length > 1 && (
+        <div style={S.card}>
+          <div style={S.label}>Viewing</div>
+          <div style={S.chips}>
+            {bowlers.map(b => (
+              <Chip key={b} label={b} selected={statsBowler === b}
+                onToggle={() => setStatsBowler(statsBowler === b ? "" : b)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={S.card}>
+        <div style={S.label}>Metric</div>
+        <div style={S.chips}>
+          {TREND_METRICS.map(m => (
+            <Chip key={m.id} label={m.label} selected={metricId === m.id}
+              onToggle={() => setMetricId(m.id)} />
+          ))}
+        </div>
+        {metric && (
+          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>{metric.help}</div>
+        )}
+
+        {leagues.length > 0 && (
+          <>
+            <div style={{ ...S.label, marginTop: "12px" }}>League</div>
+            <div style={S.chips}>
+              <Chip label="All" selected={!statsLeague} onToggle={() => setStatsLeague("")} color={C.accent} />
+              {leagues.map(l => (
+                <Chip key={l} label={l.replace(" House Shot", "")} selected={statsLeague === l}
+                  onToggle={() => setStatsLeague(statsLeague === l ? "" : l)} color={C.accent} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
+          <div style={S.label}>{metric?.label}</div>
+          <div style={{ fontSize: "11px", color: C.textMuted }}>
+            {points.length} night{points.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        {noShotData ? (
+          <div style={{ fontSize: "12px", color: C.textMuted, textAlign: "center", padding: "24px 0" }}>
+            This one needs shot-by-shot data. You're tracking game scores only, so there's nothing to plot here yet.
+          </div>
+        ) : points.length < 2 ? (
+          <div style={{ fontSize: "12px", color: C.textMuted, textAlign: "center", padding: "24px 0" }}>
+            Need at least 2 nights logged before there's a line to draw.
+          </div>
+        ) : (
+          <>
+            <div style={{ height: "220px", marginBottom: "10px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={points} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                  <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} domain={["auto", "auto"]} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "12px" }}
+                    labelStyle={{ color: C.text }} />
+                  <Line type="monotone" dataKey="value" stroke={C.accent} strokeWidth={2} dot={{ r: 3, fill: C.accent }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* The claim, kept separate from the chart on purpose: the line
+                can always be drawn, but saying it means something is a
+                different statement and gets its own hedging. */}
+            <div style={{ fontSize: "12px", color: dirColor, fontWeight: direction.confident ? 600 : 400 }}>
+              {summary}
+            </div>
+
+            {reliability.thin && (
+              <div style={{ fontSize: "11px", color: C.spare, marginTop: "6px" }}>
+                Nights here average {reliability.medianSample} attempts, which is thin — individual points will
+                swing a lot even when nothing about your game has changed.
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "6px", marginTop: "12px" }}>
+              <div style={S.statBox}>
+                <div style={{ ...S.statNum, fontSize: "18px" }}>
+                  {Math.round(points[points.length - 1].value)}{metric.unit === "percent" ? "%" : ""}
+                </div>
+                <div style={S.statLbl}>Latest</div>
+              </div>
+              <div style={S.statBox}>
+                <div style={{ ...S.statNum, fontSize: "18px", color: C.textMuted }}>
+                  {Math.round(avgValue)}{metric.unit === "percent" ? "%" : ""}
+                </div>
+                <div style={S.statLbl}>Average</div>
+              </div>
+              <div style={S.statBox}>
+                <div style={{ ...S.statNum, fontSize: "18px", color: C.strike }}>
+                  {Math.round(Math.max(...points.map(p => p.value)))}{metric.unit === "percent" ? "%" : ""}
+                </div>
+                <div style={S.statLbl}>Best</div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      <div style={{ height: "32px" }} />
+    </>
+  );
+}

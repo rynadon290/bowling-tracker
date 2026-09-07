@@ -11,6 +11,7 @@ import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
+import TrendsView from "./TrendsView.jsx";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -654,8 +655,17 @@ export default function BowlingTracker(){
 
         const goalsRes=await cloudRead("bowler_goals",q=>q.select("bowler_name,goals"));
         if(goalsRes.online&&goalsRes.data){
+          // A goal saved while offline sits in the sync queue, not in the
+          // cloud. Taking the cloud rows verbatim would overwrite it with
+          // the older server copy and silently revert the change -- same
+          // merge the matches load does, for the same reason.
+          const pendingGoals=await getQueuedRecordsForTable("bowler_goals");
+          const pendingBowlers=new Set(pendingGoals.map(r=>r.bowler_name));
           const rebuilt={};
-          goalsRes.data.forEach(r=>{rebuilt[r.bowler_name]=goalsFromRow(r);});
+          goalsRes.data
+            .filter(r=>!pendingBowlers.has(r.bowler_name))
+            .forEach(r=>{rebuilt[r.bowler_name]=goalsFromRow(r);});
+          pendingGoals.forEach(r=>{rebuilt[r.bowler_name]=goalsFromRow(r);});
           setGoalsByBowler(rebuilt);
           try{await window.storage.set(GOALS_KEY,JSON.stringify(rebuilt));}catch{}
         }else{
@@ -1416,6 +1426,11 @@ export default function BowlingTracker(){
   // Lets a bowler re-run the first-launch setup from Settings -- handy if
   // they skipped it, or their situation changed.
   function saveGoals(bowler,next){
+    // activeBowler starts empty, so without this a goal set before any
+    // bowler exists would write a row with bowler_name "" -- which the
+    // not-null constraint accepts, leaving an unreachable junk row that
+    // no view ever reads back.
+    if(!bowler)return;
     const normalized=normalizeGoals(next);
     const updated={...goalsByBowler,[bowler]:normalized};
     setGoalsByBowler(updated);
@@ -2763,9 +2778,9 @@ export default function BowlingTracker(){
           )}
         </div>
         <div style={S.nav}>
-          {["log","stats","insights","social"].map(v=>(
+          {["log","stats","trends","insights","social"].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="stats"?"Stats":v==="insights"?"Insights":"Social"}
+    {v==="log"?"Log":v==="stats"?"Stats":v==="trends"?"Trends":v==="insights"?"Insights":"Social"}
   </button>
 ))}
         </div>
@@ -2936,14 +2951,22 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* STATS VIEW                                                        */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="trends"&&(
+          <TrendsView
+            sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
+            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            isSplit={isSplit}/>
+        )}
+
         {view==="stats"&&(
           <StatsView
-            goalsPanel={
+            goalsPanel={goalBowler?(
               <GoalsPanel
                 goals={activeGoals}
                 measurements={goalMeasurements}
                 onChange={next=>saveGoals(goalBowler,next)}/>
-            }
+            ):null}
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
