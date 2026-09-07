@@ -19,7 +19,13 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+// Reads BOTH spellings. analyze-performance has always used the
+// lowercase "gemini_api_key", and this function used the uppercase one --
+// so the secret that made Insights work left the scorecard reader dead,
+// reporting "not configured" on a project where the key was configured
+// all along. Accepting either means one secret serves both, whichever
+// name it happens to be stored under.
+const GEMINI_API_KEY = Deno.env.get("gemini_api_key") || Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = "gemini-2.5-flash"; // multimodal, on the free tier
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -139,7 +145,9 @@ Deno.serve(async (req) => {
 
   try {
     if (!GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured on the server" }), {
+      return new Response(JSON.stringify({
+        error: "No Gemini API key configured for this function. Set a secret named gemini_api_key (the same one analyze-performance uses) in Project Settings > Edge Functions > Secrets, then redeploy.",
+      }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
