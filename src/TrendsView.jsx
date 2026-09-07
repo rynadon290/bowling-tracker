@@ -13,12 +13,12 @@ import {
 export default function TrendsView({
   sessions, shots, bowlers, leagues,
   statsBowler, setStatsBowler, statsLeague, setStatsLeague,
-  isSplit,
+  isSplit, isTenPinLeave,
 }) {
   const [metricId, setMetricId] = useState("average");
   const metric = trendMetric(metricId);
 
-  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit });
+  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isTenPinLeave });
   const direction = trendDirection(points);
   const reliability = seriesReliability(metricId, points);
   const summary = describeTrend(metricId, points);

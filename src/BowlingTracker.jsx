@@ -2539,6 +2539,12 @@ export default function BowlingTracker(){
       current:singlePinAttempts.length?singlePinSpareR:null,
       sample:singlePinAttempts.length,
     },
+    // Attempts, not leaves: tenPinAttempts already filters to leaves with
+    // a recorded outcome, so an unfinished frame isn't scored as a miss.
+    tenPinSpareRate:{
+      current:tenPinAttempts.length?tenPinSpareR:null,
+      sample:tenPinAttempts.length,
+    },
     cleanFrameRate:{current:frameShots.length?cleanFrameR:null,sample:frameShots.length},
   };
   const activeGoals=goalsByBowler[goalBowler]||[];
@@ -2956,7 +2962,7 @@ export default function BowlingTracker(){
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
-            isSplit={isSplit}/>
+            isSplit={isSplit} isTenPinLeave={isTenPinLeave}/>
         )}
 
         {view==="stats"&&(
