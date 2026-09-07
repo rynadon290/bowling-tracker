@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
-import { THEMES, THEME_IDS } from "./domain/themes.js";
+import { THEMES, DARK_THEME_IDS, LIGHT_THEME_IDS } from "./domain/themes.js";
 import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
@@ -222,30 +222,35 @@ export default function Settings({
       <CollapsibleCard title="Look" summary={THEMES[preferences.theme]?.label || THEMES.lane.label}
         expanded={expanded.look} onToggle={() => toggle("look")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
-          All of them are dark — you're on a phone in a bowling centre — they just take their colour from a different part of the house.
+          Each one takes its colour from a different part of the house. Dark ones for a dim centre, light ones for a bright room or daytime.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-          {THEME_IDS.map(id => {
-            const t = THEMES[id];
-            const on = (preferences.theme || "lane") === id;
-            return (
-              <button key={id} onClick={() => apply(setTheme(preferences, id))}
-                style={{
-                  textAlign: "left", cursor: "pointer", padding: "10px", borderRadius: "10px",
-                  backgroundColor: t.colors.card, color: t.colors.text,
-                  border: `2px solid ${on ? t.colors.accent : t.colors.border}`,
-                }}>
-                <div style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
-                  {[t.colors.accent, t.colors.strike, t.colors.spare, t.colors.miss].map((c, i) => (
-                    <span key={i} style={{ width: "14px", height: "14px", borderRadius: "7px", backgroundColor: c, display: "inline-block" }} />
-                  ))}
-                </div>
-                <div style={{ fontSize: "13px", fontWeight: 600 }}>{t.label}{on ? " ✓" : ""}</div>
-                <div style={{ fontSize: "10px", color: t.colors.textMuted, marginTop: "2px", lineHeight: 1.4 }}>{t.hint}</div>
-              </button>
-            );
-          })}
-        </div>
+        {[["Dark", DARK_THEME_IDS], ["Light", LIGHT_THEME_IDS]].map(([group, ids]) => (
+          <div key={group} style={{ marginBottom: "10px" }}>
+            <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "6px" }}>{group}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {ids.map(id => {
+                const t = THEMES[id];
+                const on = (preferences.theme || "lane") === id;
+                return (
+                  <button key={id} onClick={() => apply(setTheme(preferences, id))}
+                    style={{
+                      textAlign: "left", cursor: "pointer", padding: "10px", borderRadius: "10px",
+                      backgroundColor: t.colors.card, color: t.colors.text,
+                      border: `2px solid ${on ? t.colors.accent : t.colors.border}`,
+                    }}>
+                    <div style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
+                      {[t.colors.accent, t.colors.strike, t.colors.spare, t.colors.miss].map((c, i) => (
+                        <span key={i} style={{ width: "14px", height: "14px", borderRadius: "7px", backgroundColor: c, display: "inline-block" }} />
+                      ))}
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>{t.label}{on ? " ✓" : ""}</div>
+                    <div style={{ fontSize: "10px", color: t.colors.textMuted, marginTop: "2px", lineHeight: 1.4 }}>{t.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </CollapsibleCard>
 
       <CollapsibleCard title="Environment" summary={ENVIRONMENT_LABELS[preferences.environment]}

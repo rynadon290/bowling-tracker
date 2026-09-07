@@ -79,7 +79,7 @@ const S = new Proxy({}, {
   label:{ fontSize:"10px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:C.textMuted, marginBottom:"8px" },
   input:{ width:"100%", backgroundColor:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"10px 12px", color:C.text, fontSize:"14px", boxSizing:"border-box", outline:"none" },
   button:{ backgroundColor:C.surface, color:C.text, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"9px 12px", fontSize:"13px", fontWeight:600, cursor:"pointer" },
-  primary:{ backgroundColor:C.accent, color:"#fff", border:"none", borderRadius:"8px", padding:"10px 14px", fontSize:"13px", fontWeight:700, cursor:"pointer" },
+  primary:{ backgroundColor:C.accent, color:C.onAccent, border:"none", borderRadius:"8px", padding:"10px 14px", fontSize:"13px", fontWeight:700, cursor:"pointer" },
 });
     return styles[key];
   },

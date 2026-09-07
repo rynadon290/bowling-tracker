@@ -156,7 +156,7 @@ const S = new Proxy({}, {
   },
   primary:{
     backgroundColor:C.accent,
-    color:"#fff",
+    color:C.onAccent,
     border:"none",
     borderRadius:"8px",
     padding:"10px 14px",
