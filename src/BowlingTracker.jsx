@@ -52,7 +52,7 @@ import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHig
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
 import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY } from "./constants.js";
-import {
+import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
 } from "./domain/supabaseMapping.js";
@@ -1586,7 +1586,9 @@ export default function BowlingTracker(){
         bowler_user_id:member?.userId||null,
         bowler_name:e.bowler,
         uploaded_by:user.id,
-        team_id:e.teamId||null,
+        // Locally-created teams have a generated id, not a UUID -- see
+        // validTeamId. Sending one is a 22P02 the bowler can't act on.
+        team_id:validTeamId(e.teamId),
         league_id:leagueIdsRef.current[e.league]||null,
         date:e.date,
         imported_scores:e.importedScores,
@@ -3475,7 +3477,20 @@ export default function BowlingTracker(){
         {/* PROFILE + SETTINGS                                                */}
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="profile"&&(
-          <Profile
+          <>
+            {/* Scores a teammate imported for you. On Profile rather than
+                Log: the Log tab is for what you're bowling right now, and
+                a confirmation request for a night that already happened
+                is admin, not logging. It sits with the other things that
+                are about you rather than about tonight. */}
+            <ImportedScoresInbox
+              records={importedScores}
+              bowler={activeBowler}
+              onApprove={approveImportedScores}
+              onReject={rejectImportedScores}
+              onCorrectTeammate={correctTeammateScores}
+              canCorrect={r=>canCorrectImport(r)}/>
+            <Profile
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
@@ -3486,6 +3501,7 @@ export default function BowlingTracker(){
             saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             bookAverageDue={bookAverageCheck.needed} bookAverageTriggerLeague={bookAverageCheck.league} bookAverageSuggestion={bookAverageSuggestion} acknowledgeBookAverageUpdate={acknowledgeBookAverageUpdate}/>
+          </>
         )}
 
         {view==="settings"&&(
@@ -3546,15 +3562,6 @@ export default function BowlingTracker(){
             oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
-            importedScoresInbox={activeBowler?(
-              <ImportedScoresInbox
-                records={importedScores}
-                bowler={activeBowler}
-                onApprove={approveImportedScores}
-                onReject={rejectImportedScores}
-                onCorrectTeammate={correctTeammateScores}
-                canCorrect={r=>canCorrectImport(r)}/>
-            ):null}
             goalsPanel={activeBowler&&logGoals.length?(
               <GoalsPanel
                 goals={logGoals}

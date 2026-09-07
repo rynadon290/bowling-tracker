@@ -307,12 +307,17 @@ export default function ImportScorecard({
             // when the honest answer is "the reader is busy, try again in
             // a minute" -- and people give up over the difference.
             switch(body.reason){
-              case "busy":
+              case "busy": {
                 retryable=true;
+                // Only mention retries if any actually happened, and get
+                // the plural right -- "retried 1 times" undermines the
+                // reassurance the rest of the message is doing.
+                const n=Number(body.retries)||0;
+                const tried=n>0?` (Already retried ${n} time${n===1?"":"s"}.)`:"";
                 detail=`The scorecard reader is busy right now — this happens at peak times and usually clears within a few minutes. `+
-                       `Your images are still selected, so just tap Extract again in a minute. `+
-                       `(Already retried ${body.attempts||1} times.)`;
+                       `Your images are still selected, so just tap Extract again in a minute.${tried}`;
                 break;
+              }
               case "rate_limited":
                 retryable=true;
                 detail="The scorecard reader has hit its usage limit for the moment. Give it a few minutes and try again — nothing is lost.";
