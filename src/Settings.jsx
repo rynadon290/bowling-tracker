@@ -37,7 +37,7 @@ export default function Settings({
   filterResult, setFilterResult, filtered, ballUniverse,
   startEdit, deleteShot,
   centers, leagueCenters, setLeagueCenter, searchCenters,
-  leagueDates, setLeagueDates,
+  leagueDates, setLeagueDates, renameLeague,
   hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
   shots, leftHandedForBowler,
 }) {
@@ -64,6 +64,20 @@ export default function Settings({
     backup: false, reset: false, dangerZone: false,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+
+  const [editingLeague, setEditingLeague] = useState(null);
+  const [leagueDraft, setLeagueDraft] = useState("");
+
+  async function commitRename(oldName) {
+    const next = leagueDraft.trim();
+    setEditingLeague(null);
+    if (!next || next === oldName) return;
+    if ((leagues || []).some(l => l !== oldName && l.toLowerCase() === next.toLowerCase())) {
+      setError("A league with that name already exists.");
+      return;
+    }
+    await renameLeague(oldName, next);
+  }
 
   async function apply(next) {
     setError(null);
@@ -295,19 +309,41 @@ export default function Settings({
           house for a season, so this is one entry per season instead of a
           tap every night. */}
       {(leagues || []).length > 0 && (
-        <CollapsibleCard title="Where You Bowl" summary={`${leagues.length} league${leagues.length === 1 ? "" : "s"}`}
+        <CollapsibleCard title="Leagues" summary={`${leagues.length} league${leagues.length === 1 ? "" : "s"}`}
           expanded={expanded.whereYouBowl} onToggle={() => toggle("whereYouBowl")}>
           <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-            Set each league's center once and the app can compare how you score house to house.
+            Rename a league, set its center and season dates, or hide one you're not bowling any more.
           </div>
           {(leagues || []).map((league, i) => {
             const centerId = leagueCenters?.[league];
             const center = (centers || []).find(c => c.id === centerId) || null;
             return (
               <div key={league} style={{ paddingBottom: "10px", marginBottom: "10px", borderBottom: i < leagues.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                  {league.replace(" House Shot", "")}
-                </div>
+                {/* Rename. renameLeague already existed and rewrites every
+                    shot, session and record to the new name -- it just was
+                    never exposed, so a league typed wrong at creation was
+                    permanent. */}
+                {editingLeague === league ? (
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                    <input style={{ ...S.input, flex: 1, fontSize: "13px" }} autoFocus
+                      value={leagueDraft} onChange={e => setLeagueDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") commitRename(league); }} />
+                    <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+                      disabled={!leagueDraft.trim()} onClick={() => commitRename(league)}>Save</button>
+                    <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+                      onClick={() => setEditingLeague(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px", gap: "8px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                      {league.replace(" House Shot", "")}
+                    </div>
+                    {renameLeague && (
+                      <button style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: "12px", padding: 0 }}
+                        onClick={() => { setEditingLeague(league); setLeagueDraft(league); }}>Rename</button>
+                    )}
+                  </div>
+                )}
                 <CenterPicker
                   leagueName={league.replace(" House Shot", "")}
                   currentCenter={center}

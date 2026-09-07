@@ -3952,7 +3952,7 @@ export default function BowlingTracker(){
             filtered={filtered} ballUniverse={ballUniverse}
             startEdit={startEdit} deleteShot={deleteShot}
             centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}
-            leagueDates={leagueDates} setLeagueDates={saveLeagueDates}
+            leagueDates={leagueDates} setLeagueDates={saveLeagueDates} renameLeague={renameLeague}
             hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
             shots={shots}
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
