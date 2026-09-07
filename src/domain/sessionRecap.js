@@ -62,7 +62,7 @@ export function bowlerLine(manualScores, bowler, league, date) {
 
 // Everyone who bowled, best series first.
 export function sessionLines(manualScores, bowlers, league, date) {
-  return (bowlers || [])
+  return (Array.isArray(bowlers) ? bowlers : [])
     .map(b => bowlerLine(manualScores, b, league, date))
     .filter(Boolean)
     .sort((a, b) => b.total - a.total);
@@ -200,7 +200,7 @@ export function practiceRecap(manualScores, bowler, league, date, priorAverage =
 export function practiceComparison(manualScores, bowler, partners, league, date) {
   const mine = bowlerLine(manualScores, bowler, league, date);
   if (!mine) return null;
-  const others = (partners || [])
+  const others = (Array.isArray(partners) ? partners : [])
     .filter(p => p && p !== bowler)
     .map(p => bowlerLine(manualScores, p, league, date))
     .filter(Boolean);
@@ -254,7 +254,7 @@ import { attempts, conversionRate, targetLabel } from "./drills.js";
 export const MIN_DRILL_ATTEMPTS = 5;
 
 function drillsFor(drills, bowler, date) {
-  return (drills || []).filter(d =>
+  return (Array.isArray(drills) ? drills : []).filter(d =>
     d && d.bowler === bowler && (!date || d.date === date) && attempts(d) > 0);
 }
 
@@ -318,7 +318,7 @@ export function drillComparison(drills, bowler, partners, date) {
   const mine = drillLines(drills, bowler, date);
   if (!mine.length) return null;
 
-  const others = (partners || [])
+  const others = (Array.isArray(partners) ? partners : [])
     .filter(p => p && p !== bowler)
     .map(p => ({ bowler: p, lines: drillLines(drills, p, date) }))
     .filter(x => x.lines.length);

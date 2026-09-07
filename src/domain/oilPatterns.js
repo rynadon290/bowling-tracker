@@ -53,7 +53,7 @@ function key(name) {
 // typing "Kry" surfaces "Krypton" before anything with "kry" buried in the
 // middle of a longer name.
 export function searchPatterns(query, patterns, limit = 8) {
-  const q = key(query);
+  const q = key(typeof query === "string" ? query : "");
   if (q.length < 2) return [];
   const scored = (patterns || [])
     .map(normalizePattern)
@@ -131,7 +131,7 @@ export function patternDays(tournaments, patternName) {
   const target = key(patternName);
   if (!target) return [];
   const out = [];
-  for (const t of tournaments || []) {
+  for (const t of (Array.isArray(tournaments) ? tournaments : [])) {
     for (const day of t?.days || []) {
       if (key(day?.oilPattern) !== target) continue;
       const scores = scoresForDay(day);
@@ -183,7 +183,7 @@ export function patternStats(tournaments, patternName) {
 // how much they've played it. For a "your patterns" overview.
 export function loggedPatternSummaries(tournaments) {
   const names = new Map();
-  for (const t of tournaments || []) {
+  for (const t of (Array.isArray(tournaments) ? tournaments : [])) {
     for (const day of t?.days || []) {
       const name = (day?.oilPattern || "").trim();
       if (!name) continue;

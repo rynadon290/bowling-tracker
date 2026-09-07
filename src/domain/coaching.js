@@ -39,7 +39,7 @@ export function categorizeCoaching(rows, myUserId, profilesById = {}) {
   const incoming = [];    // waiting on my answer
   const outgoing = [];    // waiting on theirs
 
-  for (const r of rows || []) {
+  for (const r of (Array.isArray(rows) ? rows : [])) {
     if (!r) continue;
     const iAmCoach = r.coach_id === myUserId;
     const iAmBowler = r.bowler_id === myUserId;
@@ -266,7 +266,7 @@ export function normalizeNote(raw) {
 
 // Oldest first, so a thread reads top to bottom like a conversation.
 export function sortNotes(notes) {
-  return (notes || [])
+  return (Array.isArray(notes) ? notes : [])
     .map(normalizeNote)
     .filter(Boolean)
     .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));

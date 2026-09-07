@@ -63,7 +63,7 @@ export function usualNights(sessions, bowler, today = new Date()) {
   cutoff.setDate(cutoff.getDate() - USUAL_NIGHT_LOOKBACK_DAYS);
 
   const datesByWeekday = new Map();
-  for (const s of sessions || []) {
+  for (const s of (Array.isArray(sessions) ? sessions : [])) {
     if (!s) continue;
     // When a bowler is named, only their own sessions count -- a shared
     // device shouldn't blend two people's schedules together.
@@ -88,13 +88,17 @@ export function usualNights(sessions, bowler, today = new Date()) {
 //   dismissedDate - "YYYY-MM-DD" it was last dismissed, or "".
 //
 // Returns true only when the prompt should render right now.
-export function shouldShowLaunchPrompt({
-  sessions,
-  bowler,
-  seenOnce,
-  dismissedDate,
-  today = new Date(),
-} = {}) {
+export function shouldShowLaunchPrompt(options) {
+  // Destructuring a null argument throws, and a default only covers
+  // undefined -- so an explicit null (easy to pass from optional state)
+  // would white-screen the Log tab.
+  const {
+    sessions,
+    bowler,
+    seenOnce,
+    dismissedDate,
+    today = new Date(),
+  } = options && typeof options === "object" ? options : {};
   const todayStr = localDateString(today);
 
   // Dismissing always holds for the rest of that day, whatever the reason

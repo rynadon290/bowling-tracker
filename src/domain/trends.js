@@ -79,7 +79,7 @@ export function trendMetricFor(id, leftHanded = false) {
 }
 
 function bySession(rows, bowler, league) {
-  return (rows || []).filter(r =>
+  return (Array.isArray(rows) ? rows : []).filter(r =>
     r && (bowler ? r.bowler === bowler : true) && (league ? r.league === league : true));
 }
 
@@ -183,10 +183,11 @@ export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, 
 // nights, not days, and a six-week layoff shouldn't stretch the x-axis in
 // a way that flattens a real change.
 export function linearSlope(points) {
-  const n = (points || []).length;
+  const list = Array.isArray(points) ? points : [];
+  const n = list.length;
   if (n < 2) return null;
-  const xs = points.map((_, i) => i);
-  const ys = points.map(p => p.value);
+  const xs = list.map((_, i) => i);
+  const ys = list.map(p => p.value);
   const mx = xs.reduce((a, b) => a + b, 0) / n;
   const my = ys.reduce((a, b) => a + b, 0) / n;
   let num = 0, den = 0;
@@ -218,7 +219,8 @@ function residualSpread(points, slope) {
 // scatter. Otherwise the answer is "flat", which here honestly means "not
 // distinguishable from noise" rather than "definitely unchanged".
 export function trendDirection(points) {
-  const n = (points || []).length;
+  const list = Array.isArray(points) ? points : [];
+  const n = list.length;
   if (n < MIN_POINTS_FOR_DIRECTION) {
     return {
       direction: "unknown",
@@ -228,13 +230,13 @@ export function trendDirection(points) {
       total: null,
     };
   }
-  const slope = linearSlope(points);
+  const slope = linearSlope(list);
   if (slope == null) {
     return { direction: "flat", confident: false, slope: null, pointsNeeded: 0, total: 0 };
   }
   // Movement the line predicts across the whole series.
   const total = slope * (n - 1);
-  const spread = residualSpread(points, slope);
+  const spread = residualSpread(list, slope);
 
   // The bar: the fitted line has to move further across the series than a
   // typical night deviates from it. Below that, the shape is scatter.
@@ -254,10 +256,11 @@ export function trendDirection(points) {
 // is more representative than the total.
 export function seriesReliability(metricId, points) {
   const metric = trendMetric(metricId);
-  if (!metric || metric.source !== "shots" || !points.length) {
+  const list = Array.isArray(points) ? points : [];
+  if (!metric || metric.source !== "shots" || !list.length) {
     return { thin: false, medianSample: null };
   }
-  const samples = points.map(p => p.sample).sort((a, b) => a - b);
+  const samples = list.map(p => p.sample).sort((a, b) => a - b);
   const median = samples[Math.floor(samples.length / 2)];
   // A night with fewer first balls than a specific-leave sample is worth
   // is too thin to read on its own.

@@ -1,3 +1,9 @@
+// Every exported function here runs during render, so a bad argument is a
+// white screen rather than a caught error. `arr()` coerces anything that
+// isn't an array to an empty one -- corrupted or old-format persisted data
+// should degrade to "no stats yet", never to a crash.
+function arr(v){ return Array.isArray(v) ? v : []; }
+
 // Pure stats/records functions, extracted from BowlingTracker.jsx so they're
 // independently testable — same pattern as scoring.js and splits.js. Each
 // takes the relevant data (sessions/matches) as an explicit parameter
@@ -8,7 +14,7 @@
 // session on file for them (any league, any night).
 export function bowlerHighGame(sessions,bowler){
   let best=null;
-  sessions.filter(s=>s.bowler===bowler).forEach(s=>s.scores.forEach((v,i)=>{
+  arr(sessions).filter(s=>s.bowler===bowler).forEach(s=>s.scores.forEach((v,i)=>{
     if(best===null||v>best.value)best={value:v,date:s.date,league:s.league,game:i+1};
   }));
   return best;
@@ -17,7 +23,7 @@ export function bowlerHighGame(sessions,bowler){
 // The single highest 3-game series total this bowler has ever bowled.
 export function bowlerHighSeries(sessions,bowler){
   let best=null;
-  sessions.filter(s=>s.bowler===bowler).forEach(s=>{
+  arr(sessions).filter(s=>s.bowler===bowler).forEach(s=>{
     if(best===null||s.total>best.value)best={value:s.total,date:s.date,league:s.league};
   });
   return best;
@@ -30,7 +36,7 @@ export function bowlerHighSeries(sessions,bowler){
 // actually built from.
 export function teamDateGroups(sessions,league){
   const byKey={};
-  sessions.filter(s=>s.league===league).forEach(s=>{
+  arr(sessions).filter(s=>s.league===league).forEach(s=>{
     const k=`${s.league}__${s.date}`;
     if(!byKey[k])byKey[k]={league:s.league,date:s.date,entries:[]};
     byKey[k].entries.push(s);
@@ -67,7 +73,7 @@ export function teamHighSeries(sessions,league){
 // Tallies game/series wins-losses and points won/available from match
 // records for a league (or every league combined, if none given).
 export function seasonRecord(matches,league){
-  const ms=league?matches.filter(m=>m.league===league):matches;
+  const ms=league?arr(matches).filter(m=>m.league===league):matches;
   let gameWins=0,gameLosses=0,seriesWins=0,seriesLosses=0,pointsWon=0,pointsAvailable=0;
   ms.forEach(m=>{
     (m.games||[]).forEach(g=>{
@@ -100,7 +106,7 @@ export function weeklyPointsData(matches,league){
 // game of the night) across every session on file, optionally scoped to
 // one league. bowler="" or omitted pools every bowler together.
 export function gameAvg(sessions,bowler,gameIdx,league){
-  const ls=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true));
+  const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true));
   const vals=ls.map(s=>s.scores[gameIdx]).filter(v=>v!=null);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
@@ -128,7 +134,7 @@ export function teamGameTotalAvgAt(sessions,league,gameIdx){
 // a league (unlike cAvg) -- this is the per-league number, not a combined
 // figure across every league a bowler plays in.
 export function rAvg(sessions,bowler,league){
-  const ls=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&s.league===league);
+  const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&s.league===league);
   if(!ls.length)return null;
   const all=ls.flatMap(s=>s.scores);
   return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
@@ -139,7 +145,7 @@ export function rAvg(sessions,bowler,league){
 // rAvg in that case, but also supports the no-league "combined" view rAvg
 // doesn't).
 export function cAvg(sessions,bowler,league){
-  const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
   if(!all.length)return null;
   return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
 }
@@ -149,7 +155,7 @@ export function cAvg(sessions,bowler,league){
 // the raw (unrounded) average, and a 0-100% progress figure through the
 // current 5-pin band, for a progress-bar-style display.
 export function avgProgress(sessions,bowler,league){
-  const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
   if(!all.length)return null;
   const raw=all.reduce((a,b)=>a+b,0)/all.length;
   const current=Math.trunc(raw);
@@ -179,7 +185,7 @@ export function avgProgress(sessions,bowler,league){
 // `gainAchievable`/`dropAchievable` rather than displaying an impossible
 // target as if it were in reach.
 export function pinsForNextSession(sessions,bowler,league,gamesPerSession=3){
-  const all=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
   if(!all.length)return null;
 
   const games=all.length;
@@ -219,7 +225,7 @@ export function pinsForNextSession(sessions,bowler,league,gamesPerSession=3){
 // giant coming into this week" style comparisons where including the
 // week's own results would be circular.
 export function cumulativeAvgBeforeDate(sessions,bowler,league,beforeDate){
-  const all=sessions.filter(s=>s.bowler===bowler&&s.league===league&&s.date<beforeDate).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>s.bowler===bowler&&s.league===league&&s.date<beforeDate).flatMap(s=>s.scores);
   if(!all.length)return null;
   return all.reduce((a,b)=>a+b,0)/all.length;
 }
@@ -231,7 +237,7 @@ export function cumulativeAvgBeforeDate(sessions,bowler,league,beforeDate){
 // frame (league+date+game+frame) so only genuinely shared frames count.
 export function hungCounts(shots,league){
   const groups={};
-  shots.filter(s=>(!league||s.league===league)&&(!s.ballNum||s.ballNum===1)).forEach(s=>{
+  arr(shots).filter(s=>(!league||s.league===league)&&(!s.ballNum||s.ballNum===1)).forEach(s=>{
     const key=`${s.league}|${s.date}|${s.game}|${s.frame}`;
     (groups[key]=groups[key]||[]).push(s);
   });
@@ -258,11 +264,11 @@ export function hungCounts(shots,league){
 // hands in a later week, earlier weeks are never retroactively recomputed
 // against the new giant.
 export function beatHighBowlerStats(sessions,league){
-  const dates=[...new Set(sessions.filter(s=>s.league===league).map(s=>s.date))].sort();
+  const dates=[...new Set(arr(sessions).filter(s=>s.league===league).map(s=>s.date))].sort();
   const tally={};
   function ensure(b){if(!tally[b])tally[b]={won:0,total:0,weeksAsHigh:0};}
   dates.forEach(date=>{
-    const priorBowlers=[...new Set(sessions.filter(s=>s.league===league&&s.date<date).map(s=>s.bowler))];
+    const priorBowlers=[...new Set(arr(sessions).filter(s=>s.league===league&&s.date<date).map(s=>s.bowler))];
     if(!priorBowlers.length)return; // first week ever — no prior data, no giant yet
     let highBowler=null,highAvg=-Infinity;
     priorBowlers.forEach(b=>{
@@ -270,7 +276,7 @@ export function beatHighBowlerStats(sessions,league){
       if(avg!=null&&avg>highAvg){highAvg=avg;highBowler=b;}
     });
     if(!highBowler)return;
-    const weekSessions=sessions.filter(s=>s.league===league&&s.date===date);
+    const weekSessions=arr(sessions).filter(s=>s.league===league&&s.date===date);
     const highSession=weekSessions.find(s=>s.bowler===highBowler);
     if(!highSession)return; // reigning giant didn't bowl this week — title carries over, no comparison this week
     ensure(highBowler);
@@ -298,8 +304,8 @@ export function beatHighBowlerStats(sessions,league){
 // a whole team's summed total was never a fair comparison in the first
 // place, so that case intentionally uses team totals instead of raw scores.
 export function scoreValues(sessions,bowler,league,pooled){
-  if(bowler)return sessions.filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
-  if(pooled)return sessions.filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
+  if(bowler)return arr(sessions).filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  if(pooled)return arr(sessions).filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
   return teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
 }
 
@@ -353,7 +359,7 @@ export function histogramBuckets(values,bucketCount=8){
 // Fully computable from already-logged shots -- no new data entry needed
 // for the win/eligibility determination itself.
 export function threeSixNineResults(shots,bowler,league,date){
-  const nightShots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date);
+  const nightShots=arr(shots).filter(s=>s.bowler===bowler&&s.league===league&&s.date===date);
 
   const strikeAt=(game,frameNum)=>nightShots.some(s=>s.game===game&&parseInt(s.frame)===frameNum&&s.result==="Strike");
 

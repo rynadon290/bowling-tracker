@@ -62,6 +62,7 @@ export function resolveGameScore(manualScores, bowler, league, date, game, shotD
 // Returns null when nothing is entered at all -- distinct from 0, which
 // would be a real (if grim) series.
 export function seriesTotal(gameScores) {
+  if (!Array.isArray(gameScores)) return null;
   const valid = (gameScores || []).filter(v => typeof v === "number");
   return valid.length ? valid.reduce((a, b) => a + b, 0) : null;
 }

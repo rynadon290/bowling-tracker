@@ -218,6 +218,7 @@ export function setProfileField(profile, field, value) {
 
 // ── Supabase mapping ────────────────────────────────────────────────────
 export function profileToRow(profile, userId) {
+  profile = profile && typeof profile === "object" ? profile : {};
   return {
     created_by: userId,
     bowler_name: profile.bowlerName,
