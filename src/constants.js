@@ -1,3 +1,7 @@
+// The app's name, in one place so a rename doesn't mean hunting through
+// JSX for a hardcoded string.
+export const APP_NAME = "Board & Arrow";
+
 // Domain/form constants shared across BowlingTracker.jsx and the view
 // files split out of it. Kept separate from ui.jsx, which is specifically
 // about styling/presentation -- these are actual data values (the set of

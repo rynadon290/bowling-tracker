@@ -9,6 +9,7 @@ import Settings from "./Settings.jsx";
 import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
+import Onboarding from "./Onboarding.jsx";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -38,7 +39,7 @@ import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, n
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
-import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString } from "./constants.js";
+import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME } from "./constants.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -89,6 +90,9 @@ const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 // Separate from the dismissed-date key: "have they ever seen it" and "did
 // they dismiss it today" are different questions and both are needed.
 const SESSION_START_SEEN_KEY = "bowling-session-start-seen-v1";
+// Whether the full-screen first-launch flow has been completed. Separate
+// from the daily prompt's keys: this one is once-ever.
+const ONBOARDED_KEY = "bowling-onboarded-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -333,6 +337,10 @@ export default function BowlingTracker(){
   // effect has actually read storage, so it can't flash on startup.
   const[sessionStartDismissedDate,setSessionStartDismissedDate]=useState(localDateString());
   const[sessionStartSeen,setSessionStartSeen]=useState(true);
+  // null = storage not read yet. Rendering nothing in that window avoids
+  // both a flash of onboarding for an existing bowler and a flash of the
+  // app for a new one.
+  const[onboarded,setOnboarded]=useState(null);
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -395,6 +403,30 @@ export default function BowlingTracker(){
       lastIndexForSessionKey.get(`${s.bowler}|${s.league}|${s.date}`)===idx
     );
   }
+
+  // Deliberately its own effect, not part of the big load() below.
+  //
+  // load() is one long try block spanning every table; if any earlier
+  // await in it throws, everything after is skipped. With the onboarding
+  // read in there, a single failed cloudRead would leave `onboarded` at
+  // null forever -- and since null renders a blank holding screen, that
+  // would brick the whole app on a transient network error. Isolating it
+  // means the gate always resolves.
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      try{
+        const done=await window.storage.get(ONBOARDED_KEY);
+        if(!cancelled)setOnboarded(done?.value==="1");
+      }catch{
+        // Storage unavailable is not a reason to trap someone on a blank
+        // screen. Fail open to the app; worst case is onboarding shows
+        // once more than it should.
+        if(!cancelled)setOnboarded(true);
+      }
+    })();
+    return()=>{cancelled=true;};
+  },[]);
 
   useEffect(()=>{
     async function load(){
@@ -1314,6 +1346,19 @@ export default function BowlingTracker(){
 
   // Saves a bowler's profile. Debounced like other typed fields so a
   // name or note doesn't fire a cloud write per keystroke.
+  function finishOnboarding(){
+    setOnboarded(true);
+    try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
+    // Completing the full-screen flow counts as having seen the prompt --
+    // it asks the same two questions, so the daily card shouldn't appear
+    // again immediately afterwards on the same day.
+    setSessionStartSeen(true);
+    const today=localDateString();
+    setSessionStartDismissedDate(today);
+    try{window.storage.set(SESSION_START_SEEN_KEY,"1");}catch{}
+    try{window.storage.set(SESSION_START_KEY,today);}catch{}
+  }
+
   function dismissSessionStart(){
     const today=localDateString();
     setSessionStartDismissedDate(today);
@@ -2553,13 +2598,34 @@ export default function BowlingTracker(){
   }).filter(b=>b.total>0);
   const mCounts=MISSES.map(m=>({miss:m,count:statsShots.filter(s=>Array.isArray(s.miss)?s.miss.includes(m):s.miss===m).length})).filter(m=>m.count>0);
 
+  // ── First-launch gate ─────────────────────────────────────────────────
+  // Renders instead of the whole app -- no nav, no header, no Log tab
+  // behind it. Held back until storage has actually been read (onboarded
+  // === null) so neither screen flashes on startup.
+  //
+  // An existing bowler upgrading into this build has data but no
+  // onboarding flag; treating any prior data as "already onboarded" keeps
+  // them out of a setup flow they don't need.
+  const hasExistingData=sessions.length>0||shots.length>0;
+  if(onboarded===null){
+    return <div style={{minHeight:"100vh",backgroundColor:C.bg}}/>;
+  }
+  if(!onboarded&&!hasExistingData){
+    return(
+      <Onboarding
+        preferences={preferences}
+        onApply={updatePreferences}
+        onFinish={finishOnboarding}/>
+    );
+  }
+
   return(
     <div style={S.app}>
       {/* Header */}
       <div style={S.header}>
         <div>
           <div style={{display:"flex",alignItems:"center",gap:"10px",paddingRight:"14px"}}>
-            <div style={S.title}>🎳 Shot Tracker</div>
+            <div style={S.title}>🎳 {APP_NAME}</div>
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
