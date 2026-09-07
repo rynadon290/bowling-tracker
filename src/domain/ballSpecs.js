@@ -190,6 +190,38 @@ export function specsFromRow(row) {
   });
 }
 
+// A ball's RG and differential genuinely shift by weight -- a 12lb and a
+// 16lb version of the same ball are not the same numbers with a different
+// label. `weightSpecs`, when present, is an array of per-weight
+// breakdowns: [{weight, rg, diff, intDiff}, ...]. This picks the exact
+// weight match if the entry has one; otherwise it falls back to the
+// entry's single reference-weight specs (the shape every community
+// submission already has, since a bowler only owns one weight of their
+// own ball).
+//
+// Deliberately exact-match only, not nearest-weight: a 14lb bowler asking
+// for specs and silently getting 15lb numbers back would look correct
+// while being wrong. No match means "we don't have this weight," not "an
+// approximation."
+export function specsForWeight(entry, weight) {
+  const target = Number(weight);
+  if (Number.isFinite(target) && Array.isArray(entry?.weightSpecs)) {
+    const exact = entry.weightSpecs.find(w => Number(w.weight) === target);
+    if (exact) {
+      return normalizeBallSpecs({
+        groupId: entry.specs?.groupId || "",
+        coverstock: entry.specs?.coverstock || "",
+        coreType: entry.specs?.coreType || "",
+        weight: exact.weight,
+        rg: exact.rg,
+        diff: exact.diff,
+        intDiff: exact.intDiff,
+      });
+    }
+  }
+  return entry?.specs || emptyBallSpecs();
+}
+
 export function groupToRow(group, userId) {
   return {
     id: group.id,

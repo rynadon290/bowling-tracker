@@ -1,8 +1,48 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, setSpecField,
-  describeSpecs, groupBalls, specsToRow, specsFromRow,
+  describeSpecs, groupBalls, specsToRow, specsFromRow, specsForWeight,
 } from './ballSpecs.js';
+
+describe('specsForWeight', () => {
+  const mesmerize = {
+    specs: { coverstock: '', coreType: 'asymmetric', weight: '15', rg: '2.510', diff: '0.056', intDiff: '0.017' },
+    weightSpecs: [
+      { weight: 16, rg: 2.521, diff: 0.048 },
+      { weight: 15, rg: 2.510, diff: 0.056, intDiff: 0.017 },
+      { weight: 14, rg: 2.533, diff: 0.056 },
+      { weight: 13, rg: 2.597, diff: 0.041 },
+      { weight: 12, rg: 2.593, diff: 0.041 },
+    ],
+  };
+
+  it('returns genuinely different numbers for different weights of the same ball', () => {
+    // This is the whole point: a 12lb and 16lb Mesmerize are not the same
+    // RG with a different label -- they're real, different figures.
+    expect(specsForWeight(mesmerize, 12).rg).toBe('2.593');
+    expect(specsForWeight(mesmerize, 16).rg).toBe('2.521');
+    expect(specsForWeight(mesmerize, 12).rg).not.toBe(specsForWeight(mesmerize, 16).rg);
+  });
+
+  it('falls back to the reference specs for a weight that was never published', () => {
+    // Honest fallback, not an interpolated guess -- a 10lb Mesmerize was
+    // never measured, so this returns the reference figure, not a made-up
+    // number for 10lb specifically.
+    expect(specsForWeight(mesmerize, 10)).toEqual(mesmerize.specs);
+  });
+
+  it('falls back cleanly when the entry has no weight breakdown at all', () => {
+    expect(specsForWeight({ specs: { rg: '2.50' } }, 14).rg).toBe('2.50');
+  });
+
+  it('does not crash on a missing entry', () => {
+    expect(specsForWeight(null, 14)).toEqual(emptyBallSpecs());
+  });
+
+  it('matches a weight passed as a string just as well as a number', () => {
+    expect(specsForWeight(mesmerize, '14').rg).toBe('2.533');
+  });
+});
 
 describe('intermediate differential is asymmetric-only', () => {
   it('clears int diff when a ball is switched to symmetric', () => {
