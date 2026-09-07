@@ -229,3 +229,22 @@ describe('merging queued writes over cloud rows on load', () => {
     expect(mergeOnLoad(cloud, []).Ryan[0].target).toBe(180);
   });
 });
+
+describe('ten pin spare goal', () => {
+  it('uses the specific-leave threshold, matching insightGating', () => {
+    expect(minSampleFor(goalType('tenPinSpareRate'))).toBe(SAMPLE_THRESHOLDS.specificLeave);
+  });
+
+  it('gates below that sample and names the right unit', () => {
+    const p = goalProgress({ typeId: 'tenPinSpareRate', target: 75 }, 80, 9);
+    expect(p.gated).toBe(true);
+    expect(p.current).toBeNull();
+    expect(p.sampleNoun).toBe('10 pin attempts');
+  });
+
+  it('reports once enough attempts exist', () => {
+    const p = goalProgress({ typeId: 'tenPinSpareRate', target: 75 }, 80, 40);
+    expect(p.gated).toBe(false);
+    expect(p.met).toBe(true);
+  });
+});

@@ -86,6 +86,17 @@ export const GOAL_TYPES = [
     help: "Conversion on leaves of exactly one pin.",
   },
   {
+    id: "tenPinSpareRate",
+    label: "10 Pin Spare %",
+    unit: "percent",
+    min: 1, max: 100,
+    // Same threshold insightGating already uses for tenPinRate -- a
+    // specific leave, not an overall rate.
+    sampleKey: "specificLeave",
+    sampleNoun: "10 pin attempts",
+    help: "Conversion on a lone 10 pin (including weak and ringing tens).",
+  },
+  {
     id: "cleanFrameRate",
     label: "Clean Frame %",
     unit: "percent",

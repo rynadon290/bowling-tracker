@@ -39,10 +39,21 @@ export const TREND_METRICS = [
     help: "Your best single game each night." },
   { id: "series", label: "Series Total", source: "scores", unit: "score",
     help: "Total pins each night." },
+  // Individual game positions. Useful for spotting a pattern the nightly
+  // average hides -- a bowler who starts strong and fades, or who needs a
+  // game to find the lane, looks flat on the average but obvious here.
+  { id: "game1", label: "Game 1", source: "scores", unit: "score", gameIndex: 0,
+    help: "First game each night." },
+  { id: "game2", label: "Game 2", source: "scores", unit: "score", gameIndex: 1,
+    help: "Second game each night." },
+  { id: "game3", label: "Game 3", source: "scores", unit: "score", gameIndex: 2,
+    help: "Third game each night." },
   { id: "strikeRate", label: "Strike %", source: "shots", unit: "percent",
     help: "Share of first balls that struck, per night." },
   { id: "spareRate", label: "Spare %", source: "shots", unit: "percent",
     help: "Non-split spare conversion, per night." },
+  { id: "tenPinSpareRate", label: "10 Pin Spare %", source: "shots", unit: "percent",
+    help: "Conversion on a lone 10 pin, per night." },
   { id: "cleanFrameRate", label: "Clean Frame %", source: "shots", unit: "percent",
     help: "Frames closed with a strike or spare, per night." },
 ];
@@ -76,8 +87,25 @@ export function scoreSeries(sessions, bowler, league, metricId) {
     const scores = group.flatMap(s => Array.isArray(s.scores) ? s.scores : [])
       .filter(v => Number.isFinite(v));
     if (!scores.length) continue;
-    let value = null;
-    if (metricId === "average") {
+    const metric = trendMetric(metricId);
+    let value = null, sample = scores.length;
+
+    if (metric && metric.gameIndex != null) {
+      // A specific game position. Read per SESSION rather than from the
+      // flattened list: two sessions on one date means two "game 1"s, and
+      // flattening would make session two's game 1 look like game 4.
+      // Where a date genuinely has more than one session, they're averaged
+      // -- both really were that bowler's first game of a block.
+      const atPosition = group
+        .map(s => Array.isArray(s.scores) ? s.scores[metric.gameIndex] : null)
+        .filter(v => Number.isFinite(v));
+      sample = atPosition.length;
+      // A night that didn't reach this game (a short block, a tournament
+      // squad of two) contributes no point rather than a zero.
+      if (atPosition.length) {
+        value = Math.floor(atPosition.reduce((a, b) => a + b, 0) / atPosition.length);
+      }
+    } else if (metricId === "average") {
       // Truncated, like every other average in this app.
       value = Math.floor(scores.reduce((a, b) => a + b, 0) / scores.length);
     } else if (metricId === "highGame") {
@@ -85,7 +113,7 @@ export function scoreSeries(sessions, bowler, league, metricId) {
     } else if (metricId === "series") {
       value = scores.reduce((a, b) => a + b, 0);
     }
-    if (value != null) out.push({ date, value, sample: scores.length });
+    if (value != null) out.push({ date, value, sample });
   }
   return out;
 }
@@ -94,7 +122,7 @@ const isFrameShot = s => !s.ballNum || s.ballNum === 1;
 
 // Shot-based rate series, one point per night. `sample` travels with each
 // point so the UI can be honest about how thin any given night is.
-export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false) {
+export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false, isTenPinLeave = () => false) {
   const rows = bySession(shots, bowler, league);
   const out = [];
   for (const [date, group] of groupByDate(rows)) {
@@ -109,6 +137,13 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
       if (sample) {
         value = Math.round((frames.filter(s => s.result === "Strike" || s.spareMade === "Yes").length / sample) * 100);
       }
+    } else if (metricId === "tenPinSpareRate") {
+      // Attempts only -- a leave with no spareMade recorded isn't a miss,
+      // it's an unfinished frame, and counting it as a miss would make the
+      // rate worse than reality.
+      const attempts = group.filter(s => isTenPinLeave(s) && s.spareMade !== "" && s.spareMade != null);
+      sample = attempts.length;
+      if (sample) value = Math.round((attempts.filter(s => s.spareMade === "Yes").length / sample) * 100);
     } else if (metricId === "spareRate") {
       const attempts = group.filter(s => s.result !== "Strike" && s.spareMade !== "" && s.spareMade != null && !isSplit(s));
       sample = attempts.length;
@@ -120,12 +155,12 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
   return out;
 }
 
-export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit }) {
+export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isTenPinLeave }) {
   const metric = trendMetric(metricId);
   if (!metric) return [];
   return metric.source === "scores"
     ? scoreSeries(sessions, bowler, league, metricId)
-    : shotRateSeries(shots, bowler, league, metricId, isSplit);
+    : shotRateSeries(shots, bowler, league, metricId, isSplit, isTenPinLeave);
 }
 
 // Least-squares slope of value against position in the series.

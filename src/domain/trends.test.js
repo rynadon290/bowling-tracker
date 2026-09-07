@@ -100,3 +100,66 @@ describe('flagging thin nights', () => {
     expect(seriesReliability('average', [{ value: 200, sample: 3 }]).thin).toBe(false);
   });
 });
+
+describe('individual game positions', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Tue', date: '2026-06-02', scores: [170, 200, 230] },
+    { bowler: 'Ryan', league: 'Tue', date: '2026-06-09', scores: [180, 210, 240] },
+  ];
+
+  it('plots the chosen game position, one point per night', () => {
+    expect(scoreSeries(sessions, 'Ryan', '', 'game1').map(p => p.value)).toEqual([170, 180]);
+    expect(scoreSeries(sessions, 'Ryan', '', 'game3').map(p => p.value)).toEqual([230, 240]);
+  });
+
+  // The trap: scores are flattened for most metrics, but a game position
+  // must be read per session, or session two's first game reads as game 4.
+  it('reads per session when a date has two blocks, not from a flattened list', () => {
+    const twoBlocks = [
+      { bowler: 'Ryan', league: 'Tue', date: '2026-06-02', scores: [100, 110, 120] },
+      { bowler: 'Ryan', league: 'Tue', date: '2026-06-02', scores: [200, 210, 220] },
+    ];
+    // Both first games averaged: (100 + 200) / 2. Flattening would give 100.
+    expect(scoreSeries(twoBlocks, 'Ryan', '', 'game1')[0].value).toBe(150);
+    expect(scoreSeries(twoBlocks, 'Ryan', '', 'game3')[0].value).toBe(170);
+  });
+
+  it('omits a night that never reached that game rather than plotting a zero', () => {
+    const short = [{ bowler: 'Ryan', league: 'Tue', date: '2026-06-02', scores: [190, 195] }];
+    expect(scoreSeries(short, 'Ryan', '', 'game3')).toEqual([]);
+    expect(scoreSeries(short, 'Ryan', '', 'game2')[0].value).toBe(195);
+  });
+});
+
+describe('ten pin spare rate', () => {
+  const isTenPin = shot => shot.result === 'Weak 10' || shot.result === 'Ringing 10' ||
+    (shot.result === 'Other Leave' && (shot.otherLeave || []).filter(p => p !== '9 Pin No-Tap').join() === '10');
+  const tens = (date, n, made) => Array.from({ length: n }, (_, i) => ({
+    bowler: 'Ryan', league: 'Tue', date, ballNum: 1, result: 'Other Leave',
+    otherLeave: ['10'], spareMade: i < made ? 'Yes' : 'No',
+  }));
+
+  it('computes conversion per night', () => {
+    const s = shotRateSeries([...tens('2026-06-02', 10, 6), ...tens('2026-06-09', 10, 8)],
+      'Ryan', '', 'tenPinSpareRate', () => false, isTenPin);
+    expect(s.map(p => p.value)).toEqual([60, 80]);
+  });
+
+  it('excludes leaves with no outcome recorded, which are unfinished frames not misses', () => {
+    const rows = [...tens('2026-06-16', 4, 4),
+      { bowler: 'Ryan', league: 'Tue', date: '2026-06-16', ballNum: 1, result: 'Other Leave', otherLeave: ['10'], spareMade: '' }];
+    const s = shotRateSeries(rows, 'Ryan', '', 'tenPinSpareRate', () => false, isTenPin);
+    expect(s[0].sample).toBe(4);
+    expect(s[0].value).toBe(100);
+  });
+
+  it('counts weak and ringing tens as ten pin leaves', () => {
+    const rows = [
+      { bowler: 'Ryan', league: 'Tue', date: '2026-06-23', ballNum: 1, result: 'Weak 10', spareMade: 'Yes' },
+      { bowler: 'Ryan', league: 'Tue', date: '2026-06-23', ballNum: 1, result: 'Ringing 10', spareMade: 'No' },
+    ];
+    const s = shotRateSeries(rows, 'Ryan', '', 'tenPinSpareRate', () => false, isTenPin);
+    expect(s[0].sample).toBe(2);
+    expect(s[0].value).toBe(50);
+  });
+});
