@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   addGame, removeGame, setGameField, addDay, removeDay, setDayField, updateDay,
   dayTotal, dayAverage, dayGamesEntered, cutMargin,
   tournamentTotal, tournamentAverage, tournamentMoney,
 } from "./domain/tournaments.js";
+import { searchPatterns, describePattern } from "./domain/oilPatterns.js";
 
 function fieldLabel(text) {
   return (
@@ -13,7 +15,47 @@ function fieldLabel(text) {
   );
 }
 
-function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay }) {
+// Search-as-you-type over the seeded pattern library, falling back to
+// plain free text -- a PBA tournament pattern or a house shot won't be in
+// the seed set, and that's expected, not an error state.
+function OilPatternField({ value, onChange, patterns }) {
+  const [focused, setFocused] = useState(false);
+  const matches = focused ? searchPatterns(value, patterns) : [];
+  // An exact match (typed in full, or just selected) shows its specs
+  // instead of a dropdown -- no point suggesting alternatives to a pattern
+  // already fully identified.
+  const exact = (patterns || []).find(p => p.name.toLowerCase() === (value || "").trim().toLowerCase());
+
+  return (
+    <div style={{ position: "relative" }}>
+      {fieldLabel("Oil Pattern")}
+      <input style={S.input} placeholder="e.g. Krypton, or type your own"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)} />
+      {exact && describePattern(exact) && (
+        <div style={{ fontSize: "11px", color: exact.verified ? C.accent : C.textMuted, marginTop: "4px" }}>
+          {describePattern(exact)}
+        </div>
+      )}
+      {focused && !exact && matches.length > 0 && (
+        <div style={{ position: "absolute", zIndex: 10, left: 0, right: 0, marginTop: "2px", backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+          {matches.map(p => (
+            <button key={p.id || p.name}
+              style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 10px", cursor: "pointer", color: C.text, borderBottom: `1px solid ${C.border}` }}
+              onMouseDown={() => onChange(p.name)}>
+              <div style={{ fontSize: "13px", fontWeight: 600 }}>{p.name}</div>
+              {describePattern(p) && <div style={{ fontSize: "11px", color: C.textMuted }}>{describePattern(p)}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay, oilPatterns }) {
   const total = dayTotal(day);
   const avg = dayAverage(day);
   const entered = dayGamesEntered(day);
@@ -65,9 +107,10 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
             onChange={e => update({ ...day, blockNumber: e.target.value })} />
         </div>
         <div style={{ flex: 2 }}>
-          {fieldLabel("Oil Pattern")}
-          <input style={S.input} placeholder="e.g. Chameleon 39" value={day.oilPattern}
-            onChange={e => update({ ...day, oilPattern: e.target.value })} />
+          <OilPatternField
+            value={day.oilPattern}
+            onChange={v => update({ ...day, oilPattern: v })}
+            patterns={oilPatterns} />
         </div>
       </div>
 
@@ -148,7 +191,7 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
   );
 }
 
-export default function TournamentSession({ tournament, onChange, onSave, saved }) {
+export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns }) {
   const total = tournamentTotal(tournament);
   const avg = tournamentAverage(tournament);
   const money = tournamentMoney(tournament);
@@ -177,7 +220,8 @@ export default function TournamentSession({ tournament, onChange, onSave, saved 
           multiDay={multiDay}
           canRemoveDay={(tournament.days || []).length > 1}
           onRemoveDay={() => onChange(removeDay(tournament, day.dayNumber))}
-          onChange={next => onChange(updateDay(tournament, day.dayNumber, () => next))} />
+          onChange={next => onChange(updateDay(tournament, day.dayNumber, () => next))}
+          oilPatterns={oilPatterns} />
       ))}
 
       <button style={{ ...S.btn(), width: "100%", marginBottom: "12px" }} onClick={() => onChange(addDay(tournament))}>

@@ -30,6 +30,7 @@ export default function LogView({
   sessionStartDismissed, dismissSessionStart, updatePreferences,
   practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
+  oilPatterns,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
@@ -207,7 +208,8 @@ export default function LogView({
                 tournament={activeTournament}
                 onChange={updateTournament}
                 onSave={saveTournament}
-                saved={tournamentSaved}/>
+                saved={tournamentSaved}
+                oilPatterns={oilPatterns}/>
             )}
             {/* "Tonight's Session" is league framing -- series, money games,
                 match points. Practice has none of that, so it gets a plain

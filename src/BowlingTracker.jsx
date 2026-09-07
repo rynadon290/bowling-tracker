@@ -28,6 +28,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
+import { normalizePattern, patternFromRow } from "./domain/oilPatterns.js";
 import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
@@ -75,6 +76,7 @@ const BALL_SPECS_KEY = "bowling-ball-specs-v1";
 const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
 const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const CENTERS_KEY = "bowling-centers-v1";
+const OIL_PATTERNS_KEY = "bowling-oil-patterns-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
 const LEAGUE_DATES_KEY = "bowling-league-dates-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
@@ -279,6 +281,7 @@ export default function BowlingTracker(){
   // NAME to a center id. Kept as a parallel map rather than restructuring
   // `leagues` (a plain string array) that half the app depends on.
   const[centers,setCenters]=useState([]);
+  const[oilPatterns,setOilPatterns]=useState([]);
   const[leagueCenters,setLeagueCenters]=useState({});
   // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
   // Shared across everyone in the league (like center), unlike per-bowler
@@ -547,6 +550,16 @@ export default function BowlingTracker(){
         }else{
           const cs=await readCached(CENTERS_KEY,"array");
           if(cs)setCenters(cs.map(normalizeCenter).filter(c=>c.id&&c.name));
+        }
+
+        const patternsRes=await cloudRead("oil_patterns",q=>q.select("id,name,series,length_feet,ratio,volume_ml,forward_ml,reverse_ml,verified,source_note"));
+        if(patternsRes.online&&patternsRes.data){
+          const rebuilt=patternsRes.data.map(patternFromRow).filter(Boolean);
+          setOilPatterns(rebuilt);
+          try{await window.storage.set(OIL_PATTERNS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const op=await readCached(OIL_PATTERNS_KEY,"array");
+          if(op)setOilPatterns(op.map(normalizePattern).filter(Boolean));
         }
 
         const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id,start_date,end_date"));
@@ -2651,6 +2664,7 @@ export default function BowlingTracker(){
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
+            oilPatterns={oilPatterns}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
