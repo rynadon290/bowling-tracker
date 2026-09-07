@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
 import { RESULTS, localDateString } from "./constants.js";
-import { convertExtractedGameToShots } from "./domain/scorecardImport.js";
+import { convertExtractedGameToShots, normalizeExtraction, detailLevel } from "./domain/scorecardImport.js";
+import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
 import { supabase } from "./supabaseClient.js";
 
@@ -140,7 +141,7 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
 }
 
 export default function ImportScorecard({
-  bowlers, leagues, teams, shots, saveShots, updateManualScore,
+  bowlers, leagues, teams, profiles, shots, saveShots, updateManualScore,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
 }){
   const[step,setStep]=useState("setup"); // setup | processing | review | saving
@@ -151,6 +152,10 @@ export default function ImportScorecard({
   const[error,setError]=useState(null);
   const[games,setGames]=useState([]); // [{gameNumber, ballUsed, shots, warnings}]
   const[expandedByGame,setExpandedByGame]=useState([]); // [Set(frameKey), ...] parallel to games
+  // Team cards: one entry per bowler column, plus who each maps to.
+  const[columns,setColumns]=useState([]);
+  const[assignments,setAssignments]=useState({}); // columnIndex -> bowler name or "" (skip)
+  const[orderCheck,setOrderCheck]=useState(null);
 
   const teamId=teams.find(t=>t.league===contextLeague&&(t.members||[]).includes(contextBowler))?.id||"";
 
@@ -181,7 +186,22 @@ export default function ImportScorecard({
       const{data,error:fnError}=await supabase.functions.invoke("import-scorecard",{
         body:{images:images.map(img=>({base64:img.base64,mimeType:img.mimeType}))},
       });
-      if(fnError)throw new Error(fnError.message||"Extraction failed.");
+      if(fnError){
+        // supabase-js reports any non-2xx or network failure as the same
+        // opaque "Failed to send a request to the Edge Function", which
+        // tells the bowler nothing about what to do. The function itself
+        // returns a JSON { error } body for its own failures, so read
+        // that first and only fall back to guessing at causes.
+        let detail=fnError.message||"";
+        try{
+          const body=await fnError.context?.json?.();
+          if(body?.error)detail=body.error;
+        }catch{}
+        if(/failed to send a request/i.test(detail)){
+          detail="Couldn't reach the scorecard reader. This is usually a large or slow upload — try one photo at a time, or a smaller image.";
+        }
+        throw new Error(detail||"Extraction failed.");
+      }
       if(data?.error)throw new Error(data.error);
 
       const context={bowler:contextBowler,league:contextLeague,date:contextDate,teamId};
@@ -206,7 +226,31 @@ export default function ImportScorecard({
 
       setGames(converted);
       setExpandedByGame(converted.map(g=>new Set(g.warnings.map(w=>`${w.frame}-${w.ballNum??1}`))));
-      setStep("review");
+
+      // Column mapping. Runs for every card, not just team ones -- a
+      // single-bowler card is just a one-column team card, and going
+      // through the same path means one code path to get right.
+      const cols=normalizeExtraction(data);
+      const team=teams.find(t=>t.id===teamId);
+      const roster=(team?.members||[]).map(m=>({
+        bowler:m.bowlerName||m,
+        aliases:(profiles?.[m.bowlerName||m]?.aliases)||[],
+        lineupPosition:m.lineupPosition??0,
+      }));
+      // With no team defined, the only person we can match against is
+      // whoever is importing -- which is exactly the "my name and nobody
+      // else's" case. Everything unmatched then falls to manual picking.
+      const effectiveRoster=roster.length?roster:[{
+        bowler:contextBowler,
+        aliases:(profiles?.[contextBowler]?.aliases)||[],
+        lineupPosition:0,
+      }];
+      const matched=matchScorecard(cols.map(c=>c.scorecardName),effectiveRoster);
+      setColumns(cols.map((c,i)=>({...c,...matched.columns[i]})));
+      setAssignments(Object.fromEntries(matched.columns.map((c,i)=>[i,c.assigned||""])));
+      setOrderCheck(roster.length?rosterOrderCheck(matched.columns,roster):null);
+
+      setStep(cols.length>1?"columns":"review");
     }catch(e){
       setError(e.message||"Something went wrong during extraction.");
       setStep("setup");
@@ -317,6 +361,79 @@ export default function ImportScorecard({
         <div style={{...S.card,textAlign:"center",padding:"32px 16px"}}>
           <div style={{fontSize:"14px",color:C.textMuted}}>Reading the scorecard…</div>
         </div>
+      )}
+
+      {step==="columns"&&(
+        <>
+          <div style={S.card}>
+            <div style={S.label}>Who's who</div>
+            <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+              {columns.length} bowler{columns.length===1?"":"s"} read off the card. Confirm each one before anything is saved —
+              a wrong match writes someone else's game into their record.
+            </div>
+            {columns.map((c,i)=>{
+              const detail=detailLevel(c);
+              return(
+                <div key={i} style={{padding:"10px",marginBottom:"8px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${assignments[i]?C.border:C.spare+"66"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"6px"}}>
+                    <div style={{fontSize:"13px",fontWeight:600,color:C.text}}>
+                      {c.scorecardName||`Column ${i+1}`}
+                    </div>
+                    <div style={{fontSize:"10px",color:C.textMuted}}>
+                      {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"shot by shot":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
+                      {c.series!=null&&<> · {c.series} series</>}
+                    </div>
+                  </div>
+                  {/* The printed total and the games disagreeing means
+                      something was misread -- worth a look, not a silent
+                      pick between them. */}
+                  {c.disagrees&&(
+                    <div style={{fontSize:"10px",color:C.spare,marginBottom:"6px"}}>
+                      Printed series is {c.series} but the games add to {c.computed}. Check the card.
+                    </div>
+                  )}
+                  <select style={{...S.sel,width:"100%",fontSize:"12px"}}
+                    value={assignments[i]||""}
+                    onChange={e=>setAssignments(a=>({...a,[i]:e.target.value}))}>
+                    <option value="">Skip this bowler</option>
+                    {bowlers.map(b=><option key={b} value={b}>{b}</option>)}
+                  </select>
+                  {c.best&&!c.autoMatch&&(
+                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                      {c.ambiguous?"More than one bowler matches this name equally — pick the right one.":`Closest match: ${c.best.bowler}`}
+                    </div>
+                  )}
+                  {c.matchedVia&&c.autoMatch&&c.best?.matchedVia!==c.best?.bowler&&(
+                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                      Matched on the alias "{c.best.matchedVia}".
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {orderCheck&&!orderCheck.agrees&&(
+            <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
+              <div style={{...S.label,color:C.spare}}>Roster order</div>
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                The card's order doesn't match your team roster. Names still matched correctly — but if the roster
+                is wrong, position hints will be wrong for every future import.
+              </div>
+              <div style={{fontSize:"11px",color:C.text}}>
+                Card order: {orderCheck.suggestedOrder.join(" → ")}
+              </div>
+            </div>
+          )}
+
+          <button style={S.btn("primary")}
+            disabled={!Object.values(assignments).some(Boolean)}
+            onClick={()=>setStep("review")}>
+            Continue
+          </button>
+          <button style={{...S.btn(),marginTop:"8px"}} onClick={()=>setStep("setup")}>Start Over</button>
+          <div style={{height:"32px"}}/>
+        </>
       )}
 
       {(step==="review"||step==="saving")&&(

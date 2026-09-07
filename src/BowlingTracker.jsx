@@ -3382,7 +3382,7 @@ export default function BowlingTracker(){
 
         {view==="import"&&(
           <ImportScorecard
-            bowlers={bowlers} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots}
+            bowlers={bowlers} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots}
             updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}
