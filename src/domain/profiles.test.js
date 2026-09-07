@@ -2,8 +2,83 @@ import { describe, it, expect } from 'vitest';
 import {
   emptyProfile, normalizeProfile, resolveHandedness, addHomeCenter,
   removeHomeCenter, profileToRow, profileFromRow, membershipFor,
-  resolveHomeCenters,
+  resolveHomeCenters, suggestBookAverage,
 } from './profiles.js';
+
+function games(bowler, league, scores) {
+  return scores.map((score, i) => ({ bowler, league, date: `2026-0${(i % 9) + 1}-01`, scores: [score], total: score }));
+}
+
+describe('suggestBookAverage', () => {
+  it('is ineligible with no sessions at all', () => {
+    expect(suggestBookAverage([], 'Ryan').eligible).toBe(false);
+  });
+
+  it('requires at least 21 games in a single league', () => {
+    const twenty = games('Ryan', 'Thursday', Array(20).fill(200));
+    expect(suggestBookAverage(twenty, 'Ryan').eligible).toBe(false);
+
+    const twentyOne = games('Ryan', 'Thursday', Array(21).fill(200));
+    const r = suggestBookAverage(twentyOne, 'Ryan');
+    expect(r.eligible).toBe(true);
+    expect(r.suggested).toBe(200);
+  });
+
+  it('truncates rather than rounds, matching USBC convention', () => {
+    // 20 games at 214 and one at 213 averages to 213.952... -- a book
+    // average is total pinfall over games with the remainder DROPPED, so
+    // this must suggest 213, never 214.
+    const sessions = games('Ryan', 'Thursday', [...Array(20).fill(214), 213]);
+    expect(suggestBookAverage(sessions, 'Ryan').suggested).toBe(213);
+  });
+
+  it('picks the stronger qualifying league over a weak composite', () => {
+    const sessions = [
+      ...games('Ryan', 'Thursday', Array(25).fill(220)),
+      ...games('Ryan', 'Tuesday', Array(5).fill(150)),
+    ];
+    const r = suggestBookAverage(sessions, 'Ryan');
+    expect(r.suggested).toBe(220);
+    expect(r.basis).toContain('Thursday');
+  });
+
+  it('picks the composite when no single league reaches 21 games but the total does', () => {
+    const sessions = [
+      ...games('Ryan', 'Thursday', Array(11).fill(200)),
+      ...games('Ryan', 'Tuesday', Array(11).fill(200)),
+    ];
+    const r = suggestBookAverage(sessions, 'Ryan');
+    expect(r.eligible).toBe(true);
+    expect(r.suggested).toBe(200);
+  });
+
+  it('is ineligible when neither a single league nor the composite reaches 21 games', () => {
+    const sessions = [
+      ...games('Ryan', 'Thursday', Array(8).fill(200)),
+      ...games('Ryan', 'Tuesday', Array(8).fill(200)),
+    ];
+    expect(suggestBookAverage(sessions, 'Ryan').eligible).toBe(false);
+  });
+
+  it('scopes to the requested bowler only', () => {
+    const sessions = [
+      ...games('Ryan', 'Thursday', Array(25).fill(200)),
+      ...games('Aaron', 'Thursday', Array(25).fill(100)),
+    ];
+    expect(suggestBookAverage(sessions, 'Ryan').suggested).toBe(200);
+  });
+
+  it('never writes to a profile -- it only returns a suggestion', () => {
+    // Book average is static by design; nothing about calling this
+    // function should mutate stored data. This is really a documentation
+    // test: suggestBookAverage takes sessions and a name, nothing else,
+    // and returns a plain object.
+    const sessions = games('Ryan', 'Thursday', Array(21).fill(200));
+    const r = suggestBookAverage(sessions, 'Ryan');
+    expect(typeof r).toBe('object');
+    expect(r).not.toHaveProperty('bookAverage');
+  });
+});
 
 describe('normalizeProfile', () => {
   it('returns a complete profile for missing input rather than throwing', () => {

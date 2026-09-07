@@ -28,7 +28,9 @@ export function emptyProfile(bowlerName = "") {
     twoHanded: false,
     homeCenters: [],
     notes: "",
-    // Book average seed -- see blendedAverage below.
+    // Book average: a static, frozen number the bowler enters and the app
+    // never touches automatically. See suggestBookAverage below for the
+    // end-of-season update flow.
     bookAverage: "",
     bookGames: "",
     bookSeason: "",
@@ -54,36 +56,104 @@ export function normalizeProfile(raw, bowlerName = "") {
   };
 }
 
-// The average to show, blending a book average with logged games.
+// Suggests a new book average at the end of a season, using the same rule
+// USBC applies to establishing an official average: a minimum sample of
+// games, and -- for a bowler across several leagues -- the better of their
+// strongest single league or their combined average across all of them.
 //
-// A book average is real data from a lot of games -- usually 60-100 -- so
-// it shouldn't vanish the moment three nights are logged, and three nights
-// shouldn't be treated as equal to a whole season. Weighted by game count
-// on each side: (book * bookGames + logged * loggedGames) / total. As
-// logged games accumulate the book naturally fades out.
+//   One league bowled:      that league's average, IF it has >=21 games.
+//                            Fewer games -> not enough of a season to
+//                            suggest anything; the old book average stays.
+//   More than one league:   the higher of (a) the best average among
+//                            leagues with >=21 games of their own, and
+//                            (b) the composite average across every league
+//                            bowled. Whichever is higher wins, matching the
+//                            stated rule -- a bowler who was excellent in
+//                            one league shouldn't be dragged down by a
+//                            weaker one, but a bowler who split time evenly
+//                            across several without any single one reaching
+//                            21 games should still get a real number from
+//                            their combined total.
 //
-// Returns null with no data at all; returns the book alone with no logged
-// games; ignores the book if it's blank or nonsensical.
-export function blendedAverage(profile, loggedGames) {
-  const games = (loggedGames || []).filter(g => typeof g === "number");
-  const book = Number(profile?.bookAverage);
-  const bookN = Math.round(Number(profile?.bookGames));
-  const bookValid = Number.isFinite(book) && book >= 0 && book <= 300 && Number.isFinite(bookN) && bookN > 0;
+// ONE ASSUMPTION MADE EXPLICIT: the composite average is held to the same
+// >=21-game floor as a single league, since a suggestion from a handful of
+// total games isn't a season. This wasn't stated outright; if a bowler
+// splits time across three leagues at 8 games each, this returns
+// ineligible rather than suggesting from 24 thin games. Flag if a
+// different floor was intended for the composite case.
+//
+// Book average is a competitive number, not a live stat -- USBC computes
+// it as total pinfall divided by games, with the remainder DROPPED, never
+// rounded. A 213.9 average is a 213 book average. This function truncates
+// for exactly that reason; the running averages shown elsewhere in the app
+// round to one decimal because they're a different kind of number.
+//
+// This does its own average calculation rather than reusing seasonSummary,
+// deliberately: seasonSummary rounds to one decimal for display, and
+// truncating an already-rounded number compounds two different rounding
+// rules. 20 games at 214 and one at 213 averages to 213.952... -- rounded
+// to 213.9... no, rounded to ONE decimal that's 214.0, and truncating 214.0
+// gives 214. The correct book average is 213. Truncating the raw value
+// avoids that.
+function rawAverage(sessions, bowler, league) {
+  const games = (sessions || [])
+    .filter(s => s.bowler === bowler && (!league || s.league === league))
+    .flatMap(s => s.scores || [])
+    .filter(v => typeof v === "number");
+  if (!games.length) return { games: 0, average: null };
+  return { games: games.length, average: games.reduce((a, b) => a + b, 0) / games.length };
+}
 
-  if (!games.length && !bookValid) return null;
-  if (!games.length) return { average: Math.round(book * 10) / 10, source: "book", loggedGames: 0, bookGames: bookN };
+const MIN_GAMES_FOR_BOOK_AVERAGE = 21;
 
-  const loggedSum = games.reduce((a, b) => a + b, 0);
-  if (!bookValid) {
-    return { average: Math.round((loggedSum / games.length) * 10) / 10, source: "logged", loggedGames: games.length, bookGames: 0 };
+export function suggestBookAverage(sessions, bowler) {
+  const leagues = [...new Set(
+    (sessions || []).filter(s => s.bowler === bowler && s.league).map(s => s.league)
+  )];
+
+  if (leagues.length === 0) {
+    return { eligible: false, suggested: null, gamesUsed: 0, basis: "no sessions logged" };
   }
-  const blended = (book * bookN + loggedSum) / (bookN + games.length);
+
+  const perLeague = leagues.map(league => ({ league, ...rawAverage(sessions, bowler, league) }));
+
+  if (leagues.length === 1) {
+    const only = perLeague[0];
+    if (only.games < MIN_GAMES_FOR_BOOK_AVERAGE) {
+      return {
+        eligible: false, suggested: null, gamesUsed: only.games,
+        basis: `fewer than ${MIN_GAMES_FOR_BOOK_AVERAGE} games in ${leagues[0]}`,
+      };
+    }
+    return {
+      eligible: true, suggested: Math.trunc(only.average), gamesUsed: only.games,
+      basis: `${leagues[0]} average across ${only.games} games`,
+    };
+  }
+
+  const qualifying = perLeague.filter(l => l.games >= MIN_GAMES_FOR_BOOK_AVERAGE);
+  const bestSingle = qualifying.length
+    ? qualifying.reduce((a, b) => (b.average > a.average ? b : a))
+    : null;
+
+  const composite = rawAverage(sessions, bowler, null);
+  const compositeEligible = composite.games >= MIN_GAMES_FOR_BOOK_AVERAGE ? composite : null;
+
+  if (!bestSingle && !compositeEligible) {
+    return {
+      eligible: false, suggested: null, gamesUsed: composite.games,
+      basis: `no league reached ${MIN_GAMES_FOR_BOOK_AVERAGE} games, and the combined total didn't either`,
+    };
+  }
+  if (bestSingle && (!compositeEligible || bestSingle.average >= compositeEligible.average)) {
+    return {
+      eligible: true, suggested: Math.trunc(bestSingle.average), gamesUsed: bestSingle.games,
+      basis: `${bestSingle.league} average across ${bestSingle.games} games (your strongest league)`,
+    };
+  }
   return {
-    average: Math.round(blended * 10) / 10,
-    source: "blended",
-    loggedGames: games.length,
-    bookGames: bookN,
-    loggedOnly: Math.round((loggedSum / games.length) * 10) / 10,
+    eligible: true, suggested: Math.trunc(compositeEligible.average), gamesUsed: compositeEligible.games,
+    basis: `combined average across all ${leagues.length} leagues, ${compositeEligible.games} games`,
   };
 }
 
