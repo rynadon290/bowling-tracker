@@ -204,3 +204,65 @@ export function convertExtractedGameToShots(extractedGame, context) {
   // generated at the moment of committing, not during review/preview.
   return { shots, warnings };
 }
+
+// ── Team scorecards ─────────────────────────────────────────────────────
+//
+// The extraction returns one entry per bowler column. This normalizes
+// that into a shape the review screen can work with, and handles the
+// legacy single-bowler response (a bare `games` array) so an older
+// deployed function keeps working.
+
+// Series is ALWAYS available: printed if the card shows it, otherwise
+// summed from the games. A bowler should never have to add up their own
+// three scores because the card didn't print a total.
+export function seriesFor(bowlerEntry) {
+  const printed = Number(bowlerEntry?.seriesTotal);
+  const games = Array.isArray(bowlerEntry?.games) ? bowlerEntry.games : [];
+  const scores = games
+    .map(g => Number(g?.totalScore))
+    .filter(v => Number.isFinite(v) && v >= 0 && v <= 300);
+  const computed = scores.length ? scores.reduce((a, b) => a + b, 0) : null;
+
+  if (Number.isFinite(printed) && printed > 0) {
+    return {
+      series: printed,
+      source: "printed",
+      // Surfaced rather than silently preferred: if the printed total and
+      // the games disagree, that's a misread worth a human glance, not
+      // something to paper over by picking one.
+      disagrees: computed !== null && computed !== printed,
+      computed,
+    };
+  }
+  return { series: computed, source: computed === null ? "none" : "computed", disagrees: false, computed };
+}
+
+export function normalizeExtraction(data) {
+  // Preferred shape: one entry per bowler.
+  if (Array.isArray(data?.bowlers) && data.bowlers.length) {
+    return data.bowlers.map((b, i) => ({
+      scorecardName: (b?.bowlerName || "").trim(),
+      lineupPosition: Number.isInteger(b?.lineupPosition) ? b.lineupPosition : i,
+      games: Array.isArray(b?.games) ? b.games : [],
+      ...seriesFor(b),
+    }));
+  }
+  // Legacy shape: a bare games array for one unnamed bowler.
+  if (Array.isArray(data?.games) && data.games.length) {
+    const entry = { games: data.games, seriesTotal: null };
+    return [{ scorecardName: "", lineupPosition: 0, games: data.games, ...seriesFor(entry) }];
+  }
+  return [];
+}
+
+// Whether a bowler's column carries per-frame detail, or only totals.
+// Both are valid imports -- shot-by-shot gives shots, totals-only gives
+// game scores -- and the review screen says which the bowler is getting.
+export function detailLevel(entry) {
+  const games = Array.isArray(entry?.games) ? entry.games : [];
+  const withFrames = games.filter(g => Array.isArray(g?.frames) && g.frames.length).length;
+  if (!games.length) return "none";
+  if (withFrames === games.length) return "shots";
+  if (withFrames === 0) return "scores";
+  return "mixed";
+}

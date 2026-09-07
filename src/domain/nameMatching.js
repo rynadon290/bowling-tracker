@@ -168,3 +168,36 @@ export function matchScorecard(columns, roster) {
     unmatched: results.filter(r => !r.assigned).map(r => r.scorecardName),
   };
 }
+
+// ── Roster order check ──────────────────────────────────────────────────
+//
+// The import can use lineup position to corroborate a name match, but
+// only if the roster in the app is actually in the order the team bowls.
+// A roster entered in the wrong order would quietly make every position
+// hint wrong -- so this reports the disagreement and lets the user
+// confirm, rather than trusting either source.
+export function rosterOrderCheck(matchedColumns, roster) {
+  const byBowler = new Map((Array.isArray(roster) ? roster : []).map(r => [r.bowler, r]));
+  const rows = (Array.isArray(matchedColumns) ? matchedColumns : [])
+    .filter(c => c.assigned)
+    .map(c => {
+      const r = byBowler.get(c.assigned);
+      return {
+        bowler: c.assigned,
+        scorecardName: c.scorecardName,
+        cardPosition: c.columnIndex,
+        rosterPosition: r ? r.lineupPosition : null,
+        agrees: !!r && r.lineupPosition === c.columnIndex,
+      };
+    });
+
+  const mismatched = rows.filter(r => r.rosterPosition !== null && !r.agrees);
+  return {
+    rows,
+    agrees: mismatched.length === 0,
+    mismatched,
+    // The order the card implies, offered as a one-tap fix rather than
+    // making someone drag a roster around.
+    suggestedOrder: [...rows].sort((a, b) => a.cardPosition - b.cardPosition).map(r => r.bowler),
+  };
+}

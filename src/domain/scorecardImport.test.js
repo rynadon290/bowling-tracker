@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { convertExtractedGameToShots } from './scorecardImport.js';
+import { convertExtractedGameToShots,
+  normalizeExtraction,
+  detailLevel,
+} from './scorecardImport.js';
 import { strictPartial } from './scoring.js';
 
 const context = { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', teamId: 't1', game: 1 };
@@ -231,5 +234,53 @@ describe('convertExtractedGameToShots -- real end-to-end game from an actual upl
     expect(shots).toHaveLength(10);
     expect(strictPartial(shots)).toBe(205);
     expect(warnings).toHaveLength(0); // this game's 10th ended on an open, non-converted ball 1 -- no bonus ball at all
+  });
+});
+
+describe('team scorecards', () => {
+  const team = {
+    bowlers: [
+      { bowlerName: 'R. Nadon', lineupPosition: 0, seriesTotal: 600, games: [
+        { gameNumber: 1, totalScore: 200, frames: [{}] }, { gameNumber: 2, totalScore: 210, frames: [{}] }, { gameNumber: 3, totalScore: 190, frames: [{}] }] },
+      { bowlerName: 'Kim N', lineupPosition: 1, games: [{ gameNumber: 1, totalScore: 180 }, { gameNumber: 2, totalScore: 175 }] },
+    ],
+  };
+
+  it('returns one entry per bowler column', () => {
+    expect(normalizeExtraction(team)).toHaveLength(2);
+  });
+
+  // A bowler should never have to add up their own three scores because
+  // the card didn't print a total.
+  it('always resolves a series -- printed or summed', () => {
+    const cols = normalizeExtraction(team);
+    expect(cols[0].series).toBe(600);
+    expect(cols[0].source).toBe('printed');
+    expect(cols[1].series).toBe(355);
+    expect(cols[1].source).toBe('computed');
+  });
+
+  // Disagreement is a misread worth a human glance, not something to
+  // paper over by silently preferring one source.
+  it('flags a printed total that disagrees with the games', () => {
+    const bad = normalizeExtraction({ bowlers: [{ bowlerName: 'X', seriesTotal: 999, games: [{ totalScore: 100 }, { totalScore: 100 }] }] });
+    expect(bad[0].disagrees).toBe(true);
+    expect(bad[0].computed).toBe(200);
+  });
+
+  it('says whether a column carries shots or only scores', () => {
+    const cols = normalizeExtraction(team);
+    expect(detailLevel(cols[0])).toBe('shots');
+    expect(detailLevel(cols[1])).toBe('scores');
+  });
+
+  // An older deployed extraction function returns a bare games array.
+  it('still reads the legacy single-bowler shape', () => {
+    expect(normalizeExtraction({ games: [{ gameNumber: 1, totalScore: 200 }] })).toHaveLength(1);
+  });
+
+  it('is safe with nothing extracted', () => {
+    expect(normalizeExtraction(null)).toEqual([]);
+    expect(normalizeExtraction({})).toEqual([]);
   });
 });

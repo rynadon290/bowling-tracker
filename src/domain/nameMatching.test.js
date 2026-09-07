@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeName, nameScore, bestNameScore, matchBowler, matchScorecard, AUTO_MATCH_SCORE,
+  rosterOrderCheck,
 } from './nameMatching.js';
 
 const roster = [
@@ -83,5 +84,31 @@ describe('matching a whole card', () => {
   it('is safe with no roster or no columns', () => {
     expect(matchBowler('Anyone', []).best).toBeNull();
     expect(matchScorecard(null, null).columns).toHaveLength(0);
+  });
+});
+
+// Position hints are only worth anything if the roster is in the order
+// the team actually bowls. A roster entered wrong would quietly make
+// every hint wrong, so the disagreement is reported rather than trusted.
+describe('roster order check', () => {
+  const roster = [
+    { bowler: 'Ryan', aliases: [], lineupPosition: 0 },
+    { bowler: 'Kim', aliases: [], lineupPosition: 1 },
+    { bowler: 'Dave', aliases: [], lineupPosition: 2 },
+  ];
+
+  it('agrees when the card matches the roster', () => {
+    expect(rosterOrderCheck(matchScorecard(['Ryan', 'Kim', 'Dave'], roster).columns, roster).agrees).toBe(true);
+  });
+
+  it('reports a mismatch instead of trusting either side', () => {
+    const c = rosterOrderCheck(matchScorecard(['Dave', 'Kim', 'Ryan'], roster).columns, roster);
+    expect(c.agrees).toBe(false);
+    expect(c.mismatched.map(r => r.bowler).sort()).toEqual(['Dave', 'Ryan']);
+  });
+
+  it('offers the order the card implies as a fix', () => {
+    expect(rosterOrderCheck(matchScorecard(['Dave', 'Kim', 'Ryan'], roster).columns, roster).suggestedOrder)
+      .toEqual(['Dave', 'Kim', 'Ryan']);
   });
 });
