@@ -211,6 +211,11 @@ Deno.serve(async (req) => {
     const RETRY_DELAYS_MS = [2000, 5000];
     let geminiRes: Response | null = null;
     let lastErrText = "";
+    // Counts RETRIES, not attempts. Reporting the constant meant the
+    // message claimed three retries when a request that failed twice had
+    // been retried twice -- and a non-transient failure isn't retried at
+    // all, so a fixed number would have been wrong there too.
+    let retries = 0;
 
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
       geminiRes = await fetch(GEMINI_URL, {
@@ -224,6 +229,7 @@ Deno.serve(async (req) => {
       const transient = geminiRes.status === 503 || geminiRes.status === 429;
       if (!transient || attempt === RETRY_DELAYS_MS.length) break;
       await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+      retries++;
     }
 
     if (!geminiRes || !geminiRes.ok) {
@@ -238,7 +244,7 @@ Deno.serve(async (req) => {
         error: "Gemini API error",
         reason,
         upstreamStatus: status,
-        attempts: reason === "busy" || reason === "rate_limited" ? RETRY_DELAYS_MS.length + 1 : 1,
+        retries,
         detail: lastErrText,
       }), {
         status: 502,
