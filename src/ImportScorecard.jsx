@@ -159,20 +159,69 @@ export default function ImportScorecard({
 
   const teamId=teams.find(t=>t.league===contextLeague&&(t.members||[]).includes(contextBowler))?.id||"";
 
+  // Longest edge, in pixels, that an image is scaled down to before
+  // upload.
+  //
+  // A modern phone camera produces 4-12MB per photo, and base64 inflates
+  // that by a third. Six of those is a request body far past what the
+  // function will accept -- which arrives as a bare transport failure
+  // after a long wait, with nothing to say it was a size problem.
+  //
+  // 1600px is comfortably enough to read pin-deck graphics (a scorecard
+  // frame is a handful of pixels wide at phone resolution, and the
+  // limiting factor is the photo's sharpness, not its pixel count) while
+  // cutting a typical upload by an order of magnitude.
+  const MAX_IMAGE_EDGE = 1600;
+  const JPEG_QUALITY = 0.82;
+
+  async function downscale(file){
+    // No canvas (older browser, or a test environment) -- fall back to
+    // sending the original rather than failing the import outright.
+    if(typeof document==="undefined"||!document.createElement("canvas").getContext){
+      return readRaw(file);
+    }
+    try{
+      const bitmap=await createImageBitmap(file);
+      const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));
+      if(scale>=1)return readRaw(file);
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.round(bitmap.width*scale);
+      canvas.height=Math.round(bitmap.height*scale);
+      canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const dataUrl=canvas.toDataURL("image/jpeg",JPEG_QUALITY);
+      bitmap.close?.();
+      return{base64:dataUrl.split(",")[1],mimeType:"image/jpeg",previewUrl:dataUrl};
+    }catch{
+      return readRaw(file);
+    }
+  }
+
+  function readRaw(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const dataUrl=reader.result;
+        resolve({base64:dataUrl.split(",")[1],mimeType:file.type||"image/jpeg",previewUrl:dataUrl});
+      };
+      reader.onerror=()=>reject(new Error("Couldn't read one of the selected images."));
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function handleFilesSelected(fileList){
     const files=Array.from(fileList).slice(0,6);
     try{
-      const withData=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>{
-          const dataUrl=reader.result;
-          resolve({base64:dataUrl.split(",")[1],mimeType:file.type||"image/jpeg",previewUrl:dataUrl});
-        };
-        reader.onerror=()=>reject(new Error("Couldn't read one of the selected images."));
-        reader.readAsDataURL(file);
-      })));
-      setImages(withData);
       setError(null);
+      const withData=await Promise.all(files.map(downscale));
+      const totalMb=withData.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
+      // Still too big even after scaling -- say so now rather than after
+      // a two-minute wait that ends in a transport error.
+      if(totalMb>15){
+        setError(`These images come to about ${totalMb.toFixed(0)}MB even after resizing, which is too much to send at once. Try fewer images.`);
+        setImages([]);
+        return;
+      }
+      setImages(withData);
     }catch(e){
       setError(e.message||"Couldn't read the selected images.");
     }
@@ -198,7 +247,12 @@ export default function ImportScorecard({
           if(body?.error)detail=body.error;
         }catch{}
         if(/failed to send a request/i.test(detail)){
-          detail="Couldn't reach the scorecard reader. This is usually a large or slow upload — try one photo at a time, or a smaller image.";
+          // Keep the underlying text -- without it there's no way to tell
+          // a size problem from a timeout from a function that failed to
+          // start, and every one of those needs a different fix.
+          detail="Couldn't reach the scorecard reader. Most often the upload is too large or the read took too long — "+
+                 "try one image at a time. If it keeps failing on a single image, the reader itself may be down. "+
+                 `(${fnError.message||"no detail"})`;
         }
         throw new Error(detail||"Extraction failed.");
       }
@@ -376,13 +430,16 @@ export default function ImportScorecard({
             )}
             {error&&<div style={{fontSize:"13px",color:C.miss,marginBottom:"12px"}}>{error}</div>}
             {/* Set the expectation before the wait, not during it. */}
-            {images.length>0&&(
-              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                {images.length>1
-                  ? `${images.length} images — reading these can take a few minutes.`
-                  : "Reading a scorecard can take a minute or two."}
-              </div>
-            )}
+            {images.length>0&&(()=>{
+              const mb=images.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
+              return(
+                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                  {images.length>1
+                    ? `${images.length} images (${mb.toFixed(1)}MB after resizing) — reading these can take a few minutes.`
+                    : `Reading a scorecard can take a minute or two. (${mb.toFixed(1)}MB after resizing.)`}
+                </div>
+              );
+            })()}
             <button style={S.btn("primary")} disabled={!contextBowler||!contextLeague||!images.length} onClick={handleExtract}>
               Extract Shots
             </button>
