@@ -45,7 +45,7 @@ import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, n
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
-import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME } from "./constants.js";
+import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY } from "./constants.js";
 import {
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -2600,6 +2600,15 @@ export default function BowlingTracker(){
   // alone; league draws on the roster; practice/casual on local guests.
   const ownerName=displayName||bowlers[0]||"";
 
+  // Practice and casual have no league to pick, so sessionLeague is always
+  // "" there -- which silently disabled game-score entry AND the session
+  // recaps, both of which key off it. These environments get a stable
+  // stand-in key instead.
+  const effectiveSessionLeague=
+    preferences.environment==="practice"?PRACTICE_SESSION_KEY:
+    preferences.environment==="casual"?CASUAL_SESSION_KEY:
+    sessionLeague;
+
   // The signed-in user's own profile, which is what carries the coach
   // flag. Distinct from activeBowlerProfile: that follows whoever is being
   // logged for, and a guest never has a coach flag.
@@ -3152,7 +3161,7 @@ export default function BowlingTracker(){
             shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={activeLeagues}
             activeBowler={activeBowler} newBowlerName={newBowlerName} setNewBowlerName={setNewBowlerName} arsenals={arsenals} newBallName={newBallName} setNewBallName={setNewBallName}
             form={form} setForm={setForm} editingId={editingId} saved={saved} sessionSaved={sessionSaved} sessionSaveMessage={sessionSaveMessage}
-            sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}
+            sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} effectiveSessionLeague={effectiveSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}
             startingLane={startingLane} setStartingLane={setStartingLane} setShowSummary={setShowSummary} expandedSections={expandedSections}
             ballNumLabel={ballNumLabel} curSession={curSession} currentLane={currentLane} firstBallPins={firstBallPins} g1score={g1score} g2score={g2score} g3score={g3score}
             hasLeave={hasLeave} inTenth={inTenth} isNoTap={isNoTap} isStrike={isStrike} needsSpareMade={needsSpareMade} sessionTotal={sessionTotal} showPinCount={showPinCount}

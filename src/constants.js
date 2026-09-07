@@ -2,6 +2,16 @@
 // JSX for a hardcoded string.
 export const APP_NAME = "Board & Arrow";
 
+// Practice and casual nights aren't leagues, but every per-night record in
+// this app -- manual game scores, session recaps -- is keyed by
+// (bowler, league, date). Rather than special-case every one of those,
+// these two act as the "league" for those environments.
+//
+// They are deliberately plain names a bowler would recognise if they ever
+// saw them in an export, not opaque ids.
+export const PRACTICE_SESSION_KEY = "Practice";
+export const CASUAL_SESSION_KEY = "Just Bowling";
+
 // Domain/form constants shared across BowlingTracker.jsx and the view
 // files split out of it. Kept separate from ui.jsx, which is specifically
 // about styling/presentation -- these are actual data values (the set of

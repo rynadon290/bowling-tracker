@@ -14,7 +14,7 @@ export default function LogView({
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,
-  sessionLeague, setSessionLeague, sessionDate, setSessionDate,
+  sessionLeague, setSessionLeague, effectiveSessionLeague, sessionDate, setSessionDate,
   startingLane, setStartingLane, setShowSummary, expandedSections,
   ballNumLabel, curSession, currentLane, firstBallPins, g1score, g2score, g3score,
   hasLeave, inTenth, isNoTap, isStrike, needsSpareMade, sessionTotal, showPinCount,
@@ -162,8 +162,8 @@ export default function LogView({
                 bowlers who want score tracking without logging 30 shots a
                 night. A score entered here overrides whatever the shots
                 would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&sessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
-              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,sessionLeague,sessionDate,g));
+            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
+              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
               const total=seriesTotal(entered);
               return(
                 <CollapsibleCard
@@ -179,7 +179,7 @@ export default function LogView({
                       <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
                       <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
                         value={entered[g-1]==null?"":String(entered[g-1])}
-                        onChange={e=>updateManualScore(activeBowler,sessionLeague,sessionDate,g,e.target.value)}/>
+                        onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
                     </div>
                   ))}
                   {total!=null&&(
@@ -377,13 +377,13 @@ export default function LogView({
                 league summary below: both are scores-only, and the league
                 block leans on theoretical scores, releases and misses that
                 neither environment records. */}
-            {!editingId&&(preferences.environment==="casual"||preferences.environment==="practice")&&sessionLeague&&(
+            {!editingId&&(preferences.environment==="casual"||preferences.environment==="practice")&&effectiveSessionLeague&&(
               <SessionRecap
                 environment={preferences.environment}
                 manualScores={manualScores}
                 bowler={activeBowler}
                 allBowlers={scoreOptions}
-                league={sessionLeague}
+                league={effectiveSessionLeague}
                 date={sessionDate}
                 priorAverage={practicePriorAverage}
                 drills={drills}/>
