@@ -22,7 +22,7 @@
 //    equipment out from under someone because strangers disagreed about RG
 //    would be worse than wrong data.
 
-export const CATALOG_STATES = ["new", "approved", "verified", "rejected"];
+export const CATALOG_STATES = ["official", "new", "approved", "verified", "rejected"];
 
 // Approvals needed to move from new -> approved. Two independent people
 // agreeing is meaningfully better than one asserting.
@@ -39,6 +39,11 @@ export const VERIFICATION_THRESHOLD = 5;
 export const REJECTION_THRESHOLD = 2;
 
 export function catalogState(entry) {
+  // Official entries are manufacturer-sourced, not peer-voted -- checked
+  // first and unconditionally, since they never accumulate approvals or
+  // rejections at all (canVote below refuses to let anyone vote on one).
+  if (entry?.official) return "official";
+
   const approvals = entry?.approvals ?? 0;
   const rejections = entry?.rejections ?? 0;
 
@@ -57,7 +62,8 @@ export function catalogState(entry) {
 }
 
 export function isLocked(entry) {
-  return catalogState(entry) === "verified";
+  const state = catalogState(entry);
+  return state === "verified" || state === "official";
 }
 
 // Whether a given user may edit this entry. Verified entries are locked to
@@ -77,6 +83,7 @@ export function canEdit(entry, userId) {
 // a rejected entry is already gone.
 export function canVote(entry, userId) {
   if (!entry || !userId) return false;
+  if (entry.official) return false;
   if (entry.submittedBy === userId) return false;
   const state = catalogState(entry);
   if (state === "rejected" || state === "verified") return false;
@@ -88,12 +95,13 @@ export function canVote(entry, userId) {
 export function approvalsUntilNext(entry) {
   const state = catalogState(entry);
   const approvals = entry?.approvals ?? 0;
-  if (state === "verified" || state === "rejected") return null;
+  if (state === "official" || state === "verified" || state === "rejected") return null;
   if (state === "new") return APPROVAL_THRESHOLD - approvals;
   return VERIFICATION_THRESHOLD - approvals;
 }
 
 export const STATE_LABELS = {
+  official: "Official",
   new: "Unconfirmed",
   approved: "Community approved",
   verified: "Verified",
@@ -101,11 +109,17 @@ export const STATE_LABELS = {
 };
 
 // The disclaimer shown wherever catalog specs are surfaced. Users need to
-// know these numbers came from another bowler, not a manufacturer.
+// know these numbers came from another bowler, not a manufacturer -- or,
+// for official entries, that they DID come from the manufacturer and
+// weren't peer-voted at all.
 export function stateDescription(entry) {
   const state = catalogState(entry);
   const approvals = entry?.approvals ?? 0;
   switch (state) {
+    case "official":
+      return entry?.sourceNote
+        ? `Manufacturer specifications. Source: ${entry.sourceNote}`
+        : "Manufacturer specifications.";
     case "verified":
       return `Verified by ${approvals} bowlers. Locked from edits.`;
     case "approved":
@@ -161,9 +175,14 @@ export function bestEntry(entries) {
   const live = (entries || []).filter(e => catalogState(e) !== "rejected");
   if (!live.length) return null;
   return live.slice().sort((a, b) => {
-    const av = catalogState(a) === "verified" ? 1 : 0;
-    const bv = catalogState(b) === "verified" ? 1 : 0;
-    if (av !== bv) return bv - av;
+    // Official outranks everything -- including verified. A manufacturer's
+    // own spec sheet is more trustworthy than any number of peer votes,
+    // and an official entry never accumulates approvals to compete on, so
+    // without this check first it would lose to a well-voted community
+    // entry purely because 0 approvals sorts below a positive count.
+    const ao = a.official ? 2 : catalogState(a) === "verified" ? 1 : 0;
+    const bo = b.official ? 2 : catalogState(b) === "verified" ? 1 : 0;
+    if (ao !== bo) return bo - ao;
     const ad = a.approvals ?? 0;
     const bd = b.approvals ?? 0;
     if (ad !== bd) return bd - ad;

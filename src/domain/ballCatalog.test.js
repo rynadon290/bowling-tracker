@@ -186,3 +186,48 @@ describe('searchCatalog', () => {
     expect(out[0].id).toBe('b'); // the better-supported submission
   });
 });
+
+describe('official (manufacturer-sourced) entries', () => {
+  const official = o => ({ official: true, submittedBy: null, approvals: 0, rejections: 0, createdAt: '2026-01-01', ...o });
+
+  it('is its own state, checked before the vote-based ones', () => {
+    expect(catalogState(official())).toBe('official');
+  });
+
+  it('is locked from editing and voting, like verified but without needing any votes', () => {
+    expect(isLocked(official())).toBe(true);
+    expect(canEdit(official(), 'anyone')).toBe(false);
+    expect(canVote(official(), 'anyone')).toBe(false);
+  });
+
+  it('has nothing to progress toward', () => {
+    expect(approvalsUntilNext(official())).toBeNull();
+  });
+
+  it('describes itself as manufacturer data, not bowler consensus', () => {
+    expect(stateDescription(official())).toContain('Manufacturer');
+    expect(stateDescription(official({ sourceNote: 'Storm official site' }))).toContain('Storm official site');
+  });
+
+  it('outranks even a fully verified community entry in bestEntry', () => {
+    // This is the bug worth guarding against: an official entry never
+    // accumulates approvals (nobody votes on it), so without an explicit
+    // priority check it would lose to any community entry with a
+    // positive approval count -- including a verified one.
+    const communityVerified = entry({ approvals: VERIFICATION_THRESHOLD });
+    const best = bestEntry([communityVerified, official()]);
+    expect(best.official).toBe(true);
+  });
+
+  it('outranks a lightly-approved community entry too', () => {
+    const communityApproved = entry({ approvals: APPROVAL_THRESHOLD + 1 });
+    const best = bestEntry([communityApproved, official()]);
+    expect(best.official).toBe(true);
+  });
+
+  it('does not disturb ranking among ordinary community entries', () => {
+    const a = entry({ submittedBy: 'u1', approvals: 3 });
+    const b = entry({ submittedBy: 'u2', approvals: 1 });
+    expect(bestEntry([a, b]).approvals).toBe(3);
+  });
+});
