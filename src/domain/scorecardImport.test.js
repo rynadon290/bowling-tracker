@@ -269,6 +269,43 @@ describe('team scorecards', () => {
     expect(normalizeExtraction(flat)[0].source).toBe('printed');
   });
 
+  // The model reliably names a bowler's FIRST game and leaves the rest
+  // null. Grouping on the name alone split one bowler into their first
+  // game plus a nameless column holding the others -- which is how a
+  // three-game series showed up as one game.
+  it('keeps a bowler together when only their first game is named', () => {
+    const partial = normalizeExtraction({ games: [
+      { bowlerName: 'R. Nadon', lineupPosition: 0, seriesTotal: 600, gameNumber: 1, totalScore: 200 },
+      { bowlerName: null, lineupPosition: 0, gameNumber: 2, totalScore: 210 },
+      { bowlerName: null, lineupPosition: 0, gameNumber: 3, totalScore: 190 },
+      { bowlerName: 'B. Smith', lineupPosition: 1, gameNumber: 1, totalScore: 150 },
+    ] });
+    expect(partial).toHaveLength(2);
+    expect(partial[0].scorecardName).toBe('R. Nadon');
+    expect(partial[0].games).toHaveLength(3);
+    expect(partial[0].series).toBe(600);
+  });
+
+  it('carries the name forward when there are no lineup positions either', () => {
+    const noPos = normalizeExtraction({ games: [
+      { bowlerName: 'R. Nadon', gameNumber: 1, totalScore: 200 },
+      { bowlerName: null, gameNumber: 2, totalScore: 210 },
+      { bowlerName: null, gameNumber: 3, totalScore: 190 },
+    ] });
+    expect(noPos).toHaveLength(1);
+    expect(noPos[0].games).toHaveLength(3);
+  });
+
+  // Position beats name, so two bowlers sharing a printed name -- a
+  // father and son on one team -- still get their own column.
+  it('separates two bowlers with the same printed name by position', () => {
+    const sameName = normalizeExtraction({ games: [
+      { bowlerName: 'J. Smith', lineupPosition: 0, gameNumber: 1, totalScore: 200 },
+      { bowlerName: 'J. Smith', lineupPosition: 1, gameNumber: 1, totalScore: 150 },
+    ] });
+    expect(sameName).toHaveLength(2);
+  });
+
   it('treats unnamed games as ONE bowler, not one per game', () => {
     const solo = normalizeExtraction({ games: [{ gameNumber: 1, totalScore: 200 }, { gameNumber: 2, totalScore: 210 }] });
     expect(solo).toHaveLength(1);

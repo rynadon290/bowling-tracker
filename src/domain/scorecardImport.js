@@ -244,32 +244,55 @@ export function normalizeExtraction(data) {
   // comment on RESPONSE_SCHEMA in the Edge Function.
   if (Array.isArray(data?.games) && data.games.length) {
     const byBowler = new Map();
-    data.games.forEach((g, i) => {
-      const name = (g?.bowlerName || "").trim();
-      // Games with no name at all are one unnamed bowler, not one bowler
-      // per game.
-      const key = name.toLowerCase() || "__unnamed__";
+    // The model reliably names the FIRST game of each bowler and then
+    // leaves bowlerName null on the rest -- so grouping on the name alone
+    // split one bowler into "their first game" plus a nameless column
+    // holding the other two.
+    //
+    // lineupPosition is the stable identifier when it's present; when it
+    // isn't, the name carries forward from the last named game, because
+    // the list arrives in card order.
+    let lastName = "";
+    let lastPosition = null;
+
+    data.games.forEach((g) => {
+      const rawName = (g?.bowlerName || "").trim();
+      const rawPosition = Number.isInteger(g?.lineupPosition) ? g.lineupPosition : null;
+      if (rawName) lastName = rawName;
+      if (rawPosition !== null) lastPosition = rawPosition;
+
+      const name = rawName || lastName;
+      const position = rawPosition !== null ? rawPosition : lastPosition;
+      // Position first: it survives a missing name, and two bowlers with
+      // the same printed name (a father and son on one team) still get
+      // their own column.
+      const key = position !== null ? `pos:${position}` : (name.toLowerCase() || "__unnamed__");
+
       if (!byBowler.has(key)) {
         byBowler.set(key, {
           scorecardName: name,
-          lineupPosition: Number.isInteger(g?.lineupPosition) ? g.lineupPosition : byBowler.size,
+          lineupPosition: position !== null ? position : byBowler.size,
           seriesTotal: Number.isFinite(Number(g?.seriesTotal)) ? Number(g.seriesTotal) : null,
           games: [],
         });
       }
       const entry = byBowler.get(key);
-      // seriesTotal is repeated on each of a bowler's games; take the
-      // first real one rather than the last, so a missing value on a
-      // later game can't wipe it.
+      // A name arriving on a later game fills in a column that started
+      // nameless, rather than being ignored.
+      if (!entry.scorecardName && name) entry.scorecardName = name;
+      // seriesTotal is repeated across a bowler's games; take the first
+      // real one so a null on a later game can't wipe it.
       if (entry.seriesTotal == null && Number.isFinite(Number(g?.seriesTotal))) {
         entry.seriesTotal = Number(g.seriesTotal);
       }
       entry.games.push(g);
     });
+
     return [...byBowler.values()]
       .sort((a, b) => a.lineupPosition - b.lineupPosition)
       .map(e => ({ ...e, games: e.games.sort((a, b) => (a?.gameNumber ?? 0) - (b?.gameNumber ?? 0)), ...seriesFor(e) }));
   }
+
   // Older deployed function: games nested inside a bowlers array.
   if (Array.isArray(data?.bowlers) && data.bowlers.length) {
     return data.bowlers.map((b, i) => ({
