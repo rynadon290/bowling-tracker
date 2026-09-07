@@ -337,10 +337,19 @@ export default function BowlingTracker(){
   // effect has actually read storage, so it can't flash on startup.
   const[sessionStartDismissedDate,setSessionStartDismissedDate]=useState(localDateString());
   const[sessionStartSeen,setSessionStartSeen]=useState(true);
-  // null = storage not read yet. Rendering nothing in that window avoids
-  // both a flash of onboarding for an existing bowler and a flash of the
-  // app for a new one.
-  const[onboarded,setOnboarded]=useState(null);
+  // Read synchronously on the very first render from a localStorage
+  // mirror of the flag.
+  //
+  // The async window.storage read below is still the source of truth, but
+  // waiting for it meant an initial render with nothing decided, which
+  // showed a blank holding screen -- a visible flash in the browser, and
+  // in SSR (where effects never run) a permanently blank app. localStorage
+  // is synchronous, so mirroring the flag there lets the very first paint
+  // already know which screen to show.
+  const[onboarded,setOnboarded]=useState(()=>{
+    try{return window.localStorage.getItem(ONBOARDED_KEY)==="1";}
+    catch{return false;}
+  });
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -407,22 +416,27 @@ export default function BowlingTracker(){
   // Deliberately its own effect, not part of the big load() below.
   //
   // load() is one long try block spanning every table; if any earlier
-  // await in it throws, everything after is skipped. With the onboarding
-  // read in there, a single failed cloudRead would leave `onboarded` at
-  // null forever -- and since null renders a blank holding screen, that
-  // would brick the whole app on a transient network error. Isolating it
-  // means the gate always resolves.
+  // await in it throws, everything after is skipped. Keeping the
+  // onboarding read out of it means a transient cloudRead failure can't
+  // stop the gate from resolving.
   useEffect(()=>{
     let cancelled=false;
     (async()=>{
       try{
         const done=await window.storage.get(ONBOARDED_KEY);
-        if(!cancelled)setOnboarded(done?.value==="1");
+        if(cancelled)return;
+        const isDone=done?.value==="1";
+        setOnboarded(isDone);
+        // Re-mirror so the next launch decides synchronously. Covers a
+        // bowler whose localStorage was cleared but whose main storage
+        // still has the flag -- they get onboarding once, then never again.
+        try{
+          if(isDone)window.localStorage.setItem(ONBOARDED_KEY,"1");
+          else window.localStorage.removeItem(ONBOARDED_KEY);
+        }catch{}
       }catch{
-        // Storage unavailable is not a reason to trap someone on a blank
-        // screen. Fail open to the app; worst case is onboarding shows
-        // once more than it should.
-        if(!cancelled)setOnboarded(true);
+        // Main storage unavailable: trust whatever the synchronous mirror
+        // already decided rather than overriding it either way.
       }
     })();
     return()=>{cancelled=true;};
@@ -1349,6 +1363,7 @@ export default function BowlingTracker(){
   function finishOnboarding(){
     setOnboarded(true);
     try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
+    try{window.localStorage.setItem(ONBOARDED_KEY,"1");}catch{}
     // Completing the full-screen flow counts as having seen the prompt --
     // it asks the same two questions, so the daily card shouldn't appear
     // again immediately afterwards on the same day.
@@ -2600,16 +2615,14 @@ export default function BowlingTracker(){
 
   // ── First-launch gate ─────────────────────────────────────────────────
   // Renders instead of the whole app -- no nav, no header, no Log tab
-  // behind it. Held back until storage has actually been read (onboarded
-  // === null) so neither screen flashes on startup.
+  // behind it. The flag is read synchronously from localStorage on the
+  // first render (see the useState initializer), so the correct screen is
+  // chosen on the very first paint rather than after a blank frame.
   //
   // An existing bowler upgrading into this build has data but no
   // onboarding flag; treating any prior data as "already onboarded" keeps
   // them out of a setup flow they don't need.
   const hasExistingData=sessions.length>0||shots.length>0;
-  if(onboarded===null){
-    return <div style={{minHeight:"100vh",backgroundColor:C.bg}}/>;
-  }
   if(!onboarded&&!hasExistingData){
     return(
       <Onboarding

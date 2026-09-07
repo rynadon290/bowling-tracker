@@ -66,12 +66,32 @@ beforeAll(() => {
 });
 
 describe('app renders', () => {
-  it('mounts the whole tree without throwing', async () => {
+  // The first-launch gate decides which of two trees renders, and it reads
+  // its flag synchronously from localStorage so the choice is made on the
+  // first paint. Both branches need covering: with only the default mock
+  // (getItem -> null) this suite would render the onboarding screen and
+  // quietly stop smoke-testing the main app at all.
+  it('mounts the whole tree without throwing, for a returning bowler', async () => {
+    globalThis.window.localStorage.getItem = key =>
+      (key === 'bowling-onboarded-v1' ? '1' : null);
     const { AuthProvider } = await import('./AuthProvider.jsx');
     const { default: BowlingTracker } = await import('./BowlingTracker.jsx');
     const html = renderToStaticMarkup(
       <AuthProvider><BowlingTracker /></AuthProvider>
     );
     expect(html.length).toBeGreaterThan(100);
+    // Proves it really is the app shell and not the onboarding screen.
+    expect(html).toContain('Board &amp; Arrow');
+  });
+
+  it('mounts the first-launch flow without throwing, for a new bowler', async () => {
+    globalThis.window.localStorage.getItem = () => null;
+    const { AuthProvider } = await import('./AuthProvider.jsx');
+    const { default: BowlingTracker } = await import('./BowlingTracker.jsx');
+    const html = renderToStaticMarkup(
+      <AuthProvider><BowlingTracker /></AuthProvider>
+    );
+    expect(html.length).toBeGreaterThan(100);
+    expect(html).toContain('What are you bowling');
   });
 });
