@@ -49,7 +49,30 @@ export function storedResultFor(label){
   if(label==="Ringing 7")return"Ringing 10";
   return label;
 }
-export const STRIKE_DESCRIPTIONS = ["Flush","High","Light","Half Pocket","Trip 4","Kick 10","Brooklyn"];
+export const STRIKE_DESCRIPTIONS = ["Flush","High","Light","Messenger","Half Pocket","Trip 4","Kick 10","Brooklyn"];
+
+// "Trip 4" and "Kick 10" name the specific pin that carried through or
+// got kicked out -- a lefty's ball approaches from the opposite side, so
+// her equivalent pins are the mirror image (4\u21946, 10\u21947, matching the
+// same deck mirror domain/splits.js uses for corner pins, washouts, and
+// drill targets). The other five descriptions ("Flush", "Brooklyn", etc)
+// aren't tied to a specific pin number and stay as-is for both hands.
+//
+// Same convention as resultsForHandedness below: the STORED value stays
+// canonical ("Trip 4") for both hands so history and stats keep working
+// off one identifier; only the label a lefty sees flips.
+export function strikeDescriptionsForHand(leftHanded){
+  if(!leftHanded)return STRIKE_DESCRIPTIONS;
+  return STRIKE_DESCRIPTIONS.map(d=>
+    d==="Trip 4"?"Trip 6":d==="Kick 10"?"Kick 7":d
+  );
+}
+
+export function storedStrikeDescriptionFor(label){
+  if(label==="Trip 6")return"Trip 4";
+  if(label==="Kick 7")return"Kick 10";
+  return label;
+}
 export const RELEASES = ["Good","Acceptable","Bad"];
 export const MISSES = ["Left","Right","Fast","Slow","Execution"];
 export const BALL_CHANGE_REASONS = [

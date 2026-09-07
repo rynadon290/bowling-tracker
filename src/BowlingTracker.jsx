@@ -298,6 +298,11 @@ export default function BowlingTracker(){
   // or tasks is worse than showing nothing until the read lands.
   const[coachingRels,setCoachingRels]=useState([]);
   const[coachProfilesById,setCoachProfilesById]=useState({});
+  // Handedness of each coached bowler, so their tasks are labelled with
+  // the pins they actually leave. Comes from a view that exposes ONLY
+  // this field -- see migration_coach_reads_bowler_handedness.sql for why
+  // it isn't a policy on bowler_profiles.
+  const[coachHandednessById,setCoachHandednessById]=useState({});
   const[tasksByRelationship,setTasksByRelationship]=useState({});
   const[notesByRelationship,setNotesByRelationship]=useState({});
   // Sessions for whichever bowler the coach currently has selected in the
@@ -1502,6 +1507,15 @@ export default function BowlingTracker(){
     const otherIds=[...new Set(mine.map(r=>r.coach_id===user.id?r.bowler_id:r.coach_id))];
     if(otherIds.length){
       const profRes=await cloudRead("profiles",q=>q.select("id,display_name").in("id",otherIds));
+      // Best-effort: if the handedness view isn't present yet (migration
+      // not run), coaching still works -- labels just fall back to the
+      // right-handed default rather than the screen failing.
+      const handRes=await cloudRead("coached_bowler_handedness",q=>q.select("bowler_user_id,left_handed"));
+      if(handRes.online&&Array.isArray(handRes.data)){
+        const byId={};
+        handRes.data.forEach(r=>{if(r.left_handed)byId[r.bowler_user_id]=true;});
+        setCoachHandednessById(byId);
+      }
       if(profRes.online&&profRes.data){
         const byId={};
         profRes.data.forEach(p=>{byId[p.id]=p.display_name;});
@@ -3270,7 +3284,7 @@ export default function BowlingTracker(){
             onAttemptTask={attemptCoachingTask}
             onReopenTask={reopenCoachingTask}
             onAddNote={addCoachingNote}
-            leftHandedByUserId={{}}
+            leftHandedByUserId={coachHandednessById}
             onSelectBowler={loadCoachBowlerSessions}
             bowlerSnapshots={Object.fromEntries(Object.entries(coachBowlerSessions).map(([id,sess])=>[id,bowlerSnapshot(sess)]))}/>
         )}
