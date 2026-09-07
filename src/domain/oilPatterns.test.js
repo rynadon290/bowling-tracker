@@ -62,3 +62,18 @@ describe('supabase mapping', () => {
     expect(back.ratio).toBe('2.94:1');
   });
 });
+
+describe('user-submitted patterns', () => {
+  it('normalizes a fresh submission with blank optional fields', () => {
+    const submitted = normalizePattern({ name: 'Chameleon 39 (told at check-in)', lengthFeet: 39, ratio: '', volumeMl: null });
+    expect(submitted.name).toBe('Chameleon 39 (told at check-in)');
+    expect(submitted.lengthFeet).toBe(39);
+    expect(submitted.ratio).toBe('');
+    expect(submitted.volumeMl).toBeNull();
+  });
+
+  it('never marks a fresh submission as verified when converted to a row', () => {
+    const row = patternToRow(normalizePattern({ name: 'My House Shot' }), 'user-1');
+    expect(row.verified).toBe(false);
+  });
+});
