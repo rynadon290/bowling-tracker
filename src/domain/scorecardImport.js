@@ -238,7 +238,39 @@ export function seriesFor(bowlerEntry) {
 }
 
 export function normalizeExtraction(data) {
-  // Preferred shape: one entry per bowler.
+  // Current shape: a FLAT games list, each game tagged with its bowler.
+  // Flat rather than nested because nesting games inside a bowlers array
+  // pushed the response schema past Gemini's complexity limit -- see the
+  // comment on RESPONSE_SCHEMA in the Edge Function.
+  if (Array.isArray(data?.games) && data.games.length) {
+    const byBowler = new Map();
+    data.games.forEach((g, i) => {
+      const name = (g?.bowlerName || "").trim();
+      // Games with no name at all are one unnamed bowler, not one bowler
+      // per game.
+      const key = name.toLowerCase() || "__unnamed__";
+      if (!byBowler.has(key)) {
+        byBowler.set(key, {
+          scorecardName: name,
+          lineupPosition: Number.isInteger(g?.lineupPosition) ? g.lineupPosition : byBowler.size,
+          seriesTotal: Number.isFinite(Number(g?.seriesTotal)) ? Number(g.seriesTotal) : null,
+          games: [],
+        });
+      }
+      const entry = byBowler.get(key);
+      // seriesTotal is repeated on each of a bowler's games; take the
+      // first real one rather than the last, so a missing value on a
+      // later game can't wipe it.
+      if (entry.seriesTotal == null && Number.isFinite(Number(g?.seriesTotal))) {
+        entry.seriesTotal = Number(g.seriesTotal);
+      }
+      entry.games.push(g);
+    });
+    return [...byBowler.values()]
+      .sort((a, b) => a.lineupPosition - b.lineupPosition)
+      .map(e => ({ ...e, games: e.games.sort((a, b) => (a?.gameNumber ?? 0) - (b?.gameNumber ?? 0)), ...seriesFor(e) }));
+  }
+  // Older deployed function: games nested inside a bowlers array.
   if (Array.isArray(data?.bowlers) && data.bowlers.length) {
     return data.bowlers.map((b, i) => ({
       scorecardName: (b?.bowlerName || "").trim(),
@@ -246,11 +278,6 @@ export function normalizeExtraction(data) {
       games: Array.isArray(b?.games) ? b.games : [],
       ...seriesFor(b),
     }));
-  }
-  // Legacy shape: a bare games array for one unnamed bowler.
-  if (Array.isArray(data?.games) && data.games.length) {
-    const entry = { games: data.games, seriesTotal: null };
-    return [{ scorecardName: "", lineupPosition: 0, games: data.games, ...seriesFor(entry) }];
   }
   return [];
 }

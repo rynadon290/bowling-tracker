@@ -238,6 +238,43 @@ describe('convertExtractedGameToShots -- real end-to-end game from an actual upl
 });
 
 describe('team scorecards', () => {
+  // The flat shape the Edge Function now returns: one entry per game,
+  // each tagged with its bowler. Flat rather than nested because the
+  // nested version pushed the response schema past Gemini's complexity
+  // limit and every request failed.
+  const flat = {
+    games: [
+      { bowlerName: 'R. Nadon', lineupPosition: 0, seriesTotal: 600, gameNumber: 1, totalScore: 200, frames: [{}] },
+      { bowlerName: 'R. Nadon', lineupPosition: 0, seriesTotal: 600, gameNumber: 2, totalScore: 210, frames: [{}] },
+      { bowlerName: 'Kim N', lineupPosition: 1, gameNumber: 1, totalScore: 180 },
+      { bowlerName: 'Kim N', lineupPosition: 1, gameNumber: 2, totalScore: 175 },
+    ],
+  };
+
+  it('groups a flat game list back into one column per bowler', () => {
+    const cols = normalizeExtraction(flat);
+    expect(cols).toHaveLength(2);
+    expect(cols[0].scorecardName).toBe('R. Nadon');
+    expect(cols[0].games).toHaveLength(2);
+  });
+
+  it('keeps columns in lineup order', () => {
+    expect(normalizeExtraction(flat).map(c => c.lineupPosition)).toEqual([0, 1]);
+  });
+
+  // seriesTotal is repeated on each of a bowler's games; a missing value
+  // on a later game must not wipe one already read.
+  it('takes the first real series total for a bowler', () => {
+    expect(normalizeExtraction(flat)[0].series).toBe(600);
+    expect(normalizeExtraction(flat)[0].source).toBe('printed');
+  });
+
+  it('treats unnamed games as ONE bowler, not one per game', () => {
+    const solo = normalizeExtraction({ games: [{ gameNumber: 1, totalScore: 200 }, { gameNumber: 2, totalScore: 210 }] });
+    expect(solo).toHaveLength(1);
+    expect(solo[0].series).toBe(410);
+  });
+
   const team = {
     bowlers: [
       { bowlerName: 'R. Nadon', lineupPosition: 0, seriesTotal: 600, games: [
@@ -246,7 +283,8 @@ describe('team scorecards', () => {
     ],
   };
 
-  it('returns one entry per bowler column', () => {
+  // An older deployed function still returns the nested shape.
+  it('still reads the older nested shape', () => {
     expect(normalizeExtraction(team)).toHaveLength(2);
   });
 
