@@ -158,6 +158,11 @@ export function buildInbox({
       view: "social",
     });
   }
+  // teamInvite is kept in the priority list and honoured here, but
+  // nothing supplies it today: a team's pendingInvites are placeholders a
+  // captain types in by name, with no accept flow for the person named.
+  // Wired for when that exists rather than inventing a request an
+  // invitee has no way to answer.
   for (const invite of teamInvites) {
     items.push({
       id: `team-${invite.id || invite.teamId}`,
