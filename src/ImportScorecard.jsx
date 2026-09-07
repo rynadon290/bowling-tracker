@@ -156,6 +156,9 @@ export default function ImportScorecard({
   const[columns,setColumns]=useState([]);
   const[assignments,setAssignments]=useState({}); // columnIndex -> bowler name or "" (skip)
   const[orderCheck,setOrderCheck]=useState(null);
+  // "Busy, try again" is not the same as "this is broken", and colouring
+  // them the same is what makes people give up on a temporary problem.
+  const[errorIsTemporary,setErrorIsTemporary]=useState(false);
 
   const teamId=teams.find(t=>t.league===contextLeague&&(t.members||[]).includes(contextBowler))?.id||"";
 
@@ -264,6 +267,7 @@ export default function ImportScorecard({
     if(!contextBowler||!contextLeague||!images.length)return;
     setStep("processing");
     setError(null);
+    setErrorIsTemporary(false);
     try{
       const{data,error:fnError}=await supabase.functions.invoke("import-scorecard",{
         body:{images:images.map(img=>({base64:img.base64,mimeType:img.mimeType}))},
@@ -275,20 +279,48 @@ export default function ImportScorecard({
         // returns a JSON { error } body for its own failures, so read
         // that first and only fall back to guessing at causes.
         let detail=fnError.message||"";
+        let retryable=false;
         try{
           const body=await fnError.context?.json?.();
-          // The function returns { error, detail } -- error is a label
-          // ("Gemini API error") and detail is the actual cause. Showing
-          // only the label is how three rounds got spent guessing at a
-          // problem the server had already named.
           if(body?.error){
-            detail=body.error;
-            if(body.detail){
-              const extra=typeof body.detail==="string"?body.detail:JSON.stringify(body.detail);
-              detail+=` — ${extra.slice(0,400)}`;
+            // The function classifies failures into a `reason` so this
+            // doesn't have to parse raw API JSON. Showing a bowler
+            // `{"error":{"code":503,...}}` reads as "this app is broken"
+            // when the honest answer is "the reader is busy, try again in
+            // a minute" -- and people give up over the difference.
+            switch(body.reason){
+              case "busy":
+                retryable=true;
+                detail=`The scorecard reader is busy right now — this happens at peak times and usually clears within a few minutes. `+
+                       `Your images are still selected, so just tap Extract again in a minute. `+
+                       `(Already retried ${body.attempts||1} times.)`;
+                break;
+              case "rate_limited":
+                retryable=true;
+                detail="The scorecard reader has hit its usage limit for the moment. Give it a few minutes and try again — nothing is lost.";
+                break;
+              case "model_unavailable":
+                detail="The scorecard reader is pointed at a model that's no longer available. This needs a fix in the app, not something you can work around.";
+                break;
+              default: {
+                detail=body.error;
+                if(body.detail){
+                  const extra=typeof body.detail==="string"?body.detail:JSON.stringify(body.detail);
+                  detail+=` — ${extra.slice(0,400)}`;
+                }
+              }
             }
           }
         }catch{}
+        if(retryable){
+          // Keep the images and stay on setup so "try again" is one tap,
+          // not a re-upload.
+          setErrorIsTemporary(true);
+          setError(detail);
+          setStep("setup");
+          return;
+        }
+        setErrorIsTemporary(false);
         if(/failed to send a request/i.test(detail)){
           // Keep the underlying text -- without it there's no way to tell
           // a size problem from a timeout from a function that failed to
@@ -454,7 +486,21 @@ export default function ImportScorecard({
                 ))}
               </div>
             )}
-            {error&&<div style={{fontSize:"13px",color:C.miss,marginBottom:"12px"}}>{error}</div>}
+            {error&&(
+              <div style={{
+                fontSize:"13px",
+                color:errorIsTemporary?C.spare:C.miss,
+                backgroundColor:errorIsTemporary?C.spare+"11":"transparent",
+                border:errorIsTemporary?`1px solid ${C.spare}44`:"none",
+                borderRadius:errorIsTemporary?"8px":0,
+                padding:errorIsTemporary?"10px":0,
+                marginBottom:"12px",
+                lineHeight:1.5,
+              }}>
+                {errorIsTemporary&&<div style={{fontWeight:600,marginBottom:"4px"}}>Nothing's broken — just busy</div>}
+                {error}
+              </div>
+            )}
             {/* Set the expectation before the wait, not during it. */}
             {images.length>0&&(()=>{
               const mb=images.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
