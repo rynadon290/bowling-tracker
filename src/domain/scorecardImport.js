@@ -266,3 +266,62 @@ export function detailLevel(entry) {
   if (withFrames === 0) return "scores";
   return "mixed";
 }
+
+// Merging columns that turned out to be the same bowler.
+//
+// Uploading several images is normal and worth supporting: LaneTalk
+// scrolls, so games 1-3 and 4-6 are often two screenshots, and a wide
+// team card is often photographed in halves. All the images go to the
+// extraction as one card, which means one bowler can legitimately come
+// back as two columns.
+//
+// Left alone that is a real problem now that these write to other
+// people's records: two columns for one person means two pending
+// records, or half their games silently dropped. Merging by the bowler
+// they were MATCHED to (not by the printed name, which may differ
+// between shots) folds them back into one.
+export function mergeColumnsByBowler(columns) {
+  const merged = [];
+  const byBowler = new Map();
+
+  for (const col of (Array.isArray(columns) ? columns : [])) {
+    const key = col.assigned;
+    // Unassigned columns stay separate -- they still need a human to say
+    // who they are, and guessing that two unknowns are the same person
+    // would be exactly the wrong kind of clever.
+    if (!key) { merged.push(col); continue; }
+
+    if (!byBowler.has(key)) {
+      byBowler.set(key, { ...col, games: [...(col.games || [])], mergedFrom: 1 });
+      merged.push(byBowler.get(key));
+      continue;
+    }
+
+    const target = byBowler.get(key);
+    const seen = new Set(target.games.map(g => g?.gameNumber));
+    for (const g of (col.games || [])) {
+      // A game number already present is the same game photographed
+      // twice, not a fourth game. Keep whichever has frame detail --
+      // shot-by-shot beats a bare total.
+      if (seen.has(g?.gameNumber)) {
+        const i = target.games.findIndex(x => x?.gameNumber === g?.gameNumber);
+        const existingHasFrames = Array.isArray(target.games[i]?.frames) && target.games[i].frames.length;
+        const incomingHasFrames = Array.isArray(g?.frames) && g.frames.length;
+        if (!existingHasFrames && incomingHasFrames) target.games[i] = g;
+        continue;
+      }
+      target.games.push(g);
+      seen.add(g?.gameNumber);
+    }
+    target.games.sort((a, b) => (a?.gameNumber ?? 0) - (b?.gameNumber ?? 0));
+    target.mergedFrom += 1;
+    // Series is recomputed from the combined games unless one shot
+    // actually printed a series total.
+    const printed = [col, target].find(c => c.source === "printed");
+    Object.assign(target, printed && printed.series
+      ? { series: printed.series, source: "printed" }
+      : seriesFor({ games: target.games, seriesTotal: null }));
+  }
+
+  return merged;
+}
