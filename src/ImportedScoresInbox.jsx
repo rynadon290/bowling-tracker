@@ -118,8 +118,36 @@ export function InboxList({ items, onOpen }) {
   );
 }
 
+// Team invites are answered here rather than linked out, because the
+// Social tab only ever showed the captain's side.
+export function TeamInviteCard({ invite, onAccept, onDecline, busy }) {
+  return (
+    <div style={{ padding: "12px", marginBottom: "10px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.accent}44` }}>
+      <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>
+        Join {invite.teamName || "this team"}?
+      </div>
+      <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px", marginBottom: "10px" }}>
+        You were added to the roster as {invite.invitedName || "a member"}
+        {invite.lineupPosition != null ? `, position ${invite.lineupPosition + 1}` : ""}.
+        Teammates will be able to import your scores from a scorecard photo — you still confirm them.
+      </div>
+      <div style={{ display: "flex", gap: "6px" }}>
+        <button style={{ ...S.btn("primary"), flex: 1, padding: "8px", fontSize: "12px" }}
+          disabled={busy} onClick={() => onAccept(invite)}>
+          {busy ? "Joining…" : "Join team"}
+        </button>
+        <button style={{ ...S.btn(), flex: 1, padding: "8px", fontSize: "12px" }}
+          disabled={busy} onClick={() => onDecline(invite)}>
+          No thanks
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ImportedScoresInbox({
   records, bowler, onApprove, onReject, onCorrectTeammate, canCorrect,
+  teamInvites = [], onAcceptInvite, onDeclineInvite, inviteBusyId,
 }) {
   const [correctingId, setCorrectingId] = useState(null);
   const [draft, setDraft] = useState([]);
@@ -132,10 +160,21 @@ export default function ImportedScoresInbox({
   const stale = (records || []).filter(r =>
     r.bowler !== bowler && r.status === "pending" && canCorrect && canCorrect(r).allowed);
 
-  if (!mine.length && !reentry.length && !stale.length) return null;
+  if (!mine.length && !reentry.length && !stale.length && !teamInvites.length) return null;
 
   return (
     <>
+      {teamInvites.length > 0 && (
+        <div style={S.card}>
+          <div style={S.label}>Team {teamInvites.length === 1 ? "Invitation" : "Invitations"}</div>
+          {teamInvites.map(inv => (
+            <TeamInviteCard key={inv.id} invite={inv}
+              onAccept={onAcceptInvite} onDecline={onDeclineInvite}
+              busy={inviteBusyId === inv.id} />
+          ))}
+        </div>
+      )}
+
       {mine.length > 0 && (
         <div style={S.card}>
           <div style={S.label}>Scores To Check</div>

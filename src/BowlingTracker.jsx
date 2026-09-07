@@ -14,7 +14,7 @@ import GoalsPanel from "./GoalsPanel.jsx";
 import TrendsView from "./TrendsView.jsx";
 import CoachingView from "./CoachingView.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
-import { buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
+import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -333,6 +333,11 @@ export default function BowlingTracker(){
   // Read-only here: accepting still happens on Social, which owns the
   // full friendship state. This copy just refreshes afterwards.
   const[incomingFriendRequests,setIncomingFriendRequests]=useState([]);
+  // Team invites addressed to this account's email. Loaded at the top
+  // level for the same reason friend requests are: the invitee has no
+  // other screen to find them on.
+  const[myTeamInvites,setMyTeamInvites]=useState([]);
+  const[inviteBusyId,setInviteBusyId]=useState(null);
   // Held locally while onboarding runs, then committed once. Writing to
   // the real profile on every keystroke would create a bowler named "R"
   // the moment someone starts typing.
@@ -547,6 +552,7 @@ export default function BowlingTracker(){
     loadCoaching();
     loadImportedScores();
     loadFriendRequests();
+    loadTeamInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id]);
 
@@ -1561,6 +1567,59 @@ export default function BowlingTracker(){
     if(!latest)return;
     setCoachSeenAt(latest);
     try{await window.storage.set(COACH_SEEN_KEY,latest);}catch{}
+  }
+
+  async function loadTeamInvites(){
+    if(!user?.email)return;
+    const res=await cloudRead("pending_invites",q=>q.select("*"));
+    if(!res.online||!Array.isArray(res.data))return;
+    const mine=res.data.filter(r=>
+      String(r.invited_email||"").toLowerCase()===String(user.email).toLowerCase());
+    const teamNames={};
+    teams.forEach(t=>{teamNames[t.id]=t.name;});
+    // Team names come from teams the invitee can already see. For a team
+    // they're NOT on yet -- the normal case -- there's no name to show,
+    // so fetch just the names for the teams they've been invited to.
+    const unknown=[...new Set(mine.map(r=>r.team_id).filter(id=>!teamNames[id]))];
+    if(unknown.length){
+      const nameRes=await cloudRead("teams",q=>q.select("id,name").in("id",unknown));
+      if(nameRes.online&&Array.isArray(nameRes.data)){
+        nameRes.data.forEach(t=>{teamNames[t.id]=t.name;});
+      }
+    }
+    setMyTeamInvites(pendingTeamInvites(mine,teamNames));
+  }
+
+  async function acceptTeamInvite(invite){
+    setInviteBusyId(invite.id);
+    try{
+      // Joining writes to team_members, which the invitee has no direct
+      // permission for -- the RPC is scoped to exactly the invite that
+      // names them.
+      const{data,error}=await supabase.rpc("accept_team_invite",{invite_id:invite.id});
+      if(!error&&data){
+        setMyTeamInvites(prev=>prev.filter(i=>i.id!==invite.id));
+        // Teams are loaded by TeamManagement when the Social tab opens,
+        // so the new membership appears there rather than being spliced
+        // into local state here -- a half-built team object missing
+        // members/pendingInvites would break that screen's assumptions.
+        setSessionSaveMessage(`You've joined ${invite.teamName||"the team"}. It'll show under Social.`);
+        setTimeout(()=>setSessionSaveMessage(null),5000);
+      }else{
+        setSessionSaveMessage("Couldn't join that team just now — try again in a moment.");
+        setTimeout(()=>setSessionSaveMessage(null),5000);
+      }
+    }catch{}
+    setInviteBusyId(null);
+  }
+
+  async function declineTeamInvite(invite){
+    setInviteBusyId(invite.id);
+    // Recorded rather than deleted: a deleted invite is indistinguishable
+    // from one never sent, so the captain would just re-invite.
+    await cloudUpdate("pending_invites",{id:invite.id},{declined_at:new Date().toISOString()});
+    setMyTeamInvites(prev=>prev.filter(i=>i.id!==invite.id));
+    setInviteBusyId(null);
   }
 
   async function loadFriendRequests(){
@@ -2995,10 +3054,7 @@ export default function BowlingTracker(){
     tasksByRelationship,
     unreadResponses,
     friendRequests:incomingFriendRequests,
-    // Team invites are deliberately absent: pendingInvites are
-    // placeholders a captain types in by name, with no accept flow for
-    // the person named. There is nothing for an invitee to action, so
-    // routing them here would be inventing a request that doesn't exist.
+    teamInvites:myTeamInvites,
     bookAverageDue:bookAverageCheck,
     catalogRejections:rejectedBallsFor(arsenals[activeBowler]||[],catalogEntries,catalogAck),
     coachViewOn,
@@ -3606,7 +3662,11 @@ export default function BowlingTracker(){
               onApprove={approveImportedScores}
               onReject={rejectImportedScores}
               onCorrectTeammate={correctTeammateScores}
-              canCorrect={r=>canCorrectImport(r)}/>
+              canCorrect={r=>canCorrectImport(r)}
+              teamInvites={myTeamInvites}
+              onAcceptInvite={acceptTeamInvite}
+              onDeclineInvite={declineTeamInvite}
+              inviteBusyId={inviteBusyId}/>
             {inboxCount===0&&(
               <div style={S.card}>
                 <div style={S.label}>Nothing Waiting</div>
