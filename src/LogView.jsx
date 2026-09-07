@@ -5,6 +5,7 @@ import { sessionMoney } from "./domain/money.js";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
+import SessionRecap from "./SessionRecap.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
@@ -30,7 +31,7 @@ export default function LogView({
   showSessionStart, dismissSessionStart, updatePreferences,
   practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
-  oilPatterns, submitOilPattern, tournaments,
+  oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
@@ -372,8 +373,23 @@ export default function LogView({
               </CollapsibleCard>
             )}
 
+            {/* Casual and practice get their own recap instead of the
+                league summary below: both are scores-only, and the league
+                block leans on theoretical scores, releases and misses that
+                neither environment records. */}
+            {!editingId&&(preferences.environment==="casual"||preferences.environment==="practice")&&sessionLeague&&(
+              <SessionRecap
+                environment={preferences.environment}
+                manualScores={manualScores}
+                bowler={activeBowler}
+                allBowlers={scoreOptions}
+                league={sessionLeague}
+                date={sessionDate}
+                priorAverage={practicePriorAverage}/>
+            )}
+
             {/* Summary */}
-            {!editingId&&curSession&&(()=>{
+            {!editingId&&preferences.environment!=="casual"&&curSession&&(()=>{
               const cs=curSession;
               const sr=cs.shotCount?Math.round((cs.strikes/cs.shotCount)*100):0;
               const spr=cs.spareAttempts?Math.round((cs.sparesMade/cs.spareAttempts)*100):0;

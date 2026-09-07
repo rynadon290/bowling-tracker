@@ -2504,6 +2504,17 @@ export default function BowlingTracker(){
   //   - both high helpers match on an exact bowler name and return null
   //     for the all-bowlers view, so that falls back to the logged-in
   //     bowler rather than reporting nothing.
+  // The bowler's average BEFORE tonight, for the practice recap. Excludes
+  // the current date on purpose: comparing tonight against an average that
+  // already contains tonight would drag the baseline toward the very
+  // result being judged, so a good night would look smaller than it was.
+  const practicePriorAverage=(()=>{
+    const prior=sessions.filter(s=>s.bowler===activeBowler&&s.date!==sessionDate);
+    const all=prior.flatMap(s=>Array.isArray(s.scores)?s.scores:[]).filter(v=>Number.isFinite(v));
+    if(!all.length)return null;
+    return Math.floor(all.reduce((a,b)=>a+b,0)/all.length);
+  })();
+
   const goalBowler=statsBowler||activeBowler;
   // Handedness of the bowler being VIEWED, which isn't necessarily the one
   // currently logging shots -- viewing a left-handed teammate's stats must
@@ -2941,7 +2952,7 @@ export default function BowlingTracker(){
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
-            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments}
+            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
