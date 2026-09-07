@@ -68,44 +68,36 @@ const FRAME_SCHEMA = {
   required: ["frameNumber", "balls"],
 };
 
-// A game as it appears for ONE bowler.
-const GAME_SCHEMA = {
-  type: "object",
-  properties: {
-    gameNumber: { type: "integer" },
-    ballUsed: { type: "string", nullable: true, description: "The ball name shown for this game, if visible (e.g. 'Bionic'). Null if not shown or not legible." },
-    frames: { type: "array", items: FRAME_SCHEMA },
-    totalScore: { type: "integer", nullable: true, description: "The game's final score as printed on the scorecard, if visible. Null if not shown or not legible." },
-  },
-  required: ["gameNumber"],
-};
-
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
-    // A team scorecard lists several bowlers. Each entry is one bowler's
-    // column, with the name EXACTLY as printed -- the client matches that
-    // against the roster (and each bowler's recorded aliases) rather than
-    // this function guessing who anyone is.
-    bowlers: {
+    // FLAT list of games, exactly as this schema was before team support
+    // was added -- one bowler per game, identified by bowlerName, rather
+    // than games nested inside a bowlers array.
+    //
+    // The nested version added a level (bowlers > games > frames > balls
+    // > pinsStanding) to a schema that already sat five deep, and Gemini
+    // rejects a responseSchema past its complexity limit. Carrying the
+    // bowler on each game keeps the depth identical to the version that
+    // demonstrably worked, and the client groups by bowlerName.
+    games: {
       type: "array",
-      description: "One entry per bowler shown on the scorecard. For a single-bowler card, return exactly one entry.",
       items: {
         type: "object",
         properties: {
-          bowlerName: { type: "string", nullable: true, description: "The bowler's name exactly as printed on the scorecard, including any abbreviation (e.g. 'R. Nadon'). Null if no name is shown." },
-          lineupPosition: { type: "integer", nullable: true, description: "Zero-based position of this bowler's column on the card, left to right or top to bottom." },
-          seriesTotal: { type: "integer", nullable: true, description: "The bowler's printed series total, if shown. Null if not printed." },
-          games: { type: "array", items: GAME_SCHEMA },
+          bowlerName: { type: "string", nullable: true, description: "The bowler this game belongs to, exactly as printed on the scorecard including abbreviations (e.g. 'R. Nadon'). Null on a single-bowler card with no name shown." },
+          lineupPosition: { type: "integer", nullable: true, description: "Zero-based position of this bowler's column on the card, in the order bowlers appear." },
+          seriesTotal: { type: "integer", nullable: true, description: "This bowler's printed series total, if the card shows one. Repeat the same value on each of that bowler's games." },
+          gameNumber: { type: "integer" },
+          ballUsed: { type: "string", nullable: true, description: "The ball name shown for this game, if visible (e.g. 'Bionic'). Null if not shown or not legible." },
+          frames: { type: "array", items: FRAME_SCHEMA },
+          totalScore: { type: "integer", nullable: true, description: "The game's final score as printed on the scorecard, if visible. Null if not shown or not legible." },
         },
-        required: ["games"],
+        required: ["gameNumber"],
       },
     },
   },
-  // Must be non-empty: Gemini rejects a responseSchema with an empty
-  // `required` array, and the rejection surfaces to the client as a bare
-  // "failed to send a request to the Edge Function" with no cause.
-  required: ["bowlers"],
+  required: ["games"],
 };
 
 const EXTRACTION_PROMPT = `You are reading a bowling scorecard screenshot (from an app called LaneTalk). Extract every game and frame shown into the exact JSON shape requested.
@@ -125,11 +117,11 @@ Also record each game's final printed score in totalScore when the scorecard sho
 
 IMPORTANT -- some scorecards show only game totals with no per-frame detail at all (no pin-deck graphics, no frame boxes). That is a valid and common case, not a failure. When that happens, return the games with their totalScore and an empty frames array. Do not invent frames to fill the gap.
 
-TEAM SCORECARDS -- many scorecards show a whole team, one column or row per bowler. Return one entry in "bowlers" for EACH bowler shown, with:
+TEAM SCORECARDS -- many scorecards show a whole team, one column or row per bowler. Return EVERY bowler's games in the single flat "games" list, and tag each game with who it belongs to:
 - bowlerName exactly as printed, including abbreviations ("R. Nadon", "RYAN N"). Do not expand, correct, or guess at a fuller name; the app matches the printed text itself.
-- lineupPosition as the zero-based position of that bowler on the card, in the order they appear.
-- seriesTotal if the card prints a series/total column for that bowler.
-For a single-bowler card, return exactly one entry in "bowlers". Always populate "bowlers"; the older top-level "games" field is legacy and may be left empty.
+- lineupPosition as the zero-based position of that bowler's column, in the order bowlers appear on the card.
+- seriesTotal if the card prints a series total for that bowler, repeated on each of their games.
+So a four-bowler team playing three games each returns twelve entries in "games", not four. On a single-bowler card, bowlerName may be null.
 
 Respond with valid JSON matching the provided schema exactly. If a screenshot shows partial or cut-off games, only include complete frames you can actually read clearly from the pin-deck graphic -- do not guess or fabricate a frame or ball you can't clearly see.`;
 
