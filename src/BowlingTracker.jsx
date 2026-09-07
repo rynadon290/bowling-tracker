@@ -1107,14 +1107,43 @@ export default function BowlingTracker(){
   async function ensureLeaguesInCloud(names){
     const failed=[];
     for(const name of names){
-      if(!leagueIdsRef.current[name]){
-        const id=crypto.randomUUID();
-        const result=await cloudWrite("leagues",{id,name,created_by:user?.id||null});
-        if(result.synced){
-          leagueIdsRef.current[name]=id;
-        }else{
-          failed.push(name);
-        }
+      if(leagueIdsRef.current[name])continue;
+
+      // Look before inserting. leagues.name is globally unique, so a row
+      // may already exist for two ordinary reasons:
+      //
+      //   1. This device created it, then reloaded. leagueIdsRef is
+      //      rebuilt from the cloud on load, so anything called before
+      //      that finishes sees an empty ref and tries to insert again --
+      //      with a NEW uuid, guaranteeing a 23505 against the row it
+      //      created itself moments earlier.
+      //   2. Another bowler already created that league. Real leagues are
+      //      shared, so joining an existing one is the normal case, not
+      //      an error.
+      //
+      // Either way the right move is to adopt the existing id, not to
+      // fail the write.
+      const existing=await cloudRead("leagues",q=>q.select("id,name").eq("name",name));
+      if(existing.online&&Array.isArray(existing.data)&&existing.data.length){
+        leagueIdsRef.current[name]=existing.data[0].id;
+        continue;
+      }
+
+      const id=crypto.randomUUID();
+      const result=await cloudWrite("leagues",{id,name,created_by:user?.id||null});
+      if(result.synced){
+        leagueIdsRef.current[name]=id;
+        continue;
+      }
+
+      // Lost a race between the check above and the insert -- someone
+      // else created the same league in between. Re-read rather than
+      // reporting a failure the bowler can do nothing about.
+      const after=await cloudRead("leagues",q=>q.select("id,name").eq("name",name));
+      if(after.online&&Array.isArray(after.data)&&after.data.length){
+        leagueIdsRef.current[name]=after.data[0].id;
+      }else{
+        failed.push(name);
       }
     }
     return failed;
