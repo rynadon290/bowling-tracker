@@ -376,6 +376,10 @@ export default function BowlingTracker(){
   // Manually-entered game scores, keyed bowler|league|date|game. These take
   // precedence over scores computed from shots -- see domain/manualScores.js.
   const[manualScores,setManualScores]=useState({});
+  // Mirrors manualScores so a burst of writes in one tick each build on
+  // the last. State alone can't do that -- every call in the same tick
+  // sees the same closure value.
+  const manualScoresRef=useRef({});
   // Launch prompt state. Two separate facts feed the decision in
   // domain/launchPrompt.js: the date it was last dismissed, and whether
   // it has ever been seen at all. Defaults keep it hidden until the load
@@ -822,11 +826,19 @@ export default function BowlingTracker(){
         const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score"));
         if(manualRes.online&&manualRes.data){
           const rebuilt=manualScoresFromRows(manualRes.data,leagueNameById);
+          // Ref kept in step on every load path, or the first import
+          // after a reload would build on an empty ref and wipe what was
+          // already there.
+          manualScoresRef.current=rebuilt;
           setManualScores(rebuilt);
           try{await window.storage.set(MANUAL_SCORES_KEY,JSON.stringify(rebuilt));}catch{}
         }else{
           const ms=await window.storage.get(MANUAL_SCORES_KEY);
-          if(ms)setManualScores(normalizeManualScores(JSON.parse(ms.value)));
+          if(ms){
+            const loaded=normalizeManualScores(JSON.parse(ms.value));
+            manualScoresRef.current=loaded;
+            setManualScores(loaded);
+          }
         }
 
         try{
@@ -2362,7 +2374,20 @@ export default function BowlingTracker(){
   }
 
   function updateManualScore(bowler,league,date,game,value){
-    const updated=setManualScoreIn(manualScores,bowler,league,date,game,value);
+    // Built from a ref, not from the `manualScores` closure value.
+    //
+    // The scorecard import writes three games in one tick. Reading the
+    // closure meant all three started from the same snapshot, so games 1
+    // and 2 were overwritten by game 3 and imported as blank. A human
+    // typing one score at a time never hit it, because each tap was its
+    // own render.
+    //
+    // A ref rather than a functional setState updater because the lines
+    // below need the new value NOW -- to persist it and to queue the
+    // cloud write. React runs an updater during the next render, not
+    // during the call, so reading it back from there would be null.
+    const updated=setManualScoreIn(manualScoresRef.current,bowler,league,date,game,value);
+    manualScoresRef.current=updated;
     setManualScores(updated);
     try{window.storage.set(MANUAL_SCORES_KEY,JSON.stringify(updated));}catch{}
 
