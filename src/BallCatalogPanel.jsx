@@ -6,6 +6,7 @@ import {
 import { describeSpecs } from "./domain/ballSpecs.js";
 
 const STATE_COLORS = {
+  official: C.accent,
   new: C.textMuted,
   approved: C.spare,
   verified: C.strike,

@@ -581,7 +581,7 @@ export default function BowlingTracker(){
           if(ld)setLeagueDates(ld);
         }
 
-        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at"));
+        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at,official,source_note"));
         const votesRes=await cloudRead("ball_confirmations",q=>q.select("submission_id,confirmed_by,vote"));
         if(subsRes.online&&subsRes.data){
           const tally={};
@@ -596,6 +596,10 @@ export default function BowlingTracker(){
             const entry={
               id:row.id,submittedBy:row.submitted_by,ballKey:row.ball_key,ballName:row.ball_name,
               brand:row.brand||"",createdAt:row.created_at,
+              // Official rows never accumulate votes -- see canVote in
+              // ballCatalog.js -- so approvals/rejections stay at 0 for
+              // them regardless of what's in the confirmations table.
+              official:!!row.official,sourceNote:row.source_note||"",
               approvals:t.approvals,rejections:t.rejections,myVote:t.mine,
               specs:specsFromRow(row),
             };
