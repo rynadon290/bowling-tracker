@@ -29,7 +29,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   showSessionStart, dismissSessionStart, updatePreferences,
-  goalsPanel, importedScoresInbox, practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
+  goalsPanel, practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
@@ -392,12 +392,6 @@ export default function LogView({
                 drills={drills}
                 leftHandedForBowler={leftHandedForBowler}/>
             )}
-
-            {/* Scores a teammate imported for this bowler. Above the shot
-                form because it's a thing to act on, not a thing to read
-                past -- and it only renders when there's something
-                pending. */}
-            {!editingId&&importedScoresInbox}
 
             {/* Goals, for the bowler actually at the line. Only rendered
                 when they have some -- an empty goals card while logging
