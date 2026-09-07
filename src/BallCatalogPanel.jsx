@@ -3,7 +3,7 @@ import {
   catalogState, canVote, canEdit, isLocked, approvalsUntilNext,
   stateDescription, STATE_LABELS, bestEntry, ballKey,
 } from "./domain/ballCatalog.js";
-import { describeSpecs } from "./domain/ballSpecs.js";
+import { describeSpecs, specsForWeight } from "./domain/ballSpecs.js";
 
 const STATE_COLORS = {
   official: C.accent,
@@ -50,6 +50,15 @@ export default function BallCatalogPanel({
         const isMine = entry.submittedBy === userId;
         const votable = canVote(entry, userId);
         const remaining = approvalsUntilNext(entry);
+        // RG and differential genuinely shift by weight -- if this entry
+        // has a per-weight breakdown and the bowler has already entered
+        // their own ball's weight, show and apply THAT weight's real
+        // numbers rather than always defaulting to the 15lb reference.
+        const hasWeightData = Array.isArray(entry.weightSpecs) && entry.weightSpecs.length > 0;
+        const myWeight = myOwnSpecs?.weight;
+        const displaySpecs = hasWeightData && myWeight ? specsForWeight(entry, myWeight) : entry.specs;
+        const usingWeightMatch = hasWeightData && myWeight && displaySpecs !== entry.specs
+          && entry.weightSpecs.some(w => Number(w.weight) === Number(myWeight));
         return (
           <div key={entry.id} style={{ marginBottom: "10px", padding: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${STATE_COLORS[state]}44` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
@@ -60,8 +69,18 @@ export default function BallCatalogPanel({
             </div>
 
             <div style={{ fontSize: "12px", color: C.text, marginBottom: "4px" }}>
-              {describeSpecs(entry.specs) || "No details recorded"}
+              {describeSpecs(displaySpecs) || "No details recorded"}
             </div>
+            {usingWeightMatch && (
+              <div style={{ fontSize: "10px", color: C.accent, marginBottom: "4px" }}>
+                Showing the {myWeight}lb numbers — RG and differential differ by weight, and this ball's own numbers were published for more than one.
+              </div>
+            )}
+            {hasWeightData && myWeight && !usingWeightMatch && (
+              <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "4px" }}>
+                No published numbers for {myWeight}lb specifically — showing the reference weight instead.
+              </div>
+            )}
 
             {/* Provenance. A bowler trusting these numbers needs to know
                 where they came from. */}
@@ -73,7 +92,7 @@ export default function BallCatalogPanel({
             </div>
 
             <div style={S.chips}>
-              <Chip label="Use These" dense onToggle={() => onApply(entry.specs)} color={C.accent} />
+              <Chip label="Use These" dense onToggle={() => onApply(displaySpecs)} color={C.accent} />
               {votable && (
                 <>
                   <Chip label={entry.myVote === "approve" ? "✓ Looks right" : "Looks right"} dense

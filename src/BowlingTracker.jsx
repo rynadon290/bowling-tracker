@@ -581,7 +581,7 @@ export default function BowlingTracker(){
           if(ld)setLeagueDates(ld);
         }
 
-        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at,official,source_note"));
+        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at,official,source_note,weight_specs"));
         const votesRes=await cloudRead("ball_confirmations",q=>q.select("submission_id,confirmed_by,vote"));
         if(subsRes.online&&subsRes.data){
           const tally={};
@@ -600,6 +600,10 @@ export default function BowlingTracker(){
               // ballCatalog.js -- so approvals/rejections stay at 0 for
               // them regardless of what's in the confirmations table.
               official:!!row.official,sourceNote:row.source_note||"",
+              // Per-weight breakdown, when the source published more than
+              // one -- optional, so a plain community submission (one
+              // bowler, one weight) just has this as null.
+              weightSpecs:Array.isArray(row.weight_specs)?row.weight_specs:null,
               approvals:t.approvals,rejections:t.rejections,myVote:t.mine,
               specs:specsFromRow(row),
             };
