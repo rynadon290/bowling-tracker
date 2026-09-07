@@ -242,15 +242,6 @@ export default function BowlingTracker(){
   // ResizeObserver instead, so the spacer above it always matches exactly.
   const footerRef=useRef(null);
   const[footerHeight,setFooterHeight]=useState(80);
-  useEffect(()=>{
-    if(!footerRef.current)return;
-    const el=footerRef.current;
-    const measure=()=>setFooterHeight(el.offsetHeight);
-    measure();
-    const ro=new ResizeObserver(measure);
-    ro.observe(el);
-    return()=>ro.disconnect();
-  },[view]);
   const[teams,setTeams]=useState(()=>{
   try{
     const raw=window.localStorage.getItem("bowling-teams-v1");
@@ -616,7 +607,11 @@ export default function BowlingTracker(){
           if(bb)setBallBags(bb);
         }
 
-        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,home_centers,notes"));
+        // Every column profileFromRow reads. The select had drifted behind the
+        // mapper: is_coach, and the four book-average columns, all existed in
+        // the table and were mapped on the way out, but were never fetched --
+        // so they came back undefined on every load and silently reset.
+        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,home_centers,notes,book_average,book_games,book_season,book_average_as_of"));
         if(profilesRes.online&&profilesRes.data){
           const rebuiltProfiles={};
           profilesRes.data.forEach(row=>{
@@ -2083,6 +2078,26 @@ export default function BowlingTracker(){
   // answered. 10th-frame ball 3 is the one case that never asks (it's the
   // last delivery, nothing left to convert).
   const needsSpareMade=hasLeave&&!(parseInt(form.frame)===10&&form.ballNum===3)&&!form.spareMade;
+
+  // Measures the fixed Save Shot footer so the page can reserve space for
+  // it. Previously keyed only on `view`, which meant the effect never
+  // re-ran when the footer appeared, vanished, or grew -- switching into
+  // Practice doesn't change `view`, so the observer was often never
+  // attached at all and the spacer kept a stale height. The Notes card,
+  // being last, ended up underneath the footer.
+  //
+  // Depends on everything that changes whether the footer renders or how
+  // tall it is, and reserves the default when it isn't rendered at all.
+  useEffect(()=>{
+    const el=footerRef.current;
+    if(!el){setFooterHeight(0);return;}
+    const measure=()=>setFooterHeight(el.offsetHeight);
+    measure();
+    if(typeof ResizeObserver==="undefined")return;
+    const ro=new ResizeObserver(measure);
+    ro.observe(el);
+    return()=>ro.disconnect();
+  },[view,preferences.trackingMode,preferences.environment,practiceMode,editingId,needsSpareMade]);
   const showPinCount=hasLeave&&form.spareMade==="No"&&!isSinglePin&&standingPins>0;
 
   function stepPinCount(delta){

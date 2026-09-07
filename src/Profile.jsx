@@ -51,7 +51,7 @@ export default function Profile({
   // each one still shows a useful summary while closed.
   const [expanded, setExpanded] = useState({
     whoseProfile: true, identity: true,
-    bookAverage: false, homeCenters: false, teamsLeagues: false,
+    coaching: true, bookAverage: false, homeCenters: false, teamsLeagues: false,
     arsenal: false, bags: false, notes: false,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
@@ -113,6 +113,24 @@ export default function Profile({
             onToggle={() => update(setProfileField(profile, "twoHanded", false))} />
           <Chip label="Two-handed / no thumb" selected={profile.twoHanded}
             onToggle={() => update(setProfileField(profile, "twoHanded", true))} />
+        </div>
+      </CollapsibleCard>
+
+      {/* Coaching is opt-in and off by default. Someone who doesn't coach
+          never sees coaching UI at all, rather than an empty version of
+          it. Turning this on only unlocks the coach VIEW -- it doesn't
+          connect you to anyone, and a bowler being coached doesn't need
+          it, since the Coach tab appears for anyone in a relationship. */}
+      <CollapsibleCard title="Coaching" summary={profile.isCoach ? "Coach" : "Not coaching"}
+        expanded={expanded.coaching} onToggle={() => toggle("coaching")}>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+          Turn this on if you coach other bowlers. It adds a view that shows their tasks and notes instead of your own game.
+        </div>
+        <div style={S.chips}>
+          <Chip label="I bowl" selected={!profile.isCoach}
+            onToggle={() => update(setProfileField(profile, "isCoach", false))} />
+          <Chip label="I coach" selected={profile.isCoach}
+            onToggle={() => update(setProfileField(profile, "isCoach", true))} color={C.spare} />
         </div>
       </CollapsibleCard>
 
