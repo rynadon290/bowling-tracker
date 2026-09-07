@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildInbox, inboxCount } from './inbox.js';
+import { buildInbox, inboxCount, pendingTeamInvites } from './inbox.js';
 import { emptyImportRecord, normalizeImportRecord, approve, reject } from './importVerification.js';
 
 const rec = (bowler, over) => normalizeImportRecord({
@@ -86,5 +86,44 @@ describe('the badge count', () => {
     });
     expect(inboxCount(items)).toBe(1);
     expect(items[0].count).toBe(5);
+  });
+});
+
+describe('team invites', () => {
+  const rows = [
+    { id: 'i1', team_id: 't1', invited_name: 'Ryan', invited_email: 'r@x.com', lineup_position: 0 },
+    { id: 'i2', team_id: 't2', invited_name: 'Ryan', invited_email: 'r@x.com', accepted_at: '2026-06-01' },
+    { id: 'i3', team_id: 't3', invited_name: 'Ryan', invited_email: 'r@x.com', declined_at: '2026-06-01' },
+  ];
+
+  it('lists only invites still waiting on an answer', () => {
+    const out = pendingTeamInvites(rows, { t1: 'Tuesday Team' });
+    expect(out).toHaveLength(1);
+    expect(out[0].teamName).toBe('Tuesday Team');
+  });
+
+  // A declined invite must not reappear -- otherwise saying no achieves
+  // nothing and the prompt comes back forever.
+  it('does not resurrect a declined invite', () => {
+    expect(pendingTeamInvites([rows[2]], {})).toHaveLength(0);
+  });
+
+  it('survives an unknown team name', () => {
+    expect(pendingTeamInvites([rows[0]], {})[0].teamName).toBe('');
+  });
+
+  // Answered in the inbox, because the Social tab only ever showed the
+  // captain's side of an invite.
+  it('is actioned in the inbox rather than linked elsewhere', () => {
+    const item = buildInbox({ bowler: 'Ryan', userId: 'u1', teamInvites: pendingTeamInvites([rows[0]], { t1: 'Tuesday' }) })
+      .find(i => i.type === 'teamInvite');
+    expect(item.view).toBe('inbox');
+    expect(item.invite.id).toBe('i1');
+  });
+
+  it('says what joining actually means', () => {
+    const item = buildInbox({ bowler: 'Ryan', userId: 'u1', teamInvites: pendingTeamInvites([rows[0]], {}) })
+      .find(i => i.type === 'teamInvite');
+    expect(item.detail).toContain('import your scores');
   });
 });

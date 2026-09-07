@@ -158,19 +158,19 @@ export function buildInbox({
       view: "social",
     });
   }
-  // teamInvite is kept in the priority list and honoured here, but
-  // nothing supplies it today: a team's pendingInvites are placeholders a
-  // captain types in by name, with no accept flow for the person named.
-  // Wired for when that exists rather than inventing a request an
-  // invitee has no way to answer.
+  // Actioned in the inbox itself, not linked out. Everything else here
+  // points at a screen that already owns the workflow -- for invites
+  // there is no such screen: the Social tab is the captain's view of
+  // invites they sent, and has never had an invitee side.
   for (const invite of teamInvites) {
     items.push({
       id: `team-${invite.id || invite.teamId}`,
       type: "teamInvite",
       title: `Invitation to join ${invite.teamName || "a team"}`,
-      detail: "Accept or decline on the Social tab.",
+      detail: "Joining lets teammates import your scores from a scorecard photo.",
       count: 1,
-      view: "social",
+      view: "inbox",
+      invite,
     });
   }
 
@@ -207,4 +207,22 @@ export function buildInbox({
 // reading 14 makes an app feel like a chore rather than a tool.
 export function inboxCount(items) {
   return (Array.isArray(items) ? items : []).length;
+}
+
+// ── Team invites ────────────────────────────────────────────────────────
+//
+// Shaped from pending_invites rows into what buildInbox expects. Kept
+// here rather than inline at the call site so the "which invites are
+// actually outstanding" rule lives in one testable place: an invite that
+// has been accepted or declined is finished, and must not keep appearing.
+export function pendingTeamInvites(rows, teamNamesById = {}) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter(r => r && !r.accepted_at && !r.declined_at)
+    .map(r => ({
+      id: r.id,
+      teamId: r.team_id,
+      teamName: teamNamesById[r.team_id] || "",
+      invitedName: r.invited_name || "",
+      lineupPosition: r.lineup_position ?? null,
+    }));
 }
