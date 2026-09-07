@@ -1,5 +1,5 @@
 import { C, S, F, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
-import { formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import TournamentSession from "./TournamentSession.jsx";
@@ -7,7 +7,7 @@ import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import SessionRecap from "./SessionRecap.jsx";
 import ShareButton from "./ShareButton.jsx";
-import { getManualScore, seriesTotal } from "./domain/manualScores.js";
+import { getManualScore, seriesTotal, getGameEquipment, defaultPracticeBall } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
@@ -30,13 +30,26 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   showSessionStart, dismissSessionStart, updatePreferences,
-  goalsPanel, practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
+  goalsPanel, practiceMode, setPracticeMode, gameEquipment, updateGameEquipment, practiceTracking, setPracticeTracking, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
+  // What each environment shows on the Log tab. Kept in one place so the
+  // rules read as rules rather than being scattered through 1,100 lines
+  // of JSX:
+  //   - Tournament and casual never show goals or the ball/surface cards:
+  //     a tournament bowler is working from the tournament card, and a
+  //     casual night is scores only.
+  //   - Drills keep their own ball chips inside the drill card and don't
+  //     need the separate ball and surface cards under them.
+  const env=preferences.environment;
+  const isDrill=env==="practice"&&practiceMode==="drill";
+  const showGoals=env==="league"||(env==="practice"&&!isDrill);
+  const showEquipment=env!=="tournament"&&env!=="casual"&&!isDrill;
+
   return (
     <>
           <>
@@ -145,6 +158,26 @@ export default function LogView({
                   <Chip label="Games" selected={practiceMode==="games"} onToggle={()=>setPracticeMode("games")}/>
                   <Chip label="Drill" selected={practiceMode==="drill"} onToggle={()=>{setPracticeMode("drill");if(!activeDrill)startDrill();}}/>
                 </div>
+                {/* Tracking depth for THIS practice only. It changes what the
+                    Log tab shows tonight and nothing in Settings, so a
+                    scores-only practice can't quietly turn a league night
+                    into scores-only too. */}
+                {practiceMode==="games"&&(
+                  <>
+                    <div style={{fontSize:"12px",color:C.textMuted,margin:"10px 0 6px"}}>Tracking tonight</div>
+                    <div style={S.chips}>
+                      <Chip label="Shot by shot" selected={preferences.trackingMode==="shot"}
+                        onToggle={()=>setPracticeTracking("shot")}/>
+                      <Chip label="Scores only" selected={preferences.trackingMode==="game"}
+                        onToggle={()=>setPracticeTracking("game")}/>
+                    </div>
+                    {practiceTracking&&(
+                      <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                        Just for this practice — your Settings are unchanged.
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
             {!editingId&&activeBowler&&preferences.environment==="practice"&&practiceMode==="drill"&&activeDrill&&(
@@ -190,14 +223,47 @@ export default function LogView({
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                     Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
                   </div>
-                  {[1,2,3].map(g=>(
-                    <div key={g} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
-                      <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
-                      <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
-                        value={entered[g-1]==null?"":String(entered[g-1])}
-                        onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
+                  {[1,2,3].map(g=>{
+                    const isPracticeGames=preferences.environment==="practice";
+                    const arsenal=(arsenals?.[activeBowler]||[]);
+                    const equip=isPracticeGames?getGameEquipment(gameEquipment,activeBowler,effectiveSessionLeague,sessionDate,g):null;
+                    // One real ball means no choice to make -- it's pre-filled.
+                    // Plastic never defaults but is always offered.
+                    const defaultBall=defaultPracticeBall(arsenal,PLASTIC_BALL);
+                    const shownBall=equip?(equip.ball||defaultBall):"";
+                    return(
+                    <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
+                      <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                        <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
+                        <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
+                          value={entered[g-1]==null?"":String(entered[g-1])}
+                          onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
+                      </div>
+                      {/* Ball and surface per game, because that's what a
+                          practice is for: which ball, which surface, what
+                          did it average. Only in practice; a league night
+                          entered as scores doesn't record equipment. */}
+                      {isPracticeGames&&arsenal.length>0&&(
+                        <div style={{paddingLeft:"36px"}}>
+                          <div style={{...S.chips,marginBottom:"4px"}}>
+                            {arsenal.map(b=>(
+                              <Chip key={b} label={b} selected={shownBall===b} color={b===PLASTIC_BALL?C.strike:undefined}
+                                onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{ball:shownBall===b?"":b})}/>
+                            ))}
+                          </div>
+                          {shownBall&&shownBall!==PLASTIC_BALL&&(
+                            <div style={S.chips}>
+                              {SURFACES.map(sf=>(
+                                <Chip key={sf} label={sf} selected={equip.surface===sf}
+                                  onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{surface:equip.surface===sf?"":sf})}/>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                   {total!=null&&(
                     <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
                       <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
@@ -416,7 +482,7 @@ export default function LogView({
                 when they have some -- an empty goals card while logging
                 is noise. Deliberately collapsed by default so it doesn't
                 push the shot form down the screen. */}
-            {!editingId&&goalsPanel&&(
+            {!editingId&&showGoals&&goalsPanel&&(
               <CollapsibleCard title="Goals"
                 expanded={expandedSections.logGoals}
                 onToggle={()=>toggleSection("logGoals")}>
@@ -658,7 +724,7 @@ export default function LogView({
                   <div style={S.label}>Running Averages</div>
                   <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
                     {leagueAs.map(({league,avg})=><div key={league} style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{avg}</div><div style={S.statLbl}>{league.replace(" House Shot","")}</div></div>)}
-                    {cA&&<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,fontSize:"18px",color:C.accent}}>{cA}</div><div style={S.statLbl}>Combined</div></div>}
+                    {cA&&<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,fontSize:"18px",color:C.accent}}>{cA}</div><div style={S.statLbl}>Composite</div></div>}
                   </div>
                   {/* Share sits with the summary because that's the moment
                       someone wants to send it -- not buried in a menu. */}
@@ -681,98 +747,13 @@ export default function LogView({
 
             {!editingId&&<div style={S.divider}/>}
 
-            {/* Ball — collapsible. Once a bowler settles on a ball they may
-                throw it for a dozen frames, so a permanently-expanded grid
-                of every ball in the bag is wasted screen. */}
-            <CollapsibleCard
-              title={form.ball?`Ball · ${form.ball}`:"Ball"}
-              summary={form.ball?(formatLayout(ballLayouts?.[`${form.bowler}|${form.ball}`])||""):`${logBalls.length} available`}
-              expanded={expandedSections.ballPick}
-              onToggle={()=>toggleSection("ballPick")}>
-              {/* League and tournament are bag-constrained: you only have
-                  what you carried. Practice isn't, so it shows everything
-                  and the selector is hidden entirely. */}
-              {envBags.length>0&&(
-                <>
-                  <div style={S.label}>Bag</div>
-                  <div style={S.chips}>
-                    {envBags.map(bag=>(
-                      <Chip key={bag.id} label={bag.name} selected={selectedBagId===bag.id}
-                        onToggle={()=>setSelectedBagId(selectedBagId===bag.id?"":bag.id)}/>
-                    ))}
-                  </div>
-                  {!selectedBagId&&(
-                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                      Pick the bag you brought to see its balls.
-                    </div>
-                  )}
-                </>
-              )}
-              <div style={S.label}>Ball</div>
-              <div style={S.chips}>
-                {/* Layout shown alongside the name -- picking a ball is
-                    exactly when its drilling matters, and it saves a trip
-                    to the profile screen to remember what's what. */}
-                {logBalls.map(b=>{
-                  const layout=formatLayout(ballLayouts?.[`${form.bowler}|${b}`]);
-                  return(
-                    <Chip key={b} label={layout?`${b} · ${layout}`:b} selected={form.ball===b}
-                      onToggle={()=>editingId?set("ball",b):handleBallChange(b)}/>
-                  );
-                })}
-              </div>
-              {logBalls.length===0&&(
-                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-                  {!form.bowler
-                    ?"Select a bowler to see their arsenal."
-                    :envBags.length>0&&selectedBagId
-                      ?"That bag is empty — add balls to it on the Profile screen."
-                      :`No balls in ${form.bowler}'s arsenal yet — add them on the Profile screen.`}
-                </div>
-              )}
-            </CollapsibleCard>
-
-            {/* Ball Change Reason — only relevant when the ball actually
-                changed from the previous shot; collapsed by default. */}
-            {(()=>{
-              const lastBall=previousShotBall();
-              const ballJustChanged=!!lastBall&&!!form.ball&&lastBall!==form.ball;
-              if(!ballJustChanged)return null;
-              return(
-                <CollapsibleCard
-                  title="Ball Change Reason"
-                  summary={form.ballChangeReason.length?`${form.ballChangeReason.length} selected`:""}
-                  expanded={editingId?true:expandedSections.ballChange}
-                  onToggle={()=>toggleSection("ballChange")}>
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Switched from {lastBall} to {form.ball} — why?</div>
-                  <div style={S.chips}>
-                    {BALL_CHANGE_REASONS.map(r=>(
-                      <Chip key={r} label={r} selected={form.ballChangeReason.includes(r)} onToggle={()=>toggleMulti("ballChangeReason",r)}/>
-                    ))}
-                  </div>
-                </CollapsibleCard>
-              );
-            })()}
-
-            {/* Surface */}
-            {preferences.trackedFields.surface&&(
-              <CollapsibleCard
-                title="Surface"
-                summary={form.surface||""}
-                expanded={editingId?true:expandedSections.surface}
-                onToggle={()=>toggleSection("surface")}>
-                <div style={S.chips}>
-                  {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
-                </div>
-              </CollapsibleCard>
-            )}
-
-            {/* The whole shot-logging form only appears in shot-by-shot
-                mode. In game mode it's replaced by the score entry card
-                above -- showing both would imply you need to do both.
-                Editing an existing shot always shows the form, since
-                that's how a logged shot gets corrected. */}
-            {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(<>
+            {/* Shot-form order, top to bottom:
+                  context (game, frame, lane) -> result -> ball -> surface
+                  -> line -> release & miss -> shoes -> notes.
+                Context first because it's what changes every shot; result
+                right under it because "frame 5: strike" is one thought;
+                equipment after because it changes rarely; shoes above
+                notes because both are things you set once and leave. */}
             {/* Shot Context */}
             <div style={S.card}>
               <div style={S.label}>
@@ -879,95 +860,6 @@ export default function LogView({
                 <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
               )}
             </div>
-
-            {/* Line */}
-            {preferences.trackedFields.line&&(
-              <div style={S.card}>
-                <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
-                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Target</div>
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number" inputMode="decimal"
-                    value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
-                  <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number" inputMode="decimal"
-                    value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
-                </div>
-                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px",marginTop:"8px"}}>Actual</div>
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Actual Board" type="number" inputMode="decimal"
-                    value={form.actualBoard} onChange={e=>set("actualBoard",e.target.value)}/>
-                  <input style={{...S.input,flex:1}} placeholder="Actual Arrow" type="number" inputMode="decimal"
-                    value={form.actualArrows} onChange={e=>set("actualArrows",e.target.value)}/>
-                </div>
-                {(()=>{
-                  // The gap between target and actual is the whole point of
-                  // recording both: consistently missing the same direction
-                  // is an execution problem, which is a different fix from
-                  // having picked the wrong line to begin with.
-                  const t=parseFloat(form.targetArrows), a=parseFloat(form.actualArrows);
-                  if(Number.isNaN(t)||Number.isNaN(a))return null;
-                  const diff=a-t;
-                  if(diff===0)return(
-                    <div style={{fontSize:"12px",color:C.strike,fontWeight:600,marginTop:"6px",textAlign:"center"}}>✓ Hit the target</div>
-                  );
-                  return(
-                    <div style={{fontSize:"12px",color:C.spare,fontWeight:600,marginTop:"6px",textAlign:"center"}}>
-                      {Math.abs(diff)} board{Math.abs(diff)===1?"":"s"} {diff>0?"right":"left"} of target
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Ball Speed — an accessory field like the others: on by
-                default in Practice (where comparing speed against outcomes
-                is the point), off elsewhere, but opt-in either way. */}
-            {preferences.trackedFields.ballSpeed&&(
-              <div style={S.card}>
-                <div style={S.label}>Ball Speed</div>
-                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                  <input style={{...S.input,flex:1}} placeholder="mph" type="number" step="0.1" inputMode="decimal"
-                    value={form.ballSpeed} onChange={e=>set("ballSpeed",e.target.value)}/>
-                  <span style={{fontSize:"13px",color:C.textMuted}}>mph</span>
-                </div>
-              </div>
-            )}
-
-            {/* Rev rate and axis rotation are self-reported estimates -- there's
-                no way to measure them without a sensor -- so they're labelled
-                as such rather than presented as data. Off by default. */}
-            {(preferences.trackedFields.revRate||preferences.trackedFields.axisRotation)&&(
-              <div style={S.card}>
-                <div style={S.label}>Release Estimates</div>
-                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                  Your best guess — these can't be measured without a sensor.
-                </div>
-                <div style={S.row}>
-                  {preferences.trackedFields.revRate&&(
-                    <input style={{...S.input,flex:1}} placeholder="Rev rate (rpm)" type="number" inputMode="numeric"
-                      value={form.revRate} onChange={e=>set("revRate",e.target.value)}/>
-                  )}
-                  {preferences.trackedFields.axisRotation&&(
-                    <input style={{...S.input,flex:1}} placeholder="Axis rotation (°)" type="number" inputMode="numeric"
-                      value={form.axisRotation} onChange={e=>set("axisRotation",e.target.value)}/>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Shoes — heel and sole numbers. Interchangeable soles get
-                swapped for approach conditions, so this isn't constant for
-                a bowler the way shoe size would be. */}
-            {preferences.trackedFields.shoes&&(
-              <div style={S.card}>
-                <div style={S.label}>Shoes</div>
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="Heel #"
-                    value={form.heelNumber} onChange={e=>set("heelNumber",e.target.value)}/>
-                  <input style={{...S.input,flex:1}} placeholder="Sole #"
-                    value={form.soleNumber} onChange={e=>set("soleNumber",e.target.value)}/>
-                </div>
-              </div>
-            )}
 
             {/* Result */}
             <div style={S.card}>
@@ -1087,6 +979,175 @@ export default function LogView({
               )}
             </div>
 
+            {showEquipment&&(<>
+            {/* Ball — collapsible. Once a bowler settles on a ball they may
+                throw it for a dozen frames, so a permanently-expanded grid
+                of every ball in the bag is wasted screen. */}
+            <CollapsibleCard
+              title={form.ball?`Ball · ${form.ball}`:"Ball"}
+              summary={form.ball?(formatLayout(ballLayouts?.[`${form.bowler}|${form.ball}`])||""):`${logBalls.length} available`}
+              expanded={expandedSections.ballPick}
+              onToggle={()=>toggleSection("ballPick")}>
+              {/* League and tournament are bag-constrained: you only have
+                  what you carried. Practice isn't, so it shows everything
+                  and the selector is hidden entirely. */}
+              {envBags.length>0&&(
+                <>
+                  <div style={S.label}>Bag</div>
+                  <div style={S.chips}>
+                    {envBags.map(bag=>(
+                      <Chip key={bag.id} label={bag.name} selected={selectedBagId===bag.id}
+                        onToggle={()=>setSelectedBagId(selectedBagId===bag.id?"":bag.id)}/>
+                    ))}
+                  </div>
+                  {!selectedBagId&&(
+                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                      Pick the bag you brought to see its balls.
+                    </div>
+                  )}
+                </>
+              )}
+              <div style={S.label}>Ball</div>
+              <div style={S.chips}>
+                {/* Layout shown alongside the name -- picking a ball is
+                    exactly when its drilling matters, and it saves a trip
+                    to the profile screen to remember what's what. */}
+                {logBalls.map(b=>{
+                  const layout=formatLayout(ballLayouts?.[`${form.bowler}|${b}`]);
+                  return(
+                    <Chip key={b} label={layout?`${b} · ${layout}`:b} selected={form.ball===b}
+                      onToggle={()=>editingId?toggle("ball",b):handleBallChange(b)}/>
+                  );
+                })}
+              </div>
+              {logBalls.length===0&&(
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
+                  {!form.bowler
+                    ?"Select a bowler to see their arsenal."
+                    :envBags.length>0&&selectedBagId
+                      ?"That bag is empty — add balls to it on the Profile screen."
+                      :`No balls in ${form.bowler}'s arsenal yet — add them on the Profile screen.`}
+                </div>
+              )}
+            </CollapsibleCard>
+
+            {/* Ball Change Reason — only relevant when the ball actually
+                changed from the previous shot; collapsed by default. */}
+            {(()=>{
+              const lastBall=previousShotBall();
+              const ballJustChanged=!!lastBall&&!!form.ball&&lastBall!==form.ball;
+              if(!ballJustChanged)return null;
+              return(
+                <CollapsibleCard
+                  title="Ball Change Reason"
+                  summary={form.ballChangeReason.length?`${form.ballChangeReason.length} selected`:""}
+                  expanded={editingId?true:expandedSections.ballChange}
+                  onToggle={()=>toggleSection("ballChange")}>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Switched from {lastBall} to {form.ball} — why?</div>
+                  <div style={S.chips}>
+                    {BALL_CHANGE_REASONS.map(r=>(
+                      <Chip key={r} label={r} selected={form.ballChangeReason.includes(r)} onToggle={()=>toggleMulti("ballChangeReason",r)}/>
+                    ))}
+                  </div>
+                </CollapsibleCard>
+              );
+            })()}
+
+            {/* Surface */}
+            {preferences.trackedFields.surface&&(
+              <CollapsibleCard
+                title="Surface"
+                summary={form.surface||""}
+                expanded={editingId?true:expandedSections.surface}
+                onToggle={()=>toggleSection("surface")}>
+                <div style={S.chips}>
+                  {SURFACES.map(s=><Chip key={s} label={s} selected={form.surface===s} onToggle={()=>toggle("surface",s)}/>)}
+                </div>
+              </CollapsibleCard>
+            )}
+
+            {/* The whole shot-logging form only appears in shot-by-shot
+                mode. In game mode it's replaced by the score entry card
+                above -- showing both would imply you need to do both.
+                Editing an existing shot always shows the form, since
+                that's how a logged shot gets corrected. */}
+            {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(<>
+            </>)}
+
+            {/* Line */}
+            {preferences.trackedFields.line&&(
+              <div style={S.card}>
+                <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Target</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number" inputMode="decimal"
+                    value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number" inputMode="decimal"
+                    value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
+                </div>
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px",marginTop:"8px"}}>Actual</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Actual Board" type="number" inputMode="decimal"
+                    value={form.actualBoard} onChange={e=>set("actualBoard",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Actual Arrow" type="number" inputMode="decimal"
+                    value={form.actualArrows} onChange={e=>set("actualArrows",e.target.value)}/>
+                </div>
+                {(()=>{
+                  // The gap between target and actual is the whole point of
+                  // recording both: consistently missing the same direction
+                  // is an execution problem, which is a different fix from
+                  // having picked the wrong line to begin with.
+                  const t=parseFloat(form.targetArrows), a=parseFloat(form.actualArrows);
+                  if(Number.isNaN(t)||Number.isNaN(a))return null;
+                  const diff=a-t;
+                  if(diff===0)return(
+                    <div style={{fontSize:"12px",color:C.strike,fontWeight:600,marginTop:"6px",textAlign:"center"}}>✓ Hit the target</div>
+                  );
+                  return(
+                    <div style={{fontSize:"12px",color:C.spare,fontWeight:600,marginTop:"6px",textAlign:"center"}}>
+                      {Math.abs(diff)} board{Math.abs(diff)===1?"":"s"} {diff>0?"right":"left"} of target
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Ball Speed — an accessory field like the others: on by
+                default in Practice (where comparing speed against outcomes
+                is the point), off elsewhere, but opt-in either way. */}
+            {preferences.trackedFields.ballSpeed&&(
+              <div style={S.card}>
+                <div style={S.label}>Ball Speed</div>
+                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                  <input style={{...S.input,flex:1}} placeholder="mph" type="number" step="0.1" inputMode="decimal"
+                    value={form.ballSpeed} onChange={e=>set("ballSpeed",e.target.value)}/>
+                  <span style={{fontSize:"13px",color:C.textMuted}}>mph</span>
+                </div>
+              </div>
+            )}
+
+            {/* Rev rate and axis rotation are self-reported estimates -- there's
+                no way to measure them without a sensor -- so they're labelled
+                as such rather than presented as data. Off by default. */}
+            {(preferences.trackedFields.revRate||preferences.trackedFields.axisRotation)&&(
+              <div style={S.card}>
+                <div style={S.label}>Release Estimates</div>
+                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                  Your best guess — these can't be measured without a sensor.
+                </div>
+                <div style={S.row}>
+                  {preferences.trackedFields.revRate&&(
+                    <input style={{...S.input,flex:1}} placeholder="Rev rate (rpm)" type="number" inputMode="numeric"
+                      value={form.revRate} onChange={e=>set("revRate",e.target.value)}/>
+                  )}
+                  {preferences.trackedFields.axisRotation&&(
+                    <input style={{...S.input,flex:1}} placeholder="Axis rotation (°)" type="number" inputMode="numeric"
+                      value={form.axisRotation} onChange={e=>set("axisRotation",e.target.value)}/>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Release & Miss */}
             {(preferences.trackedFields.release||preferences.trackedFields.miss)&&(
               <CollapsibleCard
@@ -1117,6 +1178,21 @@ export default function LogView({
                   </>
                 )}
               </CollapsibleCard>
+            )}
+
+            {/* Shoes — heel and sole numbers. Interchangeable soles get
+                swapped for approach conditions, so this isn't constant for
+                a bowler the way shoe size would be. */}
+            {preferences.trackedFields.shoes&&(
+              <div style={S.card}>
+                <div style={S.label}>Shoes</div>
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="Heel #"
+                    value={form.heelNumber} onChange={e=>set("heelNumber",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} placeholder="Sole #"
+                    value={form.soleNumber} onChange={e=>set("soleNumber",e.target.value)}/>
+                </div>
+              </div>
             )}
 
             {/* Notes */}

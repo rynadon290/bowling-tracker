@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
+import { PLASTIC_BALL } from "./constants.js";
 import ArsenalList from "./ArsenalList.jsx";
 import BagManager from "./BagManager.jsx";
 import BallNameInput from "./BallNameInput.jsx";
@@ -294,6 +295,24 @@ export default function Profile({
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
           Balls and their drilling layouts.
         </div>
+        {/* Plastic is a yes/no, not a ball you name. Adding it as a reserved
+
+            entry keeps it in every ball list without a second concept. */}
+
+        {activeBowler && (
+
+          <div style={{ marginBottom: "10px" }}>
+
+            <Chip label={(arsenals?.[activeBowler] || []).includes(PLASTIC_BALL) ? "Has a plastic ball ✓" : "Add a plastic ball"}
+
+              selected={(arsenals?.[activeBowler] || []).includes(PLASTIC_BALL)} color={C.strike}
+
+              onToggle={() => (arsenals?.[activeBowler] || []).includes(PLASTIC_BALL) ? removeBall(PLASTIC_BALL) : addBall(PLASTIC_BALL)} />
+
+          </div>
+
+        )}
+
         <ArsenalList
           activeBowler={activeBowler}
           balls={balls}

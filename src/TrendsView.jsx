@@ -6,7 +6,8 @@ import { useState } from "react";
 // is shown in the stat boxes below the chart instead.
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip } from "./ui.jsx";
-import {
+import ShareButton from "./ShareButton.jsx";
+import { allGamesSeries, allGamesSummary,
   trendMetricsFor, trendMetricFor, seriesFor, trendDirection, describeTrend, seriesReliability,
 } from "./domain/trends.js";
 
@@ -16,10 +17,23 @@ export default function TrendsView({
   isSplit, isCornerPinLeave, leftHanded = false,
 }) {
   const [metricId, setMetricId] = useState("average");
+  // "Every game" plots one point per game instead of one per night.
+  // Nightly averages hide the spread: 190/190/190 and 140/240/190 are the
+  // same point. Off by default because the averaged view is the better
+  // read for a TREND; this is for looking at the scatter.
+  const [everyGame, setEveryGame] = useState(false);
   const metrics = trendMetricsFor(leftHanded);
   const metric = trendMetricFor(metricId, leftHanded);
 
-  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isCornerPinLeave });
+  // The league filter still applies in every-game mode, so "all my games
+  // in this league" and "all my games" are both reachable.
+  const gamePoints = allGamesSeries(sessions, statsBowler, statsLeague);
+  const gameSummary = allGamesSummary(gamePoints);
+  const showEveryGame = everyGame && metricId === "average";
+
+  const points = showEveryGame
+    ? gamePoints
+    : seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isCornerPinLeave });
   const direction = trendDirection(points);
   const reliability = seriesReliability(metricId, points);
   const summary = describeTrend(metricId, points);
@@ -27,7 +41,7 @@ export default function TrendsView({
   // Shot-sourced metrics need shot-by-shot data. A bowler tracking game
   // scores only has none, and saying so beats an empty chart that looks
   // broken.
-  const noShotData = metric?.source === "shots" && shots.length === 0;
+  const noShotData = metric?.source === "shots" && shots.length === 0 && !showEveryGame;
 
   const dirColor = direction.direction === "up" ? C.strike
     : direction.direction === "down" ? C.miss
@@ -59,8 +73,25 @@ export default function TrendsView({
               onToggle={() => setMetricId(m.id)} />
           ))}
         </div>
-        {metric && (
+        {metric && !showEveryGame && (
           <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>{metric.help}</div>
+        )}
+
+        {/* Only offered on Average: every-game plots raw scores, which is
+            meaningless for a rate like strike %. */}
+        {metricId === "average" && (
+          <>
+            <div style={{ ...S.chips, marginTop: "10px" }}>
+              <Chip label="Every game" selected={everyGame} onToggle={() => setEveryGame(v => !v)} />
+            </div>
+            {showEveryGame && gameSummary && (
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px", lineHeight: 1.5 }}>
+                {gameSummary.games} games{statsLeague ? ` in ${statsLeague.replace(" House Shot", "")}` : " across every league"} ·
+                {" "}averaging {gameSummary.average} · high {gameSummary.high}, low {gameSummary.low}.
+                The spread is {gameSummary.spread} pins — that's what a nightly average hides.
+              </div>
+            )}
+          </>
         )}
 
         {leagues.length > 0 && (
@@ -99,15 +130,37 @@ export default function TrendsView({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                   <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                  <XAxis dataKey={showEveryGame ? "x" : "date"} tick={{ fill: C.textMuted, fontSize: 10 }}
+                    tickFormatter={v => showEveryGame ? "" : String(v).slice(5)} />
                   <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} domain={["auto", "auto"]} />
                   <Tooltip
                     contentStyle={{ backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "12px" }}
                     labelStyle={{ color: C.text }} />
-                  <Line type="monotone" dataKey="value" stroke={C.accent} strokeWidth={2} dot={{ r: 3, fill: C.accent }} />
+                  {/* Straight segments and smaller dots for every-game:
+                      a smoothed curve through raw game scores implies a
+                      continuity that isn't there between two games. */}
+                  <Line type={showEveryGame ? "linear" : "monotone"} dataKey="value" stroke={C.accent}
+                    strokeWidth={showEveryGame ? 1.5 : 2} dot={{ r: showEveryGame ? 2 : 3, fill: C.accent }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Any trend is shareable -- a bowler who sees their spare
+                percentage climbing wants to send that to someone. */}
+            {points.length > 1 && (
+              <div style={{ marginBottom: "12px" }}>
+                <ShareButton compact label="Share this trend" summary={{
+                  bowler: statsBowler,
+                  scores: showEveryGame ? points.map(p => p.value) : [],
+                  league: statsLeague,
+                  environment: "league",
+                  highlights: showEveryGame && gameSummary
+                    ? [`${gameSummary.games} games, averaging ${gameSummary.average}`,
+                       `High ${gameSummary.high}, low ${gameSummary.low}`]
+                    : [`${metric?.label || "Trend"}: ${summary || direction}`],
+                }} />
+              </div>
+            )}
 
             {/* The claim, kept separate from the chart on purpose: the line
                 can always be drawn, but saying it means something is a

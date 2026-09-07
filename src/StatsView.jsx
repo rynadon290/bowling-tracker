@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
-import { formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { PRACTICE_SESSION_KEY, formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
   gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, pinsForNextSession,
@@ -66,7 +66,7 @@ bowlers.length>1&&(
                       {leagues.map(l=>{
   const isSelected=statsLeague===l&&!statsBowler;
   return(
-    <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={isSelected} onToggle={()=>{
+    <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:`${l.replace(" House Shot","")} Team`} selected={isSelected} onToggle={()=>{
       setStatsLeague(isSelected?"":l);
       setStatsBowler("");
       setCompareBowler("");
@@ -97,7 +97,7 @@ bowlers.length>1&&(
                             }} color={C.spare}/>
                           ))}
                           {leagues.filter(l=>l!==statsLeague).map(l=>(
-                            <Chip key={l} label={`${l.replace(" House Shot","")} Team`} selected={compareLeague===l} onToggle={()=>{
+                            <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:`${l.replace(" House Shot","")} Team`} selected={compareLeague===l} onToggle={()=>{
                               setCompareLeague(compareLeague===l?"":l);
                               setCompareBowler("");
                             }} color={C.accent}/>
@@ -131,7 +131,7 @@ showTeamCompare&&(()=>{
                       </div>
                       <div style={{fontSize:"10px",color:C.textMuted,marginBottom:"6px",display:"flex",gap:"12px"}}>
                         <span><span style={{color:C.accent}}>●</span> {meLabel}</span>
-                        <span><span style={{color:C.spare}}>●</span> {compareLabel}</span>
+                        <span><span style={{color:C.compare}}>●</span> {compareLabel}</span>
                       </div>
                       <div style={{height:`${pctData.length*36+20}px`}}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -141,7 +141,7 @@ showTeamCompare&&(()=>{
                             <YAxis type="category" dataKey="metric" tick={{fill:C.textMuted,fontSize:10}} width={110}/>
                             <Tooltip contentStyle={{backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",fontSize:"12px"}} labelStyle={{color:C.text}} formatter={(v)=>[`${v}%`]}/>
                             <Bar dataKey="you" fill={C.accent} radius={[0,4,4,0]} barSize={12}/>
-                            <Bar dataKey="opp" fill={C.spare} radius={[0,4,4,0]} barSize={12}/>
+                            <Bar dataKey="opp" fill={C.compare} radius={[0,4,4,0]} barSize={12}/>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -154,7 +154,7 @@ showTeamCompare&&(()=>{
                               <YAxis type="category" dataKey="metric" tick={{fill:C.textMuted,fontSize:10}} width={110}/>
                               <Tooltip contentStyle={{backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",fontSize:"12px"}} labelStyle={{color:C.text}}/>
                               <Bar dataKey="you" fill={C.accent} radius={[0,4,4,0]} barSize={12}/>
-                              <Bar dataKey="opp" fill={C.spare} radius={[0,4,4,0]} barSize={12}/>
+                              <Bar dataKey="opp" fill={C.compare} radius={[0,4,4,0]} barSize={12}/>
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
@@ -860,7 +860,7 @@ sessions.length>0&&(()=>{
                             {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>}
                           </div>
                         ))}
-                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Combined</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>}</div>)}
+                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Composite</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>}</div>)}
                       </div>
                       {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}
                     </div>
@@ -1025,7 +1025,7 @@ sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(session
                   <div style={S.card}>
                     <div style={S.label}>Game-by-Game Averages</div>
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                      Cumulative average at each position in the night, across the whole season — shows whether {statsBowler?"they're":"the team is"} bowling better early, middle, or late.
+                      Composite average at each position in the night, across the whole season — shows whether {statsBowler?"they're":"the team is"} bowling better early, middle, or late.
                       {isTeamView&&" \"Team\" is what the whole team scores together at that position."}
                     </div>
                     <div style={{display:"flex",gap:"6px"}}>

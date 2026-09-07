@@ -44,12 +44,12 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
-import { normalizePattern, patternFromRow, patternToRow, patternAverages } from "./domain/oilPatterns.js";
+import { normalizePattern, patternFromRow, patternToRow, patternAverages, pbaAnimalPatternSeeds } from "./domain/oilPatterns.js";
 import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
-import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
+import { setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip, applyTheme } from "./ui.jsx";
@@ -105,6 +105,7 @@ const INSIGHT_UNLOCK_KEY = "bowling-insight-unlocks-v1";
 const COACH_SEEN_KEY = "bowling-coach-seen-v1";
 const GUESTS_KEY = "bowling-practice-guests-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
+const GAME_EQUIPMENT_KEY = "bowling-game-equipment-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
 // Separate from the dismissed-date key: "have they ever seen it" and "did
 // they dismiss it today" are different questions and both are needed.
@@ -388,6 +389,10 @@ export default function BowlingTracker(){
   // and nobody ever sees someone else's numbers.
   const[drillDrafts,setDrillDrafts]=useState({});
   const[drillSaved,setDrillSaved]=useState(false);
+  // Practice-only tracking override. Lives here, not in preferences: a
+  // bowler switching to scores-only for one practice must not change how
+  // their league nights are documented. Resets when practice is left.
+  const[practiceTracking,setPracticeTracking]=useState(null); // null = follow settings
   const[practiceMode,setPracticeMode]=useState("games");
   // Practice/Drill is gated to preferences.environment==="practice" in
   // LogView, so switching to another environment mid-drill hides it from
@@ -417,6 +422,10 @@ export default function BowlingTracker(){
   // the last. State alone can't do that -- every call in the same tick
   // sees the same closure value.
   const manualScoresRef=useRef({});
+  // Ball and surface per games-only practice game. See
+  // domain/manualScores.js gameEquipment*.
+  const[gameEquipment,setGameEquipment]=useState({});
+  const gameEquipmentRef=useRef({});
   // Launch prompt state. Two separate facts feed the decision in
   // domain/launchPrompt.js: the date it was last dismissed, and whether
   // it has ever been seen at all. Defaults keep it hidden until the load
@@ -740,7 +749,7 @@ export default function BowlingTracker(){
           if(cs)setCenters(cs.map(normalizeCenter).filter(c=>c.id&&c.name));
         }
 
-        const patternsRes=await cloudRead("oil_patterns",q=>q.select("id,name,series,length_feet,ratio,volume_ml,forward_ml,reverse_ml,verified,source_note"));
+        const patternsRes=await cloudRead("oil_patterns",q=>q.select("id,name,series,length_feet,ratio,volume_ml,forward_ml,reverse_ml,verified,source_note,year"));
         if(patternsRes.online&&patternsRes.data){
           const rebuilt=patternsRes.data.map(patternFromRow).filter(Boolean);
           setOilPatterns(rebuilt);
@@ -863,9 +872,13 @@ export default function BowlingTracker(){
           if(bg){const v=JSON.parse(bg.value);if(Array.isArray(v))setBags(v.map(b=>normalizeBag(b)));}
         }
 
-        const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score"));
+        const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score,ball,surface"));
         if(manualRes.online&&manualRes.data){
           const rebuilt=manualScoresFromRows(manualRes.data,leagueNameById);
+          const equip=gameEquipmentFromRows(manualRes.data,leagueNameById);
+          gameEquipmentRef.current=equip;
+          setGameEquipment(equip);
+          try{await window.storage.set(GAME_EQUIPMENT_KEY,JSON.stringify(equip));}catch{}
           // Ref kept in step on every load path, or the first import
           // after a reload would build on an empty ref and wipe what was
           // already there.
@@ -879,6 +892,10 @@ export default function BowlingTracker(){
             manualScoresRef.current=loaded;
             setManualScores(loaded);
           }
+          try{
+            const ge=await window.storage.get(GAME_EQUIPMENT_KEY);
+            if(ge){const loadedE=JSON.parse(ge.value)||{};gameEquipmentRef.current=loadedE;setGameEquipment(loadedE);}
+          }catch{}
         }
 
         try{
@@ -2475,6 +2492,13 @@ export default function BowlingTracker(){
   }
 
   function handleBallChange(newBall){
+    // Tapping the selected ball again clears it. Every other chip in the
+    // app toggles; this one only ever set, so a mis-tap on the wrong ball
+    // couldn't be undone without picking a different wrong one.
+    if(form.ball===newBall){
+      setForm(f=>({...f,ball:"",startingBoard:"",targetArrows:""}));
+      return;
+    }
     const lane=calcLane(startingLane,form.game,form.frame);
     const stored=activeBowler?ballLaneLines[activeBowler]?.[newBall]?.[lane]:null;
     setForm(f=>({...f,ball:newBall,startingBoard:stored?.startingBoard||"",targetArrows:stored?.targetArrows||""}));
@@ -2766,8 +2790,24 @@ export default function BowlingTracker(){
       if(score===null)cloudDelete("manual_scores",{bowler_name:bowler,league_id:leagueId,date,game});
       // Same: keyed by the natural (user, bowler, league, date, game)
       // tuple, so correcting a typed score updates instead of colliding.
-      else cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null),{onConflict:"user_id,bowler_name,league_id,date,game"});
+      else cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null,
+        getGameEquipment(gameEquipmentRef.current,bowler,league,date,game)),{onConflict:"user_id,bowler_name,league_id,date,game"});
     },600);
+  }
+
+  // Ball/surface for a games-only practice game. Rides on the same
+  // manual_scores row; if there's no score yet the row is created with
+  // the equipment and a null score, and the score fills in later.
+  function updateGameEquipment(bowler,league,date,game,patch){
+    const updated=setGameEquipmentIn(gameEquipmentRef.current,bowler,league,date,game,patch);
+    gameEquipmentRef.current=updated;
+    setGameEquipment(updated);
+    try{window.storage.set(GAME_EQUIPMENT_KEY,JSON.stringify(updated));}catch{}
+    const leagueId=leagueIdsRef.current[league];
+    if(!leagueId)return;
+    const score=getManualScore(manualScoresRef.current,bowler,league,date,game);
+    cloudWrite("manual_scores",manualScoreToRow(bowler,leagueId,date,game,score,user?.id||null,
+      getGameEquipment(updated,bowler,league,date,game)),{onConflict:"user_id,bowler_name,league_id,date,game"});
   }
 
   function getSessionTotal(){
@@ -3168,6 +3208,10 @@ export default function BowlingTracker(){
   // then -- doing it on demand would silently drop the first score of
   // every practice session.
   useEffect(()=>{
+    // Casual is scores-only, so the score card is the whole screen --
+    // it opens by default there and nowhere else.
+    if(preferences.environment==="casual")setExpandedSections(e=>({...e,manualScores:true}));
+    if(preferences.environment!=="practice")setPracticeTracking(null);
     if(preferences.environment==="practice"&&user?.id)ensurePracticeLeague();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[preferences.environment,user?.id]);
@@ -3194,6 +3238,25 @@ export default function BowlingTracker(){
   // leagues themselves, and hiding Social from them permanently would
   // take away a tab they need for their own game. Switching back to
   // "I'm bowling" brings it back.
+  // What the Log tab treats as the current preferences. In practice, a
+  // session-only tracking choice overrides the stored one so a bowler can
+  // switch to scores-only for tonight without touching Settings -- and
+  // therefore without changing how their league nights get documented.
+  const logPreferences=(preferences.environment==="practice"&&practiceTracking)
+    ?{...preferences,trackingMode:practiceTracking}
+    :preferences;
+
+  // The pattern picker always offers the PBA animals for this season and
+  // last, on top of whatever the community has entered. Seeded in memory,
+  // not written to the cloud: they become real rows only when a bowler
+  // fills in specs and saves.
+  const pickerPatterns=(()=>{
+    const y=new Date().getFullYear();
+    const have=new Set(oilPatterns.map(p=>`${p.name}|${p.year||""}`));
+    const seeds=[...pbaAnimalPatternSeeds(y),...pbaAnimalPatternSeeds(y-1)].filter(p=>!have.has(`${p.name}|${p.year}`));
+    return [...oilPatterns,...seeds];
+  })();
+
   const navTabs=["log","data","insights",...(coachViewOn?[]:["social"]),...(showCoachingTab?["coaching"]:[])];
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and
@@ -3913,14 +3976,14 @@ export default function BowlingTracker(){
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
-            preferences={preferences}
+            preferences={logPreferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
             activeBowlerLeftHanded={activeBowlerLeftHanded}
             ballLayouts={ballLayouts} setBallLayout={setBallLayout}
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
-            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
+            oilPatterns={pickerPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             goalsPanel={activeBowler&&logGoals.length?(
@@ -3930,6 +3993,8 @@ export default function BowlingTracker(){
                 leftHanded={leftHandedForBowler(activeBowler)}
                 onChange={next=>saveGoals(activeBowler,next)}/>
             ):null}
+            gameEquipment={gameEquipment} updateGameEquipment={updateGameEquipment}
+            practiceTracking={practiceTracking} setPracticeTracking={setPracticeTracking}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} startAnotherDrill={startAnotherDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills} leftHandedForBowler={leftHandedForBowler}
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}

@@ -5,7 +5,7 @@ import {
   dayTotal, dayAverage, dayGamesEntered, cutMargin,
   tournamentTotal, tournamentAverage, tournamentMoney,
 } from "./domain/tournaments.js";
-import { searchPatterns, describePattern, patternStats } from "./domain/oilPatterns.js";
+import { patternDisplayName, searchPatterns, describePattern, patternStats } from "./domain/oilPatterns.js";
 import {
   SIDE_POT_TYPES, addSidePot, removeSidePot, setSidePotField, sidePotMoney, sidePotTotals,
 } from "./domain/sidePots.js";
@@ -142,7 +142,7 @@ function OilPatternField({ value, onChange, patterns, onSubmitPattern, tournamen
             <button key={p.id || p.name}
               style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 10px", cursor: "pointer", color: C.text, borderBottom: `1px solid ${C.border}` }}
               onMouseDown={() => onChange(p.name)}>
-              <div style={{ fontSize: "13px", fontWeight: 600 }}>{p.name}</div>
+              <div style={{ fontSize: "13px", fontWeight: 600 }}>{patternDisplayName(p)}</div>
               {describePattern(p) && <div style={{ fontSize: "11px", color: C.textMuted }}>{describePattern(p)}</div>}
             </button>
           ))}

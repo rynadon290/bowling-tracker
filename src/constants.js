@@ -9,6 +9,16 @@ export const APP_NAME = "Board & Arrow";
 //
 // They are deliberately plain names a bowler would recognise if they ever
 // saw them in an export, not opaque ids.
+// The plastic spare ball, as a reserved arsenal entry.
+//
+// A plastic is equipment nearly every league bowler carries and almost
+// none would list by model name -- "my plastic" is the whole identity.
+// Making it a reserved name rather than a separate flag means it flows
+// through everything an arsenal ball already flows through: the ball
+// picker, drill chips, per-ball stats, bags. One toggle in Arsenal adds
+// or removes it.
+export const PLASTIC_BALL = "Plastic";
+
 export const PRACTICE_SESSION_KEY = "Practice";
 
 // The name the practice league is stored under IN THE CLOUD.
