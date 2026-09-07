@@ -26,6 +26,10 @@ export function emptyProfile(bowlerName = "") {
     bowlerName,
     leftHanded: false,
     twoHanded: false,
+    // Whether this person coaches. Gates the coach view -- someone who
+    // isn't a coach never sees coaching UI at all, rather than seeing an
+    // empty version of it.
+    isCoach: false,
     homeCenters: [],
     notes: "",
     // Book average: a static, frozen number the bowler enters and the app
@@ -52,6 +56,7 @@ export function normalizeProfile(raw, bowlerName = "") {
     bowlerName: raw.bowlerName || bowlerName,
     leftHanded: !!raw.leftHanded,
     twoHanded: !!raw.twoHanded,
+    isCoach: !!raw.isCoach,
     homeCenters: Array.isArray(raw.homeCenters)
       ? raw.homeCenters.filter(c => typeof c === "string" && c.trim()).map(c => c.trim())
       : [],
@@ -218,6 +223,7 @@ export function profileToRow(profile, userId) {
     bowler_name: profile.bowlerName,
     left_handed: !!profile.leftHanded,
     two_handed: !!profile.twoHanded,
+    is_coach: !!profile.isCoach,
     home_centers: profile.homeCenters || [],
     notes: profile.notes || null,
     // Guard against undefined as well as "" -- a profile object built
@@ -237,6 +243,7 @@ export function profileFromRow(row) {
     bowlerName: row.bowler_name || "",
     leftHanded: !!row.left_handed,
     twoHanded: !!row.two_handed,
+    isCoach: !!row.is_coach,
     homeCenters: row.home_centers || [],
     notes: row.notes || "",
     bookAverage: row.book_average,

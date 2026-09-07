@@ -115,6 +115,21 @@ function presetFor(environment) {
   return ENVIRONMENT_PRESETS[environment] || ENVIRONMENT_PRESETS.league;
 }
 
+// Whether the coach view is switched on. Only meaningful for someone whose
+// profile says they coach -- see coachViewActive below, which is what the
+// app should actually branch on.
+export function setCoachView(prefs, value) {
+  return { ...prefs, coachView: !!value };
+}
+
+// The single source of truth for "show coaching UI". Requires BOTH the
+// profile flag and the toggle: a bowler who was once a coach, or who
+// flipped the toggle before unsetting the flag, must not be left in a
+// coach view of their own data.
+export function coachViewActive(prefs, profile) {
+  return !!(profile?.isCoach && prefs?.coachView);
+}
+
 export function defaultPreferences(environment = "league") {
   const safeEnvironment = ENVIRONMENTS.includes(environment) ? environment : "league";
   const preset = presetFor(safeEnvironment);
@@ -130,6 +145,9 @@ export function defaultPreferences(environment = "league") {
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
     hiddenStatsCards: [],
+    // Off by default even for coaches -- someone opening the app to bowl
+    // their own league night shouldn't land in coaching mode.
+    coachView: false,
   };
 }
 
@@ -162,6 +180,7 @@ export function normalizePreferences(raw) {
     hiddenStatsCards: Array.isArray(raw.hiddenStatsCards)
       ? raw.hiddenStatsCards.filter(id => MOVABLE_STATS_CARD_IDS.includes(id))
       : [],
+    coachView: typeof raw.coachView === "boolean" ? raw.coachView : base.coachView,
   };
 }
 
