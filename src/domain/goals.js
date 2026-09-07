@@ -87,14 +87,19 @@ export const GOAL_TYPES = [
   },
   {
     id: "tenPinSpareRate",
+    // The id stays "tenPinSpareRate" for every bowler on purpose: it's the
+    // storage key, and renaming it for lefties would orphan any goal they
+    // had already saved. Only the label and the help text flip -- same
+    // approach constants.js takes with "Weak 10" / "Weak 7".
     label: "10 Pin Spare %",
+    cornerPin: true,
     unit: "percent",
     min: 1, max: 100,
     // Same threshold insightGating already uses for tenPinRate -- a
     // specific leave, not an overall rate.
     sampleKey: "specificLeave",
     sampleNoun: "10 pin attempts",
-    help: "Conversion on a lone 10 pin (including weak and ringing tens).",
+    help: "Conversion on a lone corner pin (including weak and ringing ones).",
   },
   {
     id: "cleanFrameRate",
@@ -111,6 +116,18 @@ export const GOAL_TYPE_IDS = GOAL_TYPES.map(g => g.id);
 
 export function goalType(id) {
   return GOAL_TYPES.find(g => g.id === id) || null;
+}
+
+// Same goal, named for the pin this bowler actually leaves. Applied at
+// display time only -- nothing stored ever changes.
+export function goalTypeFor(id, leftHanded = false) {
+  const type = goalType(id);
+  if (!type || !type.cornerPin || !leftHanded) return type;
+  return {
+    ...type,
+    label: type.label.replace("10 Pin", "7 Pin"),
+    sampleNoun: type.sampleNoun.replace("10 pin", "7 pin"),
+  };
 }
 
 // Resolve a type's minimum sample. Types naming a shared threshold read it
@@ -171,8 +188,8 @@ export function removeGoal(goals, typeId) {
 // `current` is the measured value (null when unmeasurable), `sample` is
 // how many observations it rests on. Returns a shape the UI can render
 // without doing arithmetic of its own.
-export function goalProgress(goal, current, sample) {
-  const type = goalType(goal?.typeId);
+export function goalProgress(goal, current, sample, leftHanded = false) {
+  const type = goalTypeFor(goal?.typeId, leftHanded);
   if (!type) return null;
 
   const need = minSampleFor(type);
@@ -232,14 +249,14 @@ export function goalProgress(goal, current, sample) {
 
 // All goals with their progress, ordered as GOAL_TYPES is so the list
 // doesn't reshuffle as values change.
-export function allGoalProgress(goals, measurements) {
+export function allGoalProgress(goals, measurements, leftHanded = false) {
   const byType = new Map((goals || []).map(g => [g.typeId, g]));
   const out = [];
   for (const type of GOAL_TYPES) {
     const goal = byType.get(type.id);
     if (!goal) continue;
     const m = (measurements && measurements[type.id]) || {};
-    const p = goalProgress(goal, m.current ?? null, m.sample ?? 0);
+    const p = goalProgress(goal, m.current ?? null, m.sample ?? 0, leftHanded);
     if (p) out.push(p);
   }
   return out;

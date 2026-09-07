@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  scoreSeries, shotRateSeries, seriesFor, linearSlope,
+  scoreSeries, shotRateSeries, seriesFor, linearSlope, trendMetricFor, trendMetricsFor,
   trendDirection, describeTrend, seriesReliability, MIN_POINTS_FOR_DIRECTION,
 } from './trends.js';
 
@@ -161,5 +161,32 @@ describe('ten pin spare rate', () => {
     const s = shotRateSeries(rows, 'Ryan', '', 'tenPinSpareRate', () => false, isTenPin);
     expect(s[0].sample).toBe(2);
     expect(s[0].value).toBe(50);
+  });
+});
+
+describe('corner pin trend follows the bowler\'s hand', () => {
+  it('relabels the metric for a left-handed bowler, keeping the id stable', () => {
+    expect(trendMetricFor('tenPinSpareRate', true).label).toBe('7 Pin Spare %');
+    expect(trendMetricFor('tenPinSpareRate', true).id).toBe('tenPinSpareRate');
+    expect(trendMetricFor('tenPinSpareRate', false).label).toBe('10 Pin Spare %');
+  });
+
+  it('leaves every other metric label alone', () => {
+    expect(trendMetricsFor(true).find(m => m.id === 'strikeRate').label).toBe('Strike %');
+    expect(trendMetricsFor(true).filter(m => m.label.includes('7 Pin'))).toHaveLength(1);
+  });
+
+  it('reads the pin the bowler actually leaves', () => {
+    const sevens = Array.from({ length: 10 }, (_, i) => ({
+      bowler: 'R', league: 'T', date: '2026-06-02', ballNum: 1,
+      result: 'Other Leave', otherLeave: ['7'], spareMade: i < 6 ? 'Yes' : 'No',
+    }));
+    const asLefty = shotRateSeries(sevens, 'R', '', 'tenPinSpareRate', () => false,
+      s => (s.otherLeave || []).join() === '7');
+    expect(asLefty[0].value).toBe(60);
+    // The right-handed test ignores them entirely.
+    const asRighty = shotRateSeries(sevens, 'R', '', 'tenPinSpareRate', () => false,
+      s => (s.otherLeave || []).join() === '10');
+    expect(asRighty).toEqual([]);
   });
 });

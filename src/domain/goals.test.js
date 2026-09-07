@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  goalType, minSampleFor, normalizeGoal, normalizeGoals,
+  goalType, goalTypeFor, minSampleFor, normalizeGoal, normalizeGoals,
   setGoal, removeGoal, goalProgress, allGoalProgress, goalsToRow, goalsFromRow,
 } from './goals.js';
 import { SAMPLE_THRESHOLDS } from './insightGating.js';
@@ -246,5 +246,38 @@ describe('ten pin spare goal', () => {
     const p = goalProgress({ typeId: 'tenPinSpareRate', target: 75 }, 80, 40);
     expect(p.gated).toBe(false);
     expect(p.met).toBe(true);
+  });
+});
+
+// A left-handed bowler's ball hooks the other way, so the corner pin they
+// leave is the 7. The goal id must NOT change with handedness -- it's the
+// storage key, and renaming it would orphan a goal already saved.
+describe('corner pin goal follows the bowler\'s hand', () => {
+  it('relabels for a left-handed bowler', () => {
+    expect(goalTypeFor('tenPinSpareRate', true).label).toBe('7 Pin Spare %');
+    expect(goalTypeFor('tenPinSpareRate', false).label).toBe('10 Pin Spare %');
+  });
+
+  it('keeps the stored id identical for both hands', () => {
+    expect(goalTypeFor('tenPinSpareRate', true).id).toBe('tenPinSpareRate');
+  });
+
+  it('relabels the sample noun too', () => {
+    expect(goalTypeFor('tenPinSpareRate', true).sampleNoun).toBe('7 pin attempts');
+  });
+
+  it('uses the same threshold regardless of hand', () => {
+    expect(minSampleFor(goalTypeFor('tenPinSpareRate', true)))
+      .toBe(minSampleFor(goalTypeFor('tenPinSpareRate', false)));
+  });
+
+  it('carries the label through progress', () => {
+    expect(goalProgress({ typeId: 'tenPinSpareRate', target: 75 }, 80, 40, true).label).toBe('7 Pin Spare %');
+    expect(allGoalProgress([{ typeId: 'tenPinSpareRate', target: 75 }],
+      { tenPinSpareRate: { current: 80, sample: 40 } }, true)[0].label).toBe('7 Pin Spare %');
+  });
+
+  it('defaults to right-handed when handedness is not supplied', () => {
+    expect(goalTypeFor('tenPinSpareRate').label).toBe('10 Pin Spare %');
   });
 });

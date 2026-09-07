@@ -52,8 +52,10 @@ export const TREND_METRICS = [
     help: "Share of first balls that struck, per night." },
   { id: "spareRate", label: "Spare %", source: "shots", unit: "percent",
     help: "Non-split spare conversion, per night." },
-  { id: "tenPinSpareRate", label: "10 Pin Spare %", source: "shots", unit: "percent",
-    help: "Conversion on a lone 10 pin, per night." },
+  // id stays canonical for both hands; only the label flips. See
+  // goalTypeFor in goals.js for the same reasoning.
+  { id: "tenPinSpareRate", label: "10 Pin Spare %", source: "shots", unit: "percent", cornerPin: true,
+    help: "Conversion on a lone corner pin, per night." },
   { id: "cleanFrameRate", label: "Clean Frame %", source: "shots", unit: "percent",
     help: "Frames closed with a strike or spare, per night." },
 ];
@@ -62,6 +64,18 @@ export const TREND_METRIC_IDS = TREND_METRICS.map(m => m.id);
 
 export function trendMetric(id) {
   return TREND_METRICS.find(m => m.id === id) || null;
+}
+
+// Metric list labelled for the hand this bowler throws with.
+export function trendMetricsFor(leftHanded = false) {
+  return TREND_METRICS.map(m =>
+    m.cornerPin && leftHanded ? { ...m, label: m.label.replace("10 Pin", "7 Pin") } : m);
+}
+
+export function trendMetricFor(id, leftHanded = false) {
+  const m = trendMetric(id);
+  if (!m || !m.cornerPin || !leftHanded) return m;
+  return { ...m, label: m.label.replace("10 Pin", "7 Pin") };
 }
 
 function bySession(rows, bowler, league) {
@@ -122,7 +136,7 @@ const isFrameShot = s => !s.ballNum || s.ballNum === 1;
 
 // Shot-based rate series, one point per night. `sample` travels with each
 // point so the UI can be honest about how thin any given night is.
-export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false, isTenPinLeave = () => false) {
+export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false, isCornerPinLeave = () => false) {
   const rows = bySession(shots, bowler, league);
   const out = [];
   for (const [date, group] of groupByDate(rows)) {
@@ -141,7 +155,7 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
       // Attempts only -- a leave with no spareMade recorded isn't a miss,
       // it's an unfinished frame, and counting it as a miss would make the
       // rate worse than reality.
-      const attempts = group.filter(s => isTenPinLeave(s) && s.spareMade !== "" && s.spareMade != null);
+      const attempts = group.filter(s => isCornerPinLeave(s) && s.spareMade !== "" && s.spareMade != null);
       sample = attempts.length;
       if (sample) value = Math.round((attempts.filter(s => s.spareMade === "Yes").length / sample) * 100);
     } else if (metricId === "spareRate") {
@@ -155,12 +169,12 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
   return out;
 }
 
-export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isTenPinLeave }) {
+export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isCornerPinLeave }) {
   const metric = trendMetric(metricId);
   if (!metric) return [];
   return metric.source === "scores"
     ? scoreSeries(sessions, bowler, league, metricId)
-    : shotRateSeries(shots, bowler, league, metricId, isSplit, isTenPinLeave);
+    : shotRateSeries(shots, bowler, league, metricId, isSplit, isCornerPinLeave);
 }
 
 // Least-squares slope of value against position in the series.

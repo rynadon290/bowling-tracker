@@ -49,6 +49,37 @@ export function isSplit(shot){
   return false;
 }
 
+// The corner pin a bowler characteristically leaves depends on which hand
+// they throw with: a righty's ball hooks left-to-right and leaves the 10,
+// a lefty's leaves the 7.
+//
+// Two data shapes have to be handled differently here, following the
+// convention already set in constants.js (resultsForHandedness):
+//
+//   - "Weak 10" / "Ringing 10" are STORED values and stay canonical for
+//     everyone. A lefty taps "Weak 7" in the UI but the record says
+//     "Weak 10", so these match regardless of handedness.
+//   - An "Other Leave" records the pin that actually stood. A lefty's
+//     corner pin is logged as "7", so this is where handedness genuinely
+//     changes the test.
+//
+// Without the second case a left-handed bowler's corner-pin conversion
+// would silently ignore every leave they logged by pin number.
+export function isCornerPinLeave(shot, leftHanded = false){
+  if(!shot)return false;
+  if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
+  if(shot.result==="Other Leave"){
+    const standing=(Array.isArray(shot.otherLeave)?shot.otherLeave:[]).filter(p=>p!=="9 Pin No-Tap");
+    return standing.length===1&&standing[0]===(leftHanded?"7":"10");
+  }
+  return false;
+}
+
+// The display name for that pin, so a lefty sees "7 Pin Spare %".
+export function cornerPinLabel(leftHanded){
+  return leftHanded?"7":"10";
+}
+
 export function isTenPinLeave(shot){
   if(!shot)return false;
   if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
