@@ -26,7 +26,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // all along. Accepting either means one secret serves both, whichever
 // name it happens to be stored under.
 const GEMINI_API_KEY = Deno.env.get("gemini_api_key") || Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = "gemini-2.5-flash"; // multimodal, on the free tier
+// Kept in step with analyze-performance, which was migrated to this model
+// already. gemini-2.5-flash was retired for new callers and returns a 404
+// -- which surfaced here as a bare "Gemini API error" for a while because
+// the client was discarding the detail the function sent alongside it.
+const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // One uniform shape for every frame, 1 through 10. Each frame is just a
