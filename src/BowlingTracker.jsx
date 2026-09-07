@@ -1094,6 +1094,44 @@ export default function BowlingTracker(){
     return failed;
   }
 
+  // Practice needs a REAL league row, not just a stand-in name.
+  //
+  // Sessions and manual scores both resolve a league_id before they sync;
+  // a name with no row behind it resolves to null and the write is
+  // skipped, which is why practice scores stayed on the device forever
+  // while practice SHOTS synced fine (shots tolerate a null league_id).
+  //
+  // Created lazily on the first practice session rather than at signup,
+  // so a bowler who never practises never gets a league they didn't ask
+  // for. Hidden from the league pickers -- it is a container for syncing,
+  // not somewhere you choose to bowl.
+  const practiceLeagueEnsured=useRef(false);
+  async function ensurePracticeLeague(){
+    if(practiceLeagueEnsured.current)return leagueIdsRef.current[PRACTICE_SESSION_KEY]||null;
+    practiceLeagueEnsured.current=true;
+    if(!leagues.includes(PRACTICE_SESSION_KEY)){
+      await saveLeagues([...leagues,PRACTICE_SESSION_KEY]);
+    }
+    const failed=await ensureLeaguesInCloud([PRACTICE_SESSION_KEY]);
+    if(failed.length){
+      // Offline or the write failed: practice still works exactly as it
+      // did before, on-device. It syncs on a later attempt.
+      practiceLeagueEnsured.current=false;
+      return null;
+    }
+    // hiddenLeagues stores league IDs, not names -- pushing the name here
+    // would add an entry that never matches anything and leave Practice
+    // sitting in every league picker.
+    const practiceId=leagueIdsRef.current[PRACTICE_SESSION_KEY]||null;
+    if(practiceId&&!hiddenLeagues.includes(practiceId)){
+      const updated=[...hiddenLeagues,practiceId];
+      setHiddenLeagues(updated);
+      try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(updated));}catch{}
+      cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:practiceId});
+    }
+    return practiceId;
+  }
+
   async function addLeague(name,startDate,endDate){
     const clean=name.trim();
     if(!clean)return;
@@ -3011,6 +3049,16 @@ export default function BowlingTracker(){
     preferences.environment==="practice"?PRACTICE_SESSION_KEY:
     preferences.environment==="casual"?CASUAL_SESSION_KEY:
     sessionLeague;
+
+  // Create the practice league row the moment practice is entered, not
+  // when a score is first typed. saveSession and updateManualScore both
+  // resolve league_id synchronously, so the row has to already exist by
+  // then -- doing it on demand would silently drop the first score of
+  // every practice session.
+  useEffect(()=>{
+    if(preferences.environment==="practice"&&user?.id)ensurePracticeLeague();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preferences.environment,user?.id]);
 
   // The signed-in user's own profile, which is what carries the coach
   // flag. Distinct from activeBowlerProfile: that follows whoever is being
