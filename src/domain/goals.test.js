@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   goalType, goalTypeFor, minSampleFor, normalizeGoal, normalizeGoals,
   setGoal, removeGoal, goalProgress, allGoalProgress, goalsToRow, goalsFromRow,
+  measurementsFor,
 } from './goals.js';
+import { isSplit, isSinglePinLeave, isCornerPinLeave } from './splits.js';
 import { SAMPLE_THRESHOLDS } from './insightGating.js';
 import { rAvg, cAvg, bowlerHighGame, bowlerHighSeries } from './stats.js';
 
@@ -279,5 +281,39 @@ describe('corner pin goal follows the bowler\'s hand', () => {
 
   it('defaults to right-handed when handedness is not supplied', () => {
     expect(goalTypeFor('tenPinSpareRate').label).toBe('10 Pin Spare %');
+  });
+});
+
+// Goals are stored per bowler, never per league, so measuring them
+// against a single league answers a different question from the one the
+// goal asks. Scoped to the session's league they looked right on a
+// league night and went blank in practice -- where the league is the
+// "Practice" container and holds none of the bowler's history.
+describe('goal measurement scope', () => {
+  const shots = Array.from({ length: 200 }, (_, i) => ({
+    bowler: 'Ryan', league: 'Tuesday House Shot', ballNum: null,
+    result: i < 160 ? 'Strike' : 'Other Leave',
+    otherLeave: i < 160 ? [] : ['10'],
+    spareMade: i < 160 ? '' : 'Yes',
+  }));
+  const preds = { isSplit, isSinglePinLeave, isCornerPinLeave };
+
+  it('sees the bowler\'s whole game when no league is given', () => {
+    const m = measurementsFor({ shots, sessions: [], bowler: 'Ryan', league: null, ...preds });
+    expect(m.strikeRate.current).toBe(80);
+    expect(m.tenPinSpareRate.sample).toBe(40);
+  });
+
+  // The exact failure: practice scoped everything to a league holding
+  // none of their shots.
+  it('returns nothing when scoped to a league with no history', () => {
+    const m = measurementsFor({ shots, sessions: [], bowler: 'Ryan', league: 'Practice', ...preds });
+    expect(m.strikeRate.current).toBeNull();
+    expect(m.tenPinSpareRate.sample).toBe(0);
+  });
+
+  it('still scopes correctly when a real league IS asked for', () => {
+    const m = measurementsFor({ shots, sessions: [], bowler: 'Ryan', league: 'Tuesday House Shot', ...preds });
+    expect(m.strikeRate.current).toBe(80);
   });
 });
