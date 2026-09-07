@@ -1643,6 +1643,14 @@ export default function BowlingTracker(){
     try{await window.storage.set(COACH_SEEN_KEY,latest);}catch{}
   }
 
+  // One place that knows how a team member is named, because the shape
+  // differs by origin: cloud rows map to {userId, displayName}, while a
+  // locally-added roster entry can still be a bare string.
+  function teamMemberName(m){
+    if(typeof m==="string")return m;
+    return m?.displayName||m?.bowlerName||"";
+  }
+
   async function loadTeamInvites(){
     if(!user?.email)return;
     const res=await cloudRead("pending_invites",q=>q.select("*"));
@@ -1745,7 +1753,12 @@ export default function BowlingTracker(){
     const rows=[];
     for(const e of entries){
       const team=teams.find(t=>t.id===e.teamId);
-      const member=(team?.members||[]).find(m=>(m.bowlerName||m)===e.bowler);
+      // Cloud-loaded members carry displayName; there is no bowlerName
+      // field on them. Matching only on bowlerName silently found nobody,
+      // so every teammate's scores were filed with a null bowler_user_id
+      // and nobody could ever confirm them. Plain strings are still
+      // handled for a locally-added roster.
+      const member=(team?.members||[]).find(m=>teamMemberName(m)===e.bowler);
       rows.push({
         id:crypto.randomUUID(),
         // Null when the teammate has no account yet -- their scores still
@@ -1782,7 +1795,7 @@ export default function BowlingTracker(){
       status:next.status,
       corrected_scores:next.correctedScores,
       responded_at:next.respondedAt||null,
-      corrected_by:next.correctedBy?(teams.flatMap(t=>t.members||[]).find(m=>(m.bowlerName||m)===next.correctedBy)?.userId||user?.id||null):null,
+      corrected_by:next.correctedBy?(teams.flatMap(t=>t.members||[]).find(m=>teamMemberName(m)===next.correctedBy)?.userId||user?.id||null):null,
       note:next.note||null,
     });
   }

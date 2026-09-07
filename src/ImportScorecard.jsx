@@ -367,9 +367,13 @@ export default function ImportScorecard({
         throw new Error("Found games but couldn't read any scores or frame detail. Try a clearer screenshot.");
       }
       const team=teams.find(t=>t.id===teamId);
+      // Cloud members carry displayName, not bowlerName -- reading only
+      // bowlerName produced a roster of empty names, so every column
+      // fell through to manual matching even when the team was known.
+      const memberName=m=>(typeof m==="string"?m:(m?.displayName||m?.bowlerName||""));
       const roster=(team?.members||[]).map(m=>({
-        bowler:m.bowlerName||m,
-        aliases:(profiles?.[m.bowlerName||m]?.aliases)||[],
+        bowler:memberName(m),
+        aliases:(profiles?.[memberName(m)]?.aliases)||[],
         lineupPosition:m.lineupPosition??0,
       }));
       // With no team defined, the only person we can match against is
