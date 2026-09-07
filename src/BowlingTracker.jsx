@@ -31,7 +31,7 @@ import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRo
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./domain/goals.js";
 import { scoreStats } from "./domain/scoreInsights.js";
-import { buildAnalysisPayload, unlockSignature, newlyUnlocked } from "./domain/insightGating.js";
+import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insightGating.js";
 import { drillLines } from "./domain/sessionRecap.js";
 import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
@@ -2701,37 +2701,46 @@ export default function BowlingTracker(){
   // "new".
   const[insightUnlockSeen,setInsightUnlockSeen]=useState(null);
   const[newInsights,setNewInsights]=useState([]);
+
+  // Depends on the SIGNATURE STRING, not on insightStats.
+  //
+  // insightStats is rebuilt fresh on every render, so a new object
+  // identity every time -- an effect keyed on it re-ran on every render,
+  // called setState, re-rendered, and looped until the app went black.
+  // The signature is a plain string that only changes when what's
+  // analysable actually changes, which is the thing this cares about.
+  const insightSignature=unlockSignature(buildAnalysisPayload(insightStats));
   useEffect(()=>{
+    if(!insightSignature)return;
     let cancelled=false;
     (async()=>{
-      const payload=buildAnalysisPayload(insightStats);
-      const sig=unlockSignature(payload);
-      if(!sig)return;
       let seen=insightUnlockSeen;
       if(seen===null){
         try{
           const r=await window.storage.get(INSIGHT_UNLOCK_KEY);
-          seen=r?r.value:"";
-          if(!r){
-            // First run since this shipped: record what's already
-            // available instead of announcing it.
-            await window.storage.set(INSIGHT_UNLOCK_KEY,sig);
-            seen=sig;
+          if(r){
+            seen=r.value;
+          }else{
+            // First run since this shipped: record what's already there
+            // rather than announcing it as new.
+            await window.storage.set(INSIGHT_UNLOCK_KEY,insightSignature);
+            seen=insightSignature;
           }
-        }catch{seen="";}
+        }catch{seen=insightSignature;}
         if(cancelled)return;
         setInsightUnlockSeen(seen);
       }
-      const fresh=newlyUnlocked(payload,seen);
-      if(fresh.length){
+      const before=new Set(String(seen||"").split(",").filter(Boolean));
+      const fresh=insightSignature.split(",").filter(k=>k&&!before.has(k)).map(statLabel);
+      if(fresh.length&&!cancelled){
         setNewInsights(fresh);
-        setInsightUnlockSeen(sig);
-        try{await window.storage.set(INSIGHT_UNLOCK_KEY,sig);}catch{}
+        setInsightUnlockSeen(insightSignature);
+        try{await window.storage.set(INSIGHT_UNLOCK_KEY,insightSignature);}catch{}
       }
     })();
     return()=>{cancelled=true;};
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[insightStats]);
+  },[insightSignature]);
 
     async function analyzePerformance(payload){
     try{
@@ -2778,6 +2787,10 @@ export default function BowlingTracker(){
   // take away a tab they need for their own game. Switching back to
   // "I'm bowling" brings it back.
   const navTabs=["log","data","insights",...(coachViewOn?[]:["social"]),...(showCoachingTab?["coaching"]:[])];
+  // Icons go inline beside the title until the nav genuinely needs the
+  // width. Five was the count that pushed "Social" off a phone screen and
+  // prompted stacking in the first place; four fits comfortably.
+  const stackHeaderIcons=navTabs.length>=5;
 
   // Turning coach view on while sitting on Social would strand the user
   // on a tab that is no longer in the nav -- a blank screen with no way
@@ -3196,14 +3209,24 @@ export default function BowlingTracker(){
     <div style={S.app}>
       {/* Header */}
       <div style={S.header}>
-        {/* Profile and settings stack vertically beside the title instead
-            of sitting in a row after it. Five nav tabs need more width
-            than four did -- laid out horizontally, "Social" ran off the
-            right edge of a phone screen. Stacking these two reclaims
-            roughly an icon's width for the nav without hiding anything. */}
+        {/* Profile and settings sit beside the title, on the title's own
+            line rather than wherever the sync text below happens to end.
+            They only STACK when the nav is wide enough to need the room
+            back -- see stackHeaderIcons. At four tabs a row fits fine,
+            and stacking permanently just made the header taller for no
+            reason. */}
         <div style={{display:"flex",alignItems:"flex-start",gap:"8px",minWidth:0}}>
           <div style={{minWidth:0}}>
-            <div style={S.title}>🎳 {APP_NAME}</div>
+            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+              <div style={S.title}>🎳 {APP_NAME}</div>
+              {/* Inline with the title when there's room. */}
+              {!stackHeaderIcons&&(
+                <div style={{display:"flex",gap:"8px",flexShrink:0}}>
+                  <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
+                  <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
+                </div>
+              )}
+            </div>
           {/* "3 pending" made people wonder if their night was saved. It is --
               locally, always, the moment they tap Save. The cloud copy is
               the only thing in flight. Say that plainly. */}
@@ -3215,10 +3238,13 @@ export default function BowlingTracker(){
             <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ Saved &amp; backed up</div>
           )}
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0}}>
-            <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
-            <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
-          </div>
+          {/* Stacked only when the nav needs the horizontal space back. */}
+          {stackHeaderIcons&&(
+            <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0}}>
+              <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
+              <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
+            </div>
+          )}
         </div>
         <div style={S.nav}>
           {navTabs.map(v=>(
