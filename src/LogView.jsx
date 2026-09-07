@@ -1,4 +1,4 @@
-import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
+import { C, S, F, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
@@ -456,11 +456,11 @@ export default function LogView({
                       .filter(x=>typeof x.real==="number");
                     const theoryTotal=played.reduce((a,x)=>a+(x.theory??x.real),0);
                     const realTotal=played.reduce((a,x)=>a+x.real,0);
-                    const leftOnTable=theoryTotal-realTotal;
+                    const leftOnLane=theoryTotal-realTotal;
 
                     return(
                       <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>If every makeable spare had been made</div>
+                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>If every makeable spare had been made</div>
                         <div style={{display:"flex",gap:"6px"}}>
                           {theoreticalScores.map((v,i)=>(
                             <div key={i} style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
@@ -477,9 +477,9 @@ export default function LogView({
                         </div>
                         {played.length>0&&(
                           <div style={{textAlign:"center",marginTop:"8px",fontSize:"12px"}}>
-                            {leftOnTable>0?(
+                            {leftOnLane>0?(
                               <span style={{color:C.miss,fontWeight:600}}>
-                                ▼ {leftOnTable} pins left on the table
+                                ▼ {leftOnLane} pins left on the lane
                               </span>
                             ):(
                               <span style={{color:C.strike,fontWeight:600}}>
@@ -498,7 +498,7 @@ export default function LogView({
                   {preferences.showMoneyGames&&(
                     <>
                       <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Poker Winnings ($)</div>
+                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Poker Winnings ($)</div>
                         {[0,1,2].map(gameIdx=>{
                           if(cs.scores[gameIdx]==null)return null;
                           const quarterVal=(cs.pokerQuarter||[0,0,0])[gameIdx]??0;
@@ -516,7 +516,7 @@ export default function LogView({
                       </div>
 
                       <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>High Game Pot ($)</div>
+                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>High Game Pot ($)</div>
                         <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
                           Highest game in the league takes it — enter what you won, if anything.
                         </div>
@@ -544,7 +544,7 @@ export default function LogView({
                         if(!r369.qualifies)return null;
                         return(
                           <div style={{marginBottom:"12px"}}>
-                            <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>3-6-9 Winnings ($)</div>
+                            <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>3-6-9 Winnings ($)</div>
                             <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
                               <div style={{fontSize:"12px",color:C.strike,width:"56px"}}>Pot</div>
                               <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="$"
@@ -562,7 +562,7 @@ export default function LogView({
                       })()}
 
                       <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Buy-ins ($)</div>
+                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Buy-ins ($)</div>
                         <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
                           What it cost to enter — so the totals below show what you actually cleared.
                         </div>
@@ -774,21 +774,27 @@ export default function LogView({
 
               {/* Live scores — moved here from Tonight's Session, so they're
                   visible right alongside where you're actively logging. */}
+              {/* The series is the one loud thing on this screen. Four
+                  equal boxes made the total the same size as game 1 --
+                  which is the size of everything else -- so nothing on
+                  the page ever read as the thing you came for. */}
               {!editingId&&sessionLeague&&(
-                <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
-                  {[{lbl:"G1",score:g1score},{lbl:"G2",score:g2score},{lbl:"G3",score:g3score}].map(({lbl,score},i)=>(
-                    <div key={i} style={S.statBox}>
-                      <div style={{...S.statNum,fontSize:"20px",color:score!=null?C.text:C.textMuted}}>
-                        {score!=null?score:"—"}
-                      </div>
-                      <div style={S.statLbl}>{lbl}</div>
-                    </div>
-                  ))}
-                  <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                    <div style={{...S.statNum,fontSize:"20px",color:C.accent}}>
+                <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:"12px",marginBottom:"14px"}}>
+                  <div>
+                    <div className="num" style={{fontSize:"56px",lineHeight:0.9,fontWeight:700,fontFamily:F.num,letterSpacing:"-0.02em",color:sessionTotal!=null?C.text:C.textMuted}}>
                       {sessionTotal!=null?sessionTotal:"—"}
                     </div>
-                    <div style={S.statLbl}>Total</div>
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Series so far</div>
+                  </div>
+                  <div style={{display:"flex",gap:"14px",paddingBottom:"4px"}}>
+                    {[g1score,g2score,g3score].map((score,i)=>(
+                      <div key={i} style={{textAlign:"center"}}>
+                        <div className="num" style={{fontSize:"22px",lineHeight:1,fontWeight:700,fontFamily:F.num,color:score!=null?C.text:C.textMuted}}>
+                          {score!=null?score:"—"}
+                        </div>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>G{i+1}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -796,7 +802,7 @@ export default function LogView({
               {/* Game stepper */}
               <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:"10px",color:C.textMuted,marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.08em"}}>Game</div>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Game</div>
                   <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
                     <button style={S.btn("sm")} onClick={()=>{
                       const v=String(Math.max(1,(parseInt(form.game)||1)-1));
@@ -814,7 +820,7 @@ export default function LogView({
 
                 {/* Frame stepper — max 10 */}
                 <div style={{flex:1}}>
-                  <div style={{fontSize:"10px",color:C.textMuted,marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.08em"}}>Frame</div>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Frame</div>
                   <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
                     <button style={S.btn("sm")} onClick={()=>{
                       const v=String(Math.max(1,(parseInt(form.frame)||1)-1));
@@ -834,7 +840,7 @@ export default function LogView({
               {/* 10th frame ball selector */}
               {inTenth&&!editingId&&(
                 <div style={{marginBottom:"10px"}}>
-                  <div style={{fontSize:"10px",color:C.textMuted,marginBottom:"6px",textTransform:"uppercase",letterSpacing:"0.08em"}}>Ball in 10th</div>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Ball in 10th</div>
                   <div style={S.chips}>
                     {tenthOptions.map(n=>(
                       <Chip key={n} label={`Ball ${n}`} selected={form.ballNum===n} onToggle={()=>set("ballNum",n)} color={C.spare}/>
@@ -846,7 +852,7 @@ export default function LogView({
               {/* Lane display */}
               {!editingId&&startingLane&&(
                 <div style={{textAlign:"center",padding:"10px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${C.border}`}}>
-                  <span style={{fontSize:"11px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Lane · </span>
+                  <span style={{fontSize:"12px",color:C.textMuted}}>Lane </span>
                   <span style={{fontSize:"22px",fontWeight:700,color:C.accent}}>{currentLane||"—"}</span>
                 </div>
               )}
@@ -859,14 +865,14 @@ export default function LogView({
             {preferences.trackedFields.line&&(
               <div style={S.card}>
                 <div style={S.label}>Line{!editingId&&currentLane?` · Lane ${currentLane}`:""}{!editingId&&form.startingBoard&&form.targetArrows?" (stored)":""}</div>
-                <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"4px"}}>Target</div>
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Target</div>
                 <div style={S.row}>
                   <input style={{...S.input,flex:1}} placeholder="Starting Board" type="number" inputMode="decimal"
                     value={form.startingBoard} onChange={e=>editingId?set("startingBoard",e.target.value):handleLineChange("startingBoard",e.target.value)}/>
                   <input style={{...S.input,flex:1}} placeholder="Arrow Target" type="number" inputMode="decimal"
                     value={form.targetArrows} onChange={e=>editingId?set("targetArrows",e.target.value):handleLineChange("targetArrows",e.target.value)}/>
                 </div>
-                <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"4px",marginTop:"8px"}}>Actual</div>
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px",marginTop:"8px"}}>Actual</div>
                 <div style={S.row}>
                   <input style={{...S.input,flex:1}} placeholder="Actual Board" type="number" inputMode="decimal"
                     value={form.actualBoard} onChange={e=>set("actualBoard",e.target.value)}/>

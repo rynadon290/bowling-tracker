@@ -191,7 +191,7 @@ export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvaila
             <div key={i} style={S.card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, flex: 1 }}>{obs.headline}</div>
-                <span style={{ fontSize: "9px", color: CONFIDENCE_COLORS[obs.confidence] || C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginLeft: "8px", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize:"11px",color:C.textMuted, marginLeft: "8px", whiteSpace: "nowrap" }}>
                   {CONFIDENCE_LABELS[obs.confidence] || obs.confidence}
                 </span>
               </div>

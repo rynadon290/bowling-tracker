@@ -1072,7 +1072,7 @@ preferences.showMoneyGames&&(()=>{
                       </div>
                       {rows.length>0&&(
                         <>
-                          <div style={{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>By Game</div>
+                          <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>By Game</div>
                           {rows.map(r=>(
                             <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px",fontSize:"12px"}}>
                               <span>{r.label}</span>

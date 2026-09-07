@@ -20,6 +20,15 @@ import { themeFor, DEFAULT_THEME, normalizeThemeId } from "./domain/themes.js";
 // at the old colours.
 export const C = { ...themeFor(DEFAULT_THEME).colors };
 
+// Type. Two families with clearly different jobs -- see styles.css.
+export const F = {
+  body: "'Archivo', system-ui, -apple-system, sans-serif",
+  display: "'Archivo Expanded', 'Archivo', system-ui, sans-serif",
+  // Every score, average and percentage. Condensed so a three-digit
+  // series sits big on a phone without wrapping.
+  num: "'Roboto Condensed', 'Archivo', system-ui, sans-serif",
+};
+
 let activeThemeId = DEFAULT_THEME;
 export function currentThemeId() { return activeThemeId; }
 
@@ -35,36 +44,55 @@ export function applyTheme(id) {
   // short screen keeps the previous theme's colour.
   if (typeof document !== "undefined" && document.body) {
     document.body.style.backgroundColor = C.bg;
+    // styles.css reads this for :focus-visible rings, which inline
+    // styles can't express.
+    document.documentElement.style.setProperty("--ba-accent", C.accent);
   }
   return true;
 }
 
 export const S = {};
 function buildStyles() { return {
-  app:{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px"},
-  header:{backgroundColor:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
-  title:{fontSize:"16px",fontWeight:700,letterSpacing:"0.05em",color:C.accent,textTransform:"uppercase"},
+  app:{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:F.body,fontSize:"14px",lineHeight:1.45},
+  header:{backgroundColor:C.bg,padding:"14px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
+  // The wordmark. Weight and width carry it, not uppercase tracking --
+  // ALL-CAPS-with-letterspacing was the single loudest "generated
+  // dashboard" signal in the old header.
+  title:{fontSize:"17px",fontWeight:700,fontFamily:F.display,letterSpacing:"-0.01em",color:C.text},
   // Five tabs, not four. Tighter gap and horizontal padding, plus
   // flexShrink:0 on the buttons so labels never wrap mid-word if a
   // narrow phone still runs short.
   nav:{display:"flex",gap:"2px",flexShrink:0},
-  navBtn:(a)=>({padding:"6px 8px",whiteSpace:"nowrap",flexShrink:0,borderRadius:"6px",border:"none",cursor:"pointer",fontSize:"12px",fontWeight:600,backgroundColor:a?C.accent:"transparent",color:a?C.onAccent:C.textMuted}),
+  // Active tab is an underline in the accent, not a filled pill. A
+  // filled pill competes with every button on the page for "the thing
+  // to press"; an underline just says where you are.
+  navBtn:(a)=>({padding:"8px 10px 9px",whiteSpace:"nowrap",flexShrink:0,border:"none",borderBottom:`2px solid ${a?C.accent:"transparent"}`,borderRadius:0,cursor:"pointer",fontSize:"13px",fontWeight:a?600:500,backgroundColor:"transparent",color:a?C.text:C.textMuted,fontFamily:F.body}),
   content:{padding:"16px",maxWidth:"480px",margin:"0 auto"},
-  card:{backgroundColor:C.card,borderRadius:"12px",padding:"16px",marginBottom:"12px",border:`1px solid ${C.border}`},
-  label:{fontSize:"10px",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:C.textMuted,marginBottom:"8px"},
+  // No hairline border. On a dark ground the card tone already separates
+  // it; a border on every card is what made every screen read at the same
+  // volume, because nothing was allowed to be quieter than anything else.
+  card:{backgroundColor:C.card,borderRadius:"14px",padding:"16px",marginBottom:"12px"},
+  // Section headings. Sentence case, normal tracking, readable size.
+  // This one definition was 172 all-caps tracked-out eyebrows across the
+  // app -- the visual language of a spreadsheet column header, and the
+  // thing most responsible for it feeling like accounting software.
+  label:{fontSize:"13px",fontWeight:600,letterSpacing:"0",textTransform:"none",color:C.text,marginBottom:"8px"},
   chips:{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"12px"},
-  chip:(sel,col)=>({padding:"6px 12px",borderRadius:"20px",border:`1px solid ${sel?(col||C.accent):C.border}`,backgroundColor:sel?(col?col+"22":C.accentDim):"transparent",color:sel?(col||C.accent):C.textMuted,cursor:"pointer",fontSize:"12px",fontWeight:sel?600:400,WebkitTapHighlightColor:"transparent"}),
+  chip:(sel,col)=>({padding:"7px 13px",borderRadius:"20px",border:`1px solid ${sel?(col||C.accent):C.border}`,backgroundColor:sel?(col?col+"22":C.accentDim):C.surface,color:sel?(col||C.accent):C.textMuted,cursor:"pointer",fontSize:"13px",fontWeight:sel?600:500,fontFamily:F.body,WebkitTapHighlightColor:"transparent"}),
   row:{display:"flex",gap:"8px",marginBottom:"8px"},
-  input:{width:"100%",backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",padding:"10px 12px",color:C.text,fontSize:"14px",boxSizing:"border-box",outline:"none"},
-  sel:{flex:1,backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",padding:"10px 12px",color:C.text,fontSize:"14px",outline:"none",appearance:"none"},
-  btn:(v)=>({padding:"12px 20px",borderRadius:"10px",border:"none",cursor:"pointer",fontSize:"14px",fontWeight:700,WebkitTapHighlightColor:"transparent",...(v==="primary"?{backgroundColor:C.accent,color:C.onAccent,width:"100%"}:v==="sm"?{backgroundColor:C.surface,color:C.textMuted,border:`1px solid ${C.border}`,padding:"8px 14px",fontSize:"18px"}:v==="warn"?{backgroundColor:"#ef444422",color:"#ef4444",border:`1px solid #ef444444`,width:"100%"}:{backgroundColor:C.surface,color:C.textMuted,border:`1px solid ${C.border}`})}),
+  input:{width:"100%",backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"10px",padding:"11px 12px",color:C.text,fontSize:"15px",fontFamily:F.body,boxSizing:"border-box",outline:"none"},
+  sel:{flex:1,backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"10px",padding:"11px 12px",color:C.text,fontSize:"15px",fontFamily:F.body,outline:"none",appearance:"none"},
+  btn:(v)=>({padding:"13px 20px",borderRadius:"12px",border:"none",cursor:"pointer",fontSize:"15px",fontWeight:600,fontFamily:F.body,WebkitTapHighlightColor:"transparent",...(v==="primary"?{backgroundColor:C.accent,color:C.onAccent,width:"100%"}:v==="sm"?{backgroundColor:C.surface,color:C.text,padding:"8px 14px",fontSize:"18px"}:v==="warn"?{backgroundColor:C.miss+"1A",color:C.miss,width:"100%"}:{backgroundColor:C.surface,color:C.text})}),
   divider:{height:"1px",backgroundColor:C.border,margin:"12px 0"},
-  shotCard:{backgroundColor:C.card,borderRadius:"10px",padding:"12px",marginBottom:"8px",border:`1px solid ${C.border}`,display:"flex",gap:"12px",alignItems:"flex-start"},
+  shotCard:{backgroundColor:C.card,borderRadius:"12px",padding:"12px",marginBottom:"8px",display:"flex",gap:"12px",alignItems:"flex-start"},
   dot:(r)=>({width:"32px",height:"32px",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:700,flexShrink:0,backgroundColor:r==="Strike"?C.strike+"22":r?.includes("10")?C.miss+"22":C.spare+"22",color:r==="Strike"?C.strike:r?.includes("10")?C.miss:C.spare}),
-  tag:(c)=>({display:"inline-block",padding:"2px 8px",borderRadius:"10px",fontSize:"11px",backgroundColor:(c||C.accent)+"22",color:c||C.accent,marginRight:"4px",marginBottom:"4px"}),
-  statBox:{backgroundColor:C.surface,borderRadius:"10px",padding:"12px",textAlign:"center",flex:1,border:`1px solid ${C.border}`},
-  statNum:{fontSize:"24px",fontWeight:700,color:C.accent,lineHeight:1,marginBottom:"4px"},
-  statLbl:{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"},
+  tag:(c)=>({display:"inline-block",padding:"3px 9px",borderRadius:"10px",fontSize:"12px",fontWeight:500,backgroundColor:(c||C.accent)+"22",color:c||C.accent,marginRight:"4px",marginBottom:"4px"}),
+  statBox:{backgroundColor:C.surface,borderRadius:"12px",padding:"12px 10px",textAlign:"center",flex:1},
+  // Numbers are the point. Condensed, big, in the text colour -- accent
+  // is reserved for the one number on a screen that matters most, not
+  // sprayed across every stat so that none of them stands out.
+  statNum:{fontSize:"28px",fontWeight:700,fontFamily:F.num,fontVariantNumeric:"tabular-nums",color:C.text,lineHeight:1,marginBottom:"5px",letterSpacing:"-0.01em"},
+  statLbl:{fontSize:"12px",color:C.textMuted,textTransform:"none",letterSpacing:"0"},
 }; }
 Object.assign(S, buildStyles());
 

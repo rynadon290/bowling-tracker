@@ -11,9 +11,9 @@ function BagEditor({ bag, onChange, onSave, onCancel }) {
     <div style={{ ...S.card, border: `1px solid ${C.accent}44` }}>
       <div style={{ ...S.label, color: C.accent }}>{bag.id ? "Edit Bag" : "New Bag"}</div>
 
-      <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>Name</div>
+      <div style={{ fontSize:"12px",color:C.textMuted, marginBottom: "4px" }}>Name</div>
       <input style={{ ...S.input, marginBottom: "10px" }}
-        placeholder="e.g. Short pattern 5 ball + plastic"
+        placeholder="e.g. Short pattern, 6 ball limit"
         value={bag.name} onChange={e => onChange({ ...bag, name: e.target.value })} />
 
       <div style={{ ...S.label, marginBottom: "6px" }}>Type</div>
@@ -26,30 +26,35 @@ function BagEditor({ bag, onChange, onSave, onCancel }) {
 
       {bag.bagType === "tournament" && (
         <>
-          <div style={{ ...S.label, marginTop: "10px", marginBottom: "4px" }}>Ball Limit</div>
+          <div style={{ ...S.label, marginTop: "10px", marginBottom: "4px" }}>Balls Allowed</div>
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>
-            Leave blank for no limit. A plastic allowance sits on top of this number, the way tournaments word it.
+            The total the tournament allows. Leave blank for no limit.
           </div>
           <input style={{ ...S.input, marginBottom: "8px" }} type="number" inputMode="numeric"
-            placeholder="e.g. 5"
+            placeholder="e.g. 6"
             value={bag.ballLimit} onChange={e => onChange({ ...bag, ballLimit: e.target.value })} />
           <div style={S.chips}>
-            <Chip label="Plastic included" selected={bag.includesPlastic} color={C.strike}
+            <Chip label="Plan to include a plastic" selected={bag.includesPlastic} color={C.strike}
               onToggle={() => onChange({ ...bag, includesPlastic: !bag.includesPlastic })} />
           </div>
           <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>
-            Holds: {describeCapacity(bag)}
-            {bagCapacity(bag) !== null && ` (${bagCapacity(bag)} total)`}
+            A note for your own planning — it doesn't change the limit above.
           </div>
         </>
       )}
 
       <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-        <button style={{ ...S.btn("primary"), flex: 1 }} disabled={!bag.name.trim()} onClick={onSave}>
-          {bag.id ? "Save Changes" : "Create Bag"}
+        <button style={{ ...S.btn("primary"), flex: 1, opacity: bag.name.trim() ? 1 : 0.5 }}
+          disabled={!bag.name.trim()} onClick={onSave}>
+          Save Bag
         </button>
         <button style={{ ...S.btn(), flex: 1 }} onClick={onCancel}>Cancel</button>
       </div>
+      {!bag.name.trim() && (
+        <div style={{ fontSize: "11px", color: C.spare, marginTop: "6px", textAlign: "center" }}>
+          Give the bag a name to save it.
+        </div>
+      )}
     </div>
   );
 }
@@ -103,8 +108,9 @@ export default function BagManager({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "13px", fontWeight: 600 }}>{bag.name}</div>
                 <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>
-                  {BAG_TYPE_LABELS[bag.bagType]} · {inBag.length} ball{inBag.length === 1 ? "" : "s"}
-                  {capacity !== null && ` of ${describeCapacity(bag)}`}
+                  {BAG_TYPE_LABELS[bag.bagType]} · {inBag.length}
+                  {capacity !== null ? ` of ${capacity}` : ""} ball{inBag.length === 1 && capacity === null ? "" : "s"}
+                  {bag.includesPlastic ? " · plastic planned" : ""}
                 </div>
               </div>
               <button style={{ ...S.btn(), padding: "4px 10px", fontSize: "11px" }}

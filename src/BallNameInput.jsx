@@ -39,7 +39,7 @@ export default function BallNameInput({
 
       {suggestions.length > 0 && (
         <div style={{ marginTop: "6px", border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-          <div style={{ fontSize: "10px", color: C.textMuted, padding: "6px 10px", backgroundColor: C.surface, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <div style={{ fontSize: "12px", color: C.textMuted, padding: "6px 10px", backgroundColor: C.surface }}>
             From other bowlers
           </div>
           {suggestions.map(entry => {
@@ -55,7 +55,7 @@ export default function BallNameInput({
                 onClick={() => onAdd(entry.ballName, entry.specs)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "13px", fontWeight: 600 }}>{entry.ballName}</span>
-                  <span style={{ fontSize: "9px", color: STATE_COLORS[state], textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  <span style={{ fontSize:"11px",color:C.textMuted }}>
                     {STATE_LABELS[state]}
                   </span>
                 </div>

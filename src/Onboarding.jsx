@@ -85,7 +85,7 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "24px 16px", maxWidth: "480px", margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
 
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ fontSize: "13px", color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, marginBottom: "6px" }}>
             Welcome to
           </div>
           <div style={{ fontSize: "26px", fontWeight: 700, color: C.accent, letterSpacing: "0.04em" }}>

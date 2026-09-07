@@ -16,7 +16,7 @@ import {
 
 function fieldLabel(text) {
   return (
-    <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>
+    <div style={{ fontSize:"12px",color:C.textMuted, marginBottom: "4px" }}>
       {text}
     </div>
   );

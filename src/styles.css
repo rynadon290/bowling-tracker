@@ -1,4 +1,40 @@
-html, body, #root { margin: 0; min-height: 100%; }
-body { background: #0f1117; }
-* { box-sizing: border-box; }
-button, input, select, textarea { font: inherit; }
+/* Typography for Board & Arrow.
+ *
+ * Two families, clearly distinct in job:
+ *   - Archivo carries every word. A grotesque with more character than
+ *     Inter at small sizes, and its Expanded cut is the wordmark.
+ *   - Roboto Condensed carries every SCORE. Bowling is numbers, and a
+ *     condensed face lets a 3-digit series sit big on a phone without
+ *     wrapping -- the look of a scoreboard rather than a spreadsheet.
+ *
+ * Loaded here rather than in index.html so the build owns it. Both
+ * families fall back to system-ui, so a blocked font request degrades to
+ * "less distinctive", never to "unreadable".
+ */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@700&family=Roboto+Condensed:wght@600;700&display=swap');
+
+html, body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular figures everywhere a number can change width, so a live score
+ * doesn't jitter the layout as it ticks from 99 to 100. */
+.num, input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced motion is a user setting, not a suggestion. The few
+ * transitions in the app (chevrons, chips) collapse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* Keyboard focus is visible on every control, in the accent. Inline
+ * styles can't express :focus-visible, so this is the one thing the
+ * stylesheet has to own. */
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--ba-accent, #E8A33D);
+  outline-offset: 2px;
+}

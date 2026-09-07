@@ -249,7 +249,7 @@ export default function ArsenalList({
       {sections.map(section => (
         <div key={section.key} style={{ marginBottom: groupMode === "none" ? 0 : "14px" }}>
           {groupMode !== "none" && (
-            <div style={{ fontSize: "11px", fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: C.text, marginBottom: "6px" }}>
               {section.label} · {section.balls.length}
             </div>
           )}

@@ -126,11 +126,7 @@ const S = new Proxy({}, {
     border:`1px solid ${C.border}`,
   },
   label:{
-    fontSize:"10px",
-    fontWeight:700,
-    letterSpacing:"0.1em",
-    textTransform:"uppercase",
-    color:C.textMuted,
+    fontSize:"13px",fontWeight:600,color:C.text,
     marginBottom:"8px",
   },
   input:{
