@@ -117,3 +117,30 @@ export function localDateString(d=new Date()){
   const day=String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
 }
+
+// Human-readable date for display. Storage stays ISO ("2026-09-01") --
+// it sorts and compares correctly -- but a bowler doesn't think of their
+// league night as an ISO string, and forty places were showing one.
+//
+// Parsed from parts, not `new Date(iso)`: a bare date string is treated
+// as UTC midnight, which rolls back to the previous evening for anyone
+// west of Greenwich. Every Tuesday-night bowler in North America would
+// have seen "Mon".
+//
+// Year only when it isn't this year: "Tue 1 Sep" for tonight's league,
+// "Tue 1 Sep 2025" for last season's.
+export function formatDate(iso, { weekday = true, today = new Date() } = {}) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return String(iso || "");
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const opts = { day: "numeric", month: "short" };
+  if (weekday) opts.weekday = "short";
+  if (d.getFullYear() !== today.getFullYear()) opts.year = "numeric";
+  return d.toLocaleDateString(undefined, opts);
+}
+
+// Shorter form for tight spots -- a list row, a chip. "1 Sep".
+export function formatDateShort(iso, today) {
+  return formatDate(iso, { weekday: false, today });
+}

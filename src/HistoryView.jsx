@@ -1,5 +1,5 @@
-import { C, S, Chip, resultSym } from "./ui.jsx";
-import { RESULTS, storedStrikeDescriptionFor, strikeDescriptionsForHand } from "./constants.js";
+import { C, S, F, Chip, resultSym } from "./ui.jsx";
+import { formatDateShort, RESULTS, storedStrikeDescriptionFor, strikeDescriptionsForHand } from "./constants.js";
 import { isSplit } from "./domain/splits.js";
 
 // The reverse lookup of storedStrikeDescriptionFor: given the canonical
@@ -47,21 +47,40 @@ export default function HistoryView({
         <div style={{color:C.textMuted,fontSize:"12px"}}>{filtered.length} shots {filterBall||filterResult||filterBowler?"(filtered)":"total"}</div>
       </div>
 
-      {filtered.length===0&&<div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}>No shots logged yet.</div>}
+      {filtered.length===0&&(
+        <div style={{textAlign:"center",padding:"40px 16px"}}>
+          <div style={{fontSize:"15px",fontWeight:600,color:C.text,marginBottom:"6px"}}>
+            {filterBall||filterResult?"Nothing matches that filter":"No shots yet"}
+          </div>
+          <div style={{fontSize:"13px",color:C.textMuted,lineHeight:1.5}}>
+            {filterBall||filterResult
+              ?"Clear a filter above to see the rest."
+              :"Every shot you log on the Log tab shows up here, newest first — ball, line, leave and result."}
+          </div>
+        </div>
+      )}
 
       {[...filtered].reverse().map(shot=>(
         <div key={shot.id} style={S.shotCard}>
           <div style={S.dot(shot.result)}>{resultSym(shot._displayResult||shot.result)}</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"4px"}}>
-              <div style={{fontSize:"12px",fontWeight:600}}>
-                {bowlers.length>1&&shot.bowler&&<span style={{color:C.accent}}>{shot.bowler} · </span>}
-                {shot.ball||"—"}
-                {shot.surface&&<span style={{color:C.textMuted,fontWeight:400}}> · {shot.surface}</span>}
+              <div style={{fontSize:"13px",fontWeight:600,minWidth:0}}>
+                {bowlers.length>1&&shot.bowler&&<span style={{color:C.textMuted,fontWeight:500}}>{shot.bowler} — </span>}
+                {shot.ball||"No ball"}
+                {shot.surface&&<span style={{color:C.textMuted,fontWeight:400}}> at {shot.surface}</span>}
               </div>
-              <div style={{fontSize:"10px",color:C.textMuted,textAlign:"right"}}>
-                {shot.date}<br/>
-                G{shot.game} F{shot.frame}{shot.ballNum?` B${shot.ballNum}`:""} L{shot.lane}
+              {/* Frame position as a scoreboard would show it: the frame
+                  number big, the game and lane small under it. "G2 F7 L8"
+                  was a code that had to be decoded every time. */}
+              <div style={{textAlign:"right",flexShrink:0,marginLeft:"8px"}}>
+                <div className="num" style={{fontSize:"18px",fontWeight:700,fontFamily:F.num,lineHeight:1}}>
+                  {shot.frame}{shot.ballNum?<span style={{fontSize:"11px",color:C.textMuted,fontWeight:500}}>·{shot.ballNum}</span>:null}
+                </div>
+                <div style={{fontSize:"10px",color:C.textMuted,marginTop:"3px"}}>
+                  Game {shot.game}{shot.lane?` · Lane ${shot.lane}`:""}
+                </div>
+                <div style={{fontSize:"10px",color:C.textMuted}}>{formatDateShort(shot.date)}</div>
               </div>
             </div>
             <div style={{marginBottom:"4px"}}>

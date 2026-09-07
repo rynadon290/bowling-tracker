@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
-import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
   gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, pinsForNextSession,
@@ -44,7 +44,14 @@ export default function StatsView({
                 feature entirely from exactly the people most likely to set
                 an average or high-game target. */}
             {goalsPanel}
-            {shots.length===0&&<div style={{textAlign:"center",color:C.textMuted,padding:"40px 0"}}>No data yet.</div>}
+            {shots.length===0&&(
+              <div style={{textAlign:"center",padding:"40px 16px"}}>
+                <div style={{fontSize:"15px",fontWeight:600,color:C.text,marginBottom:"6px"}}>Nothing to count yet</div>
+                <div style={{fontSize:"13px",color:C.textMuted,lineHeight:1.5}}>
+                  Log a few frames and this fills in — strike rate, spares, ten pins, and how each ball is carrying.
+                </div>
+              </div>
+            )}
             {shots.length>0&&(
               (()=>{
                 // Each card is built into a keyed map, then rendered in the
@@ -182,7 +189,7 @@ showTeamCompare&&(()=>{
                         <div style={S.statBox}>
                           <div style={{...S.statNum,color:C.accent}}>{hs?hs.value:"—"}</div>
                           <div style={S.statLbl}>High Series</div>
-                          {hs&&<div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{hs.date}</div>}
+                          {hs&&<div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{formatDate(hs.date)}</div>}
                         </div>
                       </div>
                     </div>
@@ -1125,7 +1132,7 @@ preferences.showMoneyGames&&statsBowler&&(()=>{
                         <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"8px",marginBottom:"8px"}}>
                           <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
                             <span style={{fontSize:"12px",fontWeight:600}}>{s.league.replace(" House Shot","")}</span>
-                            <span style={{fontSize:"11px",color:C.textMuted}}>{s.date}</span>
+                            <span style={{fontSize:"11px",color:C.textMuted}}>{formatDate(s.date)}</span>
                           </div>
                           <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
                             <span style={S.tag(result.qualifies?C.strike:C.textMuted)}>{result.qualifies?"✓ Won":"No win"}</span>

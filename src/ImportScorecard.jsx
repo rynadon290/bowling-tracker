@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
-import { RESULTS, localDateString } from "./constants.js";
+import { formatDate, RESULTS, localDateString } from "./constants.js";
 import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
@@ -659,7 +659,7 @@ export default function ImportScorecard({
       {(step==="review"||step==="saving")&&(
         <>
           <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-            {contextBowler} · {contextLeague.replace(" House Shot","")} · {contextDate} — {
+            {contextBowler} · {contextLeague.replace(" House Shot","")} · {formatDate(contextDate)} — {
               // A totals-only card has no frames to review, so telling the
               // bowler to check frames sends them looking for something
               // that isn't on screen.

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
+import { formatDate } from "./constants.js";
 
 const PAGE_SIZE = 15;
 
@@ -56,7 +57,7 @@ export default function SessionHistory({ sessions, bowlers, leagues, statsBowler
             : `Showing ${visible.length} of ${filtered.length}, newest first.`}
         </div>
         {filtered.length === 0 ? (
-          <div style={{ fontSize: "12px", color: C.textMuted }}>No sessions saved yet.</div>
+          <div style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>Nothing saved yet. Finish a night with "End session" on the Log tab and it lands here.</div>
         ) : (
           <>
             {visible.map(s => (
@@ -65,7 +66,7 @@ export default function SessionHistory({ sessions, bowlers, leagues, statsBowler
                   <span style={{ fontSize: "12px", fontWeight: 600 }}>
                     {!statsBowler && s.bowler ? `${s.bowler} · ` : ""}{s.league.replace(" House Shot", "")}
                   </span>
-                  <span style={{ fontSize: "11px", color: C.textMuted }}>{s.date}</span>
+                  <span style={{ fontSize: "11px", color: C.textMuted }}>{formatDate(s.date)}</span>
                 </div>
                 <div style={{ display: "flex", gap: "6px", marginBottom: "4px" }}>
                   {s.scores.map((sc, i) => <span key={i} style={{ fontSize: "13px", fontWeight: 600 }}>{sc}</span>)}

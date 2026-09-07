@@ -345,7 +345,7 @@ export default function CoachingView({
                   return <div style={{ fontSize: "11px", color: C.textMuted }}>Loading…</div>;
                 }
                 if (snap === null) {
-                  return <div style={{ fontSize: "11px", color: C.textMuted }}>No sessions logged yet.</div>;
+                  return <div style={{ fontSize: "11px", color: C.textMuted }}>Nothing bowled yet. Their scores appear here once they save a session.</div>;
                 }
                 return (
                   <>
@@ -433,7 +433,7 @@ export default function CoachingView({
             )}
 
             {tasks.open.length === 0 && tasks.completed.length === 0 && tasks.attempted.length === 0 && (
-              <div style={{ fontSize: "11px", color: C.textMuted }}>No tasks yet.</div>
+              <div style={{ fontSize: "11px", color: C.textMuted }}>No tasks yet — set one above and it'll show in their inbox.</div>
             )}
 
             {tasks.open.map(t => (

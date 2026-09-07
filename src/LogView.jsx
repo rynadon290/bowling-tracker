@@ -1,5 +1,5 @@
 import { C, S, F, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
-import { RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import TournamentSession from "./TournamentSession.jsx";
@@ -235,7 +235,7 @@ export default function LogView({
             {!editingId&&activeBowler&&preferences.environment!=="tournament"&&preferences.environment!=="practice"&&preferences.environment!=="casual"&&(
               <CollapsibleCard
                 title="Tonight's Session"
-                summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${sessionDate}`:""}
+                summary={sessionLeague?`${sessionLeague.replace(" House Shot","")} · ${formatDate(sessionDate)}`:""}
                 expanded={expandedSections.tonightSession}
                 onToggle={()=>toggleSection("tonightSession")}>
                 <div style={S.chips}>
@@ -433,7 +433,10 @@ export default function LogView({
               const gR=cs.releases.filter(r=>r==="Good").length,bR=cs.releases.filter(r=>r==="Bad").length,rT=cs.releases.length;
               return(
                 <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
-                  <div style={{...S.label,color:C.accent}}>Summary — {cs.bowler?`${cs.bowler} · `:""}{cs.league.replace(" House Shot","")} · {cs.date}</div>
+                  <div style={{...S.label}}>
+                    {cs.bowler?`${cs.bowler}'s night`:"Tonight"}
+                    <span style={{fontWeight:400,color:C.textMuted}}> — {cs.league.replace(" House Shot","")}, {formatDate(cs.date)}</span>
+                  </div>
                   <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
                     {cs.scores.map((s,i)=>(<div key={i} style={S.statBox}><div style={{...S.statNum,fontSize:"20px"}}>{s}</div><div style={S.statLbl}>G{i+1}</div></div>))}
                     <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
@@ -762,7 +765,7 @@ export default function LogView({
               </div>
               {!editingId&&(
                 <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                  {activeBowler||"No bowler selected"} · {sessionLeague||"No league selected"} · {sessionDate}
+                  {activeBowler||"No bowler selected"}{sessionLeague?` — ${sessionLeague.replace(" House Shot","")}, ${formatDate(sessionDate)}`:" — pick a league above"}
                 </div>
               )}
               {editingId&&(

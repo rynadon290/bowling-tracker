@@ -4,6 +4,8 @@ import { strikeDescriptionsForHand, storedStrikeDescriptionFor,
   practiceLeagueCloudName,
   practiceLeagueDisplayName,
   isPracticeLeagueName,
+  formatDate,
+  formatDateShort,
 } from './constants.js';
 
 
@@ -66,5 +68,36 @@ describe('practice league naming', () => {
   it('leaves a real league name alone', () => {
     expect(isPracticeLeagueName('Tuesday House Shot')).toBe(false);
     expect(practiceLeagueDisplayName('Tuesday House Shot')).toBe('Tuesday House Shot');
+  });
+});
+
+describe('display dates', () => {
+  const today = new Date(2026, 8, 7);
+
+  it('reads as a day, not an ISO string', () => {
+    expect(formatDate('2026-09-01', { today })).toMatch(/Sep/);
+    expect(formatDate('2026-09-01', { today })).not.toMatch(/2026-09/);
+  });
+
+  // `new Date("2026-09-01")` is UTC midnight, which is the previous
+  // evening anywhere west of Greenwich -- every Tuesday-night league
+  // bowler in North America would have seen "Mon".
+  it('keeps a Tuesday a Tuesday regardless of timezone', () => {
+    expect(formatDate('2026-09-01', { today })).toMatch(/^Tue/);
+  });
+
+  it('adds the year only when it is not this year', () => {
+    expect(formatDate('2026-09-01', { today })).not.toMatch(/2026/);
+    expect(formatDate('2025-09-01', { today })).toMatch(/2025/);
+  });
+
+  it('passes garbage through rather than throwing', () => {
+    expect(formatDate('not-a-date')).toBe('not-a-date');
+    expect(formatDate('')).toBe('');
+    expect(formatDate(null)).toBe('');
+  });
+
+  it('has a short form for tight spots', () => {
+    expect(formatDateShort('2026-09-01', today)).not.toMatch(/Tue/);
   });
 });

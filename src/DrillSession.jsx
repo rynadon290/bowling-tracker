@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
+import { formatDateShort } from "./constants.js";
 import {
   DRILL_TARGETS, targetLabel, targetShortLabel, recordMade, recordMissed, undo,
   attempts, conversionRate, targetHistory, normalizeCustomPins,
@@ -162,7 +163,7 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
             <div key={w.week} style={{ marginBottom: "6px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
                 <span style={{ color: C.textMuted }}>
-                  {w.week}{w.sessions > 1 ? ` · ${w.sessions} sessions` : ""}
+                  {`Week of ${formatDateShort(w.week)}`}{w.sessions > 1 ? ` · ${w.sessions} sessions` : ""}
                 </span>
                 <span style={{ color: w.thin ? C.textMuted : C.text, fontWeight: 600 }}>
                   {w.thin ? `${w.made}/${w.attempts}` : `${w.rate}%`}

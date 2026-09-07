@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S } from "./ui.jsx";
+import { formatDate } from "./constants.js";
 import {
   effectiveScores, isConfirmed, describeStatus, pendingFor, needingReentry,
 } from "./domain/importVerification.js";
@@ -33,7 +34,7 @@ function PendingCard({ record, onApprove, onReject }) {
   return (
     <div style={{ padding: "12px", marginBottom: "10px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.spare}44` }}>
       <div style={{ fontSize: "13px", color: C.text, marginBottom: "2px" }}>
-        {record.league ? `${record.league.replace(" House Shot", "")} · ` : ""}{record.date}
+        {record.league ? `${record.league.replace(" House Shot", "")} · ` : ""}{formatDate(record.date)}
       </div>
       <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
         Imported from a teammate's scorecard photo. These are already counting — confirming just marks them checked.
@@ -195,7 +196,7 @@ export default function ImportedScoresInbox({
           </div>
           {reentry.map(r => (
             <div key={r.id} style={{ fontSize: "12px", color: C.textMuted, marginBottom: "4px" }}>
-              {r.league ? `${r.league.replace(" House Shot", "")} · ` : ""}{r.date}
+              {r.league ? `${r.league.replace(" House Shot", "")} · ` : ""}{formatDate(r.date)}
             </div>
           ))}
         </div>
