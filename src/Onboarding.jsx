@@ -54,6 +54,7 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
   const [centerQuery, setCenterQuery] = useState("");
   const [centerResults, setCenterResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [centerError, setCenterError] = useState(null);
 
   const name = profile?.bowlerName || "";
   // Defaults, not blanks: most bowlers are right-handed and one-handed,
@@ -73,10 +74,23 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
 
   async function runCenterSearch(q) {
     setCenterQuery(q);
-    if (!q.trim() || !searchCenters) { setCenterResults([]); return; }
+    if (!q.trim() || !searchCenters) { setCenterResults([]); setCenterError(null); return; }
     setSearching(true);
-    try { setCenterResults((await searchCenters(q)) || []); }
-    catch { setCenterResults([]); }
+    setCenterError(null);
+    try {
+      // searchCenters resolves to { centers: [...] } on success or
+      // { error: "..." } on failure -- never a bare array. Treating the
+      // whole result as the list meant EVERY search crashed here: the
+      // result was an object, .slice() isn't a function on it, and that
+      // throw during render produced a blank screen with no message,
+      // including on the ordinary "location permission denied" case.
+      const result = await searchCenters(q);
+      if (result?.error) { setCenterError(result.error); setCenterResults([]); }
+      else setCenterResults(Array.isArray(result?.centers) ? result.centers : []);
+    } catch (e) {
+      setCenterError(e?.message || "Couldn't search for centers right now.");
+      setCenterResults([]);
+    }
     setSearching(false);
   }
 
@@ -147,6 +161,9 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
               placeholder="Search for a center" value={centerQuery}
               onChange={e => runCenterSearch(e.target.value)} />
             {searching && <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>Searching…</div>}
+            {centerError && !searching && (
+              <div style={{ fontSize: "11px", color: C.miss, marginBottom: "8px", lineHeight: 1.5 }}>{centerError}</div>
+            )}
             {centerResults.slice(0, 4).map(r => (
               <button key={r.id || r.name}
                 style={{ display: "block", width: "100%", textAlign: "left", cursor: "pointer", padding: "8px 10px",
