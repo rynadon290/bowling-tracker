@@ -53,7 +53,7 @@ import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, n
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, Chip } from "./ui.jsx";
-import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY } from "./constants.js";
+import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName } from "./constants.js";
 import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -567,7 +567,7 @@ export default function BowlingTracker(){
         const leaguesForShots=await cloudRead("leagues",q=>q.select("id,name"));
         const leagueNameById={};
         if(leaguesForShots.online&&leaguesForShots.data){
-          leaguesForShots.data.forEach(l=>{leagueNameById[l.id]=l.name;});
+          leaguesForShots.data.forEach(l=>{leagueNameById[l.id]=practiceLeagueDisplayName(l.name);});
         }
         const shotsRes=await cloudRead("shots",q=>q.select("*"));
         if(shotsRes.online&&shotsRes.data){
@@ -922,9 +922,35 @@ export default function BowlingTracker(){
       const{data,online}=await cloudRead("leagues",q=>q.select("id,name"));
       if(online&&data){
         const pending=await getQueuedRecordsForTable("leagues");
-        data.forEach(r=>{leagueIdsRef.current[r.name]=r.id;});
-        pending.forEach(r=>{if(!leagueIdsRef.current[r.name])leagueIdsRef.current[r.name]=r.id;});
-        const names=[...new Set([...data.map(r=>r.name),...pending.map(r=>r.name)])];
+        // Practice leagues are stored per-user as "Practice·<id>" because
+        // leagues.name is globally unique. They register and list under
+        // the plain display name -- otherwise the suffixed form would
+        // appear in the league picker and nothing would resolve
+        // "Practice" to an id.
+        //
+        // Another bowler's practice league is not this bowler's: only
+        // one matching THIS user is mapped, so a shared read can't point
+        // practice at someone else's row.
+        const myPractice=user?.id?practiceLeagueCloudName(user.id):null;
+        const register=r=>{
+          if(isPracticeLeagueName(r.name)){
+            if(r.name===myPractice)leagueIdsRef.current[PRACTICE_SESSION_KEY]=r.id;
+            return;
+          }
+          leagueIdsRef.current[r.name]=r.id;
+        };
+        data.forEach(register);
+        pending.forEach(r=>{
+          if(isPracticeLeagueName(r.name)){
+            if(r.name===myPractice&&!leagueIdsRef.current[PRACTICE_SESSION_KEY])leagueIdsRef.current[PRACTICE_SESSION_KEY]=r.id;
+            return;
+          }
+          if(!leagueIdsRef.current[r.name])leagueIdsRef.current[r.name]=r.id;
+        });
+        const listable=r=>isPracticeLeagueName(r.name)
+          ?(r.name===myPractice?PRACTICE_SESSION_KEY:null)
+          :r.name;
+        const names=[...new Set([...data.map(listable),...pending.map(listable)].filter(Boolean))];
         if(names.length){
           setLeagues(names);
           try{await window.storage.set(LEAGUES_KEY,JSON.stringify(names));}catch{}
@@ -1112,7 +1138,17 @@ export default function BowlingTracker(){
     if(!leagues.includes(PRACTICE_SESSION_KEY)){
       await saveLeagues([...leagues,PRACTICE_SESSION_KEY]);
     }
-    const failed=await ensureLeaguesInCloud([PRACTICE_SESSION_KEY]);
+    // Created under a per-user name because leagues.name is globally
+    // unique; registered locally under "Practice" so the rest of the app
+    // never sees the suffixed form.
+    const cloudName=practiceLeagueCloudName(user.id);
+    if(!leagueIdsRef.current[PRACTICE_SESSION_KEY]){
+      const failedCloud=await ensureLeaguesInCloud([cloudName]);
+      if(!failedCloud.length&&leagueIdsRef.current[cloudName]){
+        leagueIdsRef.current[PRACTICE_SESSION_KEY]=leagueIdsRef.current[cloudName];
+      }
+    }
+    const failed=leagueIdsRef.current[PRACTICE_SESSION_KEY]?[]:[PRACTICE_SESSION_KEY];
     if(failed.length){
       // Offline or the write failed: practice still works exactly as it
       // did before, on-device. It syncs on a later attempt.
