@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { useAuth } from "./AuthProvider.jsx";
-import { cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
+import { cloudUpdate, cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
 
 // Pure roster-management functions, extracted so they're testable without
 // rendering the component. Each takes the current `teams` array plus
@@ -382,7 +382,12 @@ export default function TeamManagement({
     if (duplicate) { alert("A team with that name already exists in this league."); return; }
 
     setTeams(prev => prev.map(team => team.id === teamId ? { ...team, name } : team));
-    cloudWrite("teams", { id: teamId, name });
+    // cloudUpdate, not cloudWrite: cloudWrite UPSERTS the whole row, so
+    // sending just { id, name } wrote league_id as null and the NOT NULL
+    // constraint rejected it with 23502 -- then the queue retried the
+    // same doomed write forever. A rename should change the name and
+    // nothing else, which is what an UPDATE does.
+    cloudUpdate("teams", { id: teamId }, { name });
     setEditingTeamId(null);
     setEditingName("");
   }
@@ -478,14 +483,18 @@ export default function TeamManagement({
       ...t,
       pendingInvites: t.pendingInvites.map(inv => inv.id === inviteId ? { ...inv, leftHanded } : inv),
     }));
-    cloudWrite("pending_invites", { id: inviteId, left_handed: leftHanded });
+    // cloudUpdate, not cloudWrite. cloudWrite upserts the WHOLE row, so
+    // sending { id, left_handed } wiped team_id, invited_name and
+    // invited_email to null -- rejected by NOT NULL, then retried
+    // forever by the queue. Same bug the team rename had.
+    cloudUpdate("pending_invites", { id: inviteId }, { left_handed: leftHanded });
   }
   function setInviteIsSub(teamId, inviteId, isSub) {
     setTeams(prev => prev.map(t => t.id !== teamId ? t : {
       ...t,
       pendingInvites: t.pendingInvites.map(inv => inv.id === inviteId ? { ...inv, isSub } : inv),
     }));
-    cloudWrite("pending_invites", { id: inviteId, is_sub: isSub });
+    cloudUpdate("pending_invites", { id: inviteId }, { is_sub: isSub });
   }
 
   // Manual link: a team member picks any real, already-signed-up account
@@ -511,7 +520,7 @@ export default function TeamManagement({
     setTeams(prev => resolvePlaceholder(prev, teamId, inviteId, profile));
     setLinkSearchState(prev => ({ ...prev, [inviteId]: { term: "", results: [], searching: false } }));
     cloudWrite("team_members", { team_id: teamId, user_id: profile.id, lineup_position: lineupPosition });
-    cloudWrite("pending_invites", { id: inviteId, accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
+    cloudUpdate("pending_invites", { id: inviteId }, { accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
   }
 
   async function claimPlaceholder(invite) {
@@ -519,7 +528,7 @@ export default function TeamManagement({
     setMyPendingInvites(prev => prev.filter(r => r.id !== invite.id));
     await cloudWrite("team_members", { team_id: invite.teamId, user_id: user.id, lineup_position: invite.lineupPosition ?? 0 });
     const acceptedAt = new Date().toISOString();
-    await cloudWrite("pending_invites", { id: invite.id, accepted_at: acceptedAt, accepted_user_id: user.id });
+    await cloudUpdate("pending_invites", { id: invite.id }, { accepted_at: acceptedAt, accepted_user_id: user.id });
     await loadAll(); // refresh so the newly-real membership shows up if this is your own team too
   }
 
