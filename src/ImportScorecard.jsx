@@ -159,6 +159,11 @@ export default function ImportScorecard({
   // "Busy, try again" is not the same as "this is broken", and colouring
   // them the same is what makes people give up on a temporary problem.
   const[errorIsTemporary,setErrorIsTemporary]=useState(false);
+  // Teammates' scores, editable before they're sent. Sending someone
+  // else's numbers off a photo without letting the uploader check them
+  // first puts the burden of catching a misread entirely on the person
+  // who wasn't there when it was imported.
+  const[teammateScores,setTeammateScores]=useState({}); // columnIndex -> [score strings]
 
   const teamId=teams.find(t=>t.league===contextLeague&&(t.members||[]).includes(contextBowler))?.id||"";
 
@@ -260,8 +265,21 @@ export default function ImportScorecard({
     const converted=mine?convertColumn(mine,contextBowler):[];
     setGames(converted);
     setExpandedByGame(converted.map(g=>new Set(g.warnings.map(w=>`${w.frame}-${w.ballNum??1}`))));
+    // Seed the editable teammate scores from what was read, so the review
+    // step shows their numbers rather than sending them unseen.
+    const seeded={};
+    columns.forEach((c,i)=>{
+      const who=assignments[i];
+      if(!who||who===contextBowler)return;
+      seeded[i]=(c.games||[]).map(g=>g.totalScore==null?"":String(g.totalScore));
+    });
+    setTeammateScores(seeded);
     setStep("review");
   }
+
+  const teammateEntries=columns
+    .map((c,i)=>({column:c,index:i,bowler:assignments[i]}))
+    .filter(x=>x.bowler&&x.bowler!==contextBowler);
 
   async function handleExtract(){
     if(!contextBowler||!contextLeague||!images.length)return;
@@ -432,26 +450,43 @@ export default function ImportScorecard({
     // hostage to whoever bowls and goes home. See
     // domain/importVerification.js for the full lifecycle.
     const teammateColumns=columns
-      .map((c,i)=>({column:c,bowler:assignments[i]}))
+      .map((c,i)=>({column:c,index:i,bowler:assignments[i]}))
       .filter(x=>x.bowler&&x.bowler!==contextBowler);
     if(teammateColumns.length&&onSubmitTeammateScores){
-      await onSubmitTeammateScores(teammateColumns.map(({column,bowler})=>({
+      await onSubmitTeammateScores(teammateColumns.map(({index,bowler})=>({
         bowler,
         league:contextLeague,
         date:contextDate,
         teamId,
-        importedScores:(column.games||[]).map(g=>g.totalScore??null),
+        // The reviewed values, not the raw extraction -- anything
+        // corrected on the previous screen is what gets sent.
+        importedScores:(teammateScores[index]||[]).map(v=>{
+          const n=Number(v);
+          return v===""||!Number.isFinite(n)?null:Math.round(n);
+        }),
       })));
     }
 
     setSessionLeague(contextLeague);
     setSessionDate(contextDate);
     selectBowler(contextBowler);
-    const parts=[];
-    if(newShots.length)parts.push(`${newShots.length} shots`);
-    if(scoreOnlyGames.length)parts.push(`${scoreOnlyGames.length} game score${scoreOnlyGames.length>1?"s":""}`);
-    if(teammateColumns.length)parts.push(`${teammateColumns.length} teammate${teammateColumns.length>1?"s":""} sent for confirmation`);
-    setSessionSaveMessage(`Imported ${parts.join(" and ")} -- tap "Save Session & View Summary" below to finalize.`);
+    // Built in two halves: what landed for THIS bowler, and what was sent
+    // to teammates. Mapping only teammates is a normal thing to do -- one
+    // person imports the card for the whole team -- and the message has
+    // to make sense when there's nothing of your own in it.
+    const mineParts=[];
+    if(newShots.length)mineParts.push(`${newShots.length} shots`);
+    if(scoreOnlyGames.length)mineParts.push(`${scoreOnlyGames.length} game score${scoreOnlyGames.length>1?"s":""}`);
+    const names=teammateColumns.map(t=>t.bowler);
+    const sent=names.length
+      ? `Sent ${names.length>1?names.slice(0,-1).join(", ")+" and "+names[names.length-1]:names[0]} their scores to confirm.`
+      : "";
+
+    setSessionSaveMessage(
+      mineParts.length
+        ? `Imported ${mineParts.join(" and ")}${sent?` · ${sent}`:""} -- tap "Save Session & View Summary" below to finalize.`
+        : sent||"Nothing was mapped to you on this card."
+    );
     setTimeout(()=>setSessionSaveMessage(null),6000);
     setView("log");
   }
@@ -635,8 +670,52 @@ export default function ImportScorecard({
               expandedFrames={expandedByGame[idx]||new Set()}
               onToggleExpanded={key=>toggleExpanded(idx,key)}/>
           ))}
+          {/* Teammates' scores, before they're sent. Two reasons this is
+              here and not silent: the uploader is the only person who saw
+              the card, so they're the only one who can catch a misread;
+              and sending someone's scores off with no acknowledgement
+              looks like nothing happened. */}
+          {teammateEntries.length>0&&(
+            <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
+              <div style={{...S.label,color:C.spare}}>Also sending to teammates</div>
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                These go to {teammateEntries.length===1?"this bowler":"these bowlers"} to confirm. They count straight away —
+                confirming just marks them checked. Fix anything that was misread before sending.
+              </div>
+              {teammateEntries.map(({index,bowler,column})=>(
+                <div key={index} style={{padding:"10px",marginBottom:"8px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"6px"}}>
+                    <div style={{fontSize:"13px",fontWeight:600,color:C.text}}>{bowler}</div>
+                    <div style={{fontSize:"10px",color:C.textMuted}}>read as "{column.scorecardName||"unnamed"}"</div>
+                  </div>
+                  <div style={{display:"flex",gap:"6px"}}>
+                    {(teammateScores[index]||[]).map((v,gi)=>(
+                      <input key={gi} style={{...S.input,flex:1,textAlign:"center",fontSize:"14px"}}
+                        type="number" inputMode="numeric" placeholder={`G${gi+1}`}
+                        value={v}
+                        onChange={e=>setTeammateScores(prev=>({
+                          ...prev,
+                          [index]:(prev[index]||[]).map((x,j)=>j===gi?e.target.value:x),
+                        }))}/>
+                    ))}
+                  </div>
+                  {(()=>{
+                    const nums=(teammateScores[index]||[]).map(Number).filter(n=>Number.isFinite(n)&&n>0);
+                    return nums.length?(
+                      <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                        Series {nums.reduce((a,b)=>a+b,0)}
+                        {column.series!=null&&column.series!==nums.reduce((a,b)=>a+b,0)&&
+                          <span style={{color:C.spare}}> · card printed {column.series}</span>}
+                      </div>
+                    ):null;
+                  })()}
+                </div>
+              ))}
+            </div>
+          )}
+
           <button style={S.btn("primary")} disabled={step==="saving"} onClick={handleSave}>
-            {step==="saving"?"Saving…":"Looks Good — Save"}
+            {step==="saving"?"Saving…":teammateEntries.length?`Save & Send To ${teammateEntries.length} Teammate${teammateEntries.length>1?"s":""}`:"Looks Good — Save"}
           </button>
           <button style={{...S.btn(),marginTop:"8px"}} onClick={()=>setStep("setup")}>Start Over</button>
         </>
