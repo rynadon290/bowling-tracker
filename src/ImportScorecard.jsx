@@ -227,6 +227,39 @@ export default function ImportScorecard({
     }
   }
 
+  // Converts ONE bowler's column into this app's shot/score records.
+  //
+  // Deliberately runs after the who's-who mapping, not during extraction.
+  // A team card returns every bowler's games in one flat list -- four
+  // bowlers x three games is twelve entries with the game numbers
+  // repeating -- so converting up front handed the review screen all
+  // twelve as though they belonged to the importer.
+  function convertColumn(column,bowler){
+    const context={bowler,league:contextLeague,date:contextDate,teamId};
+    return (column?.games||[]).map(g=>{
+      // A card showing only totals is a normal case, not a failure --
+      // those import as scores rather than shots.
+      const hasFrames=Array.isArray(g.frames)&&g.frames.length>0;
+      if(!hasFrames){
+        return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:[],warnings:[],
+               scoreOnly:true,totalScore:g.totalScore??null};
+      }
+      const{shots:gameShots,warnings}=convertExtractedGameToShots(g,{...context,game:g.gameNumber});
+      return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:gameShots,warnings,
+             scoreOnly:false,totalScore:g.totalScore??null};
+    });
+  }
+
+  // Confirming the mapping is what decides whose games get reviewed.
+  function confirmColumns(){
+    const mineIndex=columns.findIndex((c,i)=>assignments[i]===contextBowler);
+    const mine=mineIndex>=0?columns[mineIndex]:null;
+    const converted=mine?convertColumn(mine,contextBowler):[];
+    setGames(converted);
+    setExpandedByGame(converted.map(g=>new Set(g.warnings.map(w=>`${w.frame}-${w.ballNum??1}`))));
+    setStep("review");
+  }
+
   async function handleExtract(){
     if(!contextBowler||!contextLeague||!images.length)return;
     setStep("processing");
@@ -268,33 +301,16 @@ export default function ImportScorecard({
       }
       if(data?.error)throw new Error(data.error);
 
-      const context={bowler:contextBowler,league:contextLeague,date:contextDate,teamId};
-      const converted=(data.games||[]).map(g=>{
-        // Some scorecards show only game totals with no per-frame detail.
-        // That's a normal case, not a failure -- those import as scores
-        // rather than shots, which is the whole point of supporting them.
-        const hasFrames=Array.isArray(g.frames)&&g.frames.length>0;
-        if(!hasFrames){
-          return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:[],warnings:[],
-                 scoreOnly:true,totalScore:g.totalScore??null};
-        }
-        const{shots:gameShots,warnings}=convertExtractedGameToShots(g,{...context,game:g.gameNumber});
-        return{gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:gameShots,warnings,
-               scoreOnly:false,totalScore:g.totalScore??null};
-      });
-      if(!converted.length)throw new Error("No games could be read from the image(s). Try a clearer screenshot.");
-      // A game with neither frames nor a total carries no information at all.
-      if(converted.every(g=>g.scoreOnly&&g.totalScore==null)){
-        throw new Error("Found games but couldn't read any scores or frame detail. Try a clearer screenshot.");
-      }
-
-      setGames(converted);
-      setExpandedByGame(converted.map(g=>new Set(g.warnings.map(w=>`${w.frame}-${w.ballNum??1}`))));
-
       // Column mapping. Runs for every card, not just team ones -- a
       // single-bowler card is just a one-column team card, and going
       // through the same path means one code path to get right.
       const cols=normalizeExtraction(data);
+      if(!cols.length||cols.every(c=>!c.games.length)){
+        throw new Error("No games could be read from the image(s). Try a clearer screenshot.");
+      }
+      if(cols.every(c=>c.games.every(g=>!(Array.isArray(g.frames)&&g.frames.length)&&g.totalScore==null))){
+        throw new Error("Found games but couldn't read any scores or frame detail. Try a clearer screenshot.");
+      }
       const team=teams.find(t=>t.id===teamId);
       const roster=(team?.members||[]).map(m=>({
         bowler:m.bowlerName||m,
@@ -542,7 +558,7 @@ export default function ImportScorecard({
 
           <button style={S.btn("primary")}
             disabled={!Object.values(assignments).some(Boolean)}
-            onClick={()=>setStep("review")}>
+            onClick={confirmColumns}>
             Continue
           </button>
           <button style={{...S.btn(),marginTop:"8px"}} onClick={()=>setStep("setup")}>Start Over</button>
@@ -553,7 +569,18 @@ export default function ImportScorecard({
       {(step==="review"||step==="saving")&&(
         <>
           <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-            {contextBowler} · {contextLeague.replace(" House Shot","")} · {contextDate} — review each frame below, tap any of them to correct it, then save.
+            {contextBowler} · {contextLeague.replace(" House Shot","")} · {contextDate} — {
+              // A totals-only card has no frames to review, so telling the
+              // bowler to check frames sends them looking for something
+              // that isn't on screen.
+              games.length===0
+                ? "nothing was mapped to you on this card."
+                : games.every(g=>g.scoreOnly)
+                  ? `check the ${games.length===1?"score":`${games.length} game scores`} below, correct anything that's wrong, then save.`
+                  : games.some(g=>g.scoreOnly)
+                    ? "check the games below — some came through frame by frame, some as scores only. Correct anything that's wrong, then save."
+                    : "review each frame below, tap any of them to correct it, then save."
+            }
           </div>
           {games.map((g,idx)=>(
             <GameReview key={g.gameNumber} game={g}
