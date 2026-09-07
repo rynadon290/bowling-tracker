@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   categorizeCoaching, normalizeTask, completeTask, recordAttempt, reopenTask,
   taskProgress, partitionTasks, taskToRow, taskFromRow, sortNotes, coachingToRow,
+  bowlerSnapshot,
 } from './coaching.js';
 
 const ME = 'u-me', COACH = 'u-coach', PUPIL = 'u-pupil', OTHER = 'u-other';
@@ -112,5 +113,49 @@ describe('notes', () => {
 
   it('drops an empty note', () => {
     expect(sortNotes([{ id: 'n', body: '   ', createdAt: '2026-06-01' }])).toHaveLength(0);
+  });
+});
+
+describe('bowler snapshot for the coach', () => {
+  const sess = [
+    { bowler: 'Kim', league: 'Tue', date: '2026-06-02', scores: [170, 180, 175], total: 525 },
+    { bowler: 'Kim', league: 'Tue', date: '2026-06-09', scores: [190, 195, 185], total: 570 },
+    { bowler: 'Kim', league: 'Tue', date: '2026-06-16', scores: [200, 205, 195], total: 600 },
+    { bowler: 'Kim', league: 'Tue', date: '2026-06-23', scores: [210, 215, 205], total: 630 },
+    { bowler: 'Kim', league: 'Tue', date: '2026-06-30', scores: [220, 225, 215], total: 660 },
+    { bowler: 'Kim', league: 'Tue', date: '2026-07-07', scores: [230, 235, 225], total: 690 },
+  ];
+
+  it('summarises average, high, and night count', () => {
+    const snap = bowlerSnapshot(sess);
+    expect(snap.high).toBe(235);
+    expect(snap.nights).toBe(6);
+  });
+
+  it('lists at most 5 recent nights, most recent first', () => {
+    const snap = bowlerSnapshot(sess);
+    expect(snap.recent).toHaveLength(5);
+    expect(snap.recent[0].date).toBe('2026-07-07');
+  });
+
+  it('does not claim a trend on too little history, but still reports the facts', () => {
+    const thin = bowlerSnapshot([sess[0], sess[1]]);
+    expect(thin).not.toBeNull();
+    expect(thin.trendDirection).toBe('unknown');
+  });
+
+  it('returns null for no data', () => {
+    expect(bowlerSnapshot(null)).toBeNull();
+    expect(bowlerSnapshot([])).toBeNull();
+  });
+
+  // The bug this signature exists to prevent: a session's bowler_name is a
+  // free-typed label and may not match the coached account's display
+  // name. Pre-scoping by user_id at the query level, rather than
+  // filtering by name a second time here, means that mismatch can no
+  // longer silently erase a bowler's real history.
+  it('does not lose data to a bowler-name mismatch', () => {
+    const nickname = [{ bowler: 'K.', league: 'Tue', date: '2026-06-02', scores: [200, 210, 190] }];
+    expect(bowlerSnapshot(nickname)?.average).toBe(200);
   });
 });

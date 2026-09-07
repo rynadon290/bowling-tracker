@@ -290,3 +290,57 @@ export function noteFromRow(row) {
     createdAt: row.created_at,
   });
 }
+
+// ── Bowler snapshot, for the coach ──────────────────────────────────────
+//
+// A coach's whole reason for being on this screen is "how is my bowler
+// actually doing," and tasks/notes never answer that. This reads the same
+// sessions a bowler sees on their own Stats tab and reduces it to what a
+// coach glances at first: average, best, most recent scores, and whether
+// the trend across their last several nights is real or just noise.
+//
+// Sample-gated the same way the rest of this app is: a "trend" off two
+// nights is not a trend, so trendDirection from domain/trends.js still
+// applies its own threshold here rather than this module inventing a
+// looser one for the coach's benefit.
+
+import { scoreSeries as trendScoreSeries, trendDirection, describeTrend } from "./trends.js";
+
+// `sessions` is expected to already be scoped to one bowler -- by
+// user_id, at the query level -- not filtered here by name. A session's
+// bowler_name is a free-typed label the bowler chose for themselves and
+// isn't guaranteed to match their account's display name (the same gap
+// Friends.jsx already warns about for its own leaderboard). Matching on
+// it a second time here would silently return nothing for a coach's
+// bowler whenever those two names differ, which defeats the entire
+// point of this function.
+export function bowlerSnapshot(sessions) {
+  const mine = (Array.isArray(sessions) ? sessions : []).filter(Boolean);
+  if (!mine.length) return null;
+
+  const allScores = mine.flatMap(s => Array.isArray(s.scores) ? s.scores : []).filter(v => Number.isFinite(v));
+  if (!allScores.length) return null;
+
+  const sorted = [...mine].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const recent = sorted.slice(0, 5).map(s => ({
+    date: s.date || "",
+    league: s.league || "",
+    scores: Array.isArray(s.scores) ? s.scores : [],
+    total: s.total ?? null,
+  }));
+
+  // "" as the bowler filter inside scoreSeries: it usually filters by
+  // name, but mine is already scoped to one person, so passing "" (its
+  // documented \"everyone\" value) avoids the same name-matching trap here.
+  const series = trendScoreSeries(mine, "", "", "average");
+  const direction = trendDirection(series);
+
+  return {
+    average: Math.floor(allScores.reduce((a, b) => a + b, 0) / allScores.length),
+    high: Math.max(...allScores),
+    nights: mine.length,
+    recent,
+    trendSummary: describeTrend("average", series),
+    trendDirection: direction.direction,
+  };
+}
