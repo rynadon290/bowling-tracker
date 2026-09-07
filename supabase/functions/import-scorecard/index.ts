@@ -95,25 +95,11 @@ const RESPONSE_SCHEMA = {
         required: ["games"],
       },
     },
-    // Kept for backward compatibility with single-bowler cards.
-    games: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          gameNumber: { type: "integer" },
-          ballUsed: { type: "string", nullable: true, description: "The ball name shown for this game, if visible (e.g. 'Bionic'). Null if not shown or not legible." },
-          frames: { type: "array", items: FRAME_SCHEMA },
-          // The printed final score for the game, when the scorecard shows
-          // one. Some screenshots show ONLY totals with no pin-deck detail
-          // -- those still import, as scores rather than shots.
-          totalScore: { type: "integer", nullable: true, description: "The game's final score as printed on the scorecard, if visible. Null if not shown or not legible." },
-        },
-        required: ["gameNumber"],
-      },
-    },
   },
-  required: [],
+  // Must be non-empty: Gemini rejects a responseSchema with an empty
+  // `required` array, and the rejection surfaces to the client as a bare
+  // "failed to send a request to the Edge Function" with no cause.
+  required: ["bowlers"],
 };
 
 const EXTRACTION_PROMPT = `You are reading a bowling scorecard screenshot (from an app called LaneTalk). Extract every game and frame shown into the exact JSON shape requested.
