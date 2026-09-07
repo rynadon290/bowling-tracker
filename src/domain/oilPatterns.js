@@ -102,3 +102,99 @@ export function patternFromRow(row) {
     sourceNote: row.source_note,
   });
 }
+
+// ── Per-pattern history across tournaments ──────────────────────────────
+//
+// A bowler's real question is "how do I actually score on this pattern?"
+// Tournament days each carry an oilPattern name and a set of games, so
+// history is an aggregation across every day that names the same pattern.
+//
+// Matching is by normalized name, not id: a bowler may have logged the
+// same pattern before it existed in the library (typed by hand) and again
+// after picking it from the list. Those are the same pattern to them, so
+// they aggregate together.
+//
+// Deliberately NOT computed here: strike percentage, carry, or anything
+// needing shot-level data. Tournament days store game scores only, so
+// score-derived stats are all that can honestly be produced. Shot-level
+// pattern stats would need shots tagged with the pattern, which they
+// aren't.
+
+function scoresForDay(day) {
+  return (day?.games || [])
+    .map(g => (g.score === "" || g.score == null ? null : Number(g.score)))
+    .filter(s => s != null && Number.isFinite(s) && s >= 0 && s <= 300);
+}
+
+// Every logged day matching a pattern name, flattened across tournaments.
+export function patternDays(tournaments, patternName) {
+  const target = key(patternName);
+  if (!target) return [];
+  const out = [];
+  for (const t of tournaments || []) {
+    for (const day of t?.days || []) {
+      if (key(day?.oilPattern) !== target) continue;
+      const scores = scoresForDay(day);
+      out.push({
+        tournamentId: t.id || "",
+        tournamentName: t.name || "",
+        center: t.center || "",
+        date: day.date || "",
+        dayNumber: day.dayNumber ?? null,
+        scores,
+        madeCut: day.madeCut === true || day.madeCut === false ? day.madeCut : null,
+      });
+    }
+  }
+  // Most recent first; days with no date sort last rather than pretending
+  // to be the oldest.
+  return out.sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  });
+}
+
+// Aggregate stats for one pattern. Returns null when nothing is logged,
+// so callers can hide the section rather than render a row of dashes.
+export function patternStats(tournaments, patternName) {
+  const days = patternDays(tournaments, patternName);
+  const allScores = days.flatMap(d => d.scores);
+  if (!allScores.length) {
+    return days.length ? { days, games: 0, average: null, high: null, low: null, cutsMade: null, cutsTracked: 0 } : null;
+  }
+  const total = allScores.reduce((a, b) => a + b, 0);
+  const tracked = days.filter(d => d.madeCut === true || d.madeCut === false);
+  return {
+    days,
+    games: allScores.length,
+    // Bowling averages truncate, they don't round -- same rule the book
+    // average code follows.
+    average: Math.floor(total / allScores.length),
+    high: Math.max(...allScores),
+    low: Math.min(...allScores),
+    cutsMade: tracked.length ? tracked.filter(d => d.madeCut === true).length : null,
+    cutsTracked: tracked.length,
+  };
+}
+
+// Every pattern the bowler has actually logged, with its stats, ranked by
+// how much they've played it. For a "your patterns" overview.
+export function loggedPatternSummaries(tournaments) {
+  const names = new Map();
+  for (const t of tournaments || []) {
+    for (const day of t?.days || []) {
+      const name = (day?.oilPattern || "").trim();
+      if (!name) continue;
+      if (!names.has(key(name))) names.set(key(name), name);
+    }
+  }
+  return [...names.values()]
+    .map(name => ({ name, stats: patternStats(tournaments, name) }))
+    .filter(x => x.stats)
+    .sort((a, b) => {
+      if (b.stats.games !== a.stats.games) return b.stats.games - a.stats.games;
+      return a.name.localeCompare(b.name);
+    });
+}
