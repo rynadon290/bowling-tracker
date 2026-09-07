@@ -1,4 +1,6 @@
 import { C, S } from "./ui.jsx";
+import ShareButton from "./ShareButton.jsx";
+import { formatDate } from "./constants.js";
 import {
   casualRecap, practiceRecap, practiceComparison, describePractice,
   drillRecap, drillComparison, describeDrills,
@@ -212,6 +214,20 @@ export default function SessionRecap({
   environment, manualScores, bowler, allBowlers, league, date, priorAverage,
   drills, leftHandedForBowler,
 }) {
+  // What the share carries for THIS bowler on this night.
+  const myLine = (recap) => (recap?.lines || []).find(l => l.bowler === bowler) || null;
+  const shareFor = (recap, extras = []) => {
+    const line = myLine(recap);
+    if (!line) return null;
+    return {
+      bowler,
+      scores: line.scores,
+      league: environment === "practice" || environment === "casual" ? "" : league,
+      date: formatDate(date),
+      environment,
+      highlights: extras,
+    };
+  };
   // A drill comparison can involve two people of different hands, so
   // there's no single flag for "the" handedness here -- each side needs
   // its own. Falls back to right-handed when the caller doesn't supply a
@@ -220,7 +236,24 @@ export default function SessionRecap({
   if (environment === "casual") {
     const recap = casualRecap(manualScores, allBowlers, league, date);
     if (!recap) return null;
-    return <CasualRecap recap={recap} />;
+    const mine = shareFor(recap);
+    return (
+      <>
+        <CasualRecap recap={recap} />
+        {/* Casual bowlers are the ones most likely to share -- it's the
+            one night, and the point was the people. The card says who
+            won, the button sends it. */}
+        {mine && (
+          <div style={{ marginTop: "-4px", marginBottom: "12px" }}>
+            <ShareButton label="Share the night" summary={{
+              ...mine,
+              // "Winner: Kim" reads better in a text than the full detail line.
+              highlights: (recap.awards || []).slice(0, 2).map(a => a.title && a.bowler ? `${a.title}: ${a.bowler}` : "").filter(Boolean),
+            }} />
+          </div>
+        )}
+      </>
+    );
   }
 
   if (environment === "practice") {
@@ -236,6 +269,17 @@ export default function SessionRecap({
       <>
         {recap && <PracticeRecap recap={recap} comparison={comparison} />}
         {dRecap && <DrillRecap recap={dRecap} comparison={dComparison} />}
+        {recap && recap.scores && (
+          <div style={{ marginBottom: "12px" }}>
+            <ShareButton label="Share this practice" summary={{
+              bowler, scores: recap.scores, date: formatDate(date), environment: "practice",
+              highlights: [
+                recap.vsAverage != null ? `${recap.vsAverage >= 0 ? "+" : ""}${recap.vsAverage} on my average` : null,
+                dRecap && dRecap.lines?.length ? `${dRecap.lines.length} drill${dRecap.lines.length === 1 ? "" : "s"}` : null,
+              ],
+            }} />
+          </div>
+        )}
       </>
     );
   }

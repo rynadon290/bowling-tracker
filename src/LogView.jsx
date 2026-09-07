@@ -6,6 +6,7 @@ import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import SessionRecap from "./SessionRecap.jsx";
+import ShareButton from "./ShareButton.jsx";
 import { getManualScore, seriesTotal } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
@@ -658,6 +659,21 @@ export default function LogView({
                   <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
                     {leagueAs.map(({league,avg})=><div key={league} style={S.statBox}><div style={{...S.statNum,fontSize:"18px"}}>{avg}</div><div style={S.statLbl}>{league.replace(" House Shot","")}</div></div>)}
                     {cA&&<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,fontSize:"18px",color:C.accent}}>{cA}</div><div style={S.statLbl}>Combined</div></div>}
+                  </div>
+                  {/* Share sits with the summary because that's the moment
+                      someone wants to send it -- not buried in a menu. */}
+                  <div style={{marginTop:"14px"}}>
+                    <ShareButton label="Share tonight" summary={{
+                      bowler:cs.bowler||activeBowler,
+                      scores:cs.scores,
+                      league:cs.league,
+                      date:formatDate(cs.date),
+                      environment:"league",
+                      highlights:[
+                        cs.strikes&&cs.shotCount?`${Math.round((cs.strikes/cs.shotCount)*100)}% strikes`:null,
+                        cs.sparesMade&&cs.spareAttempts?`${Math.round((cs.sparesMade/cs.spareAttempts)*100)}% spares`:null,
+                      ],
+                    }}/>
                   </div>
                 </div>
               );
