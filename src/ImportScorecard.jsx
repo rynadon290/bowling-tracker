@@ -244,7 +244,17 @@ export default function ImportScorecard({
         let detail=fnError.message||"";
         try{
           const body=await fnError.context?.json?.();
-          if(body?.error)detail=body.error;
+          // The function returns { error, detail } -- error is a label
+          // ("Gemini API error") and detail is the actual cause. Showing
+          // only the label is how three rounds got spent guessing at a
+          // problem the server had already named.
+          if(body?.error){
+            detail=body.error;
+            if(body.detail){
+              const extra=typeof body.detail==="string"?body.detail:JSON.stringify(body.detail);
+              detail+=` — ${extra.slice(0,400)}`;
+            }
+          }
         }catch{}
         if(/failed to send a request/i.test(detail)){
           // Keep the underlying text -- without it there's no way to tell
