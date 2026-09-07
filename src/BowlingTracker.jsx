@@ -13,6 +13,7 @@ import Onboarding from "./Onboarding.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import TrendsView from "./TrendsView.jsx";
 import CoachingView from "./CoachingView.jsx";
+import ImportedScoresInbox from "./ImportedScoresInbox.jsx";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -34,6 +35,8 @@ import { scoreStats } from "./domain/scoreInsights.js";
 import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insightGating.js";
 import { drillLines } from "./domain/sessionRecap.js";
 import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
+import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
+  correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed } from "./domain/importVerification.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -316,6 +319,10 @@ export default function BowlingTracker(){
   // this field -- see migration_coach_reads_bowler_handedness.sql for why
   // it isn't a policy on bowler_profiles.
   const[coachHandednessById,setCoachHandednessById]=useState({});
+  // Scores imported from someone else's scorecard photo, awaiting this
+  // bowler's confirmation. Cloud-only: they belong to two people, and a
+  // stale local copy of a teammate's scores is worse than none.
+  const[importedScores,setImportedScores]=useState([]);
   const[tasksByRelationship,setTasksByRelationship]=useState({});
   const[notesByRelationship,setNotesByRelationship]=useState({});
   // Sessions for whichever bowler the coach currently has selected in the
@@ -524,6 +531,7 @@ export default function BowlingTracker(){
   useEffect(()=>{
     if(!user?.id)return;
     loadCoaching();
+    loadImportedScores();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id]);
 
@@ -1538,6 +1546,105 @@ export default function BowlingTracker(){
     if(!latest)return;
     setCoachSeenAt(latest);
     try{await window.storage.set(COACH_SEEN_KEY,latest);}catch{}
+  }
+
+  // ── Imported scores awaiting verification ───────────────────────────
+  async function loadImportedScores(){
+    if(!user?.id)return;
+    const res=await cloudRead("imported_scores",q=>q.select("*"));
+    if(!res.online||!Array.isArray(res.data))return;
+    const nameById={};
+    Object.entries(leagueIdsRef.current||{}).forEach(([name,id])=>{nameById[id]=name;});
+    setImportedScores(res.data.map(r=>normalizeImportRecord({
+      id:r.id,
+      bowler:r.bowler_name,
+      uploadedBy:r.uploaded_by,
+      league:nameById[r.league_id]||"",
+      date:r.date,
+      importedScores:r.imported_scores,
+      correctedScores:r.corrected_scores,
+      status:r.status,
+      respondedAt:r.responded_at,
+      correctedBy:r.corrected_by,
+      note:r.note,
+    })).filter(Boolean));
+  }
+
+  // Called by the scorecard import for every column mapped to someone
+  // OTHER than the person importing. Nothing reaches their real history
+  // -- these are pending records they approve, reject, or correct.
+  async function submitTeammateScores(entries){
+    if(!user?.id||!entries?.length)return;
+    const rows=[];
+    for(const e of entries){
+      const team=teams.find(t=>t.id===e.teamId);
+      const member=(team?.members||[]).find(m=>(m.bowlerName||m)===e.bowler);
+      rows.push({
+        id:crypto.randomUUID(),
+        // Null when the teammate has no account yet -- their scores still
+        // belong on the team's card, they just have nobody to confirm them.
+        bowler_user_id:member?.userId||null,
+        bowler_name:e.bowler,
+        uploaded_by:user.id,
+        team_id:e.teamId||null,
+        league_id:leagueIdsRef.current[e.league]||null,
+        date:e.date,
+        imported_scores:e.importedScores,
+        status:"pending",
+      });
+    }
+    // Shown immediately, so the team's card is complete the moment it's
+    // imported rather than after a round trip.
+    setImportedScores(prev=>[...prev,...entries.map((e,i)=>normalizeImportRecord({
+      id:rows[i].id,
+      bowler:e.bowler,
+      uploadedBy:user.id,
+      league:e.league,
+      date:e.date,
+      importedScores:e.importedScores,
+      status:"pending",
+    })).filter(Boolean)]);
+    for(const row of rows)await cloudWrite("imported_scores",row);
+  }
+
+  function replaceImportRecord(next){
+    setImportedScores(prev=>prev.map(r=>r.id===next.id?next:r));
+    cloudUpdate("imported_scores",{id:next.id},{
+      status:next.status,
+      corrected_scores:next.correctedScores,
+      responded_at:next.respondedAt||null,
+      corrected_by:next.correctedBy?(teams.flatMap(t=>t.members||[]).find(m=>(m.bowlerName||m)===next.correctedBy)?.userId||user?.id||null):null,
+      note:next.note||null,
+    });
+  }
+
+  // Whether the active bowler may fix a teammate's unconfirmed record.
+  // The rules live in domain/importVerification.js -- this just supplies
+  // the session history and who has confirmed their own scores.
+  function canCorrectImport(record){
+    const verifiedTeammates=importedScores
+      .filter(r=>r.league===record.league&&r.date===record.date&&isConfirmed(r))
+      .map(r=>r.bowler);
+    // canCorrect, not correctAsTeammate: the latter also rejects a call
+    // with no replacement scores, which would report "not allowed" for a
+    // record the bowler is perfectly entitled to fix.
+    return canCorrectImportRecord(record,activeBowler,{sessions,verifiedTeammates});
+  }
+
+  function approveImportedScores(record){replaceImportRecord(approveImport(record));}
+  function rejectImportedScores(record,corrected){replaceImportRecord(rejectImport(record,corrected,{by:record.bowler}));}
+  function correctTeammateScores(record,corrected){
+    // Which teammates have already confirmed their own scores for this
+    // night -- the permission check needs that, not just "is on the team".
+    const verifiedTeammates=importedScores
+      .filter(r=>r.league===record.league&&r.date===record.date&&isConfirmed(r))
+      .map(r=>r.bowler);
+    const{record:next,error}=correctAsTeammate(record,corrected,activeBowler,{
+      sessions,verifiedTeammates,
+    });
+    if(error)return error;
+    replaceImportRecord(next);
+    return null;
   }
 
   // ── Coaching ────────────────────────────────────────────────────────
@@ -3407,7 +3514,7 @@ export default function BowlingTracker(){
 
         {view==="import"&&(
           <ImportScorecard
-            bowlers={bowlers} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots}
+            bowlers={bowlers} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
             updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}
@@ -3439,6 +3546,15 @@ export default function BowlingTracker(){
             oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
+            importedScoresInbox={activeBowler?(
+              <ImportedScoresInbox
+                records={importedScores}
+                bowler={activeBowler}
+                onApprove={approveImportedScores}
+                onReject={rejectImportedScores}
+                onCorrectTeammate={correctTeammateScores}
+                canCorrect={r=>canCorrectImport(r)}/>
+            ):null}
             goalsPanel={activeBowler&&logGoals.length?(
               <GoalsPanel
                 goals={logGoals}
