@@ -68,7 +68,7 @@ export default function Onboarding({ preferences, onApply, onFinish }) {
               What are you bowling?
             </div>
             <div style={{ fontSize: "13px", color: C.textMuted, marginBottom: "18px" }}>
-              This sets sensible defaults. You can change it any time, and you'll be asked again whenever you bowl on an unusual day.
+              This sets sensible defaults. You can change it any time — and it won't keep asking on your regular bowling nights.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
               {ENVIRONMENTS.map(env => {
