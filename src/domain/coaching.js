@@ -344,3 +344,71 @@ export function bowlerSnapshot(sessions) {
     trendDirection: direction.direction,
   };
 }
+
+// ── Shot-level breakdown, for the coach ─────────────────────────────────
+//
+// The snapshot above answers "how is my bowler scoring". This answers
+// "why" -- the thing 11 of 14 coaches asked for. Scores tell a coach the
+// result; carry, spare conversion, and where the misses go tell them what
+// to work on.
+//
+// Takes the handedness predicate rather than a flag, for the same reason
+// the drill comparison does: the coach and the bowler are different
+// people and can throw with different hands. Passing the coach's own hand
+// here would mislabel every corner-pin number.
+export function shotBreakdown(shots, { isSplit, isSinglePinLeave, isCornerPinLeave, leftHanded = false } = {}) {
+  const list = (Array.isArray(shots) ? shots : []).filter(Boolean);
+  if (!list.length) return null;
+
+  // First balls only -- a strike rate that counted spare attempts as
+  // misses would understate every bowler.
+  const frames = list.filter(s => !s.ballNum || s.ballNum === 1);
+  const strikes = frames.filter(s => s.result === "Strike").length;
+
+  const spareAttempts = isSplit
+    ? list.filter(s => s.result !== "Strike" && s.spareMade !== "" && !isSplit(s))
+    : [];
+  const sparesMade = spareAttempts.filter(s => s.spareMade === "Yes").length;
+
+  const singlePin = isSinglePinLeave
+    ? list.filter(s => isSinglePinLeave(s) && s.spareMade !== "")
+    : [];
+  const singlePinMade = singlePin.filter(s => s.spareMade === "Yes").length;
+
+  const cornerPin = isCornerPinLeave
+    ? list.filter(s => isCornerPinLeave(s, leftHanded) && s.spareMade !== "")
+    : [];
+  const cornerPinMade = cornerPin.filter(s => s.spareMade === "Yes").length;
+
+  const splits = isSplit ? list.filter(s => isSplit(s)) : [];
+
+  // Miss tendencies -- the most directly coachable thing in here.
+  const missCounts = {};
+  for (const s of list) {
+    const misses = Array.isArray(s.miss) ? s.miss : s.miss ? [s.miss] : [];
+    for (const m of misses) missCounts[m] = (missCounts[m] || 0) + 1;
+  }
+  const misses = Object.entries(missCounts)
+    .map(([miss, count]) => ({ miss, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const pct = (made, total) => (total ? Math.round((made / total) * 100) : null);
+
+  return {
+    shots: list.length,
+    frames: frames.length,
+    strikeRate: pct(strikes, frames.length),
+    strikeSample: frames.length,
+    spareRate: pct(sparesMade, spareAttempts.length),
+    spareSample: spareAttempts.length,
+    singlePinRate: pct(singlePinMade, singlePin.length),
+    singlePinSample: singlePin.length,
+    cornerPinRate: pct(cornerPinMade, cornerPin.length),
+    cornerPinSample: cornerPin.length,
+    // Labelled for the BOWLER's hand, not the coach's.
+    cornerPinLabel: leftHanded ? "7 Pin" : "10 Pin",
+    splitRate: pct(splits.length, frames.length),
+    splitCount: splits.length,
+    misses,
+  };
+}

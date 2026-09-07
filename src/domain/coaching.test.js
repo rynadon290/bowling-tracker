@@ -3,7 +3,9 @@ import {
   categorizeCoaching, normalizeTask, completeTask, recordAttempt, reopenTask,
   taskProgress, partitionTasks, taskToRow, taskFromRow, sortNotes, coachingToRow,
   bowlerSnapshot,
+  shotBreakdown,
 } from './coaching.js';
+import { isSplit, isSinglePinLeave, isCornerPinLeave } from './splits.js';
 
 const ME = 'u-me', COACH = 'u-coach', PUPIL = 'u-pupil', OTHER = 'u-other';
 const names = { [COACH]: 'Coach Dave', [PUPIL]: 'Kim' };
@@ -157,5 +159,38 @@ describe('bowler snapshot for the coach', () => {
   it('does not lose data to a bowler-name mismatch', () => {
     const nickname = [{ bowler: 'K.', league: 'Tue', date: '2026-06-02', scores: [200, 210, 190] }];
     expect(bowlerSnapshot(nickname)?.average).toBe(200);
+  });
+});
+
+// 11 of 14 coaches: scores tell them what, shots tell them why.
+describe('shot breakdown for the coach', () => {
+  const shots = Array.from({ length: 20 }, (_, i) => ({
+    bowler: 'Dee', ballNum: null,
+    result: i < 8 ? 'Strike' : 'Other Leave',
+    otherLeave: i < 8 ? [] : ['7'],
+    spareMade: i < 8 ? '' : (i % 2 ? 'Yes' : 'No'),
+    miss: i % 3 === 0 ? ['Left'] : [],
+  }));
+  const preds = { isSplit, isSinglePinLeave, isCornerPinLeave };
+
+  it('rates strikes over first balls, not every shot', () => {
+    expect(shotBreakdown(shots, { ...preds, leftHanded: true }).strikeRate).toBe(40);
+  });
+
+  // The coach and the bowler can throw with different hands.
+  it("uses the BOWLER's hand for the corner pin, not the coach's", () => {
+    const asLefty = shotBreakdown(shots, { ...preds, leftHanded: true });
+    expect(asLefty.cornerPinLabel).toBe('7 Pin');
+    expect(asLefty.cornerPinSample).toBe(12);
+    expect(shotBreakdown(shots, { ...preds, leftHanded: false }).cornerPinSample).toBe(0);
+  });
+
+  it('surfaces miss tendencies, most common first', () => {
+    expect(shotBreakdown(shots, { ...preds, leftHanded: true }).misses[0]).toEqual({ miss: 'Left', count: 7 });
+  });
+
+  it('returns nothing rather than a zeroed card when there are no shots', () => {
+    expect(shotBreakdown([], preds)).toBeNull();
+    expect(shotBreakdown(null, preds)).toBeNull();
   });
 });

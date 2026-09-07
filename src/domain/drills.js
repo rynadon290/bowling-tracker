@@ -9,7 +9,7 @@
 // Deliberately simple: pick a target, tap Made or Missed, see the rate.
 // Anything more elaborate becomes a coaching product.
 
-import { mirrorPin } from "./splits.js";
+import { mirrorPin, mirrorLeave } from "./splits.js";
 
 export const DRILL_TARGETS = [
   { id: "10pin", label: "10 Pin", short: "10" },
@@ -45,8 +45,39 @@ function mirrorTargetId(id) {
 // history and cross-bowler drill comparison keep working off one
 // canonical id, the same convention "Weak 10"/"Weak 7" already
 // established) -- only the label a lefty SEES flips to her real pins.
-export function targetLabel(targetId, customLabel, leftHanded = false) {
-  if (targetId === "custom") return (customLabel || "").trim() || "Custom";
+// Only real pin numbers, deduped and ordered, so "3,3,6" and "6-3" mean
+// the same target.
+export function normalizeCustomPins(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  for (const p of raw) {
+    const n = Number(p);
+    if (Number.isInteger(n) && n >= 1 && n <= 10) seen.add(String(n));
+  }
+  return [...seen].sort((a, b) => Number(a) - Number(b));
+}
+
+// A hand-agnostic key for a custom pin set, so a lefty's 2-4-7 and a
+// righty's 3-6-10 group as the SAME drill -- exactly like the built-in
+// combo targets, whose stored id is canonical for both hands. A lefty's
+// pins are mirrored back to right-handed orientation to form the key.
+export function customPinKey(pins, leftHanded = false) {
+  const clean = normalizeCustomPins(pins);
+  if (!clean.length) return "";
+  const canonical = leftHanded ? mirrorLeave(clean) : clean;
+  return normalizeCustomPins(canonical).join("-");
+}
+
+export function targetLabel(targetId, customLabel, leftHanded = false, customPins = []) {
+  if (targetId === "custom") {
+    const name = (customLabel || "").trim();
+    const pins = normalizeCustomPins(customPins);
+    // Pins already reflect the hand that logged them, so they're shown
+    // as-is; the mirroring happens in customPinKey for grouping only.
+    if (pins.length && name) return `${name} (${pins.join("-")})`;
+    if (pins.length) return pins.join("-");
+    return name || "Custom";
+  }
   const entry = DRILL_TARGETS.find(t => t.id === targetId);
   if (!entry) return targetId;
   if (!leftHanded) return entry.label;
@@ -74,6 +105,10 @@ export function emptyDrill(bowler = "", date = "", leftHanded = false) {
     date,
     target: leftHanded ? "7pin" : "10pin",
     customTarget: "",
+    // Optional pin set for a custom target, as pin-number strings.
+    // Free-text names ("Greek Church") stay supported; pins are what make
+    // a custom drill comparable across bowlers and mirrorable for a lefty.
+    customPins: [],
     ball: "",
     made: 0,
     missed: 0,
@@ -91,6 +126,7 @@ export function normalizeDrill(raw) {
     date: raw.date || "",
     target: DRILL_TARGETS.some(t => t.id === raw.target) ? raw.target : "10pin",
     customTarget: raw.customTarget || "",
+    customPins: normalizeCustomPins(raw.customPins),
     ball: raw.ball || "",
     made: n(raw.made),
     missed: n(raw.missed),
@@ -141,6 +177,7 @@ export function drillToRow(drill, userId) {
     date: drill.date,
     target: drill.target,
     custom_target: drill.customTarget || null,
+    custom_pins: (drill.customPins && drill.customPins.length) ? drill.customPins : null,
     ball: drill.ball || null,
     made: drill.made || 0,
     missed: drill.missed || 0,
@@ -156,6 +193,7 @@ export function drillFromRow(row) {
     date: row.date,
     target: row.target,
     customTarget: row.custom_target,
+    customPins: row.custom_pins,
     ball: row.ball,
     made: row.made,
     missed: row.missed,

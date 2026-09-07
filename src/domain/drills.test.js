@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { emptyDrill, normalizeDrill, recordMade, recordMissed, undo, attempts, conversionRate, targetHistory,
   targetLabel,
   targetShortLabel,
+  customPinKey,
+  normalizeCustomPins,
 } from './drills.js';
 
 describe('drill scoring', () => {
@@ -80,5 +82,33 @@ describe('hand-aware target labels', () => {
   it('starts a fresh drill on the bowler\'s own corner', () => {
     expect(emptyDrill('Dee', '2026-06-02', true).target).toBe('7pin');
     expect(emptyDrill('Ryan', '2026-06-02', false).target).toBe('10pin');
+  });
+});
+
+// Free-text custom targets could never be compared with anyone else's,
+// and a lefty's version of a shape never matched a righty's at all.
+// Naming the pins fixes both.
+describe('pin-based custom targets', () => {
+  it('labels from pins, with or without a name', () => {
+    expect(targetLabel('custom', '', false, ['6', '3', '10'])).toBe('3-6-10');
+    expect(targetLabel('custom', 'Bucket', false, ['2', '4', '5'])).toBe('Bucket (2-4-5)');
+  });
+
+  it('still supports a name-only custom target', () => {
+    expect(targetLabel('custom', 'Greek Church', false, [])).toBe('Greek Church');
+    expect(targetLabel('custom', '', false, [])).toBe('Custom');
+  });
+
+  it('dedupes, sorts, and drops junk pins', () => {
+    expect(normalizeCustomPins(['3', '3', '6', 'x', '11', '0'])).toEqual(['3', '6']);
+  });
+
+  // The point: same abstract drill, mirrored pins, one key.
+  it('gives a lefty and a righty the same key for mirrored pin sets', () => {
+    expect(customPinKey(['2', '4', '7'], true)).toBe(customPinKey(['3', '6', '10'], false));
+  });
+
+  it('does not collide unrelated pin sets', () => {
+    expect(customPinKey(['2', '4', '5'], false)).not.toBe(customPinKey(['3', '6', '10'], false));
   });
 });

@@ -246,7 +246,7 @@ export function describePractice(recap) {
 // authoritative. So the comparison is grouped by target, and a target only
 // one person did is reported as theirs alone rather than as a contest.
 
-import { attempts, conversionRate, targetLabel } from "./drills.js";
+import { attempts, conversionRate, targetLabel, customPinKey } from "./drills.js";
 
 // Default: nobody's hand is known. Real callers pass a per-bowler
 // resolver (see leftHandedForBowler in BowlingTracker.jsx) because a
@@ -270,13 +270,20 @@ function drillsFor(drills, bowler, date) {
 export function drillLines(drills, bowler, date, leftHanded = false) {
   const byTarget = new Map();
   for (const d of drillsFor(drills, bowler, date)) {
-    const key = d.target === "custom" ? `custom:${(d.customTarget || "").trim().toLowerCase()}` : d.target;
+    // Custom targets defined by PINS key off the hand-agnostic pin set,
+    // so a lefty's 2-4-7 groups with a righty's 3-6-10 -- the same
+    // cross-hand matching the built-in combo targets already get. A
+    // name-only custom target still keys off its name.
+    const pinKey = customPinKey(d.customPins, leftHanded);
+    const key = d.target === "custom"
+      ? (pinKey ? `custompins:${pinKey}` : `custom:${(d.customTarget || "").trim().toLowerCase()}`)
+      : d.target;
     if (!byTarget.has(key)) {
       // The stored target id is the canonical, hand-agnostic key used for
       // grouping and cross-bowler matching (see drillComparison) -- the
       // SAME abstract drill concept for both hands, same as "Weak 10"
       // stays "Weak 10" for a lefty. Only the label shown for it flips.
-      byTarget.set(key, { key, target: d.target, label: targetLabel(d.target, d.customTarget, leftHanded), made: 0, missed: 0, balls: new Set() });
+      byTarget.set(key, { key, target: d.target, label: targetLabel(d.target, d.customTarget, leftHanded, d.customPins), made: 0, missed: 0, balls: new Set() });
     }
     const line = byTarget.get(key);
     line.made += d.made || 0;

@@ -279,3 +279,53 @@ export function goalsToRow(goals, bowler, userId) {
 export function goalsFromRow(row) {
   return normalizeGoals(row?.goals);
 }
+
+// Measurements for ONE bowler in one league, computed from raw shots and
+// sessions rather than from a caller's pre-filtered view.
+//
+// This exists because the Stats tab and the Log tab need the same numbers
+// for different people. Stats is scoped to whoever is selected in its
+// "Viewing" picker; the Log tab must always be the bowler actually at the
+// line. Reusing the Stats-scoped values on the Log tab would show a
+// teammate's goal progress to whoever is bowling -- the same class of
+// mistake as a drill carrying across a bowler switch.
+//
+// The predicates are passed in rather than imported so this module stays
+// free of splits.js and stats.js, matching how seriesFor already takes
+// isSplit/isCornerPinLeave from its caller.
+export function measurementsFor({
+  shots, sessions, bowler, league,
+  isSplit, isSinglePinLeave, isCornerPinLeave, leftHanded = false,
+  average = null, highGame = null, highSeries = null,
+}) {
+  const mine = (Array.isArray(shots) ? shots : []).filter(s =>
+    s && (bowler ? s.bowler === bowler : true) && (league ? s.league === league : true));
+
+  const frameShots = mine.filter(s => !s.ballNum || s.ballNum === 1);
+  const strikes = frameShots.filter(s => s.result === "Strike").length;
+  const cleanFrames = frameShots.filter(s => s.result === "Strike" || s.spareMade === "Yes").length;
+
+  const spareAttempts = mine.filter(s => s.result !== "Strike" && s.spareMade !== "" && !isSplit(s));
+  const sparesMade = spareAttempts.filter(s => s.spareMade === "Yes").length;
+
+  const singlePin = mine.filter(s => isSinglePinLeave(s) && s.spareMade !== "");
+  const singlePinMade = singlePin.filter(s => s.spareMade === "Yes").length;
+
+  const cornerPin = mine.filter(s => isCornerPinLeave(s, leftHanded) && s.spareMade !== "");
+  const cornerPinMade = cornerPin.filter(s => s.spareMade === "Yes").length;
+
+  const pct = (made, total) => (total ? Math.round((made / total) * 100) : null);
+
+  return {
+    // Session-derived figures come from the caller, which already has the
+    // session helpers -- recomputing them here would duplicate that logic.
+    average: { current: average, sample: 1 },
+    highGame: { current: highGame, sample: 1 },
+    highSeries: { current: highSeries, sample: 1 },
+    strikeRate: { current: pct(strikes, frameShots.length), sample: frameShots.length },
+    spareRate: { current: pct(sparesMade, spareAttempts.length), sample: spareAttempts.length },
+    singlePinSpareRate: { current: pct(singlePinMade, singlePin.length), sample: singlePin.length },
+    tenPinSpareRate: { current: pct(cornerPinMade, cornerPin.length), sample: cornerPin.length },
+    cleanFrameRate: { current: pct(cleanFrames, frameShots.length), sample: frameShots.length },
+  };
+}
