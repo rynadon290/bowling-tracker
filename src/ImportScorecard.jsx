@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
 import { RESULTS, localDateString } from "./constants.js";
-import { convertExtractedGameToShots, normalizeExtraction, detailLevel } from "./domain/scorecardImport.js";
+import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
 import { supabase } from "./supabaseClient.js";
@@ -141,7 +141,7 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
 }
 
 export default function ImportScorecard({
-  bowlers, leagues, teams, profiles, shots, saveShots, updateManualScore,
+  bowlers, leagues, teams, profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
 }){
   const[step,setStep]=useState("setup"); // setup | processing | review | saving
@@ -246,11 +246,17 @@ export default function ImportScorecard({
         lineupPosition:0,
       }];
       const matched=matchScorecard(cols.map(c=>c.scorecardName),effectiveRoster);
-      setColumns(cols.map((c,i)=>({...c,...matched.columns[i]})));
-      setAssignments(Object.fromEntries(matched.columns.map((c,i)=>[i,c.assigned||""])));
+      // Several images are one card, so the same bowler can come back as
+      // two columns (games 1-3 and 4-6, or a wide card in halves).
+      const withMatches=cols.map((c,i)=>({...c,...matched.columns[i]}));
+      const finalCols=mergeColumnsByBowler(withMatches).map((c,i)=>({...c,columnIndex:i}));
+      setColumns(finalCols);
+      setAssignments(Object.fromEntries(finalCols.map((c,i)=>[i,c.assigned||""])));
       setOrderCheck(roster.length?rosterOrderCheck(matched.columns,roster):null);
+      // Column count is post-merge, so a split card doesn't look like a
+      // team of six.
 
-      setStep(cols.length>1?"columns":"review");
+      setStep("columns");
     }catch(e){
       setError(e.message||"Something went wrong during extraction.");
       setStep("setup");
@@ -308,12 +314,31 @@ export default function ImportScorecard({
     // than re-deriving scores/stats here -- pre-fill its context and let
     // the user's own tap run it, so there's no risk of reading stale
     // React state from a same-tick programmatic call.
+    // Teammates' columns never touch their real history. They become
+    // pending records the bowler approves, rejects, or corrects -- and
+    // which count in the meantime, so the team's numbers aren't held
+    // hostage to whoever bowls and goes home. See
+    // domain/importVerification.js for the full lifecycle.
+    const teammateColumns=columns
+      .map((c,i)=>({column:c,bowler:assignments[i]}))
+      .filter(x=>x.bowler&&x.bowler!==contextBowler);
+    if(teammateColumns.length&&onSubmitTeammateScores){
+      await onSubmitTeammateScores(teammateColumns.map(({column,bowler})=>({
+        bowler,
+        league:contextLeague,
+        date:contextDate,
+        teamId,
+        importedScores:(column.games||[]).map(g=>g.totalScore??null),
+      })));
+    }
+
     setSessionLeague(contextLeague);
     setSessionDate(contextDate);
     selectBowler(contextBowler);
     const parts=[];
     if(newShots.length)parts.push(`${newShots.length} shots`);
     if(scoreOnlyGames.length)parts.push(`${scoreOnlyGames.length} game score${scoreOnlyGames.length>1?"s":""}`);
+    if(teammateColumns.length)parts.push(`${teammateColumns.length} teammate${teammateColumns.length>1?"s":""} sent for confirmation`);
     setSessionSaveMessage(`Imported ${parts.join(" and ")} -- tap "Save Session & View Summary" below to finalize.`);
     setTimeout(()=>setSessionSaveMessage(null),6000);
     setView("log");
@@ -350,6 +375,14 @@ export default function ImportScorecard({
               </div>
             )}
             {error&&<div style={{fontSize:"13px",color:C.miss,marginBottom:"12px"}}>{error}</div>}
+            {/* Set the expectation before the wait, not during it. */}
+            {images.length>0&&(
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                {images.length>1
+                  ? `${images.length} images — reading these can take a few minutes.`
+                  : "Reading a scorecard can take a minute or two."}
+              </div>
+            )}
             <button style={S.btn("primary")} disabled={!contextBowler||!contextLeague||!images.length} onClick={handleExtract}>
               Extract Shots
             </button>
@@ -359,7 +392,20 @@ export default function ImportScorecard({
 
       {step==="processing"&&(
         <div style={{...S.card,textAlign:"center",padding:"32px 16px"}}>
-          <div style={{fontSize:"14px",color:C.textMuted}}>Reading the scorecard…</div>
+          <div style={{fontSize:"14px",color:C.text,marginBottom:"8px"}}>Reading the scorecard…</div>
+          {/* Reading pin-deck graphics frame by frame is genuinely slow,
+              and a spinner with no expectation set reads as "stuck". The
+              wording scales with what was actually uploaded, because a
+              single totals-only shot is fast and a six-image team card
+              really is minutes. */}
+          <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
+            {images.length>1
+              ? `Working through ${images.length} images. This can take a few minutes — every frame is read individually.`
+              : "This can take a minute or two — every frame is read individually."}
+          </div>
+          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"10px"}}>
+            Keep this screen open until it finishes.
+          </div>
         </div>
       )}
 
@@ -382,6 +428,7 @@ export default function ImportScorecard({
                     <div style={{fontSize:"10px",color:C.textMuted}}>
                       {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"shot by shot":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
                       {c.series!=null&&<> · {c.series} series</>}
+                      {c.mergedFrom>1&&<> · combined from {c.mergedFrom} images</>}
                     </div>
                   </div>
                   {/* The printed total and the games disagreeing means
