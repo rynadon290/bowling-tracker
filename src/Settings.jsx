@@ -14,6 +14,7 @@ import {
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
+import { describeUsualNights } from "./domain/launchPrompt.js";
 
 const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
 const ENVIRONMENT_DESCRIPTIONS = {
@@ -228,6 +229,15 @@ export default function Settings({
             {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
           </div>
         )}
+        {/* Why the "Bowling today?" prompt does or doesn't appear. It's
+            derived from bowling history rather than a setting, so without
+            this it would look arbitrary. */}
+        <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+          <div style={{ ...S.label, marginBottom: "4px" }}>The "Bowling today?" prompt</div>
+          <div style={{ fontSize: "12px", color: C.textMuted }}>
+            {describeUsualNights(sessions, activeBowler)}
+          </div>
+        </div>
       </CollapsibleCard>
 
       {/* Centers attach to LEAGUES, not sessions -- a league bowls at one

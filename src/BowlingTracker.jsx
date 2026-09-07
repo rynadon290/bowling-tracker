@@ -24,6 +24,7 @@ import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/s
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
+import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
@@ -85,6 +86,9 @@ const DRILLS_KEY = "bowling-drills-v1";
 const GUESTS_KEY = "bowling-practice-guests-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
+// Separate from the dismissed-date key: "have they ever seen it" and "did
+// they dismiss it today" are different questions and both are needed.
+const SESSION_START_SEEN_KEY = "bowling-session-start-seen-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -323,9 +327,12 @@ export default function BowlingTracker(){
   // Manually-entered game scores, keyed bowler|league|date|game. These take
   // precedence over scores computed from shots -- see domain/manualScores.js.
   const[manualScores,setManualScores]=useState({});
-  // The launch prompt is shown once per day, not once ever -- what you're
-  // bowling changes night to night. Stores the date it was last dismissed.
-  const[sessionStartDismissed,setSessionStartDismissed]=useState(true);
+  // Launch prompt state. Two separate facts feed the decision in
+  // domain/launchPrompt.js: the date it was last dismissed, and whether
+  // it has ever been seen at all. Defaults keep it hidden until the load
+  // effect has actually read storage, so it can't flash on startup.
+  const[sessionStartDismissedDate,setSessionStartDismissedDate]=useState(localDateString());
+  const[sessionStartSeen,setSessionStartSeen]=useState(true);
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -662,8 +669,12 @@ export default function BowlingTracker(){
 
         try{
           const dismissed=await window.storage.get(SESSION_START_KEY);
-          setSessionStartDismissed(dismissed?.value===localDateString());
-        }catch{setSessionStartDismissed(false);}
+          setSessionStartDismissedDate(dismissed?.value||"");
+        }catch{setSessionStartDismissedDate("");}
+        try{
+          const seen=await window.storage.get(SESSION_START_SEEN_KEY);
+          setSessionStartSeen(seen?.value==="1");
+        }catch{setSessionStartSeen(false);}
 
         const matchesRes=await cloudRead("matches",q=>q.select("*"));
         if(matchesRes.online&&matchesRes.data){
@@ -1304,8 +1315,11 @@ export default function BowlingTracker(){
   // Saves a bowler's profile. Debounced like other typed fields so a
   // name or note doesn't fire a cloud write per keystroke.
   function dismissSessionStart(){
-    setSessionStartDismissed(true);
-    try{window.storage.set(SESSION_START_KEY,localDateString());}catch{}
+    const today=localDateString();
+    setSessionStartDismissedDate(today);
+    setSessionStartSeen(true);
+    try{window.storage.set(SESSION_START_KEY,today);}catch{}
+    try{window.storage.set(SESSION_START_SEEN_KEY,"1");}catch{}
   }
 
   function updateTournament(next){
@@ -2175,6 +2189,15 @@ export default function BowlingTracker(){
   const bowlerLeaguesWithDates=bowlerLeagueNames.map(name=>({
     name, endDate:leagueDates[name]?.endDate||"",
   }));
+  // Quieter launch prompt: silent on established bowling nights, shown on
+  // unusual days. See domain/launchPrompt.js for the reasoning.
+  const showSessionStart=shouldShowLaunchPrompt({
+    sessions,
+    bowler:activeBowler,
+    seenOnce:sessionStartSeen,
+    dismissedDate:sessionStartDismissedDate,
+  });
+
   const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
   const bookAverageCheck=needsBookAverageUpdate(
     bowlerLeaguesWithDates,activeBowlerProfile.bookAverageAsOf||"",
@@ -2713,7 +2736,7 @@ export default function BowlingTracker(){
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
-            sessionStartDismissed={sessionStartDismissed} dismissSessionStart={dismissSessionStart}
+            showSessionStart={showSessionStart} dismissSessionStart={dismissSessionStart}
             updatePreferences={updatePreferences}
           />
         )}
