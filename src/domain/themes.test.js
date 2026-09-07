@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { THEMES, THEME_IDS, DEFAULT_THEME, themeFor, normalizeThemeId, themeIsComplete, THEME_TOKENS } from './themes.js';
+import { THEMES, THEME_IDS, DEFAULT_THEME, themeFor, normalizeThemeId, themeIsComplete, THEME_TOKENS, DARK_THEME_IDS, LIGHT_THEME_IDS } from './themes.js';
+
+// WCAG relative luminance and contrast ratio.
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function contrast(a, b) {
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 describe('themes', () => {
   // A missing token becomes `undefined` in an inline style, which React
@@ -35,11 +46,56 @@ describe('themes', () => {
     expect(THEMES.classic.colors.accent).toBe('#4a9eff');
   });
 
-  it('every theme is dark-ground', () => {
+  // Replaced an earlier "every theme is dark" assertion, which was my
+  // assumption about bowling centres rather than a requirement -- plenty
+  // are fluorescent-bright. What actually has to hold, on every theme,
+  // is that the text can be read.
+  it('body text is readable on every theme (WCAG AA, 4.5:1)', () => {
     for (const id of THEME_IDS) {
-      const bg = THEMES[id].colors.bg;
-      const lum = ['1', '3', '5'].map(i => parseInt(bg.slice(+i, +i + 2), 16)).reduce((a, b) => a + b, 0) / 3;
-      expect(lum).toBeLessThan(40);
+      const c = THEMES[id].colors;
+      expect(contrast(c.text, c.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c.text, c.card)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c.text, c.surface)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('muted text still meets the large-text bar (3:1) everywhere', () => {
+    for (const id of THEME_IDS) {
+      const c = THEMES[id].colors;
+      expect(contrast(c.textMuted, c.card)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  // The primary button draws onAccent on the accent. This is the check
+  // that found the original app's white-on-blue button at 2.75:1 -- and
+  // is why onAccent is a per-theme token rather than hardcoded white.
+  it('the primary button text is readable on every accent', () => {
+    for (const id of THEME_IDS) {
+      const c = THEMES[id].colors;
+      expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  // Outcome colours are drawn as text on the card. Green-on-cream is the
+  // classic failure here.
+  it('strike, spare and miss are readable as text on every card', () => {
+    for (const id of THEME_IDS) {
+      const c = THEMES[id].colors;
+      for (const k of ['strike', 'spare', 'miss']) {
+        expect(contrast(c[k], c.card)).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('offers both dark and light options', () => {
+    expect(DARK_THEME_IDS.length).toBeGreaterThanOrEqual(3);
+    expect(LIGHT_THEME_IDS.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the light flag matches the actual background', () => {
+    for (const id of THEME_IDS) {
+      const isLight = lum(THEMES[id].colors.bg) > 0.5;
+      expect(!!THEMES[id].light).toBe(isLight);
     }
   });
 });
