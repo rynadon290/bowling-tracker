@@ -52,7 +52,7 @@ import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, lea
 import { setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
-import { C, S, Chip } from "./ui.jsx";
+import { C, S, Chip, applyTheme } from "./ui.jsx";
 import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName } from "./constants.js";
 import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
@@ -234,6 +234,17 @@ async function readCached(key,expect){
 
 export default function BowlingTracker(){
   const{user,preferences,updatePreferences,displayName}=useAuth();
+
+  // Theme. Applied synchronously during render rather than in an effect,
+  // so the FIRST paint is already in the chosen theme -- an effect would
+  // flash the default palette for one frame on every load. applyTheme is
+  // idempotent and returns false when nothing changed, so this costs
+  // nothing on the renders where the theme is already right.
+  //
+  // Mutating C during render is deliberate and safe here: every component
+  // reads C at its own render, which happens after this line in the same
+  // pass, and the token object is stable so nothing re-renders in a loop.
+  applyTheme(preferences?.theme);
   // Maps league name -> its Supabase row id. The client keeps `leagues` as
   // plain name strings everywhere (unchanged, to avoid rewriting every call
   // site that compares/filters by league name) — this ref is what lets
@@ -3672,7 +3683,7 @@ export default function BowlingTracker(){
                 <div style={{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}}>
                   {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
                     📥
-                    <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:"#0f1117",fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
+                    <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:C.bg,fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
                   </button>}
                   <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
                   <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
@@ -3695,7 +3706,7 @@ export default function BowlingTracker(){
             <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0,alignItems:"center"}}>
               {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
                   📥
-                  <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:"#0f1117",fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
+                  <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:C.bg,fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
                 </button>}
               <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
               <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>

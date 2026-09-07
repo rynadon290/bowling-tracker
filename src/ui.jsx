@@ -6,14 +6,41 @@
 // view components to render them, so those files can't in turn import
 // shared utilities back from BowlingTracker.jsx itself.
 
-export const C = {
-  bg:"#0f1117",surface:"#1a1d27",card:"#22263a",
-  accent:"#4a9eff",accentDim:"#1e3a5f",
-  strike:"#22c55e",spare:"#f59e0b",miss:"#ef4444",
-  text:"#e8eaf0",textMuted:"#8892a4",border:"#2e3347",
-};
+import { themeFor, DEFAULT_THEME, normalizeThemeId } from "./domain/themes.js";
 
-export const S = {
+// C is a LIVE object, not a constant. Every component reads C.x inside
+// its render, and every S style is rebuilt from C when the theme
+// changes -- so switching theme is: mutate C in place, rebuild S in
+// place, re-render the root. Nothing else in the app has to know a theme
+// exists, and the 60-odd `${C.accent}22` alpha blends across 23 files
+// keep working unchanged because C.accent is still a plain hex string.
+//
+// Mutating rather than reassigning matters: importers hold a reference
+// to THIS object. A new object would leave every earlier import pointing
+// at the old colours.
+export const C = { ...themeFor(DEFAULT_THEME).colors };
+
+let activeThemeId = DEFAULT_THEME;
+export function currentThemeId() { return activeThemeId; }
+
+// Applies a theme in place. Returns true when the theme actually changed
+// so the caller knows whether a re-render is needed.
+export function applyTheme(id) {
+  const next = normalizeThemeId(id);
+  if (next === activeThemeId && C.bg === themeFor(next).colors.bg) return false;
+  activeThemeId = next;
+  Object.assign(C, themeFor(next).colors);
+  Object.assign(S, buildStyles());
+  // The page body sits outside React; without this the area behind a
+  // short screen keeps the previous theme's colour.
+  if (typeof document !== "undefined" && document.body) {
+    document.body.style.backgroundColor = C.bg;
+  }
+  return true;
+}
+
+export const S = {};
+function buildStyles() { return {
   app:{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px"},
   header:{backgroundColor:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
   title:{fontSize:"16px",fontWeight:700,letterSpacing:"0.05em",color:C.accent,textTransform:"uppercase"},
@@ -38,7 +65,8 @@ export const S = {
   statBox:{backgroundColor:C.surface,borderRadius:"10px",padding:"12px",textAlign:"center",flex:1,border:`1px solid ${C.border}`},
   statNum:{fontSize:"24px",fontWeight:700,color:C.accent,lineHeight:1,marginBottom:"4px"},
   statLbl:{fontSize:"10px",color:C.textMuted,textTransform:"uppercase",letterSpacing:"0.08em"},
-};
+}; }
+Object.assign(S, buildStyles());
 
 export function Chip({label,selected,onToggle,color,dense}){
   const style=dense?{...S.chip(selected,color),padding:"5px 9px"}:S.chip(selected,color);

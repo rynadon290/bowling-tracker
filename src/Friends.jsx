@@ -57,22 +57,35 @@ export function computeLeaderboard(sessions, nameById) {
     .sort((a, b) => b.overallAverage - a.overallAverage);
 }
 
-const C = {
-  bg:"#0f1117", surface:"#1a1d27", card:"#22263a",
-  accent:"#4a9eff", accentDim:"#1e3a5f",
-  text:"#e8eaf0", textMuted:"#8892a4", border:"#2e3347",
-  danger:"#ef4444", strike:"#22c55e",
-};
+// Shares the live palette from ui.jsx instead of carrying a private copy
+// of the original slate-and-blue. A private copy meant this screen stayed
+// on the old colours no matter which theme was chosen -- and `danger`
+// here is just the shared `miss` red under another name.
+import { C as SHARED_C } from "./ui.jsx";
+const C = new Proxy({}, {
+  get(_, key) {
+    if (key === "danger") return SHARED_C.miss;
+    return SHARED_C[key];
+  },
+});
 
-const S = {
+// Getters, not captured values: each style recomputes from the live C
+// when read, so a theme change is reflected on the next render instead
+// of freezing this screen on whatever colours were current at load.
+const S = new Proxy({}, {
+  get(_, key) {
+    const styles = ({
   card:{ backgroundColor:C.card, borderRadius:"12px", padding:"16px", marginBottom:"12px", border:`1px solid ${C.border}` },
   label:{ fontSize:"10px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:C.textMuted, marginBottom:"8px" },
   input:{ width:"100%", backgroundColor:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"10px 12px", color:C.text, fontSize:"14px", boxSizing:"border-box", outline:"none" },
   button:{ backgroundColor:C.surface, color:C.text, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"9px 12px", fontSize:"13px", fontWeight:600, cursor:"pointer" },
   primary:{ backgroundColor:C.accent, color:"#fff", border:"none", borderRadius:"8px", padding:"10px 14px", fontSize:"13px", fontWeight:700, cursor:"pointer" },
-};
+});
+    return styles[key];
+  },
+});
 
-export default function Friends() {
+export default function Friends({ onRequestsChanged } = {}) {
   const{user,displayName}=useAuth();
   const[friends,setFriends]=useState([]);
   const[incoming,setIncoming]=useState([]);
@@ -163,15 +176,21 @@ export default function Friends() {
     await cloudWrite("friendships",{id,requester_id:user?.id,addressee_id:profile.id,status:"pending"});
   }
 
+  // The inbox keeps its own read-only copy of pending requests, loaded
+  // at the top level so it knows about them without the bowler visiting
+  // this tab. Answering one here has to tell it, or the badge would
+  // still be showing a request that's already been dealt with.
   async function acceptRequest(entry) {
     setIncoming(prev=>prev.filter(f=>f.friendshipId!==entry.friendshipId));
     setFriends(prev=>[...prev,entry]);
     await cloudWrite("friendships",{id:entry.friendshipId,status:"accepted"});
+    onRequestsChanged?.();
   }
 
   async function declineRequest(entry) {
     setIncoming(prev=>prev.filter(f=>f.friendshipId!==entry.friendshipId));
     await cloudDelete("friendships",entry.friendshipId);
+    onRequestsChanged?.();
   }
 
   async function cancelRequest(entry) {

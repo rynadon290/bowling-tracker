@@ -100,19 +100,24 @@ export function resolvePlaceholder(teams, teamId, inviteId, profile) {
   return teams.map(t => t.id === teamId ? { ...t, pendingInvites: withoutPlaceholder, members: newMembers } : t);
 }
 
-const C = {
-  bg:"#0f1117",
-  surface:"#1a1d27",
-  card:"#22263a",
-  accent:"#4a9eff",
-  accentDim:"#1e3a5f",
-  text:"#e8eaf0",
-  textMuted:"#8892a4",
-  border:"#2e3347",
-  danger:"#ef4444",
-};
+// Shares the live palette from ui.jsx instead of carrying a private copy
+// of the original slate-and-blue. A private copy meant this screen stayed
+// on the old colours no matter which theme was chosen -- and `danger`
+// here is just the shared `miss` red under another name.
+import { C as SHARED_C } from "./ui.jsx";
+const C = new Proxy({}, {
+  get(_, key) {
+    if (key === "danger") return SHARED_C.miss;
+    return SHARED_C[key];
+  },
+});
 
-const S = {
+// Getters, not captured values: each style recomputes from the live C
+// when read, so a theme change is reflected on the next render instead
+// of freezing this screen on whatever colours were current at load.
+const S = new Proxy({}, {
+  get(_, key) {
+    const styles = ({
   card:{
     backgroundColor:C.card,
     borderRadius:"12px",
@@ -159,7 +164,10 @@ const S = {
     fontWeight:700,
     cursor:"pointer",
   },
-};
+});
+    return styles[key];
+  },
+});
 
 export default function TeamManagement({
   leagues = [],

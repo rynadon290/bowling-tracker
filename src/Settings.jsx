@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
+import { THEMES, THEME_IDS } from "./domain/themes.js";
 import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
 import SessionHistory from "./SessionHistory.jsx";
@@ -8,7 +9,7 @@ import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
-import {
+import { setTheme,
   ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
   TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS, setTrackingMode, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
@@ -58,7 +59,7 @@ export default function Settings({
   // internal confirmation steps -- collapsing them is an extra deliberate
   // step before reaching something destructive or data-heavy.
   const [expanded, setExpanded] = useState({
-    environment: true, whereYouBowl: false, trackingDetail: false,
+    look: false, environment: true, whereYouBowl: false, trackingDetail: false,
     accessoryFields: false, moneyGames: false, statsLayout: false,
     backup: false, reset: false, dangerZone: false,
   });
@@ -215,6 +216,38 @@ export default function Settings({
       )}
 
       {section === "settings" && (<>
+      {/* First, because it's the one setting a person changes and then
+          looks at everything else through. Swatches rather than names
+          alone: nobody can picture "Urethane" from the word. */}
+      <CollapsibleCard title="Look" summary={THEMES[preferences.theme]?.label || THEMES.lane.label}
+        expanded={expanded.look} onToggle={() => toggle("look")}>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+          All of them are dark — you're on a phone in a bowling centre — they just take their colour from a different part of the house.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          {THEME_IDS.map(id => {
+            const t = THEMES[id];
+            const on = (preferences.theme || "lane") === id;
+            return (
+              <button key={id} onClick={() => apply(setTheme(preferences, id))}
+                style={{
+                  textAlign: "left", cursor: "pointer", padding: "10px", borderRadius: "10px",
+                  backgroundColor: t.colors.card, color: t.colors.text,
+                  border: `2px solid ${on ? t.colors.accent : t.colors.border}`,
+                }}>
+                <div style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
+                  {[t.colors.accent, t.colors.strike, t.colors.spare, t.colors.miss].map((c, i) => (
+                    <span key={i} style={{ width: "14px", height: "14px", borderRadius: "7px", backgroundColor: c, display: "inline-block" }} />
+                  ))}
+                </div>
+                <div style={{ fontSize: "13px", fontWeight: 600 }}>{t.label}{on ? " ✓" : ""}</div>
+                <div style={{ fontSize: "10px", color: t.colors.textMuted, marginTop: "2px", lineHeight: 1.4 }}>{t.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      </CollapsibleCard>
+
       <CollapsibleCard title="Environment" summary={ENVIRONMENT_LABELS[preferences.environment]}
         expanded={expanded.environment} onToggle={() => toggle("environment")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
