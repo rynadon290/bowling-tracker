@@ -77,7 +77,6 @@ export const STATS_CARDS = [
   { id: "consistency", label: "Score Consistency" },
   { id: "scoreDistribution", label: "Score Distribution" },
   { id: "gameByGame", label: "Game-by-Game Averages" },
-  { id: "trend", label: "Trend" },
   { id: "money", label: "Money Games" },
   { id: "threeSixNine", label: "3-6-9 Tracker" },
 ];
