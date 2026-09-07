@@ -179,7 +179,7 @@ describe('drill comparison', () => {
       d('Ryan', '10pin', 8, 2), d('Dave', '10pin', 5, 5),
       d('Ryan', '7pin', 6, 4), d('Dave', '4pin', 7, 3),
     ], 'Ryan', ['Dave'], D);
-    expect(c.shared.map(s => s.label)).toEqual(['10 Pin']);
+    expect(c.shared.map(s => s.myLabel)).toEqual(['10 Pin']);
     expect(c.shared[0].others[0].diff).toBe(30);
   });
 
@@ -201,5 +201,31 @@ describe('drill comparison', () => {
     expect(drillComparison([d('Ryan', '10pin', 8, 2)], 'Ryan', ['Dave'], D)).toBeNull();
     expect(drillComparison([d('Ryan', '10pin', 8, 2)], 'Ryan', ['Ryan'], D)).toBeNull();
     expect(drillComparison([d('Dave', '10pin', 8, 2)], 'Ryan', ['Dave'], D)).toBeNull();
+  });
+});
+
+describe('drill comparison across different hands', () => {
+  const D = '2026-06-02';
+  it('matches the same stored drill for a lefty and righty, each shown their own pins', () => {
+    const drills = [
+      { bowler: 'Tom', date: D, target: '3-6-10', customTarget: '', made: 8, missed: 2 },
+      { bowler: 'Dee', date: D, target: '3-6-10', customTarget: '', made: 5, missed: 5 },
+    ];
+    const leftHandedFor = name => name === 'Dee';
+    const cmp = drillComparison(drills, 'Tom', ['Dee'], D, leftHandedFor);
+    expect(cmp.shared).toHaveLength(1);
+    expect(cmp.shared[0].myLabel).toBe('3-6-10 (bucket-ish)');
+    expect(cmp.shared[0].others[0].label).toBe('2-4-7 (bucket-ish)');
+    // The comparison itself -- rates, diff -- is untouched by handedness.
+    expect(cmp.shared[0].others[0].diff).toBe(30);
+  });
+
+  it('keeps two right-handed bowlers showing the identical label', () => {
+    const drills = [
+      { bowler: 'A', date: D, target: '3-6-10', customTarget: '', made: 8, missed: 2 },
+      { bowler: 'B', date: D, target: '3-6-10', customTarget: '', made: 5, missed: 5 },
+    ];
+    const cmp = drillComparison(drills, 'A', ['B'], D, () => false);
+    expect(cmp.shared[0].myLabel).toBe(cmp.shared[0].others[0].label);
   });
 });

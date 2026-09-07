@@ -248,6 +248,12 @@ export function describePractice(recap) {
 
 import { attempts, conversionRate, targetLabel } from "./drills.js";
 
+// Default: nobody's hand is known. Real callers pass a per-bowler
+// resolver (see leftHandedForBowler in BowlingTracker.jsx) because a
+// comparison can legitimately involve two people of different hands --
+// there is no single "the" handedness for a shared drillComparison call.
+const noHandInfo = () => false;
+
 // A conversion rate off two attempts is noise. This isn't a statistical
 // threshold so much as a floor below which a percentage misleads more than
 // it informs -- 1 for 2 reads as "50%" and means nothing.
@@ -261,12 +267,16 @@ function drillsFor(drills, bowler, date) {
 // One bowler's drill work on a date, grouped by target. Multiple drills at
 // the same target on one day are pooled -- they're the same practice, just
 // logged in more than one sitting.
-export function drillLines(drills, bowler, date) {
+export function drillLines(drills, bowler, date, leftHanded = false) {
   const byTarget = new Map();
   for (const d of drillsFor(drills, bowler, date)) {
     const key = d.target === "custom" ? `custom:${(d.customTarget || "").trim().toLowerCase()}` : d.target;
     if (!byTarget.has(key)) {
-      byTarget.set(key, { key, target: d.target, label: targetLabel(d.target, d.customTarget), made: 0, missed: 0, balls: new Set() });
+      // The stored target id is the canonical, hand-agnostic key used for
+      // grouping and cross-bowler matching (see drillComparison) -- the
+      // SAME abstract drill concept for both hands, same as "Weak 10"
+      // stays "Weak 10" for a lefty. Only the label shown for it flips.
+      byTarget.set(key, { key, target: d.target, label: targetLabel(d.target, d.customTarget, leftHanded), made: 0, missed: 0, balls: new Set() });
     }
     const line = byTarget.get(key);
     line.made += d.made || 0;
@@ -293,8 +303,8 @@ export function drillLines(drills, bowler, date) {
     .sort((a, b) => b.attempts - a.attempts);
 }
 
-export function drillRecap(drills, bowler, date) {
-  const lines = drillLines(drills, bowler, date);
+export function drillRecap(drills, bowler, date, leftHanded = false) {
+  const lines = drillLines(drills, bowler, date, leftHanded);
   if (!lines.length) return null;
   const totalMade = lines.reduce((a, l) => a + l.made, 0);
   const totalAttempts = lines.reduce((a, l) => a + l.attempts, 0);
@@ -314,13 +324,13 @@ export function drillRecap(drills, bowler, date) {
 //
 // Returns null when nobody else drilled, and lists shared targets
 // separately from ones only one person worked.
-export function drillComparison(drills, bowler, partners, date) {
-  const mine = drillLines(drills, bowler, date);
+export function drillComparison(drills, bowler, partners, date, leftHandedFor = noHandInfo) {
+  const mine = drillLines(drills, bowler, date, leftHandedFor(bowler));
   if (!mine.length) return null;
 
   const others = (Array.isArray(partners) ? partners : [])
     .filter(p => p && p !== bowler)
-    .map(p => ({ bowler: p, lines: drillLines(drills, p, date) }))
+    .map(p => ({ bowler: p, lines: drillLines(drills, p, date, leftHandedFor(p)) }))
     .filter(x => x.lines.length);
   if (!others.length) return null;
 
@@ -333,10 +343,16 @@ export function drillComparison(drills, bowler, partners, date) {
     if (!theirs.length) continue;
     shared.push({
       key: l.key,
-      label: l.label,
+      // The same stored target ("3-6-10") can read differently on each
+      // side of a comparison -- a lefty and a righty pairing off on it
+      // are working the SAME abstract drill, but her real pins are its
+      // mirror. myLabel is always my own words for what I worked.
+      myLabel: l.label,
       mine: l,
       others: theirs.map(t => ({
         bowler: t.bowler,
+        // Their own label, in their own pins -- not mine reused for them.
+        label: t.line.label,
         rate: t.line.rate,
         attempts: t.line.attempts,
         thin: t.line.thin,

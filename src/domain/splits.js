@@ -15,6 +15,45 @@ for(const pin of Object.keys(PIN_COL)){
   (COLUMN_PINS[col]=COLUMN_PINS[col]||[]).push(Number(pin));
 }
 
+// The full deck mirrors left-right across the 1-5 centerline: a lefty's
+// ball hooks the opposite way, so whatever pin a righty characteristically
+// leaves, a lefty leaves its mirror image instead. This is the complete
+// mapping -- not just the two corners -- verified against the same
+// row/column layout PIN_ROW/PIN_COL below already encode:
+//
+//   Row4: 7  8  9  10        7↔10   8↔9
+//   Row3:   4  5  6      ->    4↔6   5 stays
+//   Row2:     2  3              2↔3
+//   Row1:       1                 1 stays
+const PIN_MIRROR={1:1,2:3,3:2,4:6,5:5,6:4,7:10,8:9,9:8,10:7};
+
+// Mirrors a single pin number. Non-numeric input (e.g. the sentinel
+// "9 Pin No-Tap", which names an outcome rather than a pin position)
+// passes through unchanged rather than being coerced into a wrong number.
+export function mirrorPin(pin){
+  const n=Number(pin);
+  return Number.isInteger(n)&&PIN_MIRROR[n]!==undefined?PIN_MIRROR[n]:pin;
+}
+
+// Mirrors a whole leave -- an array of pin-number strings, as otherLeave
+// stores them, possibly including "9 Pin No-Tap" -- for cross-hand
+// comparison. "8-9" for a righty and "9-8" for... no: mirrors to "9-8"
+// meaning the SET {9,8}, same two pins, since 8↔9. A leave of {2,4,10}
+// (righty) mirrors to {3,6,7} (lefty's equivalent shape on her side).
+export function mirrorLeave(pins){
+  return (Array.isArray(pins)?pins:[]).map(p=>
+    p==="9 Pin No-Tap"?p:String(mirrorPin(p)));
+}
+
+// The pin THIS bowler's hand would leave in place of a canonical
+// (right-handed reference) pin. resolveHandedness/goalTypeFor/etc already
+// use "righty" as the reference orientation everywhere else in this app,
+// so this keeps that same convention: pinForHand(10,false)===10,
+// pinForHand(10,true)===7.
+export function pinForHand(canonicalPin,leftHanded){
+  return leftHanded?mirrorPin(canonicalPin):canonicalPin;
+}
+
 export function isSplit(shot){
   if(!shot||shot.result!=="Other Leave")return false;
   const leave=Array.isArray(shot.otherLeave)?shot.otherLeave:[];
@@ -70,14 +109,14 @@ export function isCornerPinLeave(shot, leftHanded = false){
   if(shot.result==="Weak 10"||shot.result==="Ringing 10")return true;
   if(shot.result==="Other Leave"){
     const standing=(Array.isArray(shot.otherLeave)?shot.otherLeave:[]).filter(p=>p!=="9 Pin No-Tap");
-    return standing.length===1&&standing[0]===(leftHanded?"7":"10");
+    return standing.length===1&&standing[0]===String(pinForHand(10,leftHanded));
   }
   return false;
 }
 
 // The display name for that pin, so a lefty sees "7 Pin Spare %".
 export function cornerPinLabel(leftHanded){
-  return leftHanded?"7":"10";
+  return String(pinForHand(10,leftHanded));
 }
 
 export function isTenPinLeave(shot){

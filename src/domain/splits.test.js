@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from './splits.js';
+import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare,
+  mirrorPin,
+  mirrorLeave,
+  cornerPinLabel,
+} from './splits.js';
 
 function leave(pins) {
   return { result: 'Other Leave', otherLeave: pins };
@@ -157,5 +161,36 @@ describe('isMakeableSpare', () => {
   });
   it('a Ringing 10 (lone 10-pin) is always makeable', () => {
     expect(isMakeableSpare({ result: 'Ringing 10', otherLeave: [] })).toBe(true);
+  });
+});
+
+// The user's exact framing: comparing a lefty and righty needs the WHOLE
+// rack mirrored, not just the two corners. Verified against every pair
+// they named, plus the two pins on the centerline that mirror to
+// themselves.
+describe('full-rack mirroring', () => {
+  it('mirrors every named pair both ways', () => {
+    for (const [a, b] of [[7, 10], [8, 9], [4, 6], [2, 3]]) {
+      expect(mirrorPin(a)).toBe(b);
+      expect(mirrorPin(b)).toBe(a);
+    }
+  });
+
+  it('leaves the centerline pins (1 and 5) unchanged', () => {
+    expect(mirrorPin(1)).toBe(1);
+    expect(mirrorPin(5)).toBe(5);
+  });
+
+  it('mirrors a whole leave in one call', () => {
+    expect(mirrorLeave(['2', '4', '10'])).toEqual(['3', '6', '7']);
+  });
+
+  it('passes the no-tap sentinel through untouched -- it names an outcome, not a pin', () => {
+    expect(mirrorLeave(['9 Pin No-Tap'])).toEqual(['9 Pin No-Tap']);
+  });
+
+  it('keeps the corner-pin case working through the general primitive', () => {
+    expect(cornerPinLabel(true)).toBe('7');
+    expect(cornerPinLabel(false)).toBe('10');
   });
 });

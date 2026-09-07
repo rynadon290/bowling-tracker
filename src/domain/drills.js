@@ -9,6 +9,8 @@
 // Deliberately simple: pick a target, tap Made or Missed, see the rate.
 // Anything more elaborate becomes a coaching product.
 
+import { mirrorPin } from "./splits.js";
+
 export const DRILL_TARGETS = [
   { id: "10pin", label: "10 Pin", short: "10" },
   { id: "7pin", label: "7 Pin", short: "7" },
@@ -24,17 +26,53 @@ export const DRILL_TARGETS = [
   { id: "custom", label: "Custom", short: "Custom" },
 ];
 
-export function targetLabel(targetId, customLabel) {
-  if (targetId === "custom") return (customLabel || "").trim() || "Custom";
-  return DRILL_TARGETS.find(t => t.id === targetId)?.label || targetId;
+// Mirrors a hyphenated pin-combo id ("3-6-10") across the deck's
+// centerline. Single-pin ids like "10pin" don't match the pattern and
+// pass through unchanged -- deliberately: both corners (and both halves
+// of every other single pin) are ALREADY separate, correctly-labeled
+// options in DRILL_TARGETS, so a lefty picks "7 Pin" directly rather than
+// a relabeled "10 Pin". Only combos whose mirror ISN'T already a separate
+// listed option need their label to flip.
+function mirrorTargetId(id) {
+  if (!/^\d+(-\d+)+$/.test(id)) return id;
+  return id.split("-").map(Number).map(mirrorPin).sort((a, b) => a - b).join("-");
 }
 
-export function emptyDrill(bowler = "", date = "") {
+// A lefty's ball approaches the pocket from the opposite side, so a
+// combo named for a righty's near-side shape ("3-6-10") is a DIFFERENT,
+// much rarer geometry for her -- her equivalent shape is its mirror
+// ("2-4-7"). The stored target id stays "3-6-10" for both hands (so
+// history and cross-bowler drill comparison keep working off one
+// canonical id, the same convention "Weak 10"/"Weak 7" already
+// established) -- only the label a lefty SEES flips to her real pins.
+export function targetLabel(targetId, customLabel, leftHanded = false) {
+  if (targetId === "custom") return (customLabel || "").trim() || "Custom";
+  const entry = DRILL_TARGETS.find(t => t.id === targetId);
+  if (!entry) return targetId;
+  if (!leftHanded) return entry.label;
+  const mirrored = mirrorTargetId(targetId);
+  // Unchanged if this id has no mirror (single pins, "strike", "custom")
+  // or if the mirror is already its own separate listed option (6-10/4-7).
+  if (mirrored === targetId || DRILL_TARGETS.some(t => t.id === mirrored)) return entry.label;
+  return entry.label.replace(targetId, mirrored);
+}
+
+// Same mirroring for the picker's short chip label.
+export function targetShortLabel(targetId, leftHanded = false) {
+  const entry = DRILL_TARGETS.find(t => t.id === targetId);
+  if (!entry) return targetId;
+  if (!leftHanded) return entry.short;
+  const mirrored = mirrorTargetId(targetId);
+  if (mirrored === targetId || DRILL_TARGETS.some(t => t.id === mirrored)) return entry.short;
+  return mirrored;
+}
+
+export function emptyDrill(bowler = "", date = "", leftHanded = false) {
   return {
     id: "",
     bowler,
     date,
-    target: "10pin",
+    target: leftHanded ? "7pin" : "10pin",
     customTarget: "",
     ball: "",
     made: 0,
