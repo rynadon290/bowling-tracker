@@ -3196,7 +3196,7 @@ export default function BowlingTracker(){
             leagueDates={leagueDates} setLeagueDates={saveLeagueDates}
             hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
             shots={shots}
-            teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam}/>
+            teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
         )}
 
         {view==="import"&&(
@@ -3311,6 +3311,7 @@ export default function BowlingTracker(){
             handicapMatches={handicapMatches} handicapSplit={handicapSplit} longestStrikeStreak={longestStrikeStreak}
             theoreticalScoreForGame={theoreticalScoreForGame}
             preferences={preferences}
+            viewedLeftHanded={viewedLeftHanded}
           />
         )}
       </div>

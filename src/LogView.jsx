@@ -1,5 +1,5 @@
 import { C, S, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
-import { RESULTS, SURFACES, STRIKE_DESCRIPTIONS, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor } from "./constants.js";
+import { RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
 import TournamentSession from "./TournamentSession.jsx";
@@ -988,8 +988,13 @@ export default function LogView({
                   <div style={S.divider}/>
                   <div style={S.label}>Strike Description</div>
                   <div style={S.chips}>
-                    {STRIKE_DESCRIPTIONS.map(d=>(
-                      <Chip key={d} label={d} selected={form.strikeDescription===d} onToggle={()=>toggle("strikeDescription",d)} color={C.strike}/>
+                    {strikeDescriptionsForHand(activeBowlerLeftHanded).map(label=>(
+                      <Chip key={label} label={label}
+                        selected={storedStrikeDescriptionFor(label)===form.strikeDescription}
+                        onToggle={()=>{
+                          const stored=storedStrikeDescriptionFor(label);
+                          set("strikeDescription",form.strikeDescription===stored?"":stored);
+                        }} color={C.strike}/>
                     ))}
                   </div>
                 </>

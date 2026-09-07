@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
-import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.js";
+import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
   gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, pinsForNextSession,
@@ -29,6 +29,7 @@ export default function StatsView({
   teamTenPinSpareR, tenPinAttempts, tenPinLeaveCount, tenPinMade, tenPinSpareR, tot, wk,
   handicapMatches, handicapSplit, longestStrikeStreak,
   theoreticalScoreForGame,
+  viewedLeftHanded=false,
 }) {
   // Fixed cards keep anchored positions: "Viewing" is the selector that
   // controls everything below it, and "Danger Zone" holds destructive
@@ -806,13 +807,22 @@ fivePinAttempts.length>0&&(
 !hideIndividualOnly&&statsShots.filter(s=>s.strikeDescription).length>0&&(
                   <div style={S.card}>
                     <div style={S.label}>Strike Quality</div>
-                    {STRIKE_DESCRIPTIONS.map(d=>{
+                    {/* "Trip 4" and "Kick 10" are stored canonically for
+                        both hands (same convention as Weak 10/Weak 7) --
+                        this view is scoped to one bowler (statsBowler,
+                        falling back to whoever's active), so their real
+                        hand's label is unambiguous here. A blended
+                        team/combined view has no single hand to label
+                        with, so it falls back to the canonical (righty)
+                        wording rather than inventing a mixed label. */}
+                    {strikeDescriptionsForHand(viewedLeftHanded).map(label=>{
+                      const d=storedStrikeDescriptionFor(label);
                       const count=statsShots.filter(s=>s.strikeDescription===d).length;
                       if(!count)return null;
                       const pct=stk?Math.round((count/stk)*100):0;
                       return(
                         <div key={d} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-                          <span style={{fontSize:"12px"}}>{d}</span>
+                          <span style={{fontSize:"12px"}}>{label}</span>
                           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
                             <div style={{width:"80px",height:"6px",backgroundColor:C.surface,borderRadius:"3px",overflow:"hidden"}}>
                               <div style={{height:"100%",width:`${pct}%`,backgroundColor:C.strike,borderRadius:"3px"}}/>

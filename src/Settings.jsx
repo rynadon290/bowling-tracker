@@ -38,7 +38,7 @@ export default function Settings({
   centers, leagueCenters, setLeagueCenter, searchCenters,
   leagueDates, setLeagueDates,
   hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
-  shots,
+  shots, leftHandedForBowler,
 }) {
   const { preferences, updatePreferences, displayName } = useAuth();
   const [savedFlash, setSavedFlash] = useState(false);
@@ -208,7 +208,8 @@ export default function Settings({
               filterBall={filterBall} setFilterBall={setFilterBall}
               filterResult={filterResult} setFilterResult={setFilterResult}
               filtered={filtered || []} ballUniverse={ballUniverse}
-              startEdit={startEdit} deleteShot={deleteShot} />
+              startEdit={startEdit} deleteShot={deleteShot}
+              leftHandedForBowler={leftHandedForBowler} />
           )}
         </>
       )}

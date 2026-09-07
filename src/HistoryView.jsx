@@ -1,6 +1,13 @@
 import { C, S, Chip, resultSym } from "./ui.jsx";
-import { RESULTS } from "./constants.js";
+import { RESULTS, storedStrikeDescriptionFor, strikeDescriptionsForHand } from "./constants.js";
 import { isSplit } from "./domain/splits.js";
+
+// The reverse lookup of storedStrikeDescriptionFor: given the canonical
+// stored value and this shot's own bowler's hand, find the label that
+// hand would actually see for it.
+function strikeDescriptionLabel(stored,leftHanded){
+  return strikeDescriptionsForHand(leftHanded).find(label=>storedStrikeDescriptionFor(label)===stored)||stored;
+}
 
 export default function HistoryView({
   bowlers, leagues,
@@ -8,7 +15,7 @@ export default function HistoryView({
   filterBall, setFilterBall,
   filterResult, setFilterResult,
   filtered, ballUniverse,
-  startEdit, deleteShot,
+  startEdit, deleteShot, leftHandedForBowler,
 }) {
   return (
     <>
@@ -66,7 +73,12 @@ export default function HistoryView({
                     :""}
                 </span>
               )}
-              {shot.strikeDescription&&<span style={S.tag(C.strike)}>{shot.strikeDescription}</span>}
+              {/* Each shot has its own bowler, so -- unlike an aggregate
+                  stats card -- this can resolve the real hand per row
+                  rather than for "the view" as a whole. */}
+              {shot.strikeDescription&&<span style={S.tag(C.strike)}>
+                {strikeDescriptionLabel(shot.strikeDescription,leftHandedForBowler?leftHandedForBowler(shot.bowler):false)}
+              </span>}
               {shot.spareMade&&<span style={S.tag(shot.spareMade==="Yes"?C.strike:C.miss)}>Spare: {shot.spareMade}</span>}
               {isSplit(shot)&&<span style={S.tag(C.miss)}>SPLIT</span>}
               {shot.pinCount!==""&&shot.pinCount!==undefined&&<span style={S.tag(C.spare)}>{shot.pinCount} pins</span>}
