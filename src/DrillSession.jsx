@@ -8,10 +8,11 @@ import {
 // Big two-button tapping. This runs while someone is standing on the
 // approach between shots, so everything is oversized and the rate is
 // always visible without scrolling.
-export default function DrillSession({ drill, onChange, onSave, saved, balls, drills, bowler }) {
+export default function DrillSession({ drill, onChange, onSave, saved, balls, drills, bowler, onStartAnother, sessionDate }) {
   const [lastTap, setLastTap] = useState(null);
   const rate = conversionRate(drill);
   const n = attempts(drill);
+  const todaysDrills = (drills || []).filter(d => d.bowler === bowler && d.date === (sessionDate || drill.date) && ((d.made || 0) + (d.missed || 0)) > 0);
   const history = targetHistory(drills || [], bowler, drill.target);
   const prev = history.length ? history[history.length - 1] : null;
 
@@ -85,6 +86,38 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
       <button style={S.btn("primary")} onClick={onSave} disabled={n === 0}>
         {saved ? "✓ Drill Saved" : n === 0 ? "Throw a few first" : `Save Drill (${n} attempts)`}
       </button>
+
+      {/* A night can cover several targets. Without this the only way to
+          work a second one was to change the target on the drill already
+          saved -- which updated that record instead of adding a new one,
+          quietly replacing the first drill. */}
+      {onStartAnother && drill.id && (
+        <button style={{ ...S.btn(), width: "100%", marginTop: "8px" }} onClick={onStartAnother}>
+          + Start another drill
+        </button>
+      )}
+
+      {/* Everything already saved tonight, so it's obvious the earlier
+          drills are still there once you move on to the next target. */}
+      {todaysDrills.length > 0 && (
+        <div style={{ ...S.card, marginTop: "12px" }}>
+          <div style={S.label}>Saved tonight</div>
+          {todaysDrills.map(d => {
+            const total = (d.made || 0) + (d.missed || 0);
+            const rate = total ? Math.round(((d.made || 0) / total) * 100) : null;
+            return (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                <span style={{ color: d.id === drill.id ? C.accent : C.textMuted }}>
+                  {targetLabel(d.target, d.customTarget)}{d.id === drill.id ? " (editing)" : ""}
+                </span>
+                <span style={{ color: C.textMuted }}>
+                  {d.made}/{total}{rate != null && total >= 5 ? ` · ${rate}%` : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {history.length > 1 && (
         <div style={{ ...S.card, marginTop: "12px" }}>

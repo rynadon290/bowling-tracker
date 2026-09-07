@@ -29,7 +29,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   showSessionStart, dismissSessionStart, updatePreferences,
-  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
+  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
@@ -142,7 +142,9 @@ export default function LogView({
                 saved={drillSaved}
                 balls={logBalls}
                 drills={drills}
-                bowler={activeBowler}/>
+                bowler={activeBowler}
+                sessionDate={sessionDate}
+                onStartAnother={startAnotherDrill}/>
             )}
 
             {/* The arsenal lives on the Profile screen, not here. Managing

@@ -1181,6 +1181,18 @@ export default function BowlingTracker(){
     setActiveDrill(emptyDrill(activeBowler,sessionDate));
     setDrillSaved(false);
   }
+
+  // Begins a SECOND (or third) drill in the same session.
+  //
+  // Without this there was no way to work more than one target a night:
+  // saveDrill leaves activeDrill pointing at the saved record, so changing
+  // the target and saving again updated that same row instead of adding a
+  // new one -- the first drill was silently overwritten and never reached
+  // the recap. Starting fresh gives the next drill its own id.
+  function startAnotherDrill(){
+    setActiveDrill(emptyDrill(activeBowler,sessionDate));
+    setDrillSaved(false);
+  }
   function saveDrill(){
     if(!activeDrill||!activeBowler)return;
     // Second guard, independent of the one in selectBowler: never stamp a
@@ -3181,7 +3193,7 @@ export default function BowlingTracker(){
             oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
-            practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
+            practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} startAnotherDrill={startAnotherDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
