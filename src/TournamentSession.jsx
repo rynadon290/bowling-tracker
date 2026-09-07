@@ -11,6 +11,7 @@ import {
 } from "./domain/sidePots.js";
 import {
   addMatch, removeMatch, setMatchField, setBonus, matchResult, matchPlayTotals, pinDifferential,
+  matchMargin, competitiveness, describeCompetitiveness,
 } from "./domain/matchPlay.js";
 
 function fieldLabel(text) {
@@ -420,6 +421,7 @@ function MatchPlay({ tournament, onChange }) {
   const matches = mp.matches || [];
   const totals = matchPlayTotals(mp);
   const diff = pinDifferential(mp);
+  const comp = competitiveness(mp);
 
   function update(next) { onChange({ ...tournament, matchPlay: next }); }
 
@@ -445,6 +447,7 @@ function MatchPlay({ tournament, onChange }) {
 
       {matches.map(m => {
         const result = matchResult(m);
+        const margin = matchMargin(m);
         const color = result === "win" ? C.strike : result === "loss" ? C.miss : result === "tie" ? C.spare : C.textMuted;
         return (
           <div key={m.matchNumber} style={{ padding: "10px", marginBottom: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.border}` }}>
@@ -452,6 +455,13 @@ function MatchPlay({ tournament, onChange }) {
               <div style={{ fontSize: "12px", fontWeight: 600 }}>
                 Match {m.matchNumber}
                 {result && <span style={{ color, marginLeft: "6px", textTransform: "uppercase", fontSize: "10px" }}>{result}</span>}
+                {/* The margin, right beside the result: losing by 5 and
+                    losing by 60 are the same word but not the same night. */}
+                {margin !== null && margin !== 0 && (
+                  <span style={{ color: C.textMuted, marginLeft: "6px", fontSize: "11px", fontWeight: 400 }}>
+                    by {Math.abs(margin)}
+                  </span>
+                )}
               </div>
               <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
                 onClick={() => update(removeMatch(mp, m.matchNumber))}>
@@ -504,6 +514,45 @@ function MatchPlay({ tournament, onChange }) {
             {totals.average} average over {totals.played} match{totals.played === 1 ? "" : "es"}
             {diff !== null && <> &middot; {diff >= 0 ? "+" : "\u2212"}{Math.abs(diff)} pins vs opponents</>}
           </div>
+
+          {/* Record alone can't distinguish being outclassed from losing
+              three squeakers. This is the part a bowler actually wants
+              after a bad block. */}
+          {comp && (
+            <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "12px", color: C.text, marginBottom: "8px" }}>
+                {describeCompetitiveness(tournament.matchPlay)}
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {comp.avgWinMargin != null && (
+                  <div style={S.statBox}>
+                    <div style={{ ...S.statNum, fontSize: "15px", color: C.strike }}>+{comp.avgWinMargin}</div>
+                    <div style={S.statLbl}>Avg Win</div>
+                  </div>
+                )}
+                {comp.avgLossMargin != null && (
+                  <div style={S.statBox}>
+                    <div style={{ ...S.statNum, fontSize: "15px", color: C.miss }}>&minus;{comp.avgLossMargin}</div>
+                    <div style={S.statLbl}>Avg Loss</div>
+                  </div>
+                )}
+                <div style={S.statBox}>
+                  <div style={{ ...S.statNum, fontSize: "15px", color: C.spare }}>{comp.closeCount}</div>
+                  <div style={S.statLbl}>Under {comp.closeThreshold}</div>
+                </div>
+              </div>
+              {(comp.biggestWin || comp.worstLoss) && (
+                <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px" }}>
+                  {comp.biggestWin && (
+                    <div>Best: match {comp.biggestWin.matchNumber} by {comp.biggestWin.margin}{comp.biggestWin.opponent ? ` vs ${comp.biggestWin.opponent}` : ""}</div>
+                  )}
+                  {comp.worstLoss && (
+                    <div>Worst: match {comp.worstLoss.matchNumber} by {comp.worstLoss.margin}{comp.worstLoss.opponent ? ` vs ${comp.worstLoss.opponent}` : ""}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
