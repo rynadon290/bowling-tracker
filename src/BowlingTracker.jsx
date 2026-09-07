@@ -1192,7 +1192,11 @@ export default function BowlingTracker(){
       const updated=[...hiddenLeagues,practiceId];
       setHiddenLeagues(updated);
       try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(updated));}catch{}
-      cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:practiceId});
+      // onConflict on the NATURAL key. Without it the upsert conflicts on
+      // the primary key -- and a fresh randomUUID() never matches the
+      // existing row, so it becomes an insert and hits the
+      // (user_id, league_id) unique constraint with 23505.
+      cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:practiceId},{onConflict:"user_id,league_id"});
     }
     return practiceId;
   }
@@ -1394,7 +1398,7 @@ export default function BowlingTracker(){
     setHiddenLeagues(updated);
     try{window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(updated));}catch{}
     if(isHidden)cloudDelete("hidden_leagues",{user_id:user?.id,league_id:leagueId});
-    else cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:leagueId});
+    else cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:leagueId},{onConflict:"user_id,league_id"});
   }
 
   // Leaving a team is visible to other people, so the confirmation spells
@@ -1629,7 +1633,10 @@ export default function BowlingTracker(){
     setBallBags(updated);
     try{window.storage.set(BALL_BAGS_KEY,JSON.stringify(updated));}catch{}
     if(wasIn)cloudDelete("ball_bags",{bowler_name:bowlerName,ball:ballName,bag_id:bagId});
-    else cloudWrite("ball_bags",{id:crypto.randomUUID(),bowler_name:bowlerName,ball:ballName,bag_id:bagId,created_by:user?.id||null});
+    // Same natural-key upsert as hidden_leagues: a fresh id can never
+    // match the existing row, so without this a ball put back into a bag
+    // it was previously in fails with 23505 rather than being a no-op.
+    else cloudWrite("ball_bags",{id:crypto.randomUUID(),bowler_name:bowlerName,ball:ballName,bag_id:bagId,created_by:user?.id||null},{onConflict:"created_by,bowler_name,ball,bag_id"});
   }
 
   function setBallLayout(bowlerName,ballName,layout){
