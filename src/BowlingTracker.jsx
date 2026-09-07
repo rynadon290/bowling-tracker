@@ -12,6 +12,7 @@ import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import TrendsView from "./TrendsView.jsx";
+import CoachingView from "./CoachingView.jsx";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -29,6 +30,8 @@ import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHa
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow } from "./domain/goals.js";
+import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask } from "./domain/coaching.js";
+import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
@@ -299,6 +302,16 @@ export default function BowlingTracker(){
   // Keyed by bowler name, like arsenals and profiles -- a proxy-logged
   // teammate with no account can still have goals set for them.
   const[goalsByBowler,setGoalsByBowler]=useState({});
+  // Coaching. Kept cloud-only rather than cached locally: these rows
+  // belong to two people, and a stale local copy of someone else's notes
+  // or tasks is worse than showing nothing until the read lands.
+  const[coachingRels,setCoachingRels]=useState([]);
+  const[coachProfilesById,setCoachProfilesById]=useState({});
+  const[tasksByRelationship,setTasksByRelationship]=useState({});
+  const[notesByRelationship,setNotesByRelationship]=useState({});
+  const[coachSearchResults,setCoachSearchResults]=useState([]);
+  const[coachSearching,setCoachSearching]=useState(false);
+  const coachSearchTimer=useRef(null);
   const[leagueCenters,setLeagueCenters]=useState({});
   // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
   // Shared across everyone in the league (like center), unlike per-bowler
@@ -312,6 +325,15 @@ export default function BowlingTracker(){
   // games so 30 shots at the 10 pin never distort an average.
   const[drills,setDrills]=useState([]);
   const[activeDrill,setActiveDrill]=useState(null);
+  // Unsaved drills, kept per bowler.
+  //
+  // A drill in progress belongs to whoever started it, so switching
+  // bowlers must not carry one person's counts onto another. But simply
+  // discarding it threw away real work: log a drill, add a partner,
+  // switch, and your attempts were gone with no way back. Stashing by
+  // bowler gets both -- each person's in-progress drill waits for them,
+  // and nobody ever sees someone else's numbers.
+  const[drillDrafts,setDrillDrafts]=useState({});
   const[drillSaved,setDrillSaved]=useState(false);
   const[practiceMode,setPracticeMode]=useState("games");
   // Practice/Drill is gated to preferences.environment==="practice" in
@@ -475,6 +497,15 @@ export default function BowlingTracker(){
     })();
     return()=>{cancelled=true;};
   },[]);
+
+  // Its own effect, not part of load() below: that function is one long
+  // try block, and a failure in any earlier table would silently skip
+  // coaching entirely.
+  useEffect(()=>{
+    if(!user?.id)return;
+    loadCoaching();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[user?.id]);
 
   useEffect(()=>{
     async function load(){
@@ -1138,6 +1169,18 @@ export default function BowlingTracker(){
     if(activeBowler===name)selectBowler(displayName||bowlers[0]||"");
   }
 
+  // Drill mode should always show a drill. Without this, switching to a
+  // bowler who has no drill in progress left the mode selected but the
+  // card gone, and the only way back was toggling to Games and returning.
+  useEffect(()=>{
+    if(preferences.environment!=="practice")return;
+    if(practiceMode!=="drill")return;
+    if(activeDrill)return;
+    if(!activeBowler)return;
+    setActiveDrill(emptyDrill(activeBowler,sessionDate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preferences.environment,practiceMode,activeDrill,activeBowler,sessionDate]);
+
   // ── Practice drills ─────────────────────────────────────────────────
   function startDrill(){
     setActiveDrill(emptyDrill(activeBowler,sessionDate));
@@ -1156,6 +1199,8 @@ export default function BowlingTracker(){
     try{window.storage.set(DRILLS_KEY,JSON.stringify(updated));}catch{}
     cloudWrite("drills",drillToRow(withId,user?.id||null));
     setActiveDrill(withId);
+    // No longer a draft once it's saved.
+    setDrillDrafts(prev=>{const next={...prev};delete next[withId.bowler];return next;});
     setDrillSaved(true);
     setTimeout(()=>setDrillSaved(false),1500);
   }
@@ -1428,6 +1473,130 @@ export default function BowlingTracker(){
   // name or note doesn't fire a cloud write per keystroke.
   // Lets a bowler re-run the first-launch setup from Settings -- handy if
   // they skipped it, or their situation changed.
+  // ── Coaching ────────────────────────────────────────────────────────
+  async function loadCoaching(){
+    if(!user?.id)return;
+    const relRes=await cloudRead("coaching_relationships",q=>q.select("id,coach_id,bowler_id,requested_by,status"));
+    if(!relRes.online||!relRes.data)return;
+    const mine=relRes.data.filter(r=>r.coach_id===user.id||r.bowler_id===user.id);
+    setCoachingRels(mine);
+
+    // Resolve the OTHER person's display name for each row.
+    const otherIds=[...new Set(mine.map(r=>r.coach_id===user.id?r.bowler_id:r.coach_id))];
+    if(otherIds.length){
+      const profRes=await cloudRead("profiles",q=>q.select("id,display_name").in("id",otherIds));
+      if(profRes.online&&profRes.data){
+        const byId={};
+        profRes.data.forEach(p=>{byId[p.id]=p.display_name;});
+        setCoachProfilesById(byId);
+      }
+    }
+
+    // Tasks and notes only exist for accepted relationships -- the RLS
+    // enforces that too, so a pending request returns nothing either way.
+    const acceptedIds=mine.filter(r=>r.status==="accepted").map(r=>r.id);
+    if(!acceptedIds.length){setTasksByRelationship({});setNotesByRelationship({});return;}
+
+    const taskRes=await cloudRead("coaching_tasks",q=>q.select("*").in("relationship_id",acceptedIds));
+    if(taskRes.online&&taskRes.data){
+      const byRel={};
+      taskRes.data.forEach(row=>{
+        const t=taskFromRow(row);
+        if(!t)return;
+        (byRel[row.relationship_id]=byRel[row.relationship_id]||[]).push(t);
+      });
+      setTasksByRelationship(byRel);
+    }
+    const noteRes=await cloudRead("coaching_notes",q=>q.select("*").in("relationship_id",acceptedIds));
+    if(noteRes.online&&noteRes.data){
+      const byRel={};
+      noteRes.data.forEach(row=>{
+        const n=noteFromRow(row);
+        if(!n)return;
+        (byRel[row.relationship_id]=byRel[row.relationship_id]||[]).push(n);
+      });
+      setNotesByRelationship(byRel);
+    }
+  }
+
+  function searchCoachProfiles(term){
+    clearTimeout(coachSearchTimer.current);
+    if(!term.trim()){setCoachSearchResults([]);setCoachSearching(false);return;}
+    setCoachSearching(true);
+    coachSearchTimer.current=setTimeout(async()=>{
+      const{data,online}=await cloudRead("profiles",q=>q.select("id,display_name").ilike("display_name",`%${term.trim()}%`).limit(8));
+      setCoachSearchResults((online&&data)?data.filter(p=>p.id!==user?.id):[]);
+      setCoachSearching(false);
+    },300);
+  }
+
+  async function requestCoaching(profile,iAmCoach){
+    if(!user?.id||!profile?.id)return;
+    // Don't send a second request to someone already connected or pending.
+    const existing=coachingRels.find(r=>
+      (r.coach_id===profile.id&&r.bowler_id===user.id)||
+      (r.coach_id===user.id&&r.bowler_id===profile.id));
+    if(existing)return;
+    const row={
+      id:crypto.randomUUID(),
+      coach_id:iAmCoach?user.id:profile.id,
+      bowler_id:iAmCoach?profile.id:user.id,
+      requested_by:user.id,
+      status:"pending",
+    };
+    setCoachingRels(prev=>[...prev,row]);
+    setCoachProfilesById(prev=>({...prev,[profile.id]:profile.display_name}));
+    setCoachSearchResults([]);
+    await cloudWrite("coaching_relationships",row);
+  }
+
+  async function respondCoaching(relationshipId,status){
+    setCoachingRels(prev=>prev.map(r=>r.id===relationshipId?{...r,status}:r));
+    await cloudUpdate("coaching_relationships",{id:relationshipId},{status});
+    if(status==="accepted")loadCoaching();
+  }
+
+  async function endCoaching(relationshipId){
+    setCoachingRels(prev=>prev.filter(r=>r.id!==relationshipId));
+    await cloudDelete("coaching_relationships",{id:relationshipId});
+  }
+
+  async function addCoachingTask(relationshipId,draft){
+    const t=normalizeTask({...draft,relationshipId,assignedBy:user?.id||""});
+    if(!t)return;
+    const withId={...t,id:crypto.randomUUID()};
+    setTasksByRelationship(prev=>({...prev,[relationshipId]:[...(prev[relationshipId]||[]),withId]}));
+    await cloudWrite("coaching_tasks",taskToRow(withId,relationshipId,user?.id||null));
+  }
+
+  function replaceTask(relationshipId,next){
+    setTasksByRelationship(prev=>({
+      ...prev,
+      [relationshipId]:(prev[relationshipId]||[]).map(t=>t.id===next.id?next:t),
+    }));
+    cloudUpdate("coaching_tasks",{id:next.id},taskToRow(next,relationshipId,next.assignedBy||user?.id||null));
+  }
+
+  function completeCoachingTask(relationshipId,task,note){replaceTask(relationshipId,completeTask(task,note));}
+  function attemptCoachingTask(relationshipId,task,reached,note){replaceTask(relationshipId,recordAttempt(task,reached,note));}
+  function reopenCoachingTask(relationshipId,task){replaceTask(relationshipId,reopenTask(task));}
+
+  async function removeCoachingTask(relationshipId,task){
+    setTasksByRelationship(prev=>({
+      ...prev,
+      [relationshipId]:(prev[relationshipId]||[]).filter(t=>t.id!==task.id),
+    }));
+    await cloudDelete("coaching_tasks",{id:task.id});
+  }
+
+  async function addCoachingNote(relationshipId,body){
+    const clean=(body||"").trim();
+    if(!clean)return;
+    const note={id:crypto.randomUUID(),relationshipId,authorId:user?.id||"",body:clean,createdAt:new Date().toISOString()};
+    setNotesByRelationship(prev=>({...prev,[relationshipId]:[...(prev[relationshipId]||[]),note]}));
+    await cloudWrite("coaching_notes",{id:note.id,...noteToRow(note,relationshipId,user?.id||null),created_at:note.createdAt});
+  }
+
   function saveGoals(bowler,next){
     // activeBowler starts empty, so without this a goal set before any
     // bowler exists would write a row with bowler_name "" -- which the
@@ -1599,17 +1768,15 @@ export default function BowlingTracker(){
     setActiveBowler(name);
     setShowSummary(false);
 
-    // A drill in progress belongs to whoever started it. Leaving it on
-    // screen made the previous bowler's made/missed counts look like the
-    // new bowler's, and because saveDrill stamps the CURRENT activeBowler
-    // onto whatever is in activeDrill, saving would have filed one
-    // person's attempts under the other's name. Clearing it means
-    // switching back and forth can't blend two people's results.
-    //
-    // An unsaved drill is discarded rather than stashed per bowler: the
-    // counts are a handful of taps to re-enter, and silently resurrecting
-    // a half-finished drill later would be its own surprise.
-    if(activeDrill)setActiveDrill(null);
+    // Park the outgoing bowler's drill under their own name and pick up
+    // whatever the incoming bowler had. Keyed by the drill's OWN bowler
+    // field rather than the outgoing activeBowler, so a draft can never be
+    // filed under the wrong person even if the two ever disagree.
+    if(activeDrill){
+      const owner=activeDrill.bowler||activeBowler;
+      if(owner)setDrillDrafts(prev=>({...prev,[owner]:activeDrill}));
+    }
+    setActiveDrill(drillDrafts[name]||null);
     setDrillSaved(false);
 
     // Everything about the shot itself — equipment, execution, and what
@@ -2417,6 +2584,18 @@ export default function BowlingTracker(){
   // Whose game can be recorded here. Tournaments are always the owner
   // alone; league draws on the roster; practice/casual on local guests.
   const ownerName=displayName||bowlers[0]||"";
+
+  // The signed-in user's own profile, which is what carries the coach
+  // flag. Distinct from activeBowlerProfile: that follows whoever is being
+  // logged for, and a guest never has a coach flag.
+  const myProfile=normalizeProfile(profiles[ownerName]||profiles[activeBowler],ownerName||activeBowler);
+  // Requires BOTH the profile flag and the toggle -- see coachViewActive.
+  const coachViewOn=coachViewActive(preferences,myProfile);
+  // The tab appears for anyone who coaches OR is in any coaching
+  // relationship, so a bowler being coached can reach their tasks without
+  // being told to flip a coach setting that isn't about them.
+  const showCoachingTab=!!myProfile.isCoach||coachingRels.length>0;
+
   const scoreOptions=scorekeepingOptions({
     environment:preferences.environment,
     owner:ownerName,
@@ -2820,9 +2999,9 @@ export default function BowlingTracker(){
           </div>
         </div>
         <div style={S.nav}>
-          {["log","stats","trends","insights","social"].map(v=>(
+          {["log","stats","trends","insights","social",...(showCoachingTab?["coaching"]:[])].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="stats"?"Stats":v==="trends"?"Trends":v==="insights"?"Insights":"Social"}
+    {v==="log"?"Log":v==="stats"?"Stats":v==="trends"?"Trends":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
   </button>
 ))}
         </div>
@@ -2993,6 +3172,31 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* STATS VIEW                                                        */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {view==="coaching"&&(
+          <CoachingView
+            myUserId={user?.id||""}
+            relationships={coachingRels}
+            profilesById={coachProfilesById}
+            tasksByRelationship={tasksByRelationship}
+            notesByRelationship={notesByRelationship}
+            coachViewOn={coachViewOn}
+            isCoach={!!myProfile.isCoach}
+            onToggleCoachView={v=>updatePreferences(prev=>setCoachView(prev,v))}
+            onSearch={searchCoachProfiles}
+            searchResults={coachSearchResults}
+            searching={coachSearching}
+            onRequest={requestCoaching}
+            onRespond={respondCoaching}
+            onEnd={endCoaching}
+            onAddTask={addCoachingTask}
+            onRemoveTask={removeCoachingTask}
+            onCompleteTask={completeCoachingTask}
+            onAttemptTask={attemptCoachingTask}
+            onReopenTask={reopenCoachingTask}
+            onAddNote={addCoachingNote}
+            leftHandedByUserId={{}}/>
+        )}
+
         {view==="trends"&&(
           <TrendsView
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
