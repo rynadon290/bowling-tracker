@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { strikeDescriptionsForHand, storedStrikeDescriptionFor } from './constants.js';
+import { strikeDescriptionsForHand, storedStrikeDescriptionFor,
+  PRACTICE_SESSION_KEY,
+  practiceLeagueCloudName,
+  practiceLeagueDisplayName,
+  isPracticeLeagueName,
+} from './constants.js';
 
 
 // "Trip 4" and "Kick 10" name the specific pin that carried through or
@@ -38,5 +43,28 @@ describe('strike descriptions follow the bowler\'s hand', () => {
   it('round-trips: a lefty\'s own label maps back to the canonical value and back to her label', () => {
     const stored = storedStrikeDescriptionFor('Kick 7');
     expect(strikeDescriptionsForHand(true).find(l => storedStrikeDescriptionFor(l) === stored)).toBe('Kick 7');
+  });
+});
+
+describe('practice league naming', () => {
+  const ME = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+  const THEM = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+  // leagues.name is globally unique because real leagues are shared --
+  // a team joins "Tuesday House Shot" and everyone means the same one.
+  // Practice is personal, so a plain "Practice" row meant the first
+  // bowler to practise claimed the name system-wide and everyone else
+  // got a 23505.
+  it('gives every bowler their own practice league name', () => {
+    expect(practiceLeagueCloudName(ME)).not.toBe(practiceLeagueCloudName(THEM));
+  });
+
+  it('reads back as plain Practice', () => {
+    expect(practiceLeagueDisplayName(practiceLeagueCloudName(ME))).toBe(PRACTICE_SESSION_KEY);
+  });
+
+  it('leaves a real league name alone', () => {
+    expect(isPracticeLeagueName('Tuesday House Shot')).toBe(false);
+    expect(practiceLeagueDisplayName('Tuesday House Shot')).toBe('Tuesday House Shot');
   });
 });

@@ -10,6 +10,31 @@ export const APP_NAME = "Board & Arrow";
 // They are deliberately plain names a bowler would recognise if they ever
 // saw them in an export, not opaque ids.
 export const PRACTICE_SESSION_KEY = "Practice";
+
+// The name the practice league is stored under IN THE CLOUD.
+//
+// leagues.name is globally unique (leagues_name_key), because real leagues
+// are shared objects -- a team joins "Tuesday House Shot" and everyone
+// means the same one. Practice is the opposite: personal to one bowler.
+// Storing it as plain "Practice" meant the first bowler to practise
+// claimed the name for the entire system and every other bowler got a
+// 23505 on their first practice session.
+//
+// So the row is per-user and the display name stays "Practice" -- see
+// practiceLeagueDisplayName, which translates at the mapping boundary so
+// nothing else in the app has to know.
+export function practiceLeagueCloudName(userId) {
+  return `${PRACTICE_SESSION_KEY}\u00b7${userId}`;
+}
+
+export function isPracticeLeagueName(name) {
+  return typeof name === "string" && name.startsWith(`${PRACTICE_SESSION_KEY}\u00b7`);
+}
+
+// Any per-user practice league reads back as plain "Practice".
+export function practiceLeagueDisplayName(name) {
+  return isPracticeLeagueName(name) ? PRACTICE_SESSION_KEY : name;
+}
 export const CASUAL_SESSION_KEY = "Just Bowling";
 
 // Domain/form constants shared across BowlingTracker.jsx and the view
