@@ -26,6 +26,7 @@ const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", r
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
+  restartOnboarding,
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
   confirmClear, setConfirmClear, clearAllData, hasData,
@@ -238,6 +239,17 @@ export default function Settings({
             {describeUsualNights(sessions, activeBowler)}
           </div>
         </div>
+        {restartOnboarding && (
+          <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+            <div style={{ ...S.label, marginBottom: "4px" }}>First-launch setup</div>
+            <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "8px" }}>
+              Walk through the welcome screens again.
+            </div>
+            <button style={{ ...S.btn(), width: "100%" }} onClick={restartOnboarding}>
+              Run setup again
+            </button>
+          </div>
+        )}
       </CollapsibleCard>
 
       {/* Centers attach to LEAGUES, not sessions -- a league bowls at one

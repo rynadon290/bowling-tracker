@@ -350,6 +350,19 @@ export default function BowlingTracker(){
     try{return window.localStorage.getItem(ONBOARDED_KEY)==="1";}
     catch{return false;}
   });
+  // Latched at mount, deliberately NOT recomputed as data arrives.
+  //
+  // The gate used to also consult sessions/shots to spot an existing
+  // bowler upgrading in. But those load asynchronously: on the first paint
+  // they're empty, so onboarding rendered, and a moment later the cloud
+  // read populated them and the gate flipped straight to the main app --
+  // a visible flash of the onboarding screen on every launch. Latching the
+  // decision once means whatever screen you land on is the screen you
+  // stay on until you finish.
+  const[showOnboarding,setShowOnboarding]=useState(()=>{
+    try{return window.localStorage.getItem(ONBOARDED_KEY)!=="1";}
+    catch{return true;}
+  });
   const[newBallName,setNewBallName]=useState("");
   const[form,setForm]=useState(emptyShot());
   const[editingId,setEditingId]=useState(null);
@@ -419,6 +432,22 @@ export default function BowlingTracker(){
   // await in it throws, everything after is skipped. Keeping the
   // onboarding read out of it means a transient cloudRead failure can't
   // stop the gate from resolving.
+  // An existing bowler upgrading into this build has plenty of data but no
+  // onboarding flag. Once their data has actually loaded, record that
+  // they're established so future launches go straight to the app.
+  //
+  // Writes storage only -- deliberately does not touch `onboarded` state,
+  // because flipping it mid-render is exactly the yank that caused the
+  // onboarding screen to flash and disappear.
+  useEffect(()=>{
+    if(sessions.length===0&&shots.length===0)return;
+    try{
+      if(window.localStorage.getItem(ONBOARDED_KEY)==="1")return;
+      window.localStorage.setItem(ONBOARDED_KEY,"1");
+    }catch{}
+    try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
+  },[sessions.length,shots.length]);
+
   useEffect(()=>{
     let cancelled=false;
     (async()=>{
@@ -1360,6 +1389,15 @@ export default function BowlingTracker(){
 
   // Saves a bowler's profile. Debounced like other typed fields so a
   // name or note doesn't fire a cloud write per keystroke.
+  // Lets a bowler re-run the first-launch setup from Settings -- handy if
+  // they skipped it, or their situation changed.
+  function restartOnboarding(){
+    try{window.localStorage.removeItem(ONBOARDED_KEY);}catch{}
+    try{window.storage.set(ONBOARDED_KEY,"0");}catch{}
+    setOnboarded(false);
+    setShowOnboarding(true);
+  }
+
   function finishOnboarding(){
     setOnboarded(true);
     try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
@@ -2619,11 +2657,9 @@ export default function BowlingTracker(){
   // first render (see the useState initializer), so the correct screen is
   // chosen on the very first paint rather than after a blank frame.
   //
-  // An existing bowler upgrading into this build has data but no
-  // onboarding flag; treating any prior data as "already onboarded" keeps
-  // them out of a setup flow they don't need.
-  const hasExistingData=sessions.length>0||shots.length>0;
-  if(!onboarded&&!hasExistingData){
+  // Uses the latched value only -- see the useState above for why this
+  // must not depend on asynchronously-loaded data.
+  if(showOnboarding&&!onboarded){
     return(
       <Onboarding
         preferences={preferences}
@@ -2756,6 +2792,7 @@ export default function BowlingTracker(){
 
         {view==="settings"&&(
           <Settings
+            restartOnboarding={restartOnboarding}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
             importText={importText} setImportText={setImportText}
