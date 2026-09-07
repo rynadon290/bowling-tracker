@@ -160,10 +160,29 @@ describe('home centers', () => {
 describe('supabase round trip', () => {
   it('preserves every field in both directions', () => {
     const full = {
-      bowlerName: 'Ryan', leftHanded: true, twoHanded: true, homeCenters: ['Bowlero'], notes: 'thumb tape',
+      bowlerName: 'Ryan', leftHanded: true, twoHanded: true, isCoach: false,
+      homeCenters: ['Bowlero'], notes: 'thumb tape',
       bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter', bookAverageAsOf: '2026-08-01',
     };
     expect(profileFromRow(profileToRow(full, 'user-1'))).toEqual(full);
+  });
+
+  // The case above carries isCoach: false, which would still pass if the
+  // flag were dropped entirely on the way through -- false is also what a
+  // missing value normalizes to. This one proves the column actually
+  // survives the round trip.
+  it('preserves the coach flag when it is set', () => {
+    const coach = {
+      bowlerName: 'Dave', leftHanded: false, twoHanded: false, isCoach: true,
+      homeCenters: [], notes: '',
+      bookAverage: '', bookGames: '', bookSeason: '', bookAverageAsOf: '',
+    };
+    expect(profileToRow(coach, 'user-1').is_coach).toBe(true);
+    expect(profileFromRow(profileToRow(coach, 'user-1'))).toEqual(coach);
+  });
+
+  it('treats a row from before the coach column as not a coach', () => {
+    expect(profileFromRow({ bowler_name: 'Old' }).isCoach).toBe(false);
   });
 
   it('round-trips a profile with no book average as blanks, not NaN', () => {

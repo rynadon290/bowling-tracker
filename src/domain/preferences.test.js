@@ -3,6 +3,8 @@ import {
   defaultPreferences, normalizePreferences, applyEnvironment,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, setTrackingMode, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
+  setCoachView,
+  coachViewActive
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -151,5 +153,31 @@ describe('casual environment', () => {
     const p = applyEnvironment(defaultPreferences('league'), 'casual');
     expect(p.showMoneyGames).toBe(false);
     expect(Object.values(p.trackedFields).every(v => v === false)).toBe(true);
+  });
+});
+
+// The coach view is gated on two separate facts, and both have to hold.
+// The suite passed without these only because nothing asserted the whole
+// preferences object -- the field had no coverage at all.
+describe('coach view', () => {
+  it('is off by default, even before anyone is a coach', () => {
+    expect(defaultPreferences('league').coachView).toBe(false);
+  });
+
+  it('survives normalizePreferences rather than being stripped', () => {
+    const on = setCoachView(defaultPreferences('league'), true);
+    expect(normalizePreferences(on).coachView).toBe(true);
+  });
+
+  it('requires the profile flag as well as the toggle', () => {
+    const on = setCoachView(defaultPreferences('league'), true);
+    expect(coachViewActive(on, { isCoach: true })).toBe(true);
+    // Someone who unset the coach flag must not be stranded in coach view.
+    expect(coachViewActive(on, { isCoach: false })).toBe(false);
+    expect(coachViewActive(on, null)).toBe(false);
+  });
+
+  it('requires the toggle as well as the flag', () => {
+    expect(coachViewActive(defaultPreferences('league'), { isCoach: true })).toBe(false);
   });
 });
