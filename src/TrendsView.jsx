@@ -7,18 +7,19 @@ import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  TREND_METRICS, trendMetric, seriesFor, trendDirection, describeTrend, seriesReliability,
+  trendMetricsFor, trendMetricFor, seriesFor, trendDirection, describeTrend, seriesReliability,
 } from "./domain/trends.js";
 
 export default function TrendsView({
   sessions, shots, bowlers, leagues,
   statsBowler, setStatsBowler, statsLeague, setStatsLeague,
-  isSplit, isTenPinLeave,
+  isSplit, isCornerPinLeave, leftHanded = false,
 }) {
   const [metricId, setMetricId] = useState("average");
-  const metric = trendMetric(metricId);
+  const metrics = trendMetricsFor(leftHanded);
+  const metric = trendMetricFor(metricId, leftHanded);
 
-  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isTenPinLeave });
+  const points = seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isCornerPinLeave });
   const direction = trendDirection(points);
   const reliability = seriesReliability(metricId, points);
   const summary = describeTrend(metricId, points);
@@ -53,7 +54,7 @@ export default function TrendsView({
       <div style={S.card}>
         <div style={S.label}>Metric</div>
         <div style={S.chips}>
-          {TREND_METRICS.map(m => (
+          {metrics.map(m => (
             <Chip key={m.id} label={m.label} selected={metricId === m.id}
               onToggle={() => setMetricId(m.id)} />
           ))}

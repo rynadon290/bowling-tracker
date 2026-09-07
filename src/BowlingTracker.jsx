@@ -17,7 +17,7 @@ import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
-import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
+import { isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
   nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots,
@@ -2523,6 +2523,19 @@ export default function BowlingTracker(){
   //     for the all-bowlers view, so that falls back to the logged-in
   //     bowler rather than reporting nothing.
   const goalBowler=statsBowler||activeBowler;
+  // Handedness of the bowler being VIEWED, which isn't necessarily the one
+  // currently logging shots -- viewing a left-handed teammate's stats must
+  // use their corner pin, not yours.
+  const viewedRosterLeftHanded=!!teams.find(t=>t.memberHandedness&&goalBowler in t.memberHandedness)?.memberHandedness?.[goalBowler];
+  const viewedLeftHanded=resolveHandedness(profiles[goalBowler],viewedRosterLeftHanded);
+  // Corner-pin attempts for THIS bowler's hand. Separate from the
+  // tenPinAttempts above, which the existing Stats cards still use.
+  // Trends filters by the same statsBowler, so it resolves identically --
+  // aliased rather than recomputed so the two can't drift apart.
+  const trendsLeftHanded=viewedLeftHanded;
+  const cornerPinAttempts=statsShots.filter(s=>isCornerPinLeave(s,viewedLeftHanded)&&s.spareMade!=="");
+  const cornerPinMade=cornerPinAttempts.filter(s=>s.spareMade==="Yes").length;
+  const cornerPinSpareR=cornerPinAttempts.length?Math.round((cornerPinMade/cornerPinAttempts.length)*100):0;
   const goalHighGame=bowlerHighGame(sessions,goalBowler);
   const goalHighSeries=bowlerHighSeries(sessions,goalBowler);
   const goalMeasurements={
@@ -2542,8 +2555,8 @@ export default function BowlingTracker(){
     // Attempts, not leaves: tenPinAttempts already filters to leaves with
     // a recorded outcome, so an unfinished frame isn't scored as a miss.
     tenPinSpareRate:{
-      current:tenPinAttempts.length?tenPinSpareR:null,
-      sample:tenPinAttempts.length,
+      current:cornerPinAttempts.length?cornerPinSpareR:null,
+      sample:cornerPinAttempts.length,
     },
     cleanFrameRate:{current:frameShots.length?cleanFrameR:null,sample:frameShots.length},
   };
@@ -2766,12 +2779,14 @@ export default function BowlingTracker(){
     <div style={S.app}>
       {/* Header */}
       <div style={S.header}>
-        <div>
-          <div style={{display:"flex",alignItems:"center",gap:"10px",paddingRight:"14px"}}>
+        {/* Profile and settings stack vertically beside the title instead
+            of sitting in a row after it. Five nav tabs need more width
+            than four did -- laid out horizontally, "Social" ran off the
+            right edge of a phone screen. Stacking these two reclaims
+            roughly an icon's width for the nav without hiding anything. */}
+        <div style={{display:"flex",alignItems:"flex-start",gap:"8px",minWidth:0}}>
+          <div style={{minWidth:0}}>
             <div style={S.title}>🎳 {APP_NAME}</div>
-            <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
-            <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"16px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
-          </div>
           {/* "3 pending" made people wonder if their night was saved. It is --
               locally, always, the moment they tap Save. The cloud copy is
               the only thing in flight. Say that plainly. */}
@@ -2782,6 +2797,11 @@ export default function BowlingTracker(){
           ):(
             <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ Saved &amp; backed up</div>
           )}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0}}>
+            <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
+            <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
+          </div>
         </div>
         <div style={S.nav}>
           {["log","stats","trends","insights","social"].map(v=>(
@@ -2962,7 +2982,9 @@ export default function BowlingTracker(){
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
-            isSplit={isSplit} isTenPinLeave={isTenPinLeave}/>
+            isSplit={isSplit}
+            isCornerPinLeave={shot=>isCornerPinLeave(shot,trendsLeftHanded)}
+            leftHanded={trendsLeftHanded}/>
         )}
 
         {view==="stats"&&(
@@ -2971,6 +2993,7 @@ export default function BowlingTracker(){
               <GoalsPanel
                 goals={activeGoals}
                 measurements={goalMeasurements}
+                leftHanded={viewedLeftHanded}
                 onChange={next=>saveGoals(goalBowler,next)}/>
             ):null}
             centerStats={centerStats}

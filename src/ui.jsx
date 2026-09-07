@@ -17,8 +17,11 @@ export const S = {
   app:{minHeight:"100vh",backgroundColor:C.bg,color:C.text,fontFamily:"'Inter',system-ui,sans-serif",fontSize:"14px"},
   header:{backgroundColor:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
   title:{fontSize:"16px",fontWeight:700,letterSpacing:"0.05em",color:C.accent,textTransform:"uppercase"},
-  nav:{display:"flex",gap:"4px"},
-  navBtn:(a)=>({padding:"6px 12px",borderRadius:"6px",border:"none",cursor:"pointer",fontSize:"12px",fontWeight:600,backgroundColor:a?C.accent:"transparent",color:a?"#fff":C.textMuted}),
+  // Five tabs, not four. Tighter gap and horizontal padding, plus
+  // flexShrink:0 on the buttons so labels never wrap mid-word if a
+  // narrow phone still runs short.
+  nav:{display:"flex",gap:"2px",flexShrink:0},
+  navBtn:(a)=>({padding:"6px 8px",whiteSpace:"nowrap",flexShrink:0,borderRadius:"6px",border:"none",cursor:"pointer",fontSize:"12px",fontWeight:600,backgroundColor:a?C.accent:"transparent",color:a?"#fff":C.textMuted}),
   content:{padding:"16px",maxWidth:"480px",margin:"0 auto"},
   card:{backgroundColor:C.card,borderRadius:"12px",padding:"16px",marginBottom:"12px",border:`1px solid ${C.border}`},
   label:{fontSize:"10px",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:C.textMuted,marginBottom:"8px"},

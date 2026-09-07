@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S } from "./ui.jsx";
 import {
-  GOAL_TYPES, goalType, minSampleFor, setGoal, removeGoal, allGoalProgress,
+  GOAL_TYPES, goalTypeFor, minSampleFor, setGoal, removeGoal, allGoalProgress,
 } from "./domain/goals.js";
 
 function formatValue(value, unit) {
@@ -71,16 +71,18 @@ function GoalRow({ progress, onRemove }) {
   );
 }
 
-export default function GoalsPanel({ goals, measurements, onChange }) {
+export default function GoalsPanel({ goals, measurements, onChange, leftHanded = false }) {
   const [adding, setAdding] = useState(false);
   const [pickedType, setPickedType] = useState("");
   const [target, setTarget] = useState("");
   const [error, setError] = useState("");
 
-  const progress = allGoalProgress(goals, measurements);
+  const progress = allGoalProgress(goals, measurements, leftHanded);
   const used = new Set((goals || []).map(g => g.typeId));
-  const available = GOAL_TYPES.filter(t => !used.has(t.id));
-  const picked = goalType(pickedType);
+  // Labelled for this bowler's hand -- a lefty picking a corner-pin goal
+  // should see "7 Pin Spare %" in the list, not "10 Pin".
+  const available = GOAL_TYPES.filter(t => !used.has(t.id)).map(t => goalTypeFor(t.id, leftHanded));
+  const picked = goalTypeFor(pickedType, leftHanded);
 
   function save() {
     if (!picked) { setError("Pick a statistic first."); return; }
