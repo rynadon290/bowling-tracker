@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePattern, describePattern, searchPatterns, patternToRow, patternFromRow, patternDays, patternStats, loggedPatternSummaries } from './oilPatterns.js';
+import { normalizePattern, describePattern, searchPatterns, patternToRow, patternFromRow, patternDays, patternStats, loggedPatternSummaries,
+  VERIFIED_PATTERN_SPECS,
+  allVerifiedPbaPatterns,
+  pbaPatternsForYear,
+  patternDisplayName,
+} from './oilPatterns.js';
 
 const patterns = [
   { id: '1', name: 'Arsenic', series: 'Element Sport', lengthFeet: 41, ratio: '1.36:1', volumeMl: 25.79, verified: true },
@@ -163,5 +168,40 @@ describe('per-pattern history across tournaments', () => {
     expect(loggedPatternSummaries([{ id: 'q', name: 'Q', days: [
       { oilPattern: '', games: [{ score: '200' }] },
     ] }])).toEqual([]);
+  });
+});
+
+// The whole reason a year belongs in the name: the same animal is
+// re-cut between seasons. Badger went 47' -> 48' -> 50' in three years.
+describe('PBA pattern specs by year', () => {
+  it('keeps each season separate', () => {
+    expect(VERIFIED_PATTERN_SPECS['Badger|2024'].lengthFeet).toBe(47);
+    expect(VERIFIED_PATTERN_SPECS['Badger|2025'].lengthFeet).toBe(48);
+    expect(VERIFIED_PATTERN_SPECS['Badger|2026'].lengthFeet).toBe(50);
+  });
+
+  it('displays the year so two seasons never look like one pattern', () => {
+    const dragons = allVerifiedPbaPatterns().filter(p => p.name === 'Dragon');
+    const labels = dragons.map(patternDisplayName);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toContain('Dragon (2026)');
+  });
+
+  // The animal list isn't run in full every season -- 2026 had five,
+  // 2024 had ten. Seeding all ten every year would put unverified,
+  // spec-less entries in the picker for patterns nobody bowled.
+  it('only offers patterns actually published that year', () => {
+    expect(pbaPatternsForYear(2026).map(p => p.name).sort())
+      .toEqual(['Badger', 'Bat', 'Bear', 'Dragon', 'Viper']);
+    expect(pbaPatternsForYear(2024).length).toBe(10);
+  });
+
+  it('every seeded pattern carries real specs', () => {
+    for (const p of allVerifiedPbaPatterns()) {
+      expect(p.verified).toBe(true);
+      expect(p.lengthFeet).toBeGreaterThan(0);
+      expect(p.volumeMl).toBeGreaterThan(0);
+      expect(p.ratio).toMatch(/:1$/);
+    }
   });
 });

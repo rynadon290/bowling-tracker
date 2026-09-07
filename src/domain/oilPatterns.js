@@ -44,7 +44,7 @@ export function normalizePattern(raw) {
 // ratio for the bowler or the community to fill from the official PBA
 // pattern sheet for that season. Shipping guessed numbers here would put
 // wrong specs behind a verified-looking entry, which is worse than blank.
-export const PBA_ANIMAL_PATTERNS = ["Wolf", "Cheetah", "Viper", "Bear", "Chameleon", "Scorpion", "Dragon", "Shark", "Badger"];
+export const PBA_ANIMAL_PATTERNS = ["Wolf", "Cheetah", "Bat", "Viper", "Bear", "Chameleon", "Scorpion", "Dragon", "Shark", "Badger"];
 
 // Where the authoritative year-tagged specs live. Kegel makes the
 // patterns and publishes each season's sheet, so a bowler filling these
@@ -65,9 +65,40 @@ export const PATTERN_SPEC_SOURCE = "https://patternlibrary.kegel.net";
 // correctly. So only entries confirmed against a specific year's sheet
 // go here, keyed by "Name|Year".
 export const VERIFIED_PATTERN_SPECS = {
-  // Kegel Pattern Library, 2024 PBA Cheetah.
-  "Cheetah|2024": { lengthFeet: 35, ratio: "2.00:1", volumeMl: 33.55, forwardMl: 19.65, reverseMl: 13.9 },
+  // ── 2026 ──
+  "Badger|2026": { lengthFeet: 50, volumeMl: 35.36, ratio: "2.91:1" },
+  "Bat|2026": { lengthFeet: 37, volumeMl: 25.2, ratio: "2.81:1" },
+  "Bear|2026": { lengthFeet: 38, volumeMl: 29.58, ratio: "2.01:1" },
+  "Dragon|2026": { lengthFeet: 47, volumeMl: 26.4, ratio: "2.65:1" },
+  "Viper|2026": { lengthFeet: 37, volumeMl: 25.56, ratio: "2.65:1" },
+  // ── 2025 ──
+  "Badger|2025": { lengthFeet: 48, volumeMl: 32.02, ratio: "2.48:1" },
+  "Bat|2025": { lengthFeet: 37, volumeMl: 29.02, ratio: "2.57:1" },
+  "Chameleon|2025": { lengthFeet: 41, volumeMl: 33.24, ratio: "2.66:1" },
+  "Cheetah|2025": { lengthFeet: 35, volumeMl: 36.9, ratio: "1.62:1" },
+  "Scorpion|2025": { lengthFeet: 44, volumeMl: 31.35, ratio: "2.67:1" },
+  "Viper|2025": { lengthFeet: 38, volumeMl: 27.8, ratio: "2.26:1" },
+  "Wolf|2025": { lengthFeet: 34, volumeMl: 31.78, ratio: "1.31:1" },
+  // ── 2024 ──
+  "Badger|2024": { lengthFeet: 47, volumeMl: 28.7, ratio: "3.19:1" },
+  "Bat|2024": { lengthFeet: 37, volumeMl: 25.2, ratio: "2.81:1" },
+  "Bear|2024": { lengthFeet: 41, volumeMl: 30.1, ratio: "2.29:1" },
+  "Chameleon|2024": { lengthFeet: 39, volumeMl: 30.2, ratio: "2.63:1" },
+  "Cheetah|2024": { lengthFeet: 35, volumeMl: 33.55, ratio: "2.00:1" },
+  "Dragon|2024": { lengthFeet: 45, volumeMl: 29.5, ratio: "3.03:1" },
+  "Scorpion|2024": { lengthFeet: 42, volumeMl: 35.05, ratio: "2.78:1" },
+  "Shark|2024": { lengthFeet: 48, volumeMl: 29.2, ratio: "2.78:1" },
+  "Viper|2024": { lengthFeet: 37, volumeMl: 32.4, ratio: "2.34:1" },
+  "Wolf|2024": { lengthFeet: 34, volumeMl: 29.8, ratio: "2.13:1" },
 };
+
+// The years we actually hold specs for, newest first. Used to offer the
+// picker something real rather than a guessed current year -- if the
+// 2027 sheet hasn't been entered yet, offering "Dragon (2027)" with no
+// specs is worse than offering the 2026 one that's complete.
+export const VERIFIED_PATTERN_YEARS = [...new Set(
+  Object.keys(VERIFIED_PATTERN_SPECS).map(k => Number(k.split("|")[1])),
+)].sort((a, b) => b - a);
 
 export function pbaAnimalPatternSeeds(year = new Date().getFullYear()) {
   return PBA_ANIMAL_PATTERNS.map(name => {
@@ -80,10 +111,24 @@ export function pbaAnimalPatternSeeds(year = new Date().getFullYear()) {
       ...(verified || {}),
       verified: !!verified,
       sourceNote: verified
-        ? `Specs from the ${year} Kegel pattern sheet.`
-        : `Specs change between seasons — fill from the ${year} sheet at patternlibrary.kegel.net.`,
+        ? `Official ${year} PBA specs.`
+        : `Not on the ${year} sheet — check patternlibrary.kegel.net if you bowled it.`,
     });
   });
+}
+
+// Only the patterns actually published for a given year. The full animal
+// list isn't run every season -- 2026 had five, 2024 had ten -- so
+// offering all ten every year would put nine unverified entries in the
+// picker for a season that only used five.
+export function pbaPatternsForYear(year) {
+  return pbaAnimalPatternSeeds(year).filter(p => p.verified);
+}
+
+// Every pattern we hold real specs for, newest year first. This is what
+// the picker should offer.
+export function allVerifiedPbaPatterns() {
+  return VERIFIED_PATTERN_YEARS.flatMap(y => pbaPatternsForYear(y));
 }
 
 // Display name: "Chameleon (2026)" when a year is set, so two seasons of
