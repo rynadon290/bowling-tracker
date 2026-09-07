@@ -48,7 +48,14 @@ export default function LogView({
   const env=preferences.environment;
   const isDrill=env==="practice"&&practiceMode==="drill";
   const showGoals=env==="league"||(env==="practice"&&!isDrill);
-  const showEquipment=env!=="tournament"&&env!=="casual"&&!isDrill;
+  // Bug fix: showEquipment checked environment but never trackingMode, so
+  // switching League from shot-by-shot to game-scores-only left the Ball/
+  // Surface/Line cards showing -- there was nothing gating them on HOW
+  // the bowler is tracking, only WHERE they're bowling.
+  const showEquipment=env!=="tournament"&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
+  // Shot Context (game/frame/lane) is meaningless without shots -- a
+  // scores-only night has games, not frames. It had no gate at all.
+  const showShotContext=env!=="tournament"&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
 
   return (
     <>
@@ -754,7 +761,7 @@ export default function LogView({
                 right under it because "frame 5: strike" is one thought;
                 equipment after because it changes rarely; shoes above
                 notes because both are things you set once and leave. */}
-            {/* Shot Context */}
+            {showShotContext&&(
             <div style={S.card}>
               <div style={S.label}>
                 Shot Context
@@ -860,8 +867,14 @@ export default function LogView({
                 <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
               )}
             </div>
+            )}
 
-            {/* Result */}
+            {/* Result. Regression fix: the earlier card reorder moved this
+                block above its old wrapper without carrying the guard
+                with it, so Result rendered unconditionally in every
+                tracking mode -- including scores-only, where there is no
+                per-shot result to record. */}
+            {showShotContext&&(
             <div style={S.card}>
               <div style={S.label}>Result</div>
               <div style={S.chips}>
@@ -978,6 +991,7 @@ export default function LogView({
                 </>
               )}
             </div>
+            )}
 
             {showEquipment&&(<>
             {/* Ball — collapsible. Once a bowler settles on a ball they may
