@@ -81,6 +81,88 @@ export const STATS_CARDS = [
   { id: "threeSixNine", label: "3-6-9 Tracker" },
 ];
 
+// Default card order, per environment.
+//
+// One flat order can't serve four modes. The original list led with
+// head-to-head and team records, which is reasonable on a league night
+// and meaningless in practice -- a bowler drilling ten pins alone had to
+// scroll past nine team cards to reach anything about their own game.
+//
+// The ordering rule is the same everywhere: what you came to this screen
+// for, then the context that explains it, then the detail you go looking
+// for deliberately. What differs is which cards fall into which band.
+//
+// These are DEFAULTS. Anyone who has reordered their own cards keeps
+// their arrangement -- see normalizeStatsCardOrder.
+const ORDER_BY_ENVIRONMENT = {
+  // League night: your own line first, then where the team stands, then
+  // the technical detail behind it. Side pots last -- they matter, but
+  // not before you know how you bowled.
+  league: [
+    "headlineStats", "runningAverages", "cleanFrames",
+    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
+    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
+    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves", "loneFivePin",
+    "firstBallAverage", "framePosition", "strikeStreak", "strikeQuality",
+    "byBall", "releaseQuality", "missDistribution", "ballChangeTriggers",
+    "byCenter", "theoreticalAverage", "progress", "consistency",
+    "scoreDistribution", "gameByGame",
+    "money", "threeSixNine",
+  ],
+  // Practice: execution quality and what to change, since that's the
+  // entire point of being there. Team cards sink to the bottom -- there
+  // is no team in a practice session, so they're almost always empty.
+  practice: [
+    "headlineStats", "cleanFrames", "firstBallAverage", "framePosition",
+    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves", "loneFivePin",
+    "byBall", "releaseQuality", "missDistribution", "ballChangeTriggers", "strikeQuality",
+    "strikeStreak", "progress", "consistency", "gameByGame", "scoreDistribution",
+    "runningAverages", "theoreticalAverage", "byCenter",
+    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
+    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
+    "money", "threeSixNine",
+  ],
+  // Tournament: you're on an unfamiliar pattern in an unfamiliar house,
+  // so center and equipment come early, and the score-shape cards that
+  // tell you whether you're cashing come before technical detail.
+  tournament: [
+    "headlineStats", "byCenter", "byBall",
+    "scoreDistribution", "consistency", "gameByGame", "runningAverages",
+    "money",
+    "cleanFrames", "tenPinLeaves", "singlePinSpares", "splits",
+    "nonSplitLeaves", "loneFivePin", "firstBallAverage", "framePosition",
+    "strikeStreak", "strikeQuality", "releaseQuality", "missDistribution",
+    "ballChangeTriggers", "theoreticalAverage", "progress",
+    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
+    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
+    "threeSixNine",
+  ],
+  // Casual is scores-only, so almost every shot-derived card is empty.
+  // The few that work off game scores come first; the rest stay in a
+  // sensible order for the rare casual bowler who turns tracking up.
+  casual: [
+    "headlineStats", "runningAverages", "gameByGame",
+    "scoreDistribution", "consistency", "progress", "theoreticalAverage",
+    "cleanFrames", "tenPinLeaves", "singlePinSpares", "splits",
+    "nonSplitLeaves", "loneFivePin", "firstBallAverage", "framePosition",
+    "strikeStreak", "strikeQuality", "byBall", "byCenter",
+    "releaseQuality", "missDistribution", "ballChangeTriggers",
+    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
+    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
+    "money", "threeSixNine",
+  ],
+};
+
+// Any card missing from an environment's list is appended in its
+// STATS_CARDS position, so adding a new card can never silently drop it
+// from three of the four modes.
+export function defaultStatsCardOrder(environment) {
+  const listed = ORDER_BY_ENVIRONMENT[environment] || ORDER_BY_ENVIRONMENT.league;
+  const valid = listed.filter(id => MOVABLE_STATS_CARD_IDS.includes(id));
+  const seen = new Set(valid);
+  return [...valid, ...MOVABLE_STATS_CARD_IDS.filter(id => !seen.has(id))];
+}
+
 export const STATS_CARD_IDS = STATS_CARDS.map(c => c.id);
 
 // Only these can be reordered or hidden by the person.
@@ -152,7 +234,7 @@ export function defaultPreferences(environment = "league") {
     trackingMode: ENVIRONMENT_DEFAULT_TRACKING[safeEnvironment] ?? "game",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
-    statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
+    statsCardOrder: defaultStatsCardOrder(safeEnvironment),
     hiddenStatsCards: [],
     // Off by default even for coaches -- someone opening the app to bowl
     // their own league night shouldn't land in coaching mode.
@@ -238,18 +320,38 @@ export function visibleStatsCardOrder(prefs) {
 // Practice exists to examine your game, so it opens in shot-by-shot;
 
 
+// True when this order is still one of the built-in defaults -- i.e. the
+// person has never dragged a card. Switching environments then re-sorts
+// for the new mode; if they HAVE customised it, their arrangement is
+// theirs and survives the switch.
+function isDefaultOrder(order) {
+  const current = JSON.stringify(reconcileCardOrder(order));
+  return ENVIRONMENTS.some(env => JSON.stringify(defaultStatsCardOrder(env)) === current)
+    || current === JSON.stringify([...MOVABLE_STATS_CARD_IDS]);
+}
+
 export function applyEnvironment(prefs, environment) {
   // Casual is scores-only by definition -- the point is to hide the depth.
   if (environment === "casual") {
     const safe = { ...prefs, environment: "casual", trackingMode: "game" };
     const preset = presetFor("casual");
-    return { ...safe, trackedFields: { ...preset.trackedFields }, showMoneyGames: preset.showMoneyGames };
+    return {
+      ...safe,
+      trackedFields: { ...preset.trackedFields },
+      showMoneyGames: preset.showMoneyGames,
+      statsCardOrder: isDefaultOrder(prefs?.statsCardOrder)
+        ? defaultStatsCardOrder("casual")
+        : reconcileCardOrder(prefs?.statsCardOrder),
+    };
   }
   const safeEnvironment = ENVIRONMENTS.includes(environment) ? environment : "league";
   const preset = presetFor(safeEnvironment);
   return {
     ...prefs,
     environment: safeEnvironment,
+    statsCardOrder: isDefaultOrder(prefs?.statsCardOrder)
+      ? defaultStatsCardOrder(safeEnvironment)
+      : reconcileCardOrder(prefs?.statsCardOrder),
     // Practice turns shot logging back on: its accessory fields (surface,
     // line, release, miss, ball speed) all live inside the shot form, so
     // leaving it in scores-only mode would enable them and then show none

@@ -4,8 +4,9 @@ import {
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, setTrackingMode, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
   setCoachView,
-  coachViewActive
-
+  coachViewActive,
+  defaultStatsCardOrder,
+  ENVIRONMENTS,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -64,12 +65,18 @@ describe('defaultPreferences', () => {
     expect(p.showMoneyGames).toBe(false);
   });
 
-  it('starts with every MOVABLE stats card visible in default order', () => {
+  it('starts with every MOVABLE stats card visible', () => {
     // statsCardOrder covers only the cards a person can actually reorder.
     // Fixed cards ("Viewing", "Danger Zone") are anchored by StatsView and
-    // deliberately excluded, so this is 34 of the 36 total cards.
+    // deliberately excluded.
+    //
+    // Asserts the SET, not the sequence: the default order is now
+    // per-environment (see defaultStatsCardOrder), so pinning it to the
+    // raw STATS_CARDS sequence would just re-fail every time a mode's
+    // ordering is tuned. The ordering itself is covered separately.
     const p = defaultPreferences();
-    expect(p.statsCardOrder).toEqual(MOVABLE_STATS_CARD_IDS);
+    expect([...p.statsCardOrder].sort()).toEqual([...MOVABLE_STATS_CARD_IDS].sort());
+    expect(p.statsCardOrder).toEqual(defaultStatsCardOrder('league'));
     expect(p.hiddenStatsCards).toEqual([]);
   });
 
@@ -216,5 +223,56 @@ describe('remembering a tracking choice per environment', () => {
 
   it('ignores a malformed stored choice', () => {
     expect(normalizePreferences({ trackingModeChoices: { practice: 'nonsense', bogus: 'game' } }).trackingModeChoices).toEqual({});
+  });
+});
+
+describe('card order per environment', () => {
+  // One flat order can't serve four modes: the original list led with
+  // head-to-head and team records, so a bowler drilling ten pins alone
+  // scrolled past nine team cards to reach anything about their game.
+  it('leads with what each mode is actually for', () => {
+    expect(defaultStatsCardOrder('league')[0]).toBe('headlineStats');
+    expect(defaultStatsCardOrder('practice').slice(0, 3)).toContain('cleanFrames');
+    expect(defaultStatsCardOrder('tournament').slice(0, 3)).toContain('byCenter');
+    expect(defaultStatsCardOrder('casual').slice(0, 3)).toContain('runningAverages');
+  });
+
+  it('sinks team cards in modes that have no team', () => {
+    const practice = defaultStatsCardOrder('practice');
+    expect(practice.indexOf('teamRecords')).toBeGreaterThan(practice.indexOf('tenPinLeaves'));
+    const league = defaultStatsCardOrder('league');
+    expect(league.indexOf('seasonRecord')).toBeLessThan(league.indexOf('byBall'));
+  });
+
+  // A new card added to STATS_CARDS must not silently vanish from three
+  // of the four modes just because nobody listed it.
+  it('includes every movable card in every environment', () => {
+    for (const env of ENVIRONMENTS) {
+      const order = defaultStatsCardOrder(env);
+      expect(order).toHaveLength(MOVABLE_STATS_CARD_IDS.length);
+      expect(new Set(order).size).toBe(order.length);
+    }
+  });
+
+  it('falls back to the league order for an unknown environment', () => {
+    expect(defaultStatsCardOrder('nonsense')).toEqual(defaultStatsCardOrder('league'));
+  });
+});
+
+describe('switching environments', () => {
+  it('re-sorts for the new mode when the order is still a default', () => {
+    const p = applyEnvironment(defaultPreferences('league'), 'practice');
+    expect(p.statsCardOrder).toEqual(defaultStatsCardOrder('practice'));
+  });
+
+  // Someone who dragged their cards into a particular arrangement means
+  // it -- switching to practice for one night must not throw it away.
+  it('leaves a custom arrangement alone', () => {
+    const custom = {
+      ...defaultPreferences('league'),
+      statsCardOrder: ['money', ...MOVABLE_STATS_CARD_IDS.filter(i => i !== 'money')],
+    };
+    expect(applyEnvironment(custom, 'practice').statsCardOrder[0]).toBe('money');
+    expect(applyEnvironment(custom, 'casual').statsCardOrder[0]).toBe('money');
   });
 });
