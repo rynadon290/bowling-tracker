@@ -5,6 +5,7 @@ import {
   STATS_CARD_IDS, MOVABLE_STATS_CARD_IDS, reconcileCardOrder, setTrackingMode, moveStatsCard, toggleStatsCardHidden, visibleStatsCardOrder,
   setCoachView,
   coachViewActive
+
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -179,5 +180,41 @@ describe('coach view', () => {
 
   it('requires the toggle as well as the flag', () => {
     expect(coachViewActive(defaultPreferences('league'), { isCoach: true })).toBe(false);
+  });
+});
+
+describe('remembering a tracking choice per environment', () => {
+  it('still opens Practice in shot-by-shot for someone who never chose', () => {
+    expect(applyEnvironment(defaultPreferences('league'), 'practice').trackingMode).toBe('shot');
+  });
+
+  // The bug: choosing game-score tracking in Practice, then re-selecting
+  // Practice, silently reset it to shot -- so it could never stick.
+  it('keeps an explicit Practice choice when Practice is selected again', () => {
+    let p = applyEnvironment(defaultPreferences('league'), 'practice');
+    p = setTrackingMode(p, 'game');
+    p = applyEnvironment(p, 'league');
+    expect(applyEnvironment(p, 'practice').trackingMode).toBe('game');
+  });
+
+  it('keeps the choice scoped to the environment it was made in', () => {
+    let p = applyEnvironment(defaultPreferences('league'), 'practice');
+    p = setTrackingMode(p, 'game');
+    expect(p.trackingModeChoices.practice).toBe('game');
+    expect(p.trackingModeChoices.league).toBeUndefined();
+  });
+
+  it('still forces casual to scores-only regardless of any choice', () => {
+    let p = setTrackingMode(applyEnvironment(defaultPreferences('league'), 'casual'), 'shot');
+    expect(applyEnvironment(p, 'casual').trackingMode).toBe('game');
+  });
+
+  it('survives normalize', () => {
+    let p = setTrackingMode(applyEnvironment(defaultPreferences('league'), 'practice'), 'game');
+    expect(normalizePreferences(p).trackingModeChoices.practice).toBe('game');
+  });
+
+  it('ignores a malformed stored choice', () => {
+    expect(normalizePreferences({ trackingModeChoices: { practice: 'nonsense', bogus: 'game' } }).trackingModeChoices).toEqual({});
   });
 });

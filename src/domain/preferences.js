@@ -130,6 +130,15 @@ export function coachViewActive(prefs, profile) {
   return !!(profile?.isCoach && prefs?.coachView);
 }
 
+// What a FRESH profile starts on in each environment. Practice defaults to
+// shot-by-shot because its accessory fields all live in the shot form.
+const ENVIRONMENT_DEFAULT_TRACKING = { practice: "shot", casual: "game" };
+
+// What an environment FORCES when selected, regardless of any choice.
+// Only casual: it exists specifically to hide detail, so scores-only is
+// the whole point of it.
+const ENVIRONMENT_FORCED_TRACKING = { casual: "game" };
+
 export function defaultPreferences(environment = "league") {
   const safeEnvironment = ENVIRONMENTS.includes(environment) ? environment : "league";
   const preset = presetFor(safeEnvironment);
@@ -140,7 +149,7 @@ export function defaultPreferences(environment = "league") {
     // they'd pay for. Practice is the exception: its whole purpose is
     // examining your game, and all its accessory fields live in the shot
     // form, so scores-only there would show an empty screen.
-    trackingMode: ENVIRONMENT_TRACKING_MODE[safeEnvironment] ?? "game",
+    trackingMode: ENVIRONMENT_DEFAULT_TRACKING[safeEnvironment] ?? "game",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: [...MOVABLE_STATS_CARD_IDS],
@@ -148,6 +157,7 @@ export function defaultPreferences(environment = "league") {
     // Off by default even for coaches -- someone opening the app to bowl
     // their own league night shouldn't land in coaching mode.
     coachView: false,
+    trackingModeChoices: {},
   };
 }
 
@@ -181,6 +191,15 @@ export function normalizePreferences(raw) {
       ? raw.hiddenStatsCards.filter(id => MOVABLE_STATS_CARD_IDS.includes(id))
       : [],
     coachView: typeof raw.coachView === "boolean" ? raw.coachView : base.coachView,
+    trackingModeChoices: (() => {
+      const raw2 = raw.trackingModeChoices;
+      if (!raw2 || typeof raw2 !== "object") return {};
+      const out = {};
+      for (const env of ENVIRONMENTS) {
+        if (TRACKING_MODES.includes(raw2[env])) out[env] = raw2[env];
+      }
+      return out;
+    })(),
   };
 }
 
@@ -217,10 +236,7 @@ export function visibleStatsCardOrder(prefs) {
 // (future settings) is left untouched.
 // Each environment carries the tracking mode that matches its purpose.
 // Practice exists to examine your game, so it opens in shot-by-shot;
-// casual exists to hide detail, so it forces scores-only. League and
-// tournament keep whatever the bowler chose, since both are legitimate
-// there and it's their call.
-const ENVIRONMENT_TRACKING_MODE = { practice: "shot", casual: "game" };
+
 
 export function applyEnvironment(prefs, environment) {
   // Casual is scores-only by definition -- the point is to hide the depth.
@@ -238,7 +254,14 @@ export function applyEnvironment(prefs, environment) {
     // line, release, miss, ball speed) all live inside the shot form, so
     // leaving it in scores-only mode would enable them and then show none
     // of them.
-    trackingMode: ENVIRONMENT_TRACKING_MODE[safeEnvironment] ?? prefs.trackingMode,
+    // Order matters: casual's force wins outright; otherwise an explicit
+    // choice for THIS environment wins; otherwise the environment's own
+    // default; otherwise whatever was already set.
+    trackingMode:
+      ENVIRONMENT_FORCED_TRACKING[safeEnvironment]
+      ?? prefs?.trackingModeChoices?.[safeEnvironment]
+      ?? ENVIRONMENT_DEFAULT_TRACKING[safeEnvironment]
+      ?? prefs.trackingMode,
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
   };
@@ -258,5 +281,13 @@ export function setShowMoneyGames(prefs, value) {
 
 export function setTrackingMode(prefs, mode) {
   if (!TRACKING_MODES.includes(mode)) return prefs;
-  return { ...prefs, trackingMode: mode };
+  // Remembered against the environment it was made in. Without this,
+  // re-selecting Practice reset a bowler who had chosen to track practice
+  // by game score -- so "just let me enter my scores" could never stick.
+  const env = prefs?.environment || "league";
+  return {
+    ...prefs,
+    trackingMode: mode,
+    trackingModeChoices: { ...(prefs?.trackingModeChoices || {}), [env]: mode },
+  };
 }
