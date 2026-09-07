@@ -130,6 +130,27 @@ describe('listing progress', () => {
 });
 
 describe('supabase mapping', () => {
+  // The bug this guards: goalsToRow wrote `user_id` while the migration
+  // created `created_by`, so every save failed with PGRST204 ("could not
+  // find the column in the schema cache"). Nothing in the previous tests
+  // compared the app's column names against the actual table definition,
+  // so the mismatch was invisible until it hit a real database.
+  it('writes created_by, matching the column the migration creates', () => {
+    const row = goalsToRow([], 'Ryan', 'user-1');
+    expect(row.created_by).toBe('user-1');
+    expect('user_id' in row).toBe(false);
+  });
+
+  it('writes no column the table does not have', () => {
+    const row = goalsToRow([{ typeId: 'average', target: 190 }], 'Ryan', 'user-1');
+    // Mirrors migration_bowler_goals.sql. If a column is added there, add
+    // it here too -- the point is that the two are compared at all.
+    const tableColumns = ['id', 'created_by', 'bowler_name', 'goals', 'created_at', 'updated_at'];
+    for (const written of Object.keys(row)) {
+      expect(tableColumns).toContain(written);
+    }
+  });
+
   it('round-trips', () => {
     const row = goalsToRow([{ typeId: 'average', target: 190 }], 'Ryan', 'u1');
     expect(row.bowler_name).toBe('Ryan');

@@ -237,7 +237,12 @@ export function allGoalProgress(goals, measurements) {
 // ── Supabase mapping ────────────────────────────────────────────────────
 export function goalsToRow(goals, bowler, userId) {
   return {
-    user_id: userId || null,
+    // created_by, not user_id -- must match the column name in
+    // migration_bowler_goals.sql and the RLS policies built on it. Both
+    // conventions exist in this codebase (drills and tournaments use
+    // user_id; arsenals, profiles and centers use created_by), so this one
+    // follows its own table.
+    created_by: userId || null,
     bowler_name: bowler || "",
     goals: normalizeGoals(goals),
   };
