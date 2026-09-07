@@ -1,6 +1,7 @@
 import { C, S } from "./ui.jsx";
 import {
   casualRecap, practiceRecap, practiceComparison, describePractice,
+  drillRecap, drillComparison, describeDrills,
 } from "./domain/sessionRecap.js";
 
 function ScoreRow({ line, rank, highlight }) {
@@ -132,8 +133,79 @@ function PracticeRecap({ recap, comparison }) {
   );
 }
 
+// Drill work has no game scores, so it gets its own summary: made/missed
+// per target, and a comparison that only ever pits two people against each
+// other on a target they BOTH worked.
+function DrillRecap({ recap, comparison }) {
+  return (
+    <div style={{ ...S.card, border: `1px solid ${C.accent}44` }}>
+      <div style={{ ...S.label, color: C.accent }}>Drill Recap</div>
+      <div style={{ fontSize: "12px", color: C.text, marginBottom: "10px" }}>
+        {describeDrills(recap)}
+      </div>
+
+      {recap.lines.map(l => (
+        <div key={l.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "12px", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ color: C.text }}>{l.label}</span>
+          <span style={{ color: C.textMuted }}>
+            {l.made}/{l.attempts}{" "}
+            {/* A percentage off a couple of attempts misleads more than it
+                informs, so it's withheld rather than shown small. */}
+            {l.thin
+              ? <span style={{ color: C.spare }}>(too few to rate)</span>
+              : <strong style={{ color: C.accent }}>{l.rate}%</strong>}
+          </span>
+        </div>
+      ))}
+
+      {comparison && comparison.shared.length > 0 && (
+        <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+          <div style={{ ...S.label, marginBottom: "6px" }}>Head To Head</div>
+          {comparison.shared.map(sh => (
+            <div key={sh.key} style={{ marginBottom: "8px" }}>
+              <div style={{ fontSize: "12px", color: C.text, marginBottom: "2px" }}>{sh.label}</div>
+              <div style={{ fontSize: "11px", color: C.textMuted, display: "flex", justifyContent: "space-between" }}>
+                <span>You — {sh.mine.made}/{sh.mine.attempts}{sh.mine.thin ? "" : ` (${sh.mine.rate}%)`}</span>
+              </div>
+              {sh.others.map(o => (
+                <div key={o.bowler} style={{ fontSize: "11px", color: C.textMuted, display: "flex", justifyContent: "space-between" }}>
+                  <span>{o.bowler} — {o.attempts} attempts{o.thin ? "" : ` (${o.rate}%)`}</span>
+                  {o.diff != null && (
+                    <span style={{ color: o.diff > 0 ? C.strike : o.diff < 0 ? C.miss : C.textMuted, fontWeight: 600 }}>
+                      {o.diff > 0 ? "+" : o.diff < 0 ? "\u2212" : "\u00b1"}{Math.abs(o.diff)}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {sh.others.some(o => o.diff == null) && (
+                <div style={{ fontSize: "10px", color: C.spare, marginTop: "2px" }}>
+                  Not enough attempts on one side to call a difference.
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {comparison && comparison.theirsOnly.length > 0 && (
+        <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "4px" }}>
+            They also worked (nothing of yours to compare against):
+          </div>
+          {comparison.theirsOnly.map((t, i) => (
+            <div key={`${t.bowler}-${t.label}-${i}`} style={{ fontSize: "11px", color: C.textMuted }}>
+              {t.bowler} — {t.label}, {t.attempts} attempts{t.thin ? "" : ` (${t.rate}%)`}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SessionRecap({
   environment, manualScores, bowler, allBowlers, league, date, priorAverage,
+  drills,
 }) {
   if (environment === "casual") {
     const recap = casualRecap(manualScores, allBowlers, league, date);
@@ -142,11 +214,20 @@ export default function SessionRecap({
   }
 
   if (environment === "practice") {
-    const recap = practiceRecap(manualScores, bowler, league, date, priorAverage);
-    if (!recap) return null;
     const partners = (allBowlers || []).filter(b => b !== bowler);
+    const recap = practiceRecap(manualScores, bowler, league, date, priorAverage);
     const comparison = practiceComparison(manualScores, bowler, partners, league, date);
-    return <PracticeRecap recap={recap} comparison={comparison} />;
+    // Drills and games are separate kinds of practice and a session can
+    // contain both, so neither replaces the other.
+    const dRecap = drillRecap(drills, bowler, date);
+    const dComparison = drillComparison(drills, bowler, partners, date);
+    if (!recap && !dRecap) return null;
+    return (
+      <>
+        {recap && <PracticeRecap recap={recap} comparison={comparison} />}
+        {dRecap && <DrillRecap recap={dRecap} comparison={dComparison} />}
+      </>
+    );
   }
 
   return null;

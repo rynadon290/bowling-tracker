@@ -385,7 +385,8 @@ export default function LogView({
                 allBowlers={scoreOptions}
                 league={sessionLeague}
                 date={sessionDate}
-                priorAverage={practicePriorAverage}/>
+                priorAverage={practicePriorAverage}
+                drills={drills}/>
             )}
 
             {/* Summary */}
