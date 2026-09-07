@@ -29,7 +29,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   showSessionStart, dismissSessionStart, updatePreferences,
-  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
+  goalsPanel, practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
@@ -391,6 +391,18 @@ export default function LogView({
                 priorAverage={practicePriorAverage}
                 drills={drills}
                 leftHandedForBowler={leftHandedForBowler}/>
+            )}
+
+            {/* Goals, for the bowler actually at the line. Only rendered
+                when they have some -- an empty goals card while logging
+                is noise. Deliberately collapsed by default so it doesn't
+                push the shot form down the screen. */}
+            {!editingId&&goalsPanel&&(
+              <CollapsibleCard title="Goals"
+                expanded={expandedSections.logGoals}
+                onToggle={()=>toggleSection("logGoals")}>
+                {goalsPanel}
+              </CollapsibleCard>
             )}
 
             {/* Summary */}

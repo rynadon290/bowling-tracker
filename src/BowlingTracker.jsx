@@ -29,8 +29,8 @@ import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
-import { normalizeGoals, goalsToRow, goalsFromRow } from "./domain/goals.js";
-import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot } from "./domain/coaching.js";
+import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./domain/goals.js";
+import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown } from "./domain/coaching.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -311,6 +311,7 @@ export default function BowlingTracker(){
   // to pull everyone's history before the coach has picked someone to look
   // at.
   const[coachBowlerSessions,setCoachBowlerSessions]=useState({});
+  const[coachBowlerShots,setCoachBowlerShots]=useState({});
   const[coachSearchResults,setCoachSearchResults]=useState([]);
   const[coachSearching,setCoachSearching]=useState(false);
   const coachSearchTimer=useRef(null);
@@ -415,7 +416,7 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false,ballPick:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false,ballPick:false,logGoals:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -652,7 +653,7 @@ export default function BowlingTracker(){
         const cachedGuests=await readCached(GUESTS_KEY,"array");
         if(cachedGuests){const g=normalizeGuests(cachedGuests);setGuests(g);guestsRef.current=g;}
 
-        const drillsRes=await cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,ball,made,missed,notes"));
+        const drillsRes=await cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,custom_pins,ball,made,missed,notes"));
         if(drillsRes.online&&drillsRes.data){
           const rebuilt=drillsRes.data.map(drillFromRow).filter(Boolean);
           setDrills(rebuilt);
@@ -1563,6 +1564,16 @@ export default function BowlingTracker(){
     Object.entries(leagueIdsRef.current||{}).forEach(([name,id])=>{nameById[id]=name;});
     const mapped=res.data.map(row=>sessionFromSupabaseRow(row,nameById));
     setCoachBowlerSessions(prev=>({...prev,[bowlerUserId]:mapped}));
+
+    // Shots are a separate, optional read: the policy for them may not be
+    // in place yet (see migration_coach_reads_bowler_shots.sql, which is
+    // deliberately additive because that table's existing policies aren't
+    // reproducible from this repo). If it returns nothing, the coach
+    // still gets scores -- the screen degrades rather than breaking.
+    const shotRes=await cloudRead("shots",q=>q.select("*").eq("user_id",bowlerUserId));
+    if(shotRes.online&&Array.isArray(shotRes.data)){
+      setCoachBowlerShots(prev=>({...prev,[bowlerUserId]:shotRes.data.map(row=>shotFromSupabaseRow(row,nameById))}));
+    }
   }
 
   function searchCoachProfiles(term){
@@ -2847,6 +2858,21 @@ export default function BowlingTracker(){
   };
   const activeGoals=goalsByBowler[goalBowler]||[];
 
+  // Goals for the Log tab. Scoped to the bowler actually at the line and
+  // the league they're bowling tonight -- NOT to the Stats tab's
+  // "Viewing" picker, which can be pointed at a teammate. Sharing
+  // goalMeasurements would show that teammate's progress to whoever is
+  // logging shots.
+  const logGoals=goalsByBowler[activeBowler]||[];
+  const logGoalMeasurements=measurementsFor({
+    shots,sessions,bowler:activeBowler,league:effectiveSessionLeague,
+    isSplit,isSinglePinLeave,isCornerPinLeave,
+    leftHanded:leftHandedForBowler(activeBowler),
+    average:cAvg(sessions,activeBowler,effectiveSessionLeague),
+    highGame:bowlerHighGame(sessions,activeBowler)?.value??null,
+    highSeries:bowlerHighSeries(sessions,activeBowler)?.value??null,
+  });
+
   // Weighted frame-quality score (0-100), strict priority order:
   //   Strike (100)
   //   > non-split spare, ranked by how few pins were left (a leave that's
@@ -3247,6 +3273,13 @@ export default function BowlingTracker(){
             oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
+            goalsPanel={activeBowler&&logGoals.length?(
+              <GoalsPanel
+                goals={logGoals}
+                measurements={logGoalMeasurements}
+                leftHanded={leftHandedForBowler(activeBowler)}
+                onChange={next=>saveGoals(activeBowler,next)}/>
+            ):null}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} startAnotherDrill={startAnotherDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills} leftHandedForBowler={leftHandedForBowler}
             envBags={envBags} selectedBagId={effectiveBagId} setSelectedBagId={setSelectedBagId} logBalls={logBalls}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
@@ -3286,7 +3319,10 @@ export default function BowlingTracker(){
             onAddNote={addCoachingNote}
             leftHandedByUserId={coachHandednessById}
             onSelectBowler={loadCoachBowlerSessions}
-            bowlerSnapshots={Object.fromEntries(Object.entries(coachBowlerSessions).map(([id,sess])=>[id,bowlerSnapshot(sess)]))}/>
+            bowlerSnapshots={Object.fromEntries(Object.entries(coachBowlerSessions).map(([id,sess])=>[id,bowlerSnapshot(sess)]))}
+            bowlerBreakdowns={Object.fromEntries(Object.entries(coachBowlerShots).map(([id,sh])=>[id,shotBreakdown(sh,{
+              isSplit,isSinglePinLeave,isCornerPinLeave,leftHanded:!!coachHandednessById[id],
+            })]))}/>
         )}
 
         {view==="trends"&&(

@@ -210,7 +210,7 @@ export default function CoachingView({
   onSearch, searchResults, searching, onRequest, onRespond, onEnd,
   onAddTask, onRemoveTask, onCompleteTask, onAttemptTask, onReopenTask,
   onAddNote, leftHandedByUserId = {},
-  onSelectBowler, bowlerSnapshots = {},
+  onSelectBowler, bowlerSnapshots = {}, bowlerBreakdowns = {},
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [addingTask, setAddingTask] = useState(false);
@@ -354,6 +354,44 @@ export default function CoachingView({
                       </div>
                     </div>
                     <div style={{ fontSize: "12px", color: C.text, marginBottom: "10px" }}>{snap.trendSummary}</div>
+                    {(() => {
+                      // The "why" behind the scores -- 11 of 14 coaches
+                      // asked for this. Absent when the shots policy
+                      // isn't in place yet, or when the bowler tracks
+                      // scores-only; either way the scores above still
+                      // stand on their own.
+                      const b = bowlerBreakdowns[selected.userId];
+                      if (!b) return null;
+                      const rate = (v, sample, label) => (
+                        <div key={label} style={S.statBox}>
+                          <div style={{ ...S.statNum, fontSize: "15px", color: v == null ? C.textMuted : C.text }}>
+                            {v == null ? "—" : `${v}%`}
+                          </div>
+                          <div style={S.statLbl}>{label}</div>
+                          <div style={{ fontSize: "9px", color: C.textMuted, marginTop: "2px" }}>{sample}</div>
+                        </div>
+                      );
+                      return (
+                        <div style={{ marginBottom: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+                          <div style={{ ...S.label, marginBottom: "6px" }}>From {b.shots} shots</div>
+                          <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+                            {rate(b.strikeRate, b.strikeSample, "Strike")}
+                            {rate(b.spareRate, b.spareSample, "Spare")}
+                            {rate(b.cornerPinRate, b.cornerPinSample, b.cornerPinLabel)}
+                          </div>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {rate(b.singlePinRate, b.singlePinSample, "Single Pin")}
+                            {rate(b.splitRate, b.frames, "Split")}
+                          </div>
+                          {b.misses.length > 0 && (
+                            <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px" }}>
+                              Misses: {b.misses.slice(0, 4).map(m => `${m.miss} ${m.count}`).join(" · ")}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {snap.recent.length > 0 && (
                       <div>
                         <div style={{ ...S.label, marginBottom: "4px" }}>Recent</div>

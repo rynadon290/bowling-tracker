@@ -2,7 +2,7 @@ import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   DRILL_TARGETS, targetLabel, targetShortLabel, recordMade, recordMissed, undo,
-  attempts, conversionRate, targetHistory,
+  attempts, conversionRate, targetHistory, normalizeCustomPins,
 } from "./domain/drills.js";
 
 // Big two-button tapping. This runs while someone is standing on the
@@ -27,8 +27,29 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
           ))}
         </div>
         {drill.target === "custom" && (
-          <input style={{ ...S.input, marginTop: "6px" }} placeholder="What are you shooting at?"
-            value={drill.customTarget} onChange={e => onChange({ ...drill, customTarget: e.target.value })} />
+          <>
+            <input style={{ ...S.input, marginTop: "6px" }} placeholder="Name it (optional)"
+              value={drill.customTarget} onChange={e => onChange({ ...drill, customTarget: e.target.value })} />
+            {/* Naming the actual pins is what makes a custom drill
+                comparable with anyone else's -- and mirrorable, so a
+                lefty's 2-4-7 matches a righty's 3-6-10 instead of
+                sitting in its own bucket forever. A name alone still
+                works for shapes that aren't a fixed pin set. */}
+            <div style={{ ...S.label, marginTop: "8px", marginBottom: "4px" }}>Pins (optional)</div>
+            <div style={S.chips}>
+              {["1","2","3","4","5","6","7","8","9","10"].map(pin => {
+                const selected = (drill.customPins || []).includes(pin);
+                return (
+                  <Chip key={pin} label={pin} dense selected={selected}
+                    onToggle={() => {
+                      const cur = drill.customPins || [];
+                      const next = selected ? cur.filter(x => x !== pin) : [...cur, pin];
+                      onChange({ ...drill, customPins: normalizeCustomPins(next) });
+                    }} />
+                );
+              })}
+            </div>
+          </>
         )}
         {(balls || []).length > 0 && (
           <>
@@ -45,7 +66,7 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
 
       <div style={{ ...S.card, textAlign: "center", border: `1px solid ${C.accent}44` }}>
         <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          {targetLabel(drill.target, drill.customTarget, leftHanded)}
+          {targetLabel(drill.target, drill.customTarget, leftHanded, drill.customPins)}
         </div>
         <div style={{ fontSize: "48px", fontWeight: 700, color: rate === null ? C.textMuted : rate >= 80 ? C.strike : rate >= 60 ? C.spare : C.miss, lineHeight: 1.1, margin: "8px 0" }}>
           {rate === null ? "—" : `${rate}%`}
@@ -108,7 +129,7 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
             return (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
                 <span style={{ color: d.id === drill.id ? C.accent : C.textMuted }}>
-                  {targetLabel(d.target, d.customTarget, leftHanded)}{d.id === drill.id ? " (editing)" : ""}
+                  {targetLabel(d.target, d.customTarget, leftHanded, d.customPins)}{d.id === drill.id ? " (editing)" : ""}
                 </span>
                 <span style={{ color: C.textMuted }}>
                   {d.made}/{total}{rate != null && total >= 5 ? ` · ${rate}%` : ""}
@@ -121,7 +142,7 @@ export default function DrillSession({ drill, onChange, onSave, saved, balls, dr
 
       {history.length > 1 && (
         <div style={{ ...S.card, marginTop: "12px" }}>
-          <div style={S.label}>{targetLabel(drill.target, drill.customTarget, leftHanded)} over time</div>
+          <div style={S.label}>{targetLabel(drill.target, drill.customTarget, leftHanded, drill.customPins)} over time</div>
           {history.slice(-6).map((h, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
               <span style={{ color: C.textMuted }}>{h.date}{h.ball ? ` · ${h.ball}` : ""}</span>
