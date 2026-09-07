@@ -1145,7 +1145,12 @@ export default function BowlingTracker(){
   }
   function saveDrill(){
     if(!activeDrill||!activeBowler)return;
-    const withId={...normalizeDrill(activeDrill),id:activeDrill.id||crypto.randomUUID(),bowler:activeBowler};
+    // Second guard, independent of the one in selectBowler: never stamp a
+    // drill with a bowler other than the one it was started for. If those
+    // ever disagree, something upstream is wrong and writing the row
+    // anyway would corrupt that bowler's drill history.
+    if(activeDrill.bowler&&activeDrill.bowler!==activeBowler)return;
+    const withId={...normalizeDrill(activeDrill),id:activeDrill.id||crypto.randomUUID(),bowler:activeDrill.bowler||activeBowler};
     const updated=[...drills.filter(d=>d.id!==withId.id),withId];
     setDrills(updated);
     try{window.storage.set(DRILLS_KEY,JSON.stringify(updated));}catch{}
@@ -1473,7 +1478,12 @@ export default function BowlingTracker(){
 
   async function saveTournament(){
     if(!activeTournament.name.trim())return;
-    const withIds={...activeTournament,id:activeTournament.id||crypto.randomUUID(),bowler:activeBowler};
+    // Same guard as saveDrill: a tournament belongs to the bowler who
+    // bowled it. Stamping the CURRENT activeBowler onto one that already
+    // names someone else would file their scores under the wrong person --
+    // reachable by switching bowlers in practice and returning here.
+    if(activeTournament.bowler&&activeTournament.bowler!==activeBowler)return;
+    const withIds={...activeTournament,id:activeTournament.id||crypto.randomUUID(),bowler:activeTournament.bowler||activeBowler};
     setActiveTournament(withIds);
     try{window.storage.set(TOURNAMENT_KEY,JSON.stringify(withIds));}catch{}
     // Keep the saved-tournament list in sync so pattern history reflects
@@ -1588,6 +1598,19 @@ export default function BowlingTracker(){
     const teamId=team?.id||"";
     setActiveBowler(name);
     setShowSummary(false);
+
+    // A drill in progress belongs to whoever started it. Leaving it on
+    // screen made the previous bowler's made/missed counts look like the
+    // new bowler's, and because saveDrill stamps the CURRENT activeBowler
+    // onto whatever is in activeDrill, saving would have filed one
+    // person's attempts under the other's name. Clearing it means
+    // switching back and forth can't blend two people's results.
+    //
+    // An unsaved drill is discarded rather than stashed per bowler: the
+    // counts are a handful of taps to re-enter, and silently resurrecting
+    // a half-finished drill later would be its own surprise.
+    if(activeDrill)setActiveDrill(null);
+    setDrillSaved(false);
 
     // Everything about the shot itself — equipment, execution, and what
     // happened on the delivery — is specific to whoever's actually at the
