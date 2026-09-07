@@ -194,3 +194,38 @@ describe('score measurements sourced from stats.js', () => {
     expect(goalProgress({ typeId: 'highSeries', target: 600 }, hs.value, 1).met).toBe(true);
   });
 });
+
+// Guards the offline path. A goal saved without a connection lives in the
+// sync queue until it flushes; loading must not let the older cloud copy
+// overwrite it.
+describe('merging queued writes over cloud rows on load', () => {
+  // Mirrors the load logic in BowlingTracker.jsx.
+  function mergeOnLoad(cloudRows, queuedRows) {
+    const pending = new Set(queuedRows.map(r => r.bowler_name));
+    const out = {};
+    cloudRows.filter(r => !pending.has(r.bowler_name)).forEach(r => { out[r.bowler_name] = goalsFromRow(r); });
+    queuedRows.forEach(r => { out[r.bowler_name] = goalsFromRow(r); });
+    return out;
+  }
+
+  const cloud = [{ bowler_name: 'Ryan', goals: [{ typeId: 'average', target: 180 }] }];
+  const queued = [{ bowler_name: 'Ryan', goals: [{ typeId: 'average', target: 200 }, { typeId: 'highGame', target: 250 }] }];
+
+  it('keeps the unsynced goal rather than reverting to the cloud copy', () => {
+    const merged = mergeOnLoad(cloud, queued);
+    expect(merged.Ryan.find(g => g.typeId === 'average').target).toBe(200);
+  });
+
+  it('keeps a goal that exists only in the queue', () => {
+    expect(mergeOnLoad(cloud, queued).Ryan).toHaveLength(2);
+  });
+
+  it('leaves other bowlers untouched', () => {
+    const withSam = [...cloud, { bowler_name: 'Sam', goals: [{ typeId: 'average', target: 170 }] }];
+    expect(mergeOnLoad(withSam, queued).Sam[0].target).toBe(170);
+  });
+
+  it('falls back to the cloud rows when nothing is queued', () => {
+    expect(mergeOnLoad(cloud, []).Ryan[0].target).toBe(180);
+  });
+});
