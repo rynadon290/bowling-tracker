@@ -233,3 +233,136 @@ export function describePractice(recap) {
   if (vsAverage < 0) return `${base} — ${Math.abs(vsAverage)} below your average.`;
   return `${base} — right on your average.`;
 }
+
+// ── Drills ──────────────────────────────────────────────────────────────
+//
+// The practice recap above reads game scores. A drill session has none --
+// it's made/missed attempts at one target -- so it needs its own summary,
+// and a partner comparison that only ever compares like with like.
+//
+// The rule that matters here: two people are only comparable on a target
+// they BOTH worked. Ranking someone's 10-pin percentage against another
+// person's 4-pin percentage would be meaningless, and worse, it would look
+// authoritative. So the comparison is grouped by target, and a target only
+// one person did is reported as theirs alone rather than as a contest.
+
+import { attempts, conversionRate, targetLabel } from "./drills.js";
+
+// A conversion rate off two attempts is noise. This isn't a statistical
+// threshold so much as a floor below which a percentage misleads more than
+// it informs -- 1 for 2 reads as "50%" and means nothing.
+export const MIN_DRILL_ATTEMPTS = 5;
+
+function drillsFor(drills, bowler, date) {
+  return (drills || []).filter(d =>
+    d && d.bowler === bowler && (!date || d.date === date) && attempts(d) > 0);
+}
+
+// One bowler's drill work on a date, grouped by target. Multiple drills at
+// the same target on one day are pooled -- they're the same practice, just
+// logged in more than one sitting.
+export function drillLines(drills, bowler, date) {
+  const byTarget = new Map();
+  for (const d of drillsFor(drills, bowler, date)) {
+    const key = d.target === "custom" ? `custom:${(d.customTarget || "").trim().toLowerCase()}` : d.target;
+    if (!byTarget.has(key)) {
+      byTarget.set(key, { key, target: d.target, label: targetLabel(d.target, d.customTarget), made: 0, missed: 0, balls: new Set() });
+    }
+    const line = byTarget.get(key);
+    line.made += d.made || 0;
+    line.missed += d.missed || 0;
+    if (d.ball) line.balls.add(d.ball);
+  }
+  return [...byTarget.values()]
+    .map(l => {
+      const total = l.made + l.missed;
+      return {
+        key: l.key,
+        target: l.target,
+        label: l.label,
+        made: l.made,
+        missed: l.missed,
+        attempts: total,
+        rate: conversionRate({ made: l.made, missed: l.missed }),
+        // Carried so the UI can hold back a percentage that rests on
+        // almost nothing.
+        thin: total < MIN_DRILL_ATTEMPTS,
+        balls: [...l.balls],
+      };
+    })
+    .sort((a, b) => b.attempts - a.attempts);
+}
+
+export function drillRecap(drills, bowler, date) {
+  const lines = drillLines(drills, bowler, date);
+  if (!lines.length) return null;
+  const totalMade = lines.reduce((a, l) => a + l.made, 0);
+  const totalAttempts = lines.reduce((a, l) => a + l.attempts, 0);
+  return {
+    lines,
+    targets: lines.length,
+    made: totalMade,
+    attempts: totalAttempts,
+    // Overall rate across every target, which is a fair summary of the
+    // session's work even though the individual targets differ in
+    // difficulty.
+    rate: totalAttempts ? Math.round((totalMade / totalAttempts) * 100) : null,
+  };
+}
+
+// Head-to-head on drills, target by target.
+//
+// Returns null when nobody else drilled, and lists shared targets
+// separately from ones only one person worked.
+export function drillComparison(drills, bowler, partners, date) {
+  const mine = drillLines(drills, bowler, date);
+  if (!mine.length) return null;
+
+  const others = (partners || [])
+    .filter(p => p && p !== bowler)
+    .map(p => ({ bowler: p, lines: drillLines(drills, p, date) }))
+    .filter(x => x.lines.length);
+  if (!others.length) return null;
+
+  const myByKey = new Map(mine.map(l => [l.key, l]));
+  const shared = [];
+  for (const l of mine) {
+    const theirs = others
+      .map(o => ({ bowler: o.bowler, line: o.lines.find(x => x.key === l.key) }))
+      .filter(x => x.line);
+    if (!theirs.length) continue;
+    shared.push({
+      key: l.key,
+      label: l.label,
+      mine: l,
+      others: theirs.map(t => ({
+        bowler: t.bowler,
+        rate: t.line.rate,
+        attempts: t.line.attempts,
+        thin: t.line.thin,
+        // Only stated when BOTH sides have enough attempts to mean
+        // something; otherwise the gap is an artefact of small numbers.
+        diff: l.thin || t.line.thin ? null : l.rate - t.line.rate,
+      })),
+    });
+  }
+
+  // Targets the partners worked that this bowler didn't -- shown as
+  // information, never as a comparison.
+  const theirsOnly = [];
+  for (const o of others) {
+    for (const l of o.lines) {
+      if (myByKey.has(l.key)) continue;
+      theirsOnly.push({ bowler: o.bowler, label: l.label, rate: l.rate, attempts: l.attempts, thin: l.thin });
+    }
+  }
+
+  return { shared, theirsOnly, comparedOn: shared.length };
+}
+
+export function describeDrills(recap) {
+  if (!recap) return "";
+  const { made, attempts: n, targets, rate } = recap;
+  const base = `${made} of ${n} across ${targets} target${targets === 1 ? "" : "s"}`;
+  return n < MIN_DRILL_ATTEMPTS ? `${base}.` : `${base} — ${rate}%.`;
+}

@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   bowlerLine, sessionLines, awards, casualRecap,
   practiceRecap, practiceComparison, describePractice,
+  drillLines,
+  drillRecap,
+  drillComparison,
+  describeDrills,
 } from './sessionRecap.js';
 import { setManualScore } from './manualScores.js';
 
@@ -127,5 +131,75 @@ describe('casual recap', () => {
 
   it('returns nothing when nothing was bowled', () => {
     expect(casualRecap({}, ['X'], L, D)).toBeNull();
+  });
+});
+
+describe('drill recaps', () => {
+  const D = '2026-06-02';
+  const d = (bowler, target, made, missed, extra = {}) =>
+    ({ bowler, date: D, target, made, missed, customTarget: '', ball: '', ...extra });
+
+  it('groups by target and pools repeats of the same target', () => {
+    const lines = drillLines([d('Ryan', '10pin', 4, 1), d('Ryan', '10pin', 4, 1)], 'Ryan', D);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].attempts).toBe(10);
+    expect(lines[0].made).toBe(8);
+  });
+
+  it('keeps different custom targets apart', () => {
+    const lines = drillLines([
+      d('Ryan', 'custom', 5, 0, { customTarget: 'Greek Church' }),
+      d('Ryan', 'custom', 1, 4, { customTarget: 'Big Four' }),
+    ], 'Ryan', D);
+    expect(lines).toHaveLength(2);
+  });
+
+  // 1 for 2 reads as "50%" and means nothing.
+  it('withholds a rate that rests on almost no attempts', () => {
+    expect(drillLines([d('Ryan', '10pin', 1, 1)], 'Ryan', D)[0].thin).toBe(true);
+    expect(drillLines([d('Ryan', '10pin', 3, 2)], 'Ryan', D)[0].thin).toBe(false);
+    expect(describeDrills(drillRecap([d('Ryan', '10pin', 1, 1)], 'Ryan', D))).not.toContain('%');
+  });
+
+  it('summarises across every target worked', () => {
+    const r = drillRecap([d('Ryan', '10pin', 8, 2), d('Ryan', '7pin', 3, 7)], 'Ryan', D);
+    expect(r.rate).toBe(55);
+    expect(r.targets).toBe(2);
+  });
+});
+
+describe('drill comparison', () => {
+  const D = '2026-06-02';
+  const d = (bowler, target, made, missed) => ({ bowler, date: D, target, made, missed, customTarget: '', ball: '' });
+
+  // Comparing one person's 10-pin rate to another's 4-pin rate would be
+  // meaningless and would still look authoritative.
+  it('only compares targets both people actually worked', () => {
+    const c = drillComparison([
+      d('Ryan', '10pin', 8, 2), d('Dave', '10pin', 5, 5),
+      d('Ryan', '7pin', 6, 4), d('Dave', '4pin', 7, 3),
+    ], 'Ryan', ['Dave'], D);
+    expect(c.shared.map(s => s.label)).toEqual(['10 Pin']);
+    expect(c.shared[0].others[0].diff).toBe(30);
+  });
+
+  it('lists a partner-only target as information, not a contest', () => {
+    const c = drillComparison([
+      d('Ryan', '10pin', 8, 2), d('Dave', '10pin', 5, 5), d('Dave', '4pin', 7, 3),
+    ], 'Ryan', ['Dave'], D);
+    expect(c.theirsOnly.some(t => t.label === '4 Pin')).toBe(true);
+  });
+
+  it('refuses to state a difference when either side is thin', () => {
+    const c = drillComparison([d('Ryan', '10pin', 8, 2), d('Dave', '10pin', 1, 1)], 'Ryan', ['Dave'], D);
+    expect(c.shared[0].others[0].diff).toBeNull();
+    // The raw attempts are still shown -- withheld conclusion, not withheld data.
+    expect(c.shared[0].others[0].attempts).toBe(2);
+  });
+
+  it('returns nothing when there is no one to compare against', () => {
+    expect(drillComparison([d('Ryan', '10pin', 8, 2)], 'Ryan', ['Dave'], D)).toBeNull();
+    expect(drillComparison([d('Ryan', '10pin', 8, 2)], 'Ryan', ['Ryan'], D)).toBeNull();
+    expect(drillComparison([d('Dave', '10pin', 8, 2)], 'Ryan', ['Dave'], D)).toBeNull();
   });
 });
