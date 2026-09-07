@@ -1844,12 +1844,22 @@ export default function BowlingTracker(){
       // Best-effort: if the handedness view isn't present yet (migration
       // not run), coaching still works -- labels just fall back to the
       // right-handed default rather than the screen failing.
-      const handRes=await cloudRead("coached_bowler_handedness",q=>q.select("bowler_user_id,left_handed"));
-      if(handRes.online&&Array.isArray(handRes.data)){
-        const byId={};
-        handRes.data.forEach(r=>{if(r.left_handed)byId[r.bowler_user_id]=true;});
-        setCoachHandednessById(byId);
-      }
+      // An RPC now, not a table read: coached_bowler_handedness became a
+      // security definer FUNCTION rather than a view, so it can pin its
+      // search_path and can't leak rows to a predicate evaluated before
+      // its own filter. Same rows, same boundary.
+      //
+      // Still tolerant of the call failing: a coach whose database
+      // hasn't had this migration applied falls back to right-handed
+      // defaults rather than losing the coaching screen entirely.
+      try{
+        const{data:handData,error:handErr}=await supabase.rpc("coached_bowler_handedness");
+        if(!handErr&&Array.isArray(handData)){
+          const byId={};
+          handData.forEach(r=>{if(r.left_handed)byId[r.bowler_user_id]=true;});
+          setCoachHandednessById(byId);
+        }
+      }catch{}
       if(profRes.online&&profRes.data){
         const byId={};
         profRes.data.forEach(p=>{byId[p.id]=p.display_name;});
