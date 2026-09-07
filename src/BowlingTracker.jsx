@@ -13,7 +13,8 @@ import Onboarding from "./Onboarding.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import TrendsView from "./TrendsView.jsx";
 import CoachingView from "./CoachingView.jsx";
-import ImportedScoresInbox from "./ImportedScoresInbox.jsx";
+import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
+import { buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -2927,21 +2928,31 @@ export default function BowlingTracker(){
   // prompted stacking in the first place; four fits comfortably.
   const stackHeaderIcons=navTabs.length>=5;
 
-  // The inbox icon is conditional: a permanent icon for a usually-empty
-  // inbox is clutter, and an icon that only ever appears when something
-  // is waiting is self-explanatory without a label.
-  //
-  // Counts three things, because all three need the bowler to act:
-  // scores waiting on them, scores they rejected that need re-entering,
-  // and a teammate's unconfirmed night they're now allowed to fix.
-  const inboxCount=(()=>{
-    if(!activeBowler)return 0;
-    const mine=pendingForImport(importedScores,activeBowler).length;
-    const reentry=needingImportReentry(importedScores).filter(r=>r.bowler===activeBowler).length;
-    const stale=importedScores.filter(r=>
-      r.bowler!==activeBowler&&r.status==="pending"&&canCorrectImport(r).allowed).length;
-    return mine+reentry+stale;
-  })();
+  // Everything outstanding, from every source -- coaching invitations,
+  // friend and team requests, coach tasks, imported scores, the book
+  // average prompt. Previously each lived only on its own tab, so
+  // "is anything waiting for me" meant checking five places.
+  const inboxItems=buildInbox({
+    bowler:activeBowler,
+    userId:user?.id,
+    importedScores,
+    sessions,
+    coachingRelationships:coachingRels,
+    coachingProfilesById:coachProfilesById,
+    tasksByRelationship,
+    unreadResponses,
+    // Friend and team requests are owned by the Social tab, which loads
+    // them itself. Wiring them here would mean a second fetch and a
+    // second copy that can disagree -- left out until that state moves
+    // up, rather than duplicated now.
+    bookAverageDue:bookAverageCheck,
+    catalogRejections:rejectedBallsFor(arsenals[activeBowler]||[],catalogEntries,catalogAck),
+    coachViewOn,
+  });
+  // The icon is conditional: a permanent icon for a usually-empty inbox
+  // is clutter, and one that only appears when something is waiting needs
+  // no label.
+  const inboxCount=countInbox(inboxItems);
 
   // Turning coach view on while sitting on Social would strand the user
   // on a tab that is no longer in the nav -- a blank screen with no way
@@ -3512,12 +3523,16 @@ export default function BowlingTracker(){
             icon for a usually-empty inbox is clutter. */}
         {view==="inbox"&&(
           <>
-            <div style={S.card}>
-              <div style={S.label}>Scores From Teammates</div>
-              <div style={{fontSize:"11px",color:C.textMuted}}>
-                Imported from someone's scorecard photo. They're already counting — checking them just marks them confirmed.
-              </div>
-            </div>
+            {/* Links out to whichever screen already owns each workflow.
+                The inbox notifies; it doesn't re-implement accepting a
+                coaching invitation in a second place. */}
+            <InboxList items={inboxItems} onOpen={item=>{
+              // A task set BY a coach is homework for the bowler, so open
+              // the Coach tab on the bowling side rather than dropping
+              // them into coach view looking at their own bowlers.
+              if(item.type==="coachTask")updatePreferences(prev=>setCoachView(prev,false));
+              setView(item.view);
+            }}/>
             <ImportedScoresInbox
               records={importedScores}
               bowler={activeBowler}
@@ -3525,6 +3540,14 @@ export default function BowlingTracker(){
               onReject={rejectImportedScores}
               onCorrectTeammate={correctTeammateScores}
               canCorrect={r=>canCorrectImport(r)}/>
+            {inboxCount===0&&(
+              <div style={S.card}>
+                <div style={S.label}>Nothing Waiting</div>
+                <div style={{fontSize:"12px",color:C.textMuted}}>
+                  Requests, coach tasks and scores to confirm show up here.
+                </div>
+              </div>
+            )}
             <button style={{...S.btn(),width:"100%"}} onClick={()=>setView("log")}>Done</button>
             <div style={{height:"32px"}}/>
           </>

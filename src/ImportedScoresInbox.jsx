@@ -87,6 +87,37 @@ function PendingCard({ record, onApprove, onReject }) {
   );
 }
 
+// The unified inbox: everything outstanding, in one list.
+//
+// Items that another screen already owns are links -- the inbox does not
+// re-implement accepting a coaching invitation, because two places that
+// can accept one is two places that can disagree about whether it was
+// accepted. Imported scores are the exception: this screen owns them, so
+// they're actioned here.
+export function InboxList({ items, onOpen }) {
+  if (!items?.length) return null;
+  return (
+    <div style={S.card}>
+      <div style={S.label}>Needs You</div>
+      {items.filter(i => i.view !== "inbox").map(item => (
+        <button key={item.id}
+          style={{
+            display: "block", width: "100%", textAlign: "left", cursor: "pointer",
+            padding: "10px", marginBottom: "8px", borderRadius: "8px",
+            backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          }}
+          onClick={() => onOpen(item)}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>{item.title}</span>
+            <span style={{ fontSize: "11px", color: C.accent, flexShrink: 0 }}>Open ›</span>
+          </div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>{item.detail}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ImportedScoresInbox({
   records, bowler, onApprove, onReject, onCorrectTeammate, canCorrect,
 }) {
