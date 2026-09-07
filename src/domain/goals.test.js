@@ -4,6 +4,7 @@ import {
   setGoal, removeGoal, goalProgress, allGoalProgress, goalsToRow, goalsFromRow,
 } from './goals.js';
 import { SAMPLE_THRESHOLDS } from './insightGating.js';
+import { rAvg, cAvg, bowlerHighGame, bowlerHighSeries } from './stats.js';
 
 describe('sample thresholds', () => {
   // These must stay wired to insightGating rather than copied, or the two
@@ -138,5 +139,37 @@ describe('supabase mapping', () => {
   it('survives a malformed row', () => {
     expect(goalsFromRow(null)).toEqual([]);
     expect(goalsFromRow({ goals: 'nonsense' })).toEqual([]);
+  });
+});
+
+// Guards the wiring between stats.js and goals, which is where the first
+// version of this feature broke: every score goal reported "nothing
+// logged" because of three separate mismatches with the stats helpers.
+describe('score measurements sourced from stats.js', () => {
+  const sessions = [
+    { bowler: 'Ryan', league: 'Tuesday House Shot', date: '2026-06-02', scores: [210, 190, 200], total: 600 },
+    { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-06-04', scores: [180, 240, 170], total: 590 },
+  ];
+
+  it('bowlerHighGame returns an object, so .value must be unwrapped', () => {
+    const hg = bowlerHighGame(sessions, 'Ryan');
+    expect(typeof hg).toBe('object');
+    // Passing the object straight to goalProgress is what produced
+    // "nothing logged" -- Number.isFinite({}) is false.
+    expect(goalProgress({ typeId: 'highGame', target: 250 }, hg, 1).noData).toBe(true);
+    expect(goalProgress({ typeId: 'highGame', target: 250 }, hg.value, 1).current).toBe(240);
+  });
+
+  it('rAvg returns null for the all-leagues view, so cAvg is the right source', () => {
+    expect(rAvg(sessions, 'Ryan', '')).toBeNull();
+    expect(cAvg(sessions, 'Ryan', '')).toBe(198);
+  });
+
+  it('produces real progress for every score goal in the default view', () => {
+    const hg = bowlerHighGame(sessions, 'Ryan');
+    const hs = bowlerHighSeries(sessions, 'Ryan');
+    expect(goalProgress({ typeId: 'average', target: 200 }, cAvg(sessions, 'Ryan', ''), 1).noData).toBeUndefined();
+    expect(goalProgress({ typeId: 'highGame', target: 250 }, hg.value, 1).current).toBe(240);
+    expect(goalProgress({ typeId: 'highSeries', target: 600 }, hs.value, 1).met).toBe(true);
   });
 });
