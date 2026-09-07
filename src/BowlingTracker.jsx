@@ -10,6 +10,7 @@ import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
+import GoalsPanel from "./GoalsPanel.jsx";
 import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -26,6 +27,7 @@ import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
+import { normalizeGoals, goalsToRow, goalsFromRow } from "./domain/goals.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
@@ -93,6 +95,7 @@ const SESSION_START_SEEN_KEY = "bowling-session-start-seen-v1";
 // Whether the full-screen first-launch flow has been completed. Separate
 // from the daily prompt's keys: this one is once-ever.
 const ONBOARDED_KEY = "bowling-onboarded-v1";
+const GOALS_KEY = "bowling-goals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
 const LEAGUES_KEY = "bowling-leagues-v1";
@@ -292,6 +295,9 @@ export default function BowlingTracker(){
   const[centers,setCenters]=useState([]);
   const[oilPatterns,setOilPatterns]=useState([]);
   const[tournaments,setTournaments]=useState([]);
+  // Keyed by bowler name, like arsenals and profiles -- a proxy-logged
+  // teammate with no account can still have goals set for them.
+  const[goalsByBowler,setGoalsByBowler]=useState({});
   const[leagueCenters,setLeagueCenters]=useState({});
   // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
   // Shared across everyone in the league (like center), unlike per-bowler
@@ -644,6 +650,24 @@ export default function BowlingTracker(){
         }else{
           const op=await readCached(OIL_PATTERNS_KEY,"array");
           if(op)setOilPatterns(op.map(normalizePattern).filter(Boolean));
+        }
+
+        const goalsRes=await cloudRead("bowler_goals",q=>q.select("bowler_name,goals"));
+        if(goalsRes.online&&goalsRes.data){
+          const rebuilt={};
+          goalsRes.data.forEach(r=>{rebuilt[r.bowler_name]=goalsFromRow(r);});
+          setGoalsByBowler(rebuilt);
+          try{await window.storage.set(GOALS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          try{
+            const cached=await window.storage.get(GOALS_KEY);
+            if(cached){
+              const parsed=JSON.parse(cached.value);
+              const rebuilt={};
+              Object.keys(parsed||{}).forEach(k=>{rebuilt[k]=normalizeGoals(parsed[k]);});
+              setGoalsByBowler(rebuilt);
+            }
+          }catch{}
         }
 
         const tournamentsRes=await cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,notes"));
@@ -1391,6 +1415,14 @@ export default function BowlingTracker(){
   // name or note doesn't fire a cloud write per keystroke.
   // Lets a bowler re-run the first-launch setup from Settings -- handy if
   // they skipped it, or their situation changed.
+  function saveGoals(bowler,next){
+    const normalized=normalizeGoals(next);
+    const updated={...goalsByBowler,[bowler]:normalized};
+    setGoalsByBowler(updated);
+    try{window.storage.set(GOALS_KEY,JSON.stringify(updated));}catch{}
+    cloudWrite("bowler_goals",goalsToRow(normalized,bowler,user?.id||null),{onConflict:"created_by,bowler_name"});
+  }
+
   function restartOnboarding(){
     try{window.localStorage.removeItem(ONBOARDED_KEY);}catch{}
     try{window.storage.set(ONBOARDED_KEY,"0");}catch{}
@@ -2455,6 +2487,37 @@ export default function BowlingTracker(){
   const cleanFrameCount=frameShots.filter(s=>s.result==="Strike"||s.spareMade==="Yes").length;
   const cleanFrameR=frameShots.length?Math.round((cleanFrameCount/frameShots.length)*100):0;
 
+  // ── Goal measurements ─────────────────────────────────────────────────
+  // Each goal-able statistic paired with the sample it actually rests on.
+  // Getting the pairing right is the whole point of the gate: strike rate
+  // is per FIRST BALL, spare conversion per ATTEMPT, and quoting the wrong
+  // denominator would let a goal report progress it hasn't earned.
+  //
+  // These follow the current Stats view filters (bowler / league), so a
+  // goal reads against whatever the bowler is looking at rather than a
+  // hidden global figure that wouldn't match the numbers on screen.
+  const goalCurrentAverage=(()=>{
+    const v=rAvg(sessions,statsBowler,statsLeague);
+    return v==null?null:v;
+  })();
+  const goalMeasurements={
+    average:{current:goalCurrentAverage,sample:1},
+    highGame:{current:bowlerHighGame(sessions,statsBowler)||null,sample:1},
+    highSeries:{current:bowlerHighSeries(sessions,statsBowler)||null,sample:1},
+    // Strike rate is measured over first balls only, not every shot.
+    strikeRate:{
+      current:frameShots.length?Math.round((frameShots.filter(s=>s.result==="Strike").length/frameShots.length)*100):null,
+      sample:frameShots.length,
+    },
+    spareRate:{current:spAtt.length?spR:null,sample:spAtt.length},
+    singlePinSpareRate:{
+      current:singlePinAttempts.length?singlePinSpareR:null,
+      sample:singlePinAttempts.length,
+    },
+    cleanFrameRate:{current:frameShots.length?cleanFrameR:null,sample:frameShots.length},
+  };
+  const activeGoals=goalsByBowler[statsBowler||activeBowler]||[];
+
   // Weighted frame-quality score (0-100), strict priority order:
   //   Strike (100)
   //   > non-split spare, ranked by how few pins were left (a leave that's
@@ -2865,6 +2928,12 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {view==="stats"&&(
           <StatsView
+            goalsPanel={
+              <GoalsPanel
+                goals={activeGoals}
+                measurements={goalMeasurements}
+                onChange={next=>saveGoals(statsBowler||activeBowler,next)}/>
+            }
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
