@@ -2496,14 +2496,24 @@ export default function BowlingTracker(){
   // These follow the current Stats view filters (bowler / league), so a
   // goal reads against whatever the bowler is looking at rather than a
   // hidden global figure that wouldn't match the numbers on screen.
-  const goalCurrentAverage=(()=>{
-    const v=rAvg(sessions,statsBowler,statsLeague);
-    return v==null?null:v;
-  })();
+  //
+  // Three sharp edges in these helpers, all of which silently produced
+  // "nothing logged" before:
+  //   - rAvg() requires an EXACT league match and returns null for the
+  //     all-leagues view (statsLeague === ""). cAvg() is the one that
+  //     treats a blank league as "all", so that's what a goal uses.
+  //   - bowlerHighGame/Series return an OBJECT ({value,date,league,...}),
+  //     not a number, so the .value has to be unwrapped.
+  //   - both high helpers match on an exact bowler name and return null
+  //     for the all-bowlers view, so that falls back to the logged-in
+  //     bowler rather than reporting nothing.
+  const goalBowler=statsBowler||activeBowler;
+  const goalHighGame=bowlerHighGame(sessions,goalBowler);
+  const goalHighSeries=bowlerHighSeries(sessions,goalBowler);
   const goalMeasurements={
-    average:{current:goalCurrentAverage,sample:1},
-    highGame:{current:bowlerHighGame(sessions,statsBowler)||null,sample:1},
-    highSeries:{current:bowlerHighSeries(sessions,statsBowler)||null,sample:1},
+    average:{current:cAvg(sessions,goalBowler,statsLeague),sample:1},
+    highGame:{current:goalHighGame?goalHighGame.value:null,sample:1},
+    highSeries:{current:goalHighSeries?goalHighSeries.value:null,sample:1},
     // Strike rate is measured over first balls only, not every shot.
     strikeRate:{
       current:frameShots.length?Math.round((frameShots.filter(s=>s.result==="Strike").length/frameShots.length)*100):null,
@@ -2516,7 +2526,7 @@ export default function BowlingTracker(){
     },
     cleanFrameRate:{current:frameShots.length?cleanFrameR:null,sample:frameShots.length},
   };
-  const activeGoals=goalsByBowler[statsBowler||activeBowler]||[];
+  const activeGoals=goalsByBowler[goalBowler]||[];
 
   // Weighted frame-quality score (0-100), strict priority order:
   //   Strike (100)
@@ -2932,7 +2942,7 @@ export default function BowlingTracker(){
               <GoalsPanel
                 goals={activeGoals}
                 measurements={goalMeasurements}
-                onChange={next=>saveGoals(statsBowler||activeBowler,next)}/>
+                onChange={next=>saveGoals(goalBowler,next)}/>
             }
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
