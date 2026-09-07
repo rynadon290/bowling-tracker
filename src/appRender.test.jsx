@@ -92,6 +92,11 @@ describe('app renders', () => {
       <AuthProvider><BowlingTracker /></AuthProvider>
     );
     expect(html.length).toBeGreaterThan(100);
-    expect(html).toContain('What are you bowling');
+    // The first onboarding screen asks who's bowling -- name, hand and
+    // style -- before the environment question that used to be first.
+    // Anchored on "Which hand?" rather than the heading because the
+    // heading contains an apostrophe, which server rendering escapes to
+    // &#x27; and would make this assertion fail for the wrong reason.
+    expect(html).toContain('Which hand?');
   });
 });
