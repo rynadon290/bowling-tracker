@@ -229,6 +229,11 @@ export default function BowlingTracker(){
   // that league, since teams.league_id references leagues.id).
   const leagueIdsRef=useRef({});
   const[view,setView]=useState("log");
+  // Stats and Trends are one nav tab ("Data") with a sub-tab, rather than
+  // two top-level tabs. They already share statsBowler/statsLeague, so the
+  // "Viewing" selection carries across the sub-tab switch instead of being
+  // re-picked -- which is the main reason merging them works.
+  const[dataTab,setDataTab]=useState("stats");
   // Teams and Friends share one nav slot. Which of the two is showing is
   // its own bit of state so switching between them doesn't disturb `view`.
   const[socialTab,setSocialTab]=useState("teams");
@@ -3115,9 +3120,9 @@ export default function BowlingTracker(){
           </div>
         </div>
         <div style={S.nav}>
-          {["log","stats","trends","insights","social",...(showCoachingTab?["coaching"]:[])].map(v=>(
+          {["log","data","insights","social",...(showCoachingTab?["coaching"]:[])].map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="stats"?"Stats":v==="trends"?"Trends":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
+    {v==="log"?"Log":v==="data"?"Data":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
   </button>
 ))}
         </div>
@@ -3325,7 +3330,16 @@ export default function BowlingTracker(){
             })]))}/>
         )}
 
-        {view==="trends"&&(
+        {view==="data"&&(
+          <div style={{...S.card,paddingTop:"12px",paddingBottom:"12px"}}>
+            <div style={S.chips}>
+              <Chip label="Stats" selected={dataTab==="stats"} onToggle={()=>setDataTab("stats")}/>
+              <Chip label="Trends" selected={dataTab==="trends"} onToggle={()=>setDataTab("trends")}/>
+            </div>
+          </div>
+        )}
+
+        {view==="data"&&dataTab==="trends"&&(
           <TrendsView
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
@@ -3335,7 +3349,7 @@ export default function BowlingTracker(){
             leftHanded={trendsLeftHanded}/>
         )}
 
-        {view==="stats"&&(
+        {view==="data"&&dataTab==="stats"&&(
           <StatsView
             goalsPanel={goalBowler?(
               <GoalsPanel

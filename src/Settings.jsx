@@ -389,7 +389,7 @@ export default function Settings({
       <CollapsibleCard title="Money Games" summary={preferences.showMoneyGames ? "Shown" : "Hidden"}
         expanded={expanded.moneyGames} onToggle={() => toggle("moneyGames")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Poker, 3-6-9, and High Game Pot tracking cards on the Log and Stats tabs.
+          Poker, 3-6-9, and High Game Pot tracking cards on the Log and Data tabs.
         </div>
         <div style={S.chips}>
           <Chip label="Shown" selected={preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, true))} color={C.strike} />
@@ -400,7 +400,7 @@ export default function Settings({
       <CollapsibleCard title="Stats Card Layout" summary={`${cardOrder.length - hidden.size} of ${cardOrder.length} visible`}
         expanded={expanded.statsLayout} onToggle={() => toggle("statsLayout")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Reorder or hide whole cards on the Stats tab. Each card moves as one unit — the stats grouped inside it stay together.
+          Reorder or hide whole cards on the Data tab. Each card moves as one unit — the stats grouped inside it stay together.
         </div>
         {cardOrder.map((id, idx) => {
           const isHidden = hidden.has(id);
@@ -472,7 +472,7 @@ export default function Settings({
       <CollapsibleCard title="Reset" summary={ENVIRONMENT_LABELS[preferences.environment] || "Default"}
         expanded={expanded.reset} onToggle={() => toggle("reset")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Made a mess of your own toggles or card order? Restore {ENVIRONMENT_LABELS[preferences.environment] || "this environment"}'s defaults — including the Stats card layout — without picking through everything by hand.
+          Made a mess of your own toggles or card order? Restore {ENVIRONMENT_LABELS[preferences.environment] || "this environment"}'s defaults — including the Data card layout — without picking through everything by hand.
         </div>
         <button style={{ ...S.btn(), width: "100%" }} onClick={() => apply(prev => resetToEnvironmentDefaults(prev))}>
           Reset to {ENVIRONMENT_LABELS[preferences.environment] || "Default"} Defaults
