@@ -30,7 +30,10 @@ import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHa
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./domain/goals.js";
-import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown } from "./domain/coaching.js";
+import { scoreStats } from "./domain/scoreInsights.js";
+import { buildAnalysisPayload, unlockSignature, newlyUnlocked } from "./domain/insightGating.js";
+import { drillLines } from "./domain/sessionRecap.js";
+import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -90,6 +93,11 @@ const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
 const LEAGUE_DATES_KEY = "bowling-league-dates-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
 const DRILLS_KEY = "bowling-drills-v1";
+// Signature of what was analysable last time Insights was evaluated, so a
+// newly-crossed threshold can be announced exactly once.
+const INSIGHT_UNLOCK_KEY = "bowling-insight-unlocks-v1";
+// When the coach last read their bowlers' task responses.
+const COACH_SEEN_KEY = "bowling-coach-seen-v1";
 const GUESTS_KEY = "bowling-practice-guests-v1";
 const MANUAL_SCORES_KEY = "bowling-manual-scores-v1";
 const SESSION_START_KEY = "bowling-session-start-dismissed-v1";
@@ -1501,6 +1509,25 @@ export default function BowlingTracker(){
   // name or note doesn't fire a cloud write per keystroke.
   // Lets a bowler re-run the first-launch setup from Settings -- handy if
   // they skipped it, or their situation changed.
+  // Task responses the coach hasn't read yet. Push is blocked on
+  // packaging; this is the part that works today and is arguably more
+  // useful anyway -- which bowler needs attention, visible at a glance.
+  const[coachSeenAt,setCoachSeenAt]=useState(undefined);
+  useEffect(()=>{
+    (async()=>{
+      try{const r=await window.storage.get(COACH_SEEN_KEY);setCoachSeenAt(r?r.value:null);}
+      catch{setCoachSeenAt(null);}
+    })();
+  },[]);
+  const unreadResponses=coachSeenAt===undefined?{}:respondedSince(tasksByRelationship,coachSeenAt);
+  const unreadResponseCount=Object.values(unreadResponses).reduce((n,list)=>n+list.length,0);
+  async function markCoachResponsesSeen(){
+    const latest=latestResponseAt(tasksByRelationship);
+    if(!latest)return;
+    setCoachSeenAt(latest);
+    try{await window.storage.set(COACH_SEEN_KEY,latest);}catch{}
+  }
+
   // ── Coaching ────────────────────────────────────────────────────────
   async function loadCoaching(){
     if(!user?.id)return;
@@ -2651,10 +2678,62 @@ export default function BowlingTracker(){
       recentAverages:mySessions.slice(-8).map(s=>s.average).filter(v=>typeof v==="number"),
       balls:ballRows,
       centers:centerStats.map(c=>({name:c.center.name,average:c.average,games:c.games})),
+      // Drills, patterns, and score-only statistics: data the app already
+      // had and Insights was ignoring. Each is gated on its own sample in
+      // buildAnalysisPayload, so adding them here widens what CAN be
+      // analysed without loosening any bar.
+      drills:drillLines(drills,who,null,leftHandedForBowler(who)).map(l=>({
+        label:l.label,attempts:l.attempts,rate:l.rate,
+      })),
+      patterns:patternAverages(sessions,lanePatterns,tournaments,who),
+      scoreStats:scoreStats(mySessions,who,normalizeProfile(profiles[who],who).bookAverage),
     };
   })();
 
-  async function analyzePerformance(payload){
+  // Notifies once when a statistic crosses its threshold, so a bowler
+  // isn't left checking a tab that had nothing for them last time.
+  //
+  // Keyed on a signature of WHAT is analysable rather than a count, so it
+  // fires on the transition and not on every render. Persisted, so it
+  // survives a reload and doesn't re-announce the same unlock. Seeded on
+  // first run rather than firing -- an existing bowler opening the app
+  // after this ships should not be told everything they already had is
+  // "new".
+  const[insightUnlockSeen,setInsightUnlockSeen]=useState(null);
+  const[newInsights,setNewInsights]=useState([]);
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      const payload=buildAnalysisPayload(insightStats);
+      const sig=unlockSignature(payload);
+      if(!sig)return;
+      let seen=insightUnlockSeen;
+      if(seen===null){
+        try{
+          const r=await window.storage.get(INSIGHT_UNLOCK_KEY);
+          seen=r?r.value:"";
+          if(!r){
+            // First run since this shipped: record what's already
+            // available instead of announcing it.
+            await window.storage.set(INSIGHT_UNLOCK_KEY,sig);
+            seen=sig;
+          }
+        }catch{seen="";}
+        if(cancelled)return;
+        setInsightUnlockSeen(seen);
+      }
+      const fresh=newlyUnlocked(payload,seen);
+      if(fresh.length){
+        setNewInsights(fresh);
+        setInsightUnlockSeen(sig);
+        try{await window.storage.set(INSIGHT_UNLOCK_KEY,sig);}catch{}
+      }
+    })();
+    return()=>{cancelled=true;};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[insightStats]);
+
+    async function analyzePerformance(payload){
     try{
       const{data,error}=await supabase.functions.invoke("analyze-performance",{body:{payload}});
       if(error)return{error:error.message||"Analysis failed."};
@@ -3145,6 +3224,14 @@ export default function BowlingTracker(){
           {navTabs.map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
     {v==="log"?"Log":v==="data"?"Data":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
+    {/* Dot rather than a count: the point is "there's something new
+        here", and a number invites counting rather than looking. */}
+    {v==="insights"&&newInsights.length>0&&view!=="insights"&&(
+      <span style={{display:"inline-block",width:"6px",height:"6px",borderRadius:"50%",backgroundColor:C.spare,marginLeft:"4px",verticalAlign:"top"}}/>
+    )}
+    {v==="coaching"&&coachViewOn&&unreadResponseCount>0&&view!=="coaching"&&(
+      <span style={{display:"inline-block",width:"6px",height:"6px",borderRadius:"50%",backgroundColor:C.spare,marginLeft:"4px",verticalAlign:"top"}}/>
+    )}
   </button>
 ))}
         </div>
@@ -3199,7 +3286,8 @@ export default function BowlingTracker(){
       <div style={S.content}>
         
         {view==="insights"&&(
-          <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}/>
+          <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}
+            newlyAvailable={newInsights} onDismissNew={()=>setNewInsights([])}/>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3345,6 +3433,8 @@ export default function BowlingTracker(){
             onReopenTask={reopenCoachingTask}
             onAddNote={addCoachingNote}
             leftHandedByUserId={coachHandednessById}
+            unreadResponses={unreadResponses}
+            onMarkResponsesSeen={markCoachResponsesSeen}
             onSelectBowler={loadCoachBowlerSessions}
             bowlerSnapshots={Object.fromEntries(Object.entries(coachBowlerSessions).map(([id,sess])=>[id,bowlerSnapshot(sess)]))}
             bowlerBreakdowns={Object.fromEntries(Object.entries(coachBowlerShots).map(([id,sh])=>[id,shotBreakdown(sh,{

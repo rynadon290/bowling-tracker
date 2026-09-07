@@ -211,6 +211,7 @@ export default function CoachingView({
   onAddTask, onRemoveTask, onCompleteTask, onAttemptTask, onReopenTask,
   onAddNote, leftHandedByUserId = {},
   onSelectBowler, bowlerSnapshots = {}, bowlerBreakdowns = {},
+  unreadResponses = {}, onMarkResponsesSeen,
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [addingTask, setAddingTask] = useState(false);
@@ -232,6 +233,14 @@ export default function CoachingView({
   useEffect(() => {
     if (coachViewOn && selected && onSelectBowler) onSelectBowler(selected.userId);
   }, [coachViewOn, selected?.userId]);
+
+  // Marked read when the coach is actually on this screen in coach view --
+  // not when the data loads, which would clear the badge for someone who
+  // never looked.
+  useEffect(() => {
+    if (coachViewOn && onMarkResponsesSeen) onMarkResponsesSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coachViewOn]);
   const tasks = selected ? partitionTasks(tasksByRelationship?.[selected.relationshipId] || []) : null;
   const notes = selected ? (notesByRelationship?.[selected.relationshipId] || []) : [];
   const actingAsCoach = coachViewOn;
@@ -290,7 +299,8 @@ export default function CoachingView({
         {list.length > 0 && (
           <div style={S.chips}>
             {list.map(x => (
-              <Chip key={x.relationshipId} label={x.displayName}
+              <Chip key={x.relationshipId}
+                label={(unreadResponses[x.relationshipId]?.length ? "• " : "") + x.displayName}
                 selected={selected?.relationshipId === x.relationshipId}
                 onToggle={() => setSelectedId(x.relationshipId)} color={C.accent} />
             ))}

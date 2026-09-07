@@ -2,6 +2,7 @@ import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   canAnalyze, gamesUntilAnalysis, buildAnalysisPayload, payloadIsEmpty,
+  upcomingUnlocks,
   MIN_GAMES_FOR_ANALYSIS, SAMPLE_THRESHOLDS,
 } from "./domain/insightGating.js";
 
@@ -63,7 +64,7 @@ function DataBasis({ payload }) {
   );
 }
 
-export default function InsightsView({ stats, onAnalyze, bowlerName }) {
+export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvailable = [], onDismissNew }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -112,20 +113,57 @@ export default function InsightsView({ stats, onAnalyze, bowlerName }) {
   }
 
   if (nothingToSay) {
+    // A distance, not a dead end. 26 of 50 league bowlers hit the old
+    // version of this screen on their first visit and 9 never returned --
+    // not because the bar was wrong, but because "no statistic has enough
+    // behind it" reads as never rather than not yet.
+    const next = upcomingUnlocks(payload, 3);
     return (
       <div style={S.card}>
         <div style={S.label}>Insights</div>
-        <div style={{ fontSize: "12px", color: C.textMuted }}>
-          You have {gameCount} games logged, but no single statistic has enough
-          behind it yet to analyse honestly. Keep logging — this fills in as
-          each one reaches a usable sample.
+        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: next.length ? "10px" : 0 }}>
+          You have {gameCount} games logged. Nothing has enough behind it to
+          analyse honestly yet — here's what's closest.
         </div>
+        {next.map(u => (
+          <div key={u.key} style={{ marginBottom: "8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "12px" }}>
+              <span style={{ color: C.text }}>{u.label}</span>
+              <span style={{ color: C.accent, fontWeight: 600 }}>
+                {u.shortBy} more {u.unit}
+              </span>
+            </div>
+            <div style={{ height: "4px", backgroundColor: C.surface, borderRadius: "2px", overflow: "hidden", marginTop: "3px" }}>
+              <div style={{ height: "100%", width: `${Math.round(((u.have || 0) / u.need) * 100)}%`, backgroundColor: C.accent, borderRadius: "2px" }} />
+            </div>
+            <div style={{ fontSize: "10px", color: C.textMuted, marginTop: "2px" }}>
+              {u.have} of {u.need}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
     <div>
+      {/* Announced once, when a threshold is actually crossed -- so a
+          bowler who found nothing here last month knows to come back,
+          rather than having to keep checking. */}
+      {newlyAvailable.length > 0 && (
+        <div style={{ ...S.card, border: `1px solid ${C.spare}44`, backgroundColor: C.spare + "11" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
+            <div style={{ fontSize: "13px", color: C.text }}>
+              <strong>New since last time:</strong> {newlyAvailable.join(", ")}.
+            </div>
+            {onDismissNew && (
+              <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "16px", padding: 0, lineHeight: 1 }}
+                onClick={onDismissNew} aria-label="Dismiss">×</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {!result && (
         <div style={S.card}>
           <div style={S.label}>Insights</div>
