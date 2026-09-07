@@ -2670,9 +2670,18 @@ export default function BowlingTracker(){
     const valid=scores.filter(s=>s!=null);
     return valid.length?valid.reduce((a,b)=>a+b,0):null;
   }
+  const effectiveSessionLeague=
+    preferences.environment==="practice"?PRACTICE_SESSION_KEY:
+    preferences.environment==="casual"?CASUAL_SESSION_KEY:
+    sessionLeague;
+
   async function submitSession(){
-    if(!sessionLeague||!activeBowler)return;
-    const scores=[1,2,3].map(g=>getGameStrict(activeBowler,sessionLeague,sessionDate,g)).filter(s=>s!=null);
+    // effectiveSessionLeague, not sessionLeague. Practice and casual have
+    // no league to pick, so sessionLeague is "" there and this returned
+    // immediately -- meaning neither environment could ever end a
+    // session or produce a summary, however the button was wired.
+    if(!effectiveSessionLeague||!activeBowler)return;
+    const scores=[1,2,3].map(g=>getGameStrict(activeBowler,effectiveSessionLeague,sessionDate,g)).filter(s=>s!=null);
     if(!scores.length){
       // Previously silently did nothing here — no feedback at all, even
       // though this is a common, valid state (e.g. only the match points
@@ -2682,14 +2691,14 @@ export default function BowlingTracker(){
       setTimeout(()=>setSessionSaveMessage(null),2000);
       return;
     }
-    const ss=shots.filter(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
+    const ss=shots.filter(s=>s.bowler===activeBowler&&s.league===effectiveSessionLeague&&s.date===sessionDate);
     // A session is uniquely identified by bowler+league+date. If one already
     // exists (e.g. a double-tap on Save), update it in place rather than
     // adding a duplicate — a duplicate would silently double-count this
     // night in every average, the leaderboard, and the season record.
-    const existing=sessions.find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
+    const existing=sessions.find(s=>s.bowler===activeBowler&&s.league===effectiveSessionLeague&&s.date===sessionDate);
     const session={
-      id:existing?existing.id:crypto.randomUUID(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:sessionLeague,date:sessionDate,scores,
+      id:existing?existing.id:crypto.randomUUID(),bowler:activeBowler,teamId:ss[0]?.teamId||"",league:effectiveSessionLeague,date:sessionDate,scores,
       total:scores.reduce((a,b)=>a+b,0),
       average:Math.round(scores.reduce((a,b)=>a+b,0)/scores.length),
       pokerQuarter:existing?.pokerQuarter||[0,0,0],
@@ -3045,10 +3054,7 @@ export default function BowlingTracker(){
   // "" there -- which silently disabled game-score entry AND the session
   // recaps, both of which key off it. These environments get a stable
   // stand-in key instead.
-  const effectiveSessionLeague=
-    preferences.environment==="practice"?PRACTICE_SESSION_KEY:
-    preferences.environment==="casual"?CASUAL_SESSION_KEY:
-    sessionLeague;
+
 
   // Create the practice league row the moment practice is entered, not
   // when a score is first typed. saveSession and updateManualScore both
@@ -3314,11 +3320,22 @@ export default function BowlingTracker(){
   // goalMeasurements would show that teammate's progress to whoever is
   // logging shots.
   const logGoals=goalsByBowler[activeBowler]||[];
+  // Measured across ALL of this bowler's play, not just tonight's league.
+  //
+  // Goals are stored per bowler (goalsByBowler), never per league, so
+  // scoping the measurement to one league answered a different question
+  // from the one the goal asks. It looked fine on a league night --
+  // that's where the data was -- and went blank in practice, where the
+  // league is the "Practice" container and holds none of their history.
+  //
+  // Deliberately league-agnostic rather than practice-specific: a bowler
+  // in a Thursday session would have had the same problem, seeing only
+  // Thursday's numbers against a goal covering their whole game.
   const logGoalMeasurements=measurementsFor({
-    shots,sessions,bowler:activeBowler,league:effectiveSessionLeague,
+    shots,sessions,bowler:activeBowler,league:null,
     isSplit,isSinglePinLeave,isCornerPinLeave,
     leftHanded:leftHandedForBowler(activeBowler),
-    average:cAvg(sessions,activeBowler,effectiveSessionLeague),
+    average:cAvg(sessions,activeBowler,null),
     highGame:bowlerHighGame(sessions,activeBowler)?.value??null,
     highSeries:bowlerHighSeries(sessions,activeBowler)?.value??null,
   });

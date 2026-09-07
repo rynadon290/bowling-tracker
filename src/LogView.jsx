@@ -126,6 +126,18 @@ export default function LogView({
             {/* In Practice, a night can be games OR a drill. A drill is a
                 focused repetition scored as a rate -- it's kept out of the
                 game flow entirely so it can never touch an average. */}
+            {!editingId&&activeBowler&&(preferences.environment==="practice"||preferences.environment==="casual")&&(
+              <div style={{...S.card,padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{...S.label,marginBottom:0}}>
+                    {preferences.environment==="practice"?"Practice":"Bowling"}
+                  </div>
+                  <input style={{...S.input,width:"auto",fontSize:"12px",padding:"4px 8px"}} type="date"
+                    value={sessionDate} onChange={e=>setSessionDate(e.target.value)}/>
+                </div>
+              </div>
+            )}
+
             {!editingId&&activeBowler&&preferences.environment==="practice"&&(
               <div style={{...S.card,padding:"10px 12px"}}>
                 <div style={S.chips}>
@@ -220,18 +232,6 @@ export default function LogView({
                 match points. Practice has none of that, so it gets a plain
                 date header instead of a card promising things that aren't
                 there. */}
-            {!editingId&&activeBowler&&(preferences.environment==="practice"||preferences.environment==="casual")&&practiceMode!=="drill"&&(
-              <div style={{...S.card,padding:"10px 12px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{...S.label,marginBottom:0}}>
-                    {preferences.environment==="practice"?"Practice":"Bowling"}
-                  </div>
-                  <input style={{...S.input,width:"auto",fontSize:"12px",padding:"4px 8px"}} type="date"
-                    value={sessionDate} onChange={e=>setSessionDate(e.target.value)}/>
-                </div>
-              </div>
-            )}
-
             {!editingId&&activeBowler&&preferences.environment!=="tournament"&&preferences.environment!=="practice"&&preferences.environment!=="casual"&&(
               <CollapsibleCard
                 title="Tonight's Session"
@@ -380,6 +380,24 @@ export default function LogView({
                 league summary below: both are scores-only, and the league
                 block leans on theoretical scores, releases and misses that
                 neither environment records. */}
+            {/* Ending a session is explicit in every environment, not just
+                league. Without it practice and casual had no "I'm done"
+                moment at all: scores accumulated, no session row was
+                written, and no summary ever appeared -- so nothing marked
+                the night as finished and averages never picked it up.
+                Drills and tournaments save from their own cards, so this
+                covers the game-score environments. */}
+            {!editingId&&activeBowler&&effectiveSessionLeague
+              &&preferences.environment!=="league"
+              &&preferences.environment!=="tournament"
+              &&practiceMode!=="drill"&&(
+              <button style={{...S.btn("primary"),marginBottom:"12px"}} onClick={submitSession}>
+                {sessionSaveMessage?sessionSaveMessage:sessionSaved
+                  ?"✓ Session Saved"
+                  :preferences.environment==="practice"?"End Practice & View Summary":"Finish & View Summary"}
+              </button>
+            )}
+
             {!editingId&&(preferences.environment==="casual"||preferences.environment==="practice")&&effectiveSessionLeague&&(
               <SessionRecap
                 environment={preferences.environment}
