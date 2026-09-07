@@ -384,8 +384,6 @@ export default function BowlingTracker(){
   const[statsBowler,setStatsBowler]=useState("");
   const[compareBowler,setCompareBowler]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
-  const[trendMetric,setTrendMetric]=useState("weekly"); // 0, 1, 2, or "weekly"
-  const[trendScope,setTrendScope]=useState(""); // "" = combined both teams, or a specific league
   const[compareLeague,setCompareLeague]=useState("");
   const[sessionLeague,setSessionLeague]=useState("");
   const[sessionDate,setSessionDate]=useState(localDateString());
@@ -2248,22 +2246,6 @@ export default function BowlingTracker(){
   // average ACROSS those bowlers for that night before folding into the
   // running average — this works identically whether there's one bowler
   // (individual trend) or many (team trend).
-  function trendData(bowler,league,metric){
-    const ls=sessions.filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true));
-    const byDate={};
-    ls.forEach(s=>{(byDate[s.date]=byDate[s.date]||[]).push(s);});
-    const dates=Object.keys(byDate).sort();
-    let sum=0,count=0;
-    const points=[];
-    for(const date of dates){
-      const dayVals=byDate[date].map(s=>metric==="weekly"?s.average:s.scores[metric]).filter(v=>v!=null);
-      if(!dayVals.length)continue;
-      const dayAvg=dayVals.reduce((a,b)=>a+b,0)/dayVals.length;
-      sum+=dayAvg;count++;
-      points.push({date,value:Math.round((sum/count)*10)/10});
-    }
-    return points;
-  }
 
   // Every match with both a handicap value AND at least one result marked,
   // sorted by handicap ascending — the raw data for "do we do better closer
@@ -2999,7 +2981,7 @@ export default function BowlingTracker(){
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
-            statsLeague={statsLeague} setStatsLeague={setStatsLeague} trendMetric={trendMetric} setTrendMetric={setTrendMetric} trendScope={trendScope} setTrendScope={setTrendScope}
+            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
             compareLeague={compareLeague} setCompareLeague={setCompareLeague}
             matches={matches}
             FRAME_POSITION_RELIABILITY_THRESHOLD={FRAME_POSITION_RELIABILITY_THRESHOLD} SHOT_SAMPLE_THRESHOLD={SHOT_SAMPLE_THRESHOLD} allFirstBalls={allFirstBalls} bStats={bStats} bowlerLeagueCount={bowlerLeagueCount}
@@ -3011,7 +2993,7 @@ export default function BowlingTracker(){
             teamSinglePinSpareR={teamSinglePinSpareR} teamSpR={teamSpR} teamSplitConvR={teamSplitConvR} teamSplitR={teamSplitR} teamStkR={teamStkR} teamTenPinRate={teamTenPinRate}
             teamTenPinSpareR={teamTenPinSpareR} tenPinAttempts={tenPinAttempts} tenPinLeaveCount={tenPinLeaveCount} tenPinMade={tenPinMade} tenPinSpareR={tenPinSpareR} tot={tot} wk={wk}
             handicapMatches={handicapMatches} handicapSplit={handicapSplit} longestStrikeStreak={longestStrikeStreak}
-            theoreticalScoreForGame={theoreticalScoreForGame} trendData={trendData}
+            theoreticalScoreForGame={theoreticalScoreForGame}
             preferences={preferences}
           />
         )}

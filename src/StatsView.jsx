@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, Chip, CompareBadge } from "./ui.jsx";
 import { STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS } from "./constants.js";
 import {
@@ -17,7 +17,7 @@ export default function StatsView({
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
-  statsLeague, setStatsLeague, trendMetric, setTrendMetric, trendScope, setTrendScope,
+  statsLeague, setStatsLeague,
   compareLeague, setCompareLeague, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
   cleanFrameCount, cleanFrameR, compareLabel, firstBallAvg, fivePinAttempts, fivePinMisses,
@@ -28,7 +28,7 @@ export default function StatsView({
   teamSinglePinSpareR, teamSpR, teamSplitConvR, teamSplitR, teamStkR, teamTenPinRate,
   teamTenPinSpareR, tenPinAttempts, tenPinLeaveCount, tenPinMade, tenPinSpareR, tot, wk,
   handicapMatches, handicapSplit, longestStrikeStreak,
-  theoreticalScoreForGame, trendData,
+  theoreticalScoreForGame,
 }) {
   // Fixed cards keep anchored positions: "Viewing" is the selector that
   // controls everything below it, and "Danger Zone" holds destructive
@@ -1028,46 +1028,6 @@ sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(session
                     </div>
                   </div>
                 )
-                );
-                byId["trend"] = (
-sessions.length>0&&(()=>{
-                  const data=trendData(statsBowler,trendScope,trendMetric);
-                  return(
-                    <div style={S.card}>
-                      <div style={S.label}>Trend</div>
-                      <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                        Cumulative average across the season — shows whether {statsBowler||"the team"} is trending up or down.
-                      </div>
-                      <div style={S.chips}>
-                        <Chip label="Game 1" selected={trendMetric===0} onToggle={()=>setTrendMetric(0)}/>
-                        <Chip label="Game 2" selected={trendMetric===1} onToggle={()=>setTrendMetric(1)}/>
-                        <Chip label="Game 3" selected={trendMetric===2} onToggle={()=>setTrendMetric(2)}/>
-                        <Chip label="Weekly" selected={trendMetric==="weekly"} onToggle={()=>setTrendMetric("weekly")}/>
-                      </div>
-                      <div style={{...S.chips,marginTop:"8px"}}>
-                        <Chip label="Combined" selected={!trendScope} onToggle={()=>setTrendScope("")} color={C.accent}/>
-                        {leagues.map(l=>(
-                          <Chip key={l} label={l.replace(" House Shot","")} selected={trendScope===l} onToggle={()=>setTrendScope(trendScope===l?"":l)} color={C.accent}/>
-                        ))}
-                      </div>
-                      {data.length<2?(
-                        <div style={{fontSize:"12px",color:C.textMuted,textAlign:"center",padding:"24px 0"}}>Need at least 2 nights logged for this view to plot a trend.</div>
-                      ):(
-                        <div style={{height:"220px",marginTop:"12px"}}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={data} margin={{top:8,right:8,left:-16,bottom:0}}>
-                              <CartesianGrid stroke={C.border} strokeDasharray="3 3"/>
-                              <XAxis dataKey="date" tick={{fill:C.textMuted,fontSize:10}} tickFormatter={d=>d.slice(5)}/>
-                              <YAxis tick={{fill:C.textMuted,fontSize:10}} domain={["auto","auto"]}/>
-                              <Tooltip contentStyle={{backgroundColor:C.surface,border:`1px solid ${C.border}`,borderRadius:"8px",fontSize:"12px"}} labelStyle={{color:C.text}}/>
-                              <Line type="monotone" dataKey="value" stroke={C.accent} strokeWidth={2} dot={{r:3,fill:C.accent}}/>
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()
                 );
                 byId["money"] = (
 preferences.showMoneyGames&&(()=>{
