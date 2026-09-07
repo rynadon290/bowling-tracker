@@ -17,21 +17,46 @@ function fieldLabel(text) {
 
 // Search-as-you-type over the seeded pattern library, falling back to
 // plain free text -- a PBA tournament pattern or a house shot won't be in
-// the seed set, and that's expected, not an error state.
-function OilPatternField({ value, onChange, patterns }) {
+// the seed set, and that's expected, not an error state. If it's genuinely
+// new, "Save this pattern" adds it to the shared table so it's searchable
+// next time, for this bowler or anyone else.
+function OilPatternField({ value, onChange, patterns, onSubmitPattern }) {
   const [focused, setFocused] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newLength, setNewLength] = useState("");
+  const [newRatio, setNewRatio] = useState("");
+  const [newVolume, setNewVolume] = useState("");
+  const [saved, setSaved] = useState(false);
+
   const matches = focused ? searchPatterns(value, patterns) : [];
   // An exact match (typed in full, or just selected) shows its specs
   // instead of a dropdown -- no point suggesting alternatives to a pattern
   // already fully identified.
-  const exact = (patterns || []).find(p => p.name.toLowerCase() === (value || "").trim().toLowerCase());
+  const trimmed = (value || "").trim();
+  const exact = (patterns || []).find(p => p.name.toLowerCase() === trimmed.toLowerCase());
+  // Worth offering to save once there's a plausible name and it isn't
+  // already in the table -- 3 characters keeps this from popping up on
+  // every single keystroke of a short partial name.
+  const offerToAdd = trimmed.length >= 3 && !exact && !focused;
+
+  function save() {
+    onSubmitPattern?.({
+      name: trimmed,
+      lengthFeet: newLength ? Number(newLength) : null,
+      ratio: newRatio.trim(),
+      volumeMl: newVolume ? Number(newVolume) : null,
+    });
+    setAdding(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
 
   return (
     <div style={{ position: "relative" }}>
       {fieldLabel("Oil Pattern")}
       <input style={S.input} placeholder="e.g. Krypton, or type your own"
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={e => { onChange(e.target.value); setAdding(false); setSaved(false); }}
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 150)} />
       {exact && describePattern(exact) && (
@@ -51,11 +76,40 @@ function OilPatternField({ value, onChange, patterns }) {
           ))}
         </div>
       )}
+
+      {offerToAdd && !adding && !saved && onSubmitPattern && (
+        <button style={{ background: "none", border: "none", padding: 0, marginTop: "4px", fontSize: "11px", color: C.accent, cursor: "pointer", textDecoration: "underline" }}
+          onClick={() => setAdding(true)}>
+          + Save "{trimmed}" for next time
+        </button>
+      )}
+      {saved && (
+        <div style={{ fontSize: "11px", color: C.strike, marginTop: "4px" }}>✓ Saved</div>
+      )}
+      {adding && (
+        <div style={{ marginTop: "6px", padding: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "6px" }}>
+            Length, ratio, and volume are optional — fill in whatever you know.
+          </div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+            <input style={{ ...S.input, flex: 1, fontSize: "12px" }} type="number" placeholder="Feet"
+              value={newLength} onChange={e => setNewLength(e.target.value)} />
+            <input style={{ ...S.input, flex: 1, fontSize: "12px" }} placeholder="Ratio e.g. 3:1"
+              value={newRatio} onChange={e => setNewRatio(e.target.value)} />
+            <input style={{ ...S.input, flex: 1, fontSize: "12px" }} type="number" placeholder="mL"
+              value={newVolume} onChange={e => setNewVolume(e.target.value)} />
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button style={{ ...S.btn("primary"), flex: 1, padding: "6px", fontSize: "12px" }} onClick={save}>Save</button>
+            <button style={{ ...S.btn(), flex: 1, padding: "6px", fontSize: "12px" }} onClick={() => setAdding(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay, oilPatterns }) {
+function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay, oilPatterns, submitOilPattern }) {
   const total = dayTotal(day);
   const avg = dayAverage(day);
   const entered = dayGamesEntered(day);
@@ -110,7 +164,8 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
           <OilPatternField
             value={day.oilPattern}
             onChange={v => update({ ...day, oilPattern: v })}
-            patterns={oilPatterns} />
+            patterns={oilPatterns}
+            onSubmitPattern={submitOilPattern} />
         </div>
       </div>
 
@@ -191,7 +246,7 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
   );
 }
 
-export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns }) {
+export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns, submitOilPattern }) {
   const total = tournamentTotal(tournament);
   const avg = tournamentAverage(tournament);
   const money = tournamentMoney(tournament);
@@ -221,7 +276,8 @@ export default function TournamentSession({ tournament, onChange, onSave, saved,
           canRemoveDay={(tournament.days || []).length > 1}
           onRemoveDay={() => onChange(removeDay(tournament, day.dayNumber))}
           onChange={next => onChange(updateDay(tournament, day.dayNumber, () => next))}
-          oilPatterns={oilPatterns} />
+          oilPatterns={oilPatterns}
+          submitOilPattern={submitOilPattern} />
       ))}
 
       <button style={{ ...S.btn(), width: "100%", marginBottom: "12px" }} onClick={() => onChange(addDay(tournament))}>

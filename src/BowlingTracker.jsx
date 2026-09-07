@@ -28,7 +28,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
-import { normalizePattern, patternFromRow } from "./domain/oilPatterns.js";
+import { normalizePattern, patternFromRow, patternToRow } from "./domain/oilPatterns.js";
 import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
@@ -874,6 +874,23 @@ export default function BowlingTracker(){
 
   // Editable later too -- a season date typed wrong at creation, or a
   // league that never had one, shouldn't be locked in forever.
+  // Adding a pattern that isn't in the seed set -- a house shot, a PBA
+  // Tour stop that wasn't included, or one typed wrong the first time.
+  // Never marked verified: only the seeded, sourced rows carry that.
+  async function submitOilPattern(pattern){
+    const normalized=normalizePattern(pattern);
+    if(!normalized)return null;
+    // If it already exists (same name, case-insensitive), don't create a
+    // duplicate -- just use the existing one.
+    const existing=oilPatterns.find(p=>p.name.toLowerCase()===normalized.name.toLowerCase());
+    if(existing)return existing;
+    const updated=[...oilPatterns,normalized];
+    setOilPatterns(updated);
+    try{window.storage.set(OIL_PATTERNS_KEY,JSON.stringify(updated));}catch{}
+    cloudWrite("oil_patterns",patternToRow(normalized,user?.id||null));
+    return normalized;
+  }
+
   async function saveLeagueDates(name,startDate,endDate){
     const normalized=normalizeLeagueDates({startDate,endDate});
     const updated={...leagueDates,[name]:normalized};
@@ -2664,7 +2681,7 @@ export default function BowlingTracker(){
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
-            oilPatterns={oilPatterns}
+            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}
