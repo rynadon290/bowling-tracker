@@ -161,7 +161,7 @@ describe('supabase round trip', () => {
   it('preserves every field in both directions', () => {
     const full = {
       bowlerName: 'Ryan', leftHanded: true, twoHanded: true, homeCenters: ['Bowlero'], notes: 'thumb tape',
-      bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter',
+      bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter', bookAverageAsOf: '2026-08-01',
     };
     expect(profileFromRow(profileToRow(full, 'user-1'))).toEqual(full);
   });

@@ -34,6 +34,12 @@ export function emptyProfile(bowlerName = "") {
     bookAverage: "",
     bookGames: "",
     bookSeason: "",
+    // The end_date of the most recent league-season this bowler has
+    // already been prompted about updating their book average for. Set
+    // when they accept, override, or dismiss the prompt -- never touched
+    // otherwise. See domain/leagueSeasons.js for how this stops the same
+    // season-end from nagging twice.
+    bookAverageAsOf: "",
   };
 }
 
@@ -53,6 +59,7 @@ export function normalizeProfile(raw, bowlerName = "") {
     bookAverage: raw.bookAverage === null || raw.bookAverage === undefined ? "" : String(raw.bookAverage),
     bookGames: raw.bookGames === null || raw.bookGames === undefined ? "" : String(raw.bookGames),
     bookSeason: typeof raw.bookSeason === "string" ? raw.bookSeason : "",
+    bookAverageAsOf: typeof raw.bookAverageAsOf === "string" ? raw.bookAverageAsOf : "",
   };
 }
 
@@ -219,6 +226,7 @@ export function profileToRow(profile, userId) {
     book_average: numOrNull(profile.bookAverage, 0, 300),
     book_games: (() => { const n = numOrNull(profile.bookGames, 1, 10000); return n === null ? null : Math.round(n); })(),
     book_season: profile.bookSeason || null,
+    book_average_as_of: profile.bookAverageAsOf || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -234,6 +242,7 @@ export function profileFromRow(row) {
     bookAverage: row.book_average,
     bookGames: row.book_games,
     bookSeason: row.book_season,
+    bookAverageAsOf: row.book_average_as_of,
   });
 }
 
