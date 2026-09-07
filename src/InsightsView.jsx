@@ -64,7 +64,7 @@ function DataBasis({ payload }) {
   );
 }
 
-export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvailable = [], onDismissNew }) {
+export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvailable = [], onDismissNew, hasCoach = false, coachName = "" }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -210,8 +210,24 @@ export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvaila
 
           {payload && <DataBasis payload={payload} />}
 
-          <div style={{ fontSize: "10px", color: C.textMuted, textAlign: "center", marginBottom: "12px" }}>
-            Generated from your own logged stats. Patterns in your numbers, not coaching.
+          {/* Sits with the results, not on the button that runs them: a
+              disclaimer read before there's anything to be sceptical
+              about is a disclaimer nobody reads. */}
+          <div style={{ ...S.card, backgroundColor: C.surface, marginBottom: "12px" }}>
+            <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.6 }}>
+              Written by AI from the stats you've logged. It can be wrong, and it can sound
+              confident while being wrong — treat it as a starting point for a conversation,
+              not an instruction.
+            </div>
+            {/* Only when they actually have a coach. A bowler without one
+                has nobody to check with, and telling them to consult
+                someone who doesn't exist is noise. */}
+            {hasCoach && (
+              <div style={{ fontSize: "11px", color: C.spare, lineHeight: 1.6, marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }}>
+                You're working with {coachName || "a coach"} — worth talking this through with
+                them before changing anything. They can see what these numbers can't.
+              </div>
+            )}
           </div>
 
           <button style={{ ...S.btn(), width: "100%" }} onClick={() => { setResult(null); setError(null); }}>

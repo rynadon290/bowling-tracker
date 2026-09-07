@@ -35,7 +35,7 @@ import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./dom
 import { scoreStats } from "./domain/scoreInsights.js";
 import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insightGating.js";
 import { drillLines } from "./domain/sessionRecap.js";
-import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
+import { categorizeCoaching, taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
 import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
   correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
   pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
@@ -325,6 +325,14 @@ export default function BowlingTracker(){
   // bowler's confirmation. Cloud-only: they belong to two people, and a
   // stale local copy of a teammate's scores is worse than none.
   const[importedScores,setImportedScores]=useState([]);
+  // Friend requests waiting on this account. Loaded here rather than
+  // read from the Social tab, because Social only mounts when the bowler
+  // visits it -- and an inbox that only knows about a request after you
+  // check the tab it lives on is no better than the tab.
+  //
+  // Read-only here: accepting still happens on Social, which owns the
+  // full friendship state. This copy just refreshes afterwards.
+  const[incomingFriendRequests,setIncomingFriendRequests]=useState([]);
   const[tasksByRelationship,setTasksByRelationship]=useState({});
   const[notesByRelationship,setNotesByRelationship]=useState({});
   // Sessions for whichever bowler the coach currently has selected in the
@@ -534,6 +542,7 @@ export default function BowlingTracker(){
     if(!user?.id)return;
     loadCoaching();
     loadImportedScores();
+    loadFriendRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id]);
 
@@ -1548,6 +1557,25 @@ export default function BowlingTracker(){
     if(!latest)return;
     setCoachSeenAt(latest);
     try{await window.storage.set(COACH_SEEN_KEY,latest);}catch{}
+  }
+
+  async function loadFriendRequests(){
+    if(!user?.id)return;
+    const res=await cloudRead("friendships",q=>q.select("id,requester_id,addressee_id,status"));
+    if(!res.online||!Array.isArray(res.data))return;
+    const pending=res.data.filter(f=>f.addressee_id===user.id&&f.status==="pending");
+    if(!pending.length){setIncomingFriendRequests([]);return;}
+    const ids=[...new Set(pending.map(f=>f.requester_id))];
+    const profRes=await cloudRead("profiles",q=>q.select("id,display_name").in("id",ids));
+    const nameById={};
+    if(profRes.online&&Array.isArray(profRes.data)){
+      profRes.data.forEach(p=>{nameById[p.id]=p.display_name;});
+    }
+    setIncomingFriendRequests(pending.map(f=>({
+      friendshipId:f.id,
+      userId:f.requester_id,
+      displayName:nameById[f.requester_id]||"Someone",
+    })));
   }
 
   // ── Imported scores awaiting verification ───────────────────────────
@@ -2941,10 +2969,11 @@ export default function BowlingTracker(){
     coachingProfilesById:coachProfilesById,
     tasksByRelationship,
     unreadResponses,
-    // Friend and team requests are owned by the Social tab, which loads
-    // them itself. Wiring them here would mean a second fetch and a
-    // second copy that can disagree -- left out until that state moves
-    // up, rather than duplicated now.
+    friendRequests:incomingFriendRequests,
+    // Team invites are deliberately absent: pendingInvites are
+    // placeholders a captain types in by name, with no accept flow for
+    // the person named. There is nothing for an invitee to action, so
+    // routing them here would be inventing a request that doesn't exist.
     bookAverageDue:bookAverageCheck,
     catalogRejections:rejectedBallsFor(arsenals[activeBowler]||[],catalogEntries,catalogAck),
     coachViewOn,
@@ -2953,6 +2982,12 @@ export default function BowlingTracker(){
   // is clutter, and one that only appears when something is waiting needs
   // no label.
   const inboxCount=countInbox(inboxItems);
+
+  // Whether the bowler being VIEWED has an accepted coach -- Insights adds
+  // a line telling them to check with that coach before acting on it.
+  // Uses the viewed bowler, not the signed-in account: a coach reading a
+  // bowler's insights should see the same caveat the bowler does.
+  const insightCoaches=categorizeCoaching(coachingRels,user?.id,coachProfilesById).myCoaches;
 
   // Turning coach view on while sitting on Social would strand the user
   // on a tab that is no longer in the nav -- a blank screen with no way
@@ -3488,7 +3523,9 @@ export default function BowlingTracker(){
         
         {view==="insights"&&(
           <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}
-            newlyAvailable={newInsights} onDismissNew={()=>setNewInsights([])}/>
+            newlyAvailable={newInsights} onDismissNew={()=>setNewInsights([])}
+            hasCoach={insightCoaches.length>0}
+            coachName={insightCoaches.map(c=>c.displayName).join(" and ")}/>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3510,7 +3547,7 @@ export default function BowlingTracker(){
                 onLeagueRename={renameLeague}
               />
             )}
-            {socialTab==="friends"&&<Friends/>}
+            {socialTab==="friends"&&<Friends onRequestsChanged={loadFriendRequests}/>}
           </>
         )}
 
