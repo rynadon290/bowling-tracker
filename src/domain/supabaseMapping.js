@@ -1,13 +1,23 @@
+// Teams created locally get a generated id like "team-1788229040114-ohqwpv",
+// which Postgres rejects for a uuid column with 22P02. Only teams that
+// round-tripped through the cloud have real UUIDs. Any caller writing
+// team_id must pass it through this first -- the alternative is a sync
+// error the bowler can do nothing about.
+export function validTeamId(id) {
+  return (typeof id === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) ? id : null;
+}
+
 // team_id is validated defensively here even though shots never currently
 // use the form.teamId||sessionLeague fallback that caused this exact bug
 // in matches and lane_patterns — this same bug pattern has now shown up
 // twice, so trusting every caller forever isn't a great bet.
 export function shotToSupabaseRow(shot,userId,leagueIdsMap){
-  const validTeamId=(typeof shot.teamId==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(shot.teamId))?shot.teamId:null;
+  const teamId=validTeamId(shot.teamId);
   return{
     id:shot.id,
     user_id:userId,
-    team_id:validTeamId,
+    team_id:teamId,
     league_id:leagueIdsMap[shot.league]||null,
     bowler_name:shot.bowler||"",
     date:shot.date,
