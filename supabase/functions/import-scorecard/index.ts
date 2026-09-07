@@ -127,6 +127,8 @@ TEAM SCORECARDS -- many scorecards show a whole team, one column or row per bowl
 - seriesTotal if the card prints a series total for that bowler, repeated on each of their games.
 So a four-bowler team playing three games each returns twelve entries in "games", not four. On a single-bowler card, bowlerName may be null.
 
+Repeat bowlerName and lineupPosition on EVERY game belonging to that bowler -- not just their first one. Game 2 and game 3 of the same bowler must each carry that bowler's name and position, otherwise there is no way to tell whose game it is.
+
 Respond with valid JSON matching the provided schema exactly. If a screenshot shows partial or cut-off games, only include complete frames you can actually read clearly from the pin-deck graphic -- do not guess or fabricate a frame or ball you can't clearly see.`;
 
 Deno.serve(async (req) => {
@@ -193,21 +195,52 @@ Deno.serve(async (req) => {
       })),
     ];
 
-    const geminiRes = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
+    // 503 (model overloaded) and 429 (rate limited) are transient -- the
+    // model is busy, not broken, and a spike usually clears in seconds.
+    // Retrying here rather than showing the bowler an error means most
+    // spikes never surface at all. Everything else fails immediately;
+    // retrying a bad request just wastes the bowler's time.
+    const requestBody = JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: RESPONSE_SCHEMA,
+      },
     });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return new Response(JSON.stringify({ error: "Gemini API error", detail: errText }), {
+    const RETRY_DELAYS_MS = [2000, 5000];
+    let geminiRes: Response | null = null;
+    let lastErrText = "";
+
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      geminiRes = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody,
+      });
+      if (geminiRes.ok) break;
+
+      lastErrText = await geminiRes.text();
+      const transient = geminiRes.status === 503 || geminiRes.status === 429;
+      if (!transient || attempt === RETRY_DELAYS_MS.length) break;
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+
+    if (!geminiRes || !geminiRes.ok) {
+      const status = geminiRes?.status ?? 0;
+      // A machine-readable reason so the client can say something useful
+      // instead of showing raw API JSON to a bowler.
+      const reason = status === 503 ? "busy"
+        : status === 429 ? "rate_limited"
+        : status === 404 ? "model_unavailable"
+        : "api_error";
+      return new Response(JSON.stringify({
+        error: "Gemini API error",
+        reason,
+        upstreamStatus: status,
+        attempts: reason === "busy" || reason === "rate_limited" ? RETRY_DELAYS_MS.length + 1 : 1,
+        detail: lastErrText,
+      }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
