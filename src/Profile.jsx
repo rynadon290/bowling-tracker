@@ -8,6 +8,7 @@ import { centerLabel } from "./domain/centers.js";
 import {
   emptyProfile, normalizeProfile, addHomeCenter, removeHomeCenter,
   setProfileField, membershipFor, resolveHomeCenters,
+  normalizeAliases,
 } from "./domain/profiles.js";
 
 function BookAverageUpdatePrompt({ currentAverage, suggestion, onSave, onDismiss }) {
@@ -43,6 +44,10 @@ export default function Profile({
   bookAverageDue, bookAverageTriggerLeague, bookAverageSuggestion, acknowledgeBookAverageUpdate,
 }) {
   const [addingCenter, setAddingCenter] = useState(false);
+  // Must sit with the other hooks, ABOVE the early return below. A hook
+  // after a conditional return runs on some renders and not others, which
+  // React treats as a fatal error -- the app goes blank, not degraded.
+  const [aliasDraft, setAliasDraft] = useState("");
 
   // Every card on this screen is collapsible, keyed by section id. The
   // bowler switcher and identity card default open since they're the
@@ -51,7 +56,7 @@ export default function Profile({
   // each one still shows a useful summary while closed.
   const [expanded, setExpanded] = useState({
     whoseProfile: true, identity: true,
-    coaching: true, bookAverage: false, homeCenters: false, teamsLeagues: false,
+    aliases: false, coaching: true, bookAverage: false, homeCenters: false, teamsLeagues: false,
     arsenal: false, bags: false, notes: false,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
@@ -72,6 +77,13 @@ export default function Profile({
   const balls = arsenals[activeBowler] || [];
   const resolvedHomeCenters = resolveHomeCenters(profile, centers || []);
   const bowlerBagCount = (bags || []).filter(b => b.bowlerName === activeBowler).length;
+
+  function addAlias() {
+    const clean = aliasDraft.trim();
+    if (!clean) return;
+    update(setProfileField(profile, "aliases", normalizeAliases([...(profile.aliases || []), clean])));
+    setAliasDraft("");
+  }
 
   function update(next) {
     setProfile(activeBowler, next);
@@ -113,6 +125,38 @@ export default function Profile({
             onToggle={() => update(setProfileField(profile, "twoHanded", false))} />
           <Chip label="Two-handed / no thumb" selected={profile.twoHanded}
             onToggle={() => update(setProfileField(profile, "twoHanded", true))} />
+        </div>
+      </CollapsibleCard>
+
+      {/* Aliases: how this bowler's name appears on the house scoring
+          display, which is often not how it appears in the app. Used
+          only to match a scorecard photo back to the right person -- a
+          wrong match writes someone else's game into your record, and
+          that is far worse than an import that stops to ask. */}
+      <CollapsibleCard title="Scorecard Names"
+        summary={profile.aliases?.length ? `${profile.aliases.length} alias${profile.aliases.length === 1 ? "" : "es"}` : "None"}
+        expanded={expanded.aliases} onToggle={() => toggle("aliases")}>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+          How your name shows up on the screens at your center — "R. Nadon", "RYAN N", a nickname.
+          Adding these lets a scorecard photo find you instead of asking every time.
+        </div>
+        {(profile.aliases || []).map((alias, i) => (
+          <div key={`${alias}-${i}`} style={{ display: "flex", gap: "6px", marginBottom: "6px", alignItems: "center" }}>
+            <div style={{ flex: 1, fontSize: "13px", color: C.text }}>{alias}</div>
+            <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
+              onClick={() => update(setProfileField(profile, "aliases",
+                normalizeAliases((profile.aliases || []).filter((_, j) => j !== i))))}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: "6px" }}>
+          <input style={{ ...S.input, flex: 1, fontSize: "12px" }}
+            placeholder="e.g. R. Nadon"
+            value={aliasDraft} onChange={e => setAliasDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") addAlias(); }} />
+          <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+            disabled={!aliasDraft.trim()} onClick={addAlias}>Add</button>
         </div>
       </CollapsibleCard>
 
