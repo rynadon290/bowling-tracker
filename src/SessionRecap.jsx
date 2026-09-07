@@ -163,13 +163,18 @@ function DrillRecap({ recap, comparison }) {
           <div style={{ ...S.label, marginBottom: "6px" }}>Head To Head</div>
           {comparison.shared.map(sh => (
             <div key={sh.key} style={{ marginBottom: "8px" }}>
-              <div style={{ fontSize: "12px", color: C.text, marginBottom: "2px" }}>{sh.label}</div>
+              {/* A shared drill can read differently on each side: a
+                  lefty and a righty working the same abstract target
+                  ("the near-corner bucket-ish shape") have mirror-image
+                  real pins, so each line states its OWN label rather
+                  than assuming both sides mean the same physical pins. */}
+              <div style={{ fontSize: "12px", color: C.text, marginBottom: "2px" }}>{sh.myLabel}</div>
               <div style={{ fontSize: "11px", color: C.textMuted, display: "flex", justifyContent: "space-between" }}>
                 <span>You — {sh.mine.made}/{sh.mine.attempts}{sh.mine.thin ? "" : ` (${sh.mine.rate}%)`}</span>
               </div>
               {sh.others.map(o => (
                 <div key={o.bowler} style={{ fontSize: "11px", color: C.textMuted, display: "flex", justifyContent: "space-between" }}>
-                  <span>{o.bowler} — {o.attempts} attempts{o.thin ? "" : ` (${o.rate}%)`}</span>
+                  <span>{o.bowler} — {o.label !== sh.myLabel ? `${o.label}, ` : ""}{o.attempts} attempts{o.thin ? "" : ` (${o.rate}%)`}</span>
                   {o.diff != null && (
                     <span style={{ color: o.diff > 0 ? C.strike : o.diff < 0 ? C.miss : C.textMuted, fontWeight: 600 }}>
                       {o.diff > 0 ? "+" : o.diff < 0 ? "\u2212" : "\u00b1"}{Math.abs(o.diff)}
@@ -205,8 +210,13 @@ function DrillRecap({ recap, comparison }) {
 
 export default function SessionRecap({
   environment, manualScores, bowler, allBowlers, league, date, priorAverage,
-  drills,
+  drills, leftHandedForBowler,
 }) {
+  // A drill comparison can involve two people of different hands, so
+  // there's no single flag for "the" handedness here -- each side needs
+  // its own. Falls back to right-handed when the caller doesn't supply a
+  // resolver, matching every other handedness-aware default in this app.
+  const handOf = leftHandedForBowler || (() => false);
   if (environment === "casual") {
     const recap = casualRecap(manualScores, allBowlers, league, date);
     if (!recap) return null;
@@ -219,8 +229,8 @@ export default function SessionRecap({
     const comparison = practiceComparison(manualScores, bowler, partners, league, date);
     // Drills and games are separate kinds of practice and a session can
     // contain both, so neither replaces the other.
-    const dRecap = drillRecap(drills, bowler, date);
-    const dComparison = drillComparison(drills, bowler, partners, date);
+    const dRecap = drillRecap(drills, bowler, date, handOf(bowler));
+    const dComparison = drillComparison(drills, bowler, partners, date, handOf);
     if (!recap && !dRecap) return null;
     return (
       <>

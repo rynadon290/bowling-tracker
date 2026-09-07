@@ -29,7 +29,7 @@ export default function LogView({
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
   showSessionStart, dismissSessionStart, updatePreferences,
-  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills,
+  practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
   envBags, selectedBagId, setSelectedBagId, logBalls,
@@ -144,7 +144,8 @@ export default function LogView({
                 drills={drills}
                 bowler={activeBowler}
                 sessionDate={sessionDate}
-                onStartAnother={startAnotherDrill}/>
+                onStartAnother={startAnotherDrill}
+                leftHanded={leftHandedForBowler ? leftHandedForBowler(activeBowler) : false}/>
             )}
 
             {/* The arsenal lives on the Profile screen, not here. Managing
@@ -388,7 +389,8 @@ export default function LogView({
                 league={effectiveSessionLeague}
                 date={sessionDate}
                 priorAverage={practicePriorAverage}
-                drills={drills}/>
+                drills={drills}
+                leftHandedForBowler={leftHandedForBowler}/>
             )}
 
             {/* Summary */}
