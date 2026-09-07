@@ -1855,6 +1855,14 @@ export default function BowlingTracker(){
   }
 
   function restartOnboarding(){
+    // Seed from the existing profile. Without this an established bowler
+    // reruns setup to a blank name field, and finishing would either
+    // create a SECOND bowler under whatever they retyped or wipe the
+    // handedness and centers they already had.
+    const existing=activeBowler?profiles[activeBowler]:null;
+    setOnboardingProfile(existing
+      ?normalizeProfile(existing,activeBowler)
+      :emptyProfile(activeBowler||""));
     try{window.localStorage.removeItem(ONBOARDED_KEY);}catch{}
     try{window.storage.set(ONBOARDED_KEY,"0");}catch{}
     setOnboarded(false);
@@ -1869,7 +1877,11 @@ export default function BowlingTracker(){
     if(typed){
       if(!bowlers.includes(typed))saveBowlers([...bowlers,typed]);
       selectBowler(typed);
-      setProfile(typed,normalizeProfile({...onboardingProfile,bowlerName:typed},typed));
+      // Merge over whatever that bowler already had rather than replacing
+      // it: rerunning setup must not discard an arsenal, notes or a book
+      // average that onboarding never asks about.
+      const prior=profiles[typed];
+      setProfile(typed,normalizeProfile({...(prior||{}),...onboardingProfile,bowlerName:typed},typed));
     }
     setOnboarded(true);
     try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
