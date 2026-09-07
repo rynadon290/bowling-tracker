@@ -29,12 +29,47 @@ export function normalizePattern(raw) {
     reverseMl: raw.reverseMl ?? null,
     verified: !!raw.verified,
     sourceNote: raw.sourceNote || "",
+    // The season the specs belong to. PBA animal patterns keep their
+    // names year to year but the length, volume and ratio change -- a
+    // "Chameleon" without a year is ambiguous, and a bowler's 2024
+    // Chameleon numbers don't belong in the same bucket as 2026's.
+    year: Number.isInteger(Number(raw.year)) && Number(raw.year) > 1990 ? Number(raw.year) : null,
   };
+}
+
+// ── PBA animal patterns ────────────────────────────────────────────────
+//
+// The names are stable; the specs are not. So this seeds the NAMES, with
+// the year as the thing that disambiguates, and leaves length/volume/
+// ratio for the bowler or the community to fill from the official PBA
+// pattern sheet for that season. Shipping guessed numbers here would put
+// wrong specs behind a verified-looking entry, which is worse than blank.
+export const PBA_ANIMAL_PATTERNS = ["Cheetah", "Viper", "Chameleon", "Scorpion", "Shark", "Bear", "Wolf", "Badger", "Dragon"];
+
+export function pbaAnimalPatternSeeds(year = new Date().getFullYear()) {
+  return PBA_ANIMAL_PATTERNS.map(name => normalizePattern({
+    id: `pba-${name.toLowerCase()}-${year}`,
+    name,
+    series: "PBA Animal",
+    year,
+    verified: false,
+    sourceNote: `Specs change each season — fill from the PBA ${year} pattern sheet.`,
+  }));
+}
+
+// Display name: "Chameleon (2026)" when a year is set, so two seasons of
+// the same animal never look like one pattern.
+export function patternDisplayName(pattern) {
+  if (!pattern?.name) return "";
+  return pattern.year ? `${pattern.name} (${pattern.year})` : pattern.name;
 }
 
 // A short line for showing under a pattern's name, e.g.
 // "41' · Element Sport · 1.36:1 · 25.79 mL"
 export function describePattern(pattern) {
+  if (pattern?.year && !pattern?.lengthFeet && !pattern?.volumeMl) {
+    return `${pattern.series || "Sport"} · ${pattern.year} · specs not entered yet`;
+  }
   if (!pattern) return "";
   const parts = [];
   if (pattern.lengthFeet) parts.push(`${pattern.lengthFeet}'`);
@@ -76,6 +111,7 @@ export function searchPatterns(query, patterns, limit = 8) {
 export function patternToRow(pattern, userId) {
   return {
     name: pattern.name,
+    year: pattern.year ?? null,
     series: pattern.series || null,
     length_feet: pattern.lengthFeet || null,
     ratio: pattern.ratio || null,
@@ -92,6 +128,7 @@ export function patternFromRow(row) {
   return normalizePattern({
     id: row.id,
     name: row.name,
+    year: row.year,
     series: row.series,
     lengthFeet: row.length_feet,
     ratio: row.ratio,

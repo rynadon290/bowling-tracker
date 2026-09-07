@@ -99,3 +99,22 @@ describe('themes', () => {
     }
   });
 });
+
+describe('comparison colour', () => {
+  // The bug: on Lane, accent and spare were the same amber, so a
+  // head-to-head chart drew both bowlers identically.
+  // Luminance contrast is the wrong measure here -- teal and yellow can
+  // have the same luminance and still be obviously different. Colour
+  // distance in RGB is what "these are two different bowlers" needs.
+  it('is distinct from the accent on every theme', () => {
+    const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const dist = (a, b) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]));
+    for (const id of THEME_IDS) {
+      const c = THEMES[id].colors;
+      expect(dist(c.compare, c.accent)).toBeGreaterThan(80);
+    }
+  });
+  it('is readable on the card', () => {
+    for (const id of THEME_IDS) expect(contrast(THEMES[id].colors.compare, THEMES[id].colors.card)).toBeGreaterThanOrEqual(3);
+  });
+});

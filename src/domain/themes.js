@@ -29,6 +29,7 @@ export const THEMES = {
       bg: "#14110E", surface: "#1C1813", card: "#26201A",
       accent: "#E8A33D", accentDim: "#3D2E15",
       onAccent: "#1A1206",
+      compare: "#7FB8D9",
       strike: "#5FBF7F", spare: "#E8A33D", miss: "#D9564B",
       text: "#F4F0E6", textMuted: "#9A8F80", border: "#332B22",
     },
@@ -46,6 +47,7 @@ export const THEMES = {
       bg: "#0f1117", surface: "#1a1d27", card: "#22263a",
       accent: "#4a9eff", accentDim: "#1e3a5f",
       onAccent: "#0B1626",
+      compare: "#f59e0b",
       strike: "#22c55e", spare: "#f59e0b", miss: "#ef4444",
       text: "#e8eaf0", textMuted: "#8892a4", border: "#2e3347",
     },
@@ -61,6 +63,7 @@ export const THEMES = {
       bg: "#0F1412", surface: "#161D19", card: "#1E2822",
       accent: "#4FC9A4", accentDim: "#153A2E",
       onAccent: "#07201A",
+      compare: "#E8B94D",
       strike: "#5FBF7F", spare: "#E8B94D", miss: "#D9564B",
       text: "#EAF2EC", textMuted: "#8FA398", border: "#2A3A32",
     },
@@ -77,6 +80,7 @@ export const THEMES = {
       bg: "#140F16", surface: "#1C1520", card: "#271D2C",
       accent: "#E874A6", accentDim: "#3F1F30",
       onAccent: "#2A0F1C",
+      compare: "#7FC8B0",
       strike: "#5FBF7F", spare: "#E8A33D", miss: "#E05A5A",
       text: "#F3ECF2", textMuted: "#A08FA0", border: "#362A39",
     },
@@ -94,6 +98,7 @@ export const THEMES = {
       // Deepened from #E5484D: that shade only gave white text 3.9:1.
       accent: "#D63A40", accentDim: "#3E1418",
       onAccent: "#FFFFFF",
+      compare: "#7FB8D9",
       strike: "#5FBF7F", spare: "#E8B94D", miss: "#E5484D",
       text: "#FAFAFA", textMuted: "#9A9A9A", border: "#2E2E2E",
     },
@@ -114,6 +119,7 @@ Object.assign(THEMES, {
       bg: "#F6F3EE", surface: "#FFFFFF", card: "#FBF9F5",
       accent: "#9A5B14", accentDim: "#F3E4CD",
       onAccent: "#FFFFFF",
+      compare: "#2B5797",
       strike: "#1E7A44", spare: "#A5620F", miss: "#B8322C",
       text: "#1C1712", textMuted: "#6E655B", border: "#E2DBD0",
     },
@@ -131,6 +137,7 @@ Object.assign(THEMES, {
       bg: "#F4EFE2", surface: "#FBF8F0", card: "#FFFDF7",
       accent: "#2B5797", accentDim: "#DCE5F3",
       onAccent: "#FFFFFF",
+      compare: "#B8322C",
       strike: "#1E7A44", spare: "#9A6A0E", miss: "#B8322C",
       text: "#1E1B15", textMuted: "#6B655A", border: "#DED6C3",
     },
@@ -147,6 +154,7 @@ Object.assign(THEMES, {
       bg: "#F3F5F8", surface: "#FFFFFF", card: "#FAFBFD",
       accent: "#2457B0", accentDim: "#DCE6F7",
       onAccent: "#FFFFFF",
+      compare: "#A5620F",
       strike: "#1E7A44", spare: "#A5620F", miss: "#B8322C",
       text: "#141A24", textMuted: "#5F6B7A", border: "#DCE2EA",
     },
@@ -179,6 +187,10 @@ export const THEME_TOKENS = [
   // Hardcoding white here was the original app's one real accessibility
   // failure: Classic's blue only manages 2.75:1 under white.
   "onAccent",
+  // The second series in any two-bowler chart. Distinct from accent AND
+  // from spare on every theme -- on Lane those two are the same amber,
+  // which drew both bowlers in a head-to-head chart in one colour.
+  "compare",
   "strike", "spare", "miss", "text", "textMuted", "border",
 ];
 

@@ -283,3 +283,55 @@ export function describeTrend(metricId, points) {
   const word = d.direction === "up" ? "up" : "down";
   return `Trending ${word} about ${Math.abs(d.total)}${unit} across this stretch.`;
 }
+
+// ── Every game, one point each ──────────────────────────────────────────
+//
+// The other series average a night into a single point, which is right
+// for spotting a trend but hides the spread: a 190 night of 190/190/190
+// and one of 140/240/190 plot identically. This plots each game.
+//
+// The league filter still applies, so "all my games this Tuesday league"
+// and "all my games ever" are both available.
+//
+// x is a running index rather than a date: several games share one date,
+// and a date axis would stack them on top of each other.
+export function allGamesSeries(sessions, bowler, league) {
+  const rows = (Array.isArray(sessions) ? sessions : [])
+    .filter(s => s && (bowler ? s.bowler === bowler : true) && (league ? s.league === league : true))
+    .slice()
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const out = [];
+  let i = 0;
+  for (const s of rows) {
+    const scores = (Array.isArray(s.scores) ? s.scores : []).filter(v => Number.isFinite(v));
+    scores.forEach((score, gi) => {
+      out.push({
+        x: i++,
+        date: s.date,
+        game: gi + 1,
+        league: s.league || "",
+        value: score,
+        // Shown in the tooltip so a point can be placed: "Game 2, Tue 1 Sep".
+        label: `Game ${gi + 1}`,
+      });
+    });
+  }
+  return out;
+}
+
+// Summary of a game-level series, for the share text and the header.
+export function allGamesSummary(points) {
+  const vals = (Array.isArray(points) ? points : []).map(p => p.value).filter(Number.isFinite);
+  if (!vals.length) return null;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return {
+    games: vals.length,
+    average: Math.round(avg * 10) / 10,
+    high: Math.max(...vals),
+    low: Math.min(...vals),
+    // Spread is the reason to look at every game rather than nightly
+    // averages, so it's part of the summary rather than an extra.
+    spread: Math.max(...vals) - Math.min(...vals),
+  };
+}

@@ -56,6 +56,9 @@ describe('share card', () => {
     return { calls,
       fillRect() { calls.push(['rect']); },
       fillText(t) { calls.push(['text', t]); },
+      // Path methods: the logo is drawn rather than loaded, so a share
+      // works offline.
+      beginPath() { calls.push(['path']); }, moveTo() {}, lineTo() {}, closePath() {}, fill() { calls.push(['fill']); },
       set fillStyle(v) {}, set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {},
     };
   }
@@ -81,6 +84,15 @@ describe('share card', () => {
     const ctx = fakeCtx();
     drawShareCard(ctx, { scores: [200] });
     expect(ctx.calls.filter(c => c[0] === 'rect').length).toBe(40);
+  });
+
+  // The mark is drawn, not loaded, so a share that happens offline still
+  // carries the logo.
+  it('draws the arrow mark without loading an image', () => {
+    const ctx = fakeCtx();
+    drawShareCard(ctx, { scores: [200] });
+    expect(ctx.calls.some(c => c[0] === 'path')).toBe(true);
+    expect(ctx.calls.some(c => c[0] === 'fill')).toBe(true);
   });
 
   it('returns null with no canvas so the caller can fall back to text', () => {

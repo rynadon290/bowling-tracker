@@ -84,7 +84,7 @@ export function isManualNight(manualScores, bowler, league, date, gameCount = 3)
 }
 
 // ── Supabase mapping ────────────────────────────────────────────────────
-export function manualScoreToRow(bowler, leagueId, date, game, score, userId) {
+export function manualScoreToRow(bowler, leagueId, date, game, score, userId, equipment = null) {
   return {
     user_id: userId,
     bowler_name: bowler,
@@ -92,6 +92,10 @@ export function manualScoreToRow(bowler, leagueId, date, game, score, userId) {
     date,
     game,
     score,
+    // Null rather than "" so a league score row stays clean and an
+    // equipment-less practice game doesn't write two empty strings.
+    ball: equipment?.ball || null,
+    surface: equipment?.surface || null,
   };
 }
 
@@ -102,4 +106,48 @@ export function manualScoresFromRows(rows, leagueNameById) {
     out[scoreKey(row.bowler_name, leagueName, row.date, row.game)] = row.score;
   }
   return out;
+}
+
+// The equipment half of the same rows, keyed identically.
+export function gameEquipmentFromRows(rows, leagueNameById) {
+  const out = {};
+  for (const row of rows || []) {
+    if (!row.ball && !row.surface) continue;
+    const leagueName = leagueNameById?.[row.league_id] || "";
+    out[scoreKey(row.bowler_name, leagueName, row.date, row.game)] = { ball: row.ball || "", surface: row.surface || "" };
+  }
+  return out;
+}
+
+// ── Equipment per game (practice, scores-only) ──────────────────────────
+//
+// A practice night tracked by game score alone still has a ball and a
+// surface, and those are the things practice is FOR -- "the pearl at
+// 2000 averaged 205, the solid at 500 averaged 198" is the whole
+// experiment. Stored alongside the score under the same key so the two
+// can never drift apart.
+//
+// Kept in a separate map from the scores so getManualScore keeps
+// returning a number and nothing that reads scores has to learn about
+// equipment.
+export function getGameEquipment(equipment, bowler, league, date, game) {
+  const e = equipment?.[scoreKey(bowler, league, date, game)];
+  return { ball: e?.ball || "", surface: e?.surface || "" };
+}
+
+export function setGameEquipment(equipment, bowler, league, date, game, patch) {
+  const key = scoreKey(bowler, league, date, game);
+  const next = { ...(equipment || {}) };
+  const merged = { ...getGameEquipment(equipment, bowler, league, date, game), ...patch };
+  if (!merged.ball && !merged.surface) delete next[key];
+  else next[key] = merged;
+  return next;
+}
+
+// The ball a games-only practice defaults to. One ball in the arsenal
+// means no choice to make; more than one means ask. Plastic is never the
+// default -- nobody practises strikes with it -- but stays selectable.
+export function defaultPracticeBall(arsenal, plasticName = "Plastic") {
+  const real = (Array.isArray(arsenal) ? arsenal : []).filter(b => b && b !== plasticName);
+  return real.length === 1 ? real[0] : "";
 }

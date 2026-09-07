@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   scoreSeries, shotRateSeries, seriesFor, linearSlope, trendMetricFor, trendMetricsFor,
   trendDirection, describeTrend, seriesReliability, MIN_POINTS_FOR_DIRECTION,
+  allGamesSeries,
+  allGamesSummary,
 } from './trends.js';
 
 const sessions = [
@@ -188,5 +190,43 @@ describe('corner pin trend follows the bowler\'s hand', () => {
     const asRighty = shotRateSeries(sevens, 'R', '', 'tenPinSpareRate', () => false,
       s => (s.otherLeave || []).join() === '10');
     expect(asRighty).toEqual([]);
+  });
+});
+
+// A nightly average hides the spread: 190/190/190 and 140/240/190 plot
+// as the same point. This plots every game.
+describe('every game series', () => {
+  const sessions = [
+    { bowler: 'R', league: 'Tue', date: '2026-08-27', scores: [190, 190, 190] },
+    { bowler: 'R', league: 'Tue', date: '2026-09-01', scores: [140, 240, 190] },
+    { bowler: 'R', league: 'Thu', date: '2026-09-03', scores: [200, 210] },
+  ];
+
+  it('gives one point per game, not per night', () => {
+    expect(allGamesSeries(sessions, 'R', null)).toHaveLength(8);
+  });
+
+  it('still honours the league filter', () => {
+    expect(allGamesSeries(sessions, 'R', 'Tue')).toHaveLength(6);
+  });
+
+  // Several games share a date, so a date axis would stack them.
+  it('indexes games so same-night games do not collide', () => {
+    const pts = allGamesSeries(sessions, 'R', null);
+    expect(new Set(pts.map(p => p.x)).size).toBe(pts.length);
+    expect(pts.filter(p => p.date === '2026-09-01').map(p => p.value)).toEqual([140, 240, 190]);
+  });
+
+  it('reports the spread, which is the reason to look at all', () => {
+    const s = allGamesSummary(allGamesSeries(sessions, 'R', null));
+    expect(s.games).toBe(8);
+    expect(s.high).toBe(240);
+    expect(s.low).toBe(140);
+    expect(s.spread).toBe(100);
+  });
+
+  it('is empty rather than throwing with no sessions', () => {
+    expect(allGamesSeries([], 'R', null)).toEqual([]);
+    expect(allGamesSummary([])).toBeNull();
   });
 });
