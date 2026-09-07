@@ -40,7 +40,25 @@ export const SAMPLE_THRESHOLDS = {
   centerAverage: 9,
   // Sessions before a trend over time is claimed.
   trendOverTime: 8,
+  // Attempts at one drill target before its conversion is analysed. Same
+  // bar as a specific leave -- a drill IS repeated attempts at one leave,
+  // so there is no reason to hold it to a different standard.
+  drillTarget: 25,
+  // Games on one oil pattern before that pattern is analysed separately.
+  // Lower than centerAverage: a pattern is a sharper variable than a
+  // building, and a bowler sees far fewer games on any single one.
+  patternGames: 6,
 };
+
+// Score-only thresholds live in domain/scoreInsights.js, next to the
+// statistics they gate, because they count NIGHTS rather than shots and
+// mixing the two scales in one table invited exactly the confusion this
+// comment is preventing.
+// Imported AND re-exported: `export { X } from "..."` forwards the name
+// to consumers but does NOT bind it in this module's scope, so
+// buildAnalysisPayload below could not see it.
+import { SCORE_THRESHOLDS } from "./scoreInsights.js";
+export { SCORE_THRESHOLDS };
 
 export function meetsThreshold(kind, n) {
   const need = SAMPLE_THRESHOLDS[kind];
@@ -119,6 +137,58 @@ export function buildAnalysisPayload(stats) {
     included.recentAverages = stats.recentAverages;
   }
 
+  // ── Drills ────────────────────────────────────────────────────────────
+  // The practice group generates the most drill data and clears the shot
+  // gates fastest, yet drills were never sent for analysis at all.
+  const drills = (stats?.drills || [])
+    .filter(d => meetsThreshold("drillTarget", d.attempts))
+    .map(d => ({ target: d.label, conversion: d.rate, sampleSize: d.attempts }));
+  (stats?.drills || [])
+    .filter(d => !meetsThreshold("drillTarget", d.attempts))
+    .forEach(d => withheld.push({
+      key: `drill:${d.label}`,
+      need: SAMPLE_THRESHOLDS.drillTarget,
+      have: d.attempts ?? 0,
+      shortBy: shortfall("drillTarget", d.attempts),
+    }));
+  if (drills.length) included.drills = drills;
+
+  // ── Oil patterns ──────────────────────────────────────────────────────
+  // Blending house-shot and sport-pattern games analyses two different
+  // bowlers as one. Each pattern clears the bar on its own.
+  const patterns = (stats?.patterns || [])
+    .filter(p => meetsThreshold("patternGames", p.games))
+    .map(p => ({ name: p.name, average: p.average, sampleSize: p.games }));
+  if (patterns.length) included.patterns = patterns;
+
+  // ── Score-only statistics ─────────────────────────────────────────────
+  // These need no shots at all, so a bowler who tracks game scores only
+  // still gets a real analysis instead of being told to come back later.
+  const score = stats?.scoreStats;
+  if (score) {
+    if ((score.nights ?? 0) >= SCORE_THRESHOLDS.gamePosition && score.gamePosition) {
+      included.gamePosition = {
+        fade: score.gamePosition.fade,
+        bestPosition: score.gamePosition.bestPosition,
+        lastPosition: score.gamePosition.lastPosition,
+        positions: score.gamePosition.positions,
+        sampleSize: score.nights,
+      };
+    } else if (score.gamePosition) {
+      withheld.push({ key: "gamePosition", need: SCORE_THRESHOLDS.gamePosition,
+        have: score.nights ?? 0, shortBy: Math.max(0, SCORE_THRESHOLDS.gamePosition - (score.nights ?? 0)) });
+    }
+    if ((score.nights ?? 0) >= SCORE_THRESHOLDS.consistency && score.consistency) {
+      included.consistency = { ...score.consistency, sampleSize: score.nights };
+    } else if (score.consistency) {
+      withheld.push({ key: "consistency", need: SCORE_THRESHOLDS.consistency,
+        have: score.nights ?? 0, shortBy: Math.max(0, SCORE_THRESHOLDS.consistency - (score.nights ?? 0)) });
+    }
+    if ((score.nights ?? 0) >= SCORE_THRESHOLDS.formVsBook && score.formVsBook) {
+      included.formVsBook = { ...score.formVsBook, sampleSize: score.nights };
+    }
+  }
+
   return {
     included,
     withheld,
@@ -133,4 +203,108 @@ export function buildAnalysisPayload(stats) {
 // request whose payload is empty.
 export function payloadIsEmpty(payload) {
   return !payload || Object.keys(payload.included || {}).length === 0;
+}
+
+// ── What unlocks next ───────────────────────────────────────────────────
+//
+// 26 of 50 league bowlers hit "not enough data yet" on their first visit
+// and 9 never came back. Nobody argued the bar was wrong once it was
+// explained -- the complaint was being handed a dead end instead of a
+// distance. This turns the wall into a progress bar.
+//
+// Sorted by how close each one is, so the first thing a bowler reads is
+// the thing they are about to earn.
+
+// Plain names for the statistics, since a bowler should never see a
+// payload key.
+const STAT_LABELS = {
+  strikeRate: "Strike rate",
+  spareConversion: "Spare conversion",
+  tenPinRate: "Corner pin conversion",
+  splitRate: "Split rate",
+  recentAverages: "Trend over time",
+  gamePosition: "Game-by-game fade",
+  consistency: "Consistency",
+  formVsBook: "Form vs book average",
+};
+
+// The unit each threshold counts, so "90 more" is never ambiguous.
+const UNIT_LABELS = {
+  overallStrikeRate: "first balls",
+  spareConversion: "spare attempts",
+  specificLeave: "attempts",
+  ballComparison: "first balls",
+  centerAverage: "games",
+  trendOverTime: "nights",
+  drillTarget: "attempts",
+  patternGames: "games",
+  gamePosition: "nights",
+  consistency: "nights",
+  formVsBook: "nights",
+};
+
+export function statLabel(key) {
+  if (key.startsWith("ball:")) return `${key.slice(5)} (ball)`;
+  if (key.startsWith("drill:")) return `${key.slice(6)} drill`;
+  return STAT_LABELS[key] || key;
+}
+
+// Which threshold each statistic is measured against. Needed because a
+// stat key and its threshold key are not the same thing -- "strikeRate"
+// is gated by "overallStrikeRate" -- and getting this wrong renders
+// "8 more more" to the bowler.
+const STAT_KIND = {
+  strikeRate: "overallStrikeRate",
+  spareConversion: "spareConversion",
+  tenPinRate: "specificLeave",
+  splitRate: "specificLeave",
+  recentAverages: "trendOverTime",
+  gamePosition: "gamePosition",
+  consistency: "consistency",
+  formVsBook: "formVsBook",
+};
+
+export function kindForStat(key) {
+  if (key.startsWith("ball:")) return "ballComparison";
+  if (key.startsWith("drill:")) return "drillTarget";
+  return STAT_KIND[key] || key;
+}
+
+export function unitLabel(kind) {
+  return UNIT_LABELS[kind] || "more";
+}
+
+// Turns a payload's `withheld` list into an ordered "coming next" list.
+// Takes the payload rather than raw stats so it reflects exactly what the
+// analysis would have used.
+export function upcomingUnlocks(payload, limit = 3) {
+  const withheld = Array.isArray(payload?.withheld) ? payload.withheld : [];
+  return withheld
+    .filter(w => (w.shortBy ?? 0) > 0)
+    .sort((a, b) => (a.shortBy ?? 0) - (b.shortBy ?? 0))
+    .slice(0, limit)
+    .map(w => ({
+      key: w.key,
+      label: statLabel(w.key),
+      unit: unitLabel(kindForStat(w.key)),
+      shortBy: w.shortBy,
+      need: w.need,
+      have: w.have,
+    }));
+}
+
+// Signature of what is currently analysable, for spotting the moment a
+// bowler crosses a threshold. Compared against the last value seen so a
+// notification fires once, on the transition, rather than every render.
+export function unlockSignature(payload) {
+  return Object.keys(payload?.included || {}).sort().join(",");
+}
+
+// Which statistics are newly available since the signature last seen.
+// Empty when nothing changed, which is the normal case.
+export function newlyUnlocked(payload, previousSignature) {
+  const now = Object.keys(payload?.included || {});
+  if (previousSignature === null || previousSignature === undefined) return [];
+  const before = new Set(String(previousSignature).split(",").filter(Boolean));
+  return now.filter(k => !before.has(k)).map(statLabel);
 }

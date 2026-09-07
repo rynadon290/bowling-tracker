@@ -200,3 +200,77 @@ export function drillFromRow(row) {
     notes: row.notes,
   });
 }
+
+// ── History by week ─────────────────────────────────────────────────────
+//
+// targetHistory above lists individual sessions, which is the right thing
+// while you're standing there. Over a season it's noise: 14/50 practice
+// bowlers asked to see whether a target is actually improving, and a list
+// of one-off percentages doesn't answer that.
+//
+// Weekly buckets pool every drill at a target in the same week, so the
+// rate is computed from combined attempts rather than averaging small
+// per-session percentages -- which would let a 2-attempt session swing a
+// week as hard as a 40-attempt one.
+
+// Monday-start week key. Local date parts, not UTC: a Thursday-night
+// league west of UTC is already Friday in ISO terms, which would scatter
+// one league's drills across two buckets.
+export function weekStart(dateStr) {
+  const [y, m, d] = String(dateStr || "").split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  const dow = (dt.getDay() + 6) % 7; // Monday = 0
+  dt.setDate(dt.getDate() - dow);
+  const pad = n => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+export function weeklyTargetHistory(drills, bowler, targetId, { customPins = null, minAttempts = 5 } = {}) {
+  const key = customPins && customPins.length ? customPinKey(customPins) : null;
+  const mine = (Array.isArray(drills) ? drills : []).filter(d => {
+    if (!d || d.bowler !== bowler || attempts(d) <= 0) return false;
+    if (d.target !== targetId) return false;
+    // A custom target only matches another custom target with the same pins.
+    if (targetId === "custom") return key ? customPinKey(d.customPins) === key : true;
+    return true;
+  });
+
+  const byWeek = new Map();
+  for (const d of mine) {
+    const wk = weekStart(d.date);
+    if (!wk) continue;
+    if (!byWeek.has(wk)) byWeek.set(wk, { week: wk, made: 0, missed: 0, sessions: 0 });
+    const b = byWeek.get(wk);
+    b.made += d.made || 0;
+    b.missed += d.missed || 0;
+    b.sessions += 1;
+  }
+
+  return [...byWeek.values()]
+    .map(b => ({
+      week: b.week,
+      made: b.made,
+      attempts: b.made + b.missed,
+      sessions: b.sessions,
+      rate: Math.round((b.made / (b.made + b.missed)) * 100),
+      // Flagged rather than dropped: a thin week is still real work, it
+      // just shouldn't be read as a data point.
+      thin: b.made + b.missed < minAttempts,
+    }))
+    .sort((a, b) => a.week.localeCompare(b.week));
+}
+
+// Direction across the weekly buckets that have enough attempts to count.
+// Deliberately conservative: needs at least three usable weeks, and calls
+// anything inside a few points "steady" rather than manufacturing a story.
+export function weeklyTrend(weeks) {
+  const usable = (Array.isArray(weeks) ? weeks : []).filter(w => !w.thin);
+  if (usable.length < 3) return { direction: "unknown", weeks: usable.length };
+  const firstHalf = usable.slice(0, Math.floor(usable.length / 2));
+  const lastHalf = usable.slice(Math.ceil(usable.length / 2));
+  const avg = list => list.reduce((a, w) => a + w.rate, 0) / list.length;
+  const change = Math.round(avg(lastHalf) - avg(firstHalf));
+  if (Math.abs(change) < 5) return { direction: "steady", change, weeks: usable.length };
+  return { direction: change > 0 ? "up" : "down", change, weeks: usable.length };
+}

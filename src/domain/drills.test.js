@@ -4,6 +4,8 @@ import { emptyDrill, normalizeDrill, recordMade, recordMissed, undo, attempts, c
   targetShortLabel,
   customPinKey,
   normalizeCustomPins,
+  weeklyTargetHistory,
+  weeklyTrend,
 } from './drills.js';
 
 describe('drill scoring', () => {
@@ -110,5 +112,38 @@ describe('pin-based custom targets', () => {
 
   it('does not collide unrelated pin sets', () => {
     expect(customPinKey(['2', '4', '5'], false)).not.toBe(customPinKey(['3', '6', '10'], false));
+  });
+});
+
+// A list of one-off session percentages is noise over a season. Weekly
+// buckets pool attempts so a 2-attempt night can't swing a week as hard
+// as a 40-attempt one.
+describe('weekly drill history', () => {
+  const mk = (date, made, missed) => ({ bowler: 'R', date, target: '10pin', made, missed, customPins: [] });
+  const drills = [mk('2026-06-01', 5, 5), mk('2026-06-03', 6, 4), mk('2026-06-08', 7, 3),
+    mk('2026-06-15', 8, 2), mk('2026-06-22', 9, 1)];
+
+  it('pools drills bowled in the same week', () => {
+    const w = weeklyTargetHistory(drills, 'R', '10pin');
+    expect(w[0].sessions).toBe(2);
+    expect(w[0].attempts).toBe(20);
+  });
+
+  it('computes the rate from pooled attempts, not averaged percentages', () => {
+    expect(weeklyTargetHistory(drills, 'R', '10pin')[0].rate).toBe(55);
+  });
+
+  it('flags a thin week rather than dropping it', () => {
+    expect(weeklyTargetHistory([mk('2026-06-01', 1, 1)], 'R', '10pin')[0].thin).toBe(true);
+  });
+
+  it('reports direction only with enough usable weeks', () => {
+    expect(weeklyTrend(weeklyTargetHistory(drills, 'R', '10pin')).direction).toBe('up');
+    expect(weeklyTrend(weeklyTargetHistory(drills.slice(0, 2), 'R', '10pin')).direction).toBe('unknown');
+  });
+
+  it('calls a small change steady rather than inventing a story', () => {
+    const flat = [mk('2026-06-01', 5, 5), mk('2026-06-08', 5, 5), mk('2026-06-15', 5, 5), mk('2026-06-22', 5, 5)];
+    expect(weeklyTrend(weeklyTargetHistory(flat, 'R', '10pin')).direction).toBe('steady');
   });
 });

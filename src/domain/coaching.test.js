@@ -4,6 +4,8 @@ import {
   taskProgress, partitionTasks, taskToRow, taskFromRow, sortNotes, coachingToRow,
   bowlerSnapshot,
   shotBreakdown,
+  respondedSince,
+  latestResponseAt,
 } from './coaching.js';
 import { isSplit, isSinglePinLeave, isCornerPinLeave } from './splits.js';
 
@@ -192,5 +194,27 @@ describe('shot breakdown for the coach', () => {
   it('returns nothing rather than a zeroed card when there are no shots', () => {
     expect(shotBreakdown([], preds)).toBeNull();
     expect(shotBreakdown(null, preds)).toBeNull();
+  });
+});
+
+// Push is blocked on packaging; knowing which bowler needs attention is
+// the useful part and works today.
+describe('unread task responses', () => {
+  const tasks = {
+    r1: [{ id: 't1', title: 'A', status: 'attempted', result: '68', completedAt: '2026-06-10T10:00:00Z' },
+         { id: 't2', title: 'B', status: 'open' }],
+    r2: [{ id: 't3', title: 'C', status: 'completed', completedAt: '2026-06-12T10:00:00Z' }],
+  };
+
+  it('finds responses since the coach last looked', () => {
+    expect(Object.keys(respondedSince(tasks, '2026-06-05T00:00:00Z'))).toHaveLength(2);
+  });
+
+  it('does not treat an open task as a response', () => {
+    expect(respondedSince(tasks, '2026-06-05T00:00:00Z').r1.map(t => t.title)).toEqual(['A']);
+  });
+
+  it('goes quiet once marked seen', () => {
+    expect(Object.keys(respondedSince(tasks, latestResponseAt(tasks)))).toHaveLength(0);
   });
 });

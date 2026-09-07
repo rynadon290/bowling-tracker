@@ -198,3 +198,57 @@ export function loggedPatternSummaries(tournaments) {
       return a.name.localeCompare(b.name);
     });
 }
+
+// Per-pattern scoring, for Insights.
+//
+// 18/50 tournament players: "my Chameleon numbers and my house-shot
+// numbers are two different bowlers." Blending them analyses a bowler who
+// does not exist. The pattern library already knows what was down; this
+// joins it to what was scored.
+//
+// Two sources, because a pattern is recorded differently in each:
+//   - League nights: lanePatterns rows keyed by (league, date).
+//   - Tournaments: the pattern is on the tournament day itself.
+export function patternAverages(sessions, lanePatterns, tournaments, bowler) {
+  const byPattern = new Map();
+
+  function add(name, scores) {
+    const clean = (Array.isArray(scores) ? scores : []).filter(v => Number.isFinite(v));
+    if (!name || !clean.length) return;
+    const key = String(name).trim();
+    if (!key) return;
+    if (!byPattern.has(key)) byPattern.set(key, []);
+    byPattern.get(key).push(...clean);
+  }
+
+  // League nights, matched on the night they were bowled.
+  const patternByNight = new Map();
+  for (const p of (Array.isArray(lanePatterns) ? lanePatterns : [])) {
+    if (!p?.patternName) continue;
+    patternByNight.set(`${p.league}|${p.date}`, p.patternName);
+  }
+  for (const s of (Array.isArray(sessions) ? sessions : [])) {
+    if (!s || (bowler && s.bowler !== bowler)) continue;
+    const name = patternByNight.get(`${s.league}|${s.date}`);
+    if (name) add(name, s.scores);
+  }
+
+  // Tournament days carry their own pattern.
+  for (const t of (Array.isArray(tournaments) ? tournaments : [])) {
+    if (!t || (bowler && t.bowler && t.bowler !== bowler)) continue;
+    for (const d of (Array.isArray(t.days) ? t.days : [])) {
+      const scores = (Array.isArray(d?.games) ? d.games : [])
+        .map(g => Number(g?.score))
+        .filter(v => Number.isFinite(v));
+      add(d?.oilPattern, scores);
+    }
+  }
+
+  return [...byPattern.entries()]
+    .map(([name, scores]) => ({
+      name,
+      games: scores.length,
+      average: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10,
+    }))
+    .sort((a, b) => b.games - a.games);
+}

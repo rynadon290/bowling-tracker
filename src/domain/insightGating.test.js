@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   MIN_GAMES_FOR_ANALYSIS, SAMPLE_THRESHOLDS, meetsThreshold, shortfall,
   canAnalyze, gamesUntilAnalysis, buildAnalysisPayload, payloadIsEmpty,
+  upcomingUnlocks,
+  newlyUnlocked,
 } from './insightGating.js';
+import { scoreStats } from './scoreInsights.js';
 
 describe('analysis floor', () => {
   it('refuses to analyse below the minimum game count', () => {
@@ -96,5 +99,83 @@ describe('buildAnalysisPayload', () => {
     // No request should be made at all in this case.
     const p = buildAnalysisPayload({ gameCount: 12, firstBalls: 120, strikeRate: 0.5, balls: [] });
     expect(payloadIsEmpty(p)).toBe(true);
+  });
+});
+
+// Insights was dead for anyone tracking game scores only -- and told them
+// "no statistic has enough behind it", which reads as never rather than
+// not yet. Game scores support real analysis.
+describe('scores-only analysis', () => {
+  const nights = n => Array.from({ length: n }, () => ({ bowler: 'R', scores: [200, 195, 168] }));
+  const payloadFor = n => buildAnalysisPayload({
+    gameCount: n * 3, sessionCount: n, firstBalls: 0, balls: [], centers: [],
+    scoreStats: scoreStats(nights(n), 'R', 190),
+  });
+
+  it('gives a bowler with no shots a real payload', () => {
+    const p = payloadFor(10);
+    expect(payloadIsEmpty(p)).toBe(false);
+    expect(Object.keys(p.included)).toContain('gamePosition');
+    expect(Object.keys(p.included)).toContain('consistency');
+  });
+
+  it('invents no shot statistics for them', () => {
+    expect(Object.keys(payloadFor(10).included)).not.toContain('strikeRate');
+  });
+
+  it('still withholds until the nights are there, and says how many short', () => {
+    const p = payloadFor(4);
+    expect(Object.keys(p.included)).not.toContain('gamePosition');
+    expect(p.withheld.find(w => w.key === 'gamePosition').shortBy).toBe(4);
+  });
+});
+
+describe('what unlocks next', () => {
+  const payload = {
+    included: {}, withheld: [
+      { key: 'strikeRate', need: 150, have: 60, shortBy: 90 },
+      { key: 'gamePosition', need: 8, have: 6, shortBy: 2 },
+    ],
+  };
+
+  it('leads with whatever is closest', () => {
+    expect(upcomingUnlocks(payload)[0].key).toBe('gamePosition');
+  });
+
+  // A stat key and its threshold key are not the same thing; getting this
+  // wrong renders "8 more more".
+  it('names the right unit for each statistic', () => {
+    const u = upcomingUnlocks(payload);
+    expect(u.find(x => x.key === 'gamePosition').unit).toBe('nights');
+    expect(u.find(x => x.key === 'strikeRate').unit).toBe('first balls');
+  });
+});
+
+describe('announcing a newly crossed threshold', () => {
+  it('fires only on the transition', () => {
+    expect(newlyUnlocked({ included: { a: {}, b: {} } }, 'a')).toHaveLength(1);
+    expect(newlyUnlocked({ included: { a: {} } }, 'a')).toHaveLength(0);
+  });
+
+  // An existing bowler opening the app after this ships must not be told
+  // everything they already had is new.
+  it('says nothing on the very first evaluation', () => {
+    expect(newlyUnlocked({ included: { a: {}, b: {} } }, null)).toHaveLength(0);
+  });
+});
+
+describe('drills and patterns reach the analysis', () => {
+  it('includes a drill target that has earned its sample', () => {
+    const p = buildAnalysisPayload({ gameCount: 30, firstBalls: 0, balls: [], centers: [],
+      drills: [{ label: '10 Pin', attempts: 40, rate: 75 }, { label: '7 Pin', attempts: 5, rate: 80 }] });
+    expect(p.included.drills).toHaveLength(1);
+    expect(p.withheld.some(w => w.key === 'drill:7 Pin')).toBe(true);
+  });
+
+  it('keeps oil patterns separate rather than blending them', () => {
+    const p = buildAnalysisPayload({ gameCount: 30, firstBalls: 0, balls: [], centers: [],
+      patterns: [{ name: 'House Shot', games: 12, average: 200 }, { name: 'Chameleon', games: 3, average: 170 }] });
+    expect(p.included.patterns).toHaveLength(1);
+    expect(p.included.patterns[0].name).toBe('House Shot');
   });
 });

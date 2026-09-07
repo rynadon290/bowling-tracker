@@ -412,3 +412,38 @@ export function shotBreakdown(shots, { isSplit, isSinglePinLeave, isCornerPinLea
     misses,
   };
 }
+
+// Tasks the bowler has responded to since the coach last looked.
+//
+// Push notification is blocked on app-store packaging, but the useful
+// part isn't the push -- it's that a coach opening the app can see at a
+// glance which bowlers need attention, instead of tapping through every
+// one to find out. This is that, and it works today.
+//
+// Keyed on completedAt so it survives a reload and doesn't re-announce.
+// A task the bowler reopened deliberately drops out: it's back to being
+// open work, not a result waiting to be read.
+export function respondedSince(tasksByRelationship, lastSeenIso) {
+  const since = lastSeenIso ? String(lastSeenIso) : "";
+  const out = {};
+  for (const [relationshipId, tasks] of Object.entries(tasksByRelationship || {})) {
+    const fresh = normalizeTasks(tasks).filter(t =>
+      (t.status === "completed" || t.status === "attempted") &&
+      t.completedAt &&
+      String(t.completedAt) > since);
+    if (fresh.length) out[relationshipId] = fresh;
+  }
+  return out;
+}
+
+// Most recent response across everything, for advancing the marker once
+// the coach has actually looked.
+export function latestResponseAt(tasksByRelationship) {
+  let latest = "";
+  for (const tasks of Object.values(tasksByRelationship || {})) {
+    for (const t of normalizeTasks(tasks)) {
+      if (t.completedAt && String(t.completedAt) > latest) latest = String(t.completedAt);
+    }
+  }
+  return latest || null;
+}
