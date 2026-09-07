@@ -1,3 +1,4 @@
+import { normalizeThemeId, DEFAULT_THEME } from "./themes.js";
 // User customization preferences -- which optional fields are tracked, and
 // which "environment" (practice/league/tournament) the app is styled for.
 //
@@ -236,6 +237,9 @@ export function defaultPreferences(environment = "league") {
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: defaultStatsCardOrder(safeEnvironment),
     hiddenStatsCards: [],
+    // Colour theme. Independent of environment: switching to practice
+    // should not change what the app looks like.
+    theme: DEFAULT_THEME,
     // Off by default even for coaches -- someone opening the app to bowl
     // their own league night shouldn't land in coaching mode.
     coachView: false,
@@ -272,6 +276,7 @@ export function normalizePreferences(raw) {
     hiddenStatsCards: Array.isArray(raw.hiddenStatsCards)
       ? raw.hiddenStatsCards.filter(id => MOVABLE_STATS_CARD_IDS.includes(id))
       : [],
+    theme: normalizeThemeId(raw.theme),
     coachView: typeof raw.coachView === "boolean" ? raw.coachView : base.coachView,
     trackingModeChoices: (() => {
       const raw2 = raw.trackingModeChoices;
@@ -392,4 +397,9 @@ export function setTrackingMode(prefs, mode) {
     trackingMode: mode,
     trackingModeChoices: { ...(prefs?.trackingModeChoices || {}), [env]: mode },
   };
+}
+
+
+export function setTheme(prefs, themeId) {
+  return { ...prefs, theme: normalizeThemeId(themeId) };
 }
