@@ -2687,6 +2687,28 @@ export default function BowlingTracker(){
   // being told to flip a coach setting that isn't about them.
   const showCoachingTab=!!myProfile.isCoach||coachingRels.length>0;
 
+  // Social is Teams + Friends, both of which are about the coach's OWN
+  // bowling, not their coaching. It's also now redundant for coaching:
+  // friendship and an accepted coaching relationship grant the same
+  // session read, and coaching grants it directionally rather than
+  // symmetrically -- so a coach no longer needs to friend a bowler to
+  // see their scores.
+  //
+  // Gated on coachViewActive rather than on isCoach: most coaches bowl
+  // leagues themselves, and hiding Social from them permanently would
+  // take away a tab they need for their own game. Switching back to
+  // "I'm bowling" brings it back.
+  const navTabs=["log","data","insights",...(coachViewOn?[]:["social"]),...(showCoachingTab?["coaching"]:[])];
+
+  // Turning coach view on while sitting on Social would strand the user
+  // on a tab that is no longer in the nav -- a blank screen with no way
+  // back except the tab they can't see. Same for the Coach tab if the
+  // last coaching relationship is ended while viewing it.
+  useEffect(()=>{
+    if(!navTabs.includes(view))setView("log");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[coachViewOn,showCoachingTab]);
+
   const scoreOptions=scorekeepingOptions({
     environment:preferences.environment,
     owner:ownerName,
@@ -3120,7 +3142,7 @@ export default function BowlingTracker(){
           </div>
         </div>
         <div style={S.nav}>
-          {["log","data","insights","social",...(showCoachingTab?["coaching"]:[])].map(v=>(
+          {navTabs.map(v=>(
   <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
     {v==="log"?"Log":v==="data"?"Data":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
   </button>
