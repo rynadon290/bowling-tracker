@@ -36,7 +36,8 @@ import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insig
 import { drillLines } from "./domain/sessionRecap.js";
 import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
 import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
-  correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed } from "./domain/importVerification.js";
+  correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
+  pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -2926,12 +2927,33 @@ export default function BowlingTracker(){
   // prompted stacking in the first place; four fits comfortably.
   const stackHeaderIcons=navTabs.length>=5;
 
+  // The inbox icon is conditional: a permanent icon for a usually-empty
+  // inbox is clutter, and an icon that only ever appears when something
+  // is waiting is self-explanatory without a label.
+  //
+  // Counts three things, because all three need the bowler to act:
+  // scores waiting on them, scores they rejected that need re-entering,
+  // and a teammate's unconfirmed night they're now allowed to fix.
+  const inboxCount=(()=>{
+    if(!activeBowler)return 0;
+    const mine=pendingForImport(importedScores,activeBowler).length;
+    const reentry=needingImportReentry(importedScores).filter(r=>r.bowler===activeBowler).length;
+    const stale=importedScores.filter(r=>
+      r.bowler!==activeBowler&&r.status==="pending"&&canCorrectImport(r).allowed).length;
+    return mine+reentry+stale;
+  })();
+
   // Turning coach view on while sitting on Social would strand the user
   // on a tab that is no longer in the nav -- a blank screen with no way
   // back except the tab they can't see. Same for the Coach tab if the
   // last coaching relationship is ended while viewing it.
   useEffect(()=>{
-    if(!navTabs.includes(view))setView("log");
+    // Screens reached from a header icon rather than the nav. They're
+    // legitimate views, so they must not be treated as "not in the nav"
+    // and bounced -- which would have thrown a coach off Settings the
+    // moment they flipped coach view.
+    const iconViews=["profile","settings","inbox"];
+    if(!navTabs.includes(view)&&!iconViews.includes(view))setView("log");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[coachViewOn,showCoachingTab]);
 
@@ -3355,7 +3377,11 @@ export default function BowlingTracker(){
               <div style={S.title}>🎳 {APP_NAME}</div>
               {/* Inline with the title when there's room. */}
               {!stackHeaderIcons&&(
-                <div style={{display:"flex",gap:"8px",flexShrink:0}}>
+                <div style={{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}}>
+                  {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
+                    📥
+                    <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:"#0f1117",fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
+                  </button>}
                   <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
                   <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
                 </div>
@@ -3374,7 +3400,11 @@ export default function BowlingTracker(){
           </div>
           {/* Stacked only when the nav needs the horizontal space back. */}
           {stackHeaderIcons&&(
-            <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0}}>
+            <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0,alignItems:"center"}}>
+              {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
+                  📥
+                  <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:"#0f1117",fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
+                </button>}
               <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
               <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
             </div>
@@ -3476,13 +3506,18 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* PROFILE + SETTINGS                                                */}
         {/* ══════════════════════════════════════════════════════════════════ */}
-        {view==="profile"&&(
+        {/* Its own screen, reached from an icon that only exists while
+            something is waiting. A confirmation request for a night that
+            already happened is admin, not logging -- and a permanent
+            icon for a usually-empty inbox is clutter. */}
+        {view==="inbox"&&(
           <>
-            {/* Scores a teammate imported for you. On Profile rather than
-                Log: the Log tab is for what you're bowling right now, and
-                a confirmation request for a night that already happened
-                is admin, not logging. It sits with the other things that
-                are about you rather than about tonight. */}
+            <div style={S.card}>
+              <div style={S.label}>Scores From Teammates</div>
+              <div style={{fontSize:"11px",color:C.textMuted}}>
+                Imported from someone's scorecard photo. They're already counting — checking them just marks them confirmed.
+              </div>
+            </div>
             <ImportedScoresInbox
               records={importedScores}
               bowler={activeBowler}
@@ -3490,7 +3525,13 @@ export default function BowlingTracker(){
               onReject={rejectImportedScores}
               onCorrectTeammate={correctTeammateScores}
               canCorrect={r=>canCorrectImport(r)}/>
-            <Profile
+            <button style={{...S.btn(),width:"100%"}} onClick={()=>setView("log")}>Done</button>
+            <div style={{height:"32px"}}/>
+          </>
+        )}
+
+        {view==="profile"&&(
+          <Profile
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
@@ -3501,7 +3542,6 @@ export default function BowlingTracker(){
             saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             bookAverageDue={bookAverageCheck.needed} bookAverageTriggerLeague={bookAverageCheck.league} bookAverageSuggestion={bookAverageSuggestion} acknowledgeBookAverageUpdate={acknowledgeBookAverageUpdate}/>
-          </>
         )}
 
         {view==="settings"&&(
