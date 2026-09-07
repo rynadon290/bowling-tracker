@@ -30,6 +30,10 @@ export function emptyProfile(bowlerName = "") {
     // isn't a coach never sees coaching UI at all, rather than seeing an
     // empty version of it.
     isCoach: false,
+    // Other ways this bowler's name appears on a house scoring display --
+    // "R. Nadon", "RYAN N", whatever the desk typed. Used only to match a
+    // scorecard photo back to the right person; never shown as their name.
+    aliases: [],
     homeCenters: [],
     notes: "",
     // Book average: a static, frozen number the bowler enters and the app
@@ -49,6 +53,21 @@ export function emptyProfile(bowlerName = "") {
 
 // Normalizes stored/partial data into a complete, safe profile. Never
 // throws -- a malformed or half-written row should render, not crash.
+// Trimmed, de-duplicated, case-insensitively unique. Capped because this
+// is a matching aid, not a place to accumulate every typo the desk has
+// ever produced.
+export function normalizeAliases(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Map();
+  for (const a of raw) {
+    const clean = String(a ?? "").trim();
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) seen.set(key, clean);
+  }
+  return [...seen.values()].slice(0, 8);
+}
+
 export function normalizeProfile(raw, bowlerName = "") {
   const base = emptyProfile(raw?.bowlerName || bowlerName);
   if (!raw || typeof raw !== "object") return base;
@@ -57,6 +76,7 @@ export function normalizeProfile(raw, bowlerName = "") {
     leftHanded: !!raw.leftHanded,
     twoHanded: !!raw.twoHanded,
     isCoach: !!raw.isCoach,
+    aliases: normalizeAliases(raw.aliases),
     homeCenters: Array.isArray(raw.homeCenters)
       ? raw.homeCenters.filter(c => typeof c === "string" && c.trim()).map(c => c.trim())
       : [],
@@ -225,6 +245,7 @@ export function profileToRow(profile, userId) {
     left_handed: !!profile.leftHanded,
     two_handed: !!profile.twoHanded,
     is_coach: !!profile.isCoach,
+    aliases: (profile.aliases && profile.aliases.length) ? profile.aliases : null,
     home_centers: profile.homeCenters || [],
     notes: profile.notes || null,
     // Guard against undefined as well as "" -- a profile object built
@@ -245,6 +266,7 @@ export function profileFromRow(row) {
     leftHanded: !!row.left_handed,
     twoHanded: !!row.two_handed,
     isCoach: !!row.is_coach,
+    aliases: row.aliases,
     homeCenters: row.home_centers || [],
     notes: row.notes || "",
     bookAverage: row.book_average,

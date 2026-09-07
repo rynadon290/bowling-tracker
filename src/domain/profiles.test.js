@@ -3,6 +3,7 @@ import {
   emptyProfile, normalizeProfile, resolveHandedness, addHomeCenter,
   removeHomeCenter, profileToRow, profileFromRow, membershipFor,
   resolveHomeCenters, suggestBookAverage,
+  normalizeAliases,
 } from './profiles.js';
 
 function games(bowler, league, scores) {
@@ -160,7 +161,7 @@ describe('home centers', () => {
 describe('supabase round trip', () => {
   it('preserves every field in both directions', () => {
     const full = {
-      bowlerName: 'Ryan', leftHanded: true, twoHanded: true, isCoach: false,
+      bowlerName: 'Ryan', leftHanded: true, twoHanded: true, isCoach: false, aliases: [],
       homeCenters: ['Bowlero'], notes: 'thumb tape',
       bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter', bookAverageAsOf: '2026-08-01',
     };
@@ -173,7 +174,7 @@ describe('supabase round trip', () => {
   // survives the round trip.
   it('preserves the coach flag when it is set', () => {
     const coach = {
-      bowlerName: 'Dave', leftHanded: false, twoHanded: false, isCoach: true,
+      bowlerName: 'Dave', leftHanded: false, twoHanded: false, isCoach: true, aliases: [],
       homeCenters: [], notes: '',
       bookAverage: '', bookGames: '', bookSeason: '', bookAverageAsOf: '',
     };
@@ -221,5 +222,24 @@ describe('membershipFor', () => {
 
   it('tolerates a missing teams list', () => {
     expect(membershipFor('Ryan', null).teams).toEqual([]);
+  });
+});
+
+describe('scorecard aliases', () => {
+  it('trims, dedupes case-insensitively, and drops blanks', () => {
+    expect(normalizeAliases([' R. Nadon ', 'RYAN N', 'r. nadon', '', null])).toEqual(['R. Nadon', 'RYAN N']);
+  });
+
+  it('caps the list -- a matching aid, not a typo archive', () => {
+    expect(normalizeAliases(Array.from({ length: 20 }, (_, i) => `name${i}`))).toHaveLength(8);
+  });
+
+  it('round-trips through a row', () => {
+    const p = normalizeProfile({ bowlerName: 'Ryan', aliases: ['R. Nadon'] });
+    expect(profileFromRow(profileToRow(p, 'u1')).aliases).toEqual(['R. Nadon']);
+  });
+
+  it('treats a profile with no aliases as an empty list', () => {
+    expect(profileFromRow({ bowler_name: 'X' }).aliases).toEqual([]);
   });
 });
