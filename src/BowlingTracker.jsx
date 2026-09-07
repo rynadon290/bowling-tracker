@@ -44,7 +44,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
-import { normalizePattern, patternFromRow, patternToRow, patternAverages, pbaAnimalPatternSeeds } from "./domain/oilPatterns.js";
+import { normalizePattern, patternFromRow, patternToRow, patternAverages, allVerifiedPbaPatterns } from "./domain/oilPatterns.js";
 import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
@@ -3250,10 +3250,16 @@ export default function BowlingTracker(){
   // last, on top of whatever the community has entered. Seeded in memory,
   // not written to the cloud: they become real rows only when a bowler
   // fills in specs and saves.
+  // The picker offers every PBA pattern we hold real specs for, on top of
+  // whatever the community has entered. Only verified year-tagged entries
+  // are seeded -- the animal list isn't run in full every season, so
+  // offering all ten each year would fill the picker with patterns that
+  // weren't bowled and have no specs behind them.
+  //
+  // Seeded in memory: they become rows only when a bowler picks one.
   const pickerPatterns=(()=>{
-    const y=new Date().getFullYear();
     const have=new Set(oilPatterns.map(p=>`${p.name}|${p.year||""}`));
-    const seeds=[...pbaAnimalPatternSeeds(y),...pbaAnimalPatternSeeds(y-1)].filter(p=>!have.has(`${p.name}|${p.year}`));
+    const seeds=allVerifiedPbaPatterns().filter(p=>!have.has(`${p.name}|${p.year}`));
     return [...oilPatterns,...seeds];
   })();
 
