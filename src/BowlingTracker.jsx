@@ -22,12 +22,13 @@ import {
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
 import { normalizeLayout } from "./domain/layouts.js";
-import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness } from "./domain/profiles.js";
+import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
+import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
@@ -75,6 +76,7 @@ const BALL_GROUPS_KEY = "bowling-ball-groups-v1";
 const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const CENTERS_KEY = "bowling-centers-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
+const LEAGUE_DATES_KEY = "bowling-league-dates-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
 const DRILLS_KEY = "bowling-drills-v1";
 const GUESTS_KEY = "bowling-practice-guests-v1";
@@ -278,6 +280,10 @@ export default function BowlingTracker(){
   // `leagues` (a plain string array) that half the app depends on.
   const[centers,setCenters]=useState([]);
   const[leagueCenters,setLeagueCenters]=useState({});
+  // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
+  // Shared across everyone in the league (like center), unlike per-bowler
+  // book-average tracking which lives on the profile.
+  const[leagueDates,setLeagueDates]=useState({});
   // Leagues this user has hidden. Personal and reversible -- hidden
   // leagues drop out of pickers but their sessions stay in history and
   // keep counting toward averages.
@@ -543,15 +549,23 @@ export default function BowlingTracker(){
           if(cs)setCenters(cs.map(normalizeCenter).filter(c=>c.id&&c.name));
         }
 
-        const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id"));
+        const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id,start_date,end_date"));
         if(leagueCentersRes.online&&leagueCentersRes.data){
           const map={};
-          leagueCentersRes.data.forEach(r=>{if(r.center_id)map[r.name]=r.center_id;});
+          const dateMap={};
+          leagueCentersRes.data.forEach(r=>{
+            if(r.center_id)map[r.name]=r.center_id;
+            if(r.start_date||r.end_date)dateMap[r.name]=normalizeLeagueDates({startDate:r.start_date||"",endDate:r.end_date||""});
+          });
           setLeagueCenters(map);
+          setLeagueDates(dateMap);
           try{await window.storage.set(LEAGUE_CENTERS_KEY,JSON.stringify(map));}catch{}
+          try{await window.storage.set(LEAGUE_DATES_KEY,JSON.stringify(dateMap));}catch{}
         }else{
           const lc=await readCached(LEAGUE_CENTERS_KEY,"object");
           if(lc)setLeagueCenters(lc);
+          const ld=await readCached(LEAGUE_DATES_KEY,"object");
+          if(ld)setLeagueDates(ld);
         }
 
         const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at"));
@@ -833,15 +847,27 @@ export default function BowlingTracker(){
     return failed;
   }
 
-  async function addLeague(name){
+  async function addLeague(name,startDate,endDate){
     const clean=name.trim();
     if(!clean)return;
     if(leagues.some(l=>l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
     await saveLeagues([...leagues,clean]);
+    if(startDate||endDate)await saveLeagueDates(clean,startDate,endDate);
     const failed=await ensureLeaguesInCloud([clean]);
     if(failed.length){
       alert(`"${clean}" was saved on this device only and hasn't reached the cloud yet — it won't be visible to teammates or usable for creating a team until it syncs. It'll keep retrying in the background if you're offline; check back if this persists.`);
     }
+  }
+
+  // Editable later too -- a season date typed wrong at creation, or a
+  // league that never had one, shouldn't be locked in forever.
+  async function saveLeagueDates(name,startDate,endDate){
+    const normalized=normalizeLeagueDates({startDate,endDate});
+    const updated={...leagueDates,[name]:normalized};
+    setLeagueDates(updated);
+    try{window.storage.set(LEAGUE_DATES_KEY,JSON.stringify(updated));}catch{}
+    const leagueId=leagueIdsRef.current[name];
+    if(leagueId)cloudUpdate("leagues",{id:leagueId},{start_date:normalized.startDate||null,end_date:normalized.endDate||null});
   }
 
   async function renameLeague(oldName,newName){
@@ -1260,6 +1286,20 @@ export default function BowlingTracker(){
       // without this, editing a profile fails on every save after the first.
       cloudWrite("bowler_profiles",profileToRow(normalized,user?.id||null),{onConflict:"created_by,bowler_name"});
     },600);
+  }
+
+  // Accepting, overriding, or dismissing the book-average prompt all do the
+  // same thing underneath: record that this bowler has now been asked
+  // about this specific season-end, so it never nags again for the same
+  // one. `newAverage` is omitted entirely on a plain dismissal -- "not
+  // now" must not silently overwrite a real book average with nothing.
+  function acknowledgeBookAverageUpdate(bowlerName,endDate,newAverage){
+    const current=normalizeProfile(profiles[bowlerName],bowlerName);
+    const next={...current,bookAverageAsOf:endDate};
+    if(newAverage!==undefined&&newAverage!==null&&newAverage!==""){
+      next.bookAverage=String(newAverage);
+    }
+    setProfile(bowlerName,next);
   }
 
   async function removeBall(bowlerName,ballName){
@@ -2069,6 +2109,25 @@ export default function BowlingTracker(){
   const leaguesWithCenters=leagues.map(name=>({name,centerId:leagueCenters[name]}));
   const centerStats=statsByCenter(sessions,leaguesWithCenters,centers,statsBowler||activeBowler);
 
+  // Whether the active bowler should be prompted to update their book
+  // average, and what the app would suggest if so. Computed here rather
+  // than inside Profile.jsx because it needs `teams` (to know which
+  // leagues this bowler is actually in) and `leagueDates` (the season
+  // boundaries) -- both already assembled at this level.
+  const bowlerLeagueNames=[...new Set(
+    teams.filter(t=>(t.members||[]).includes(activeBowler)).map(t=>t.league)
+  )];
+  const bowlerLeaguesWithDates=bowlerLeagueNames.map(name=>({
+    name, endDate:leagueDates[name]?.endDate||"",
+  }));
+  const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
+  const bookAverageCheck=needsBookAverageUpdate(
+    bowlerLeaguesWithDates,activeBowlerProfile.bookAverageAsOf||"",
+  );
+  const bookAverageSuggestion=bookAverageCheck.needed
+    ?suggestBookAverage(sessions,activeBowler)
+    :null;
+
   // Pre-computed statistics for Insights. Deliberately assembled here and
   // sent as summary figures -- raw shot rows would be 8x the tokens and
   // invite the model to find patterns it can't properly weigh.
@@ -2534,7 +2593,8 @@ export default function BowlingTracker(){
             centers={centers} ensureCenter={ensureCenter} searchCenters={searchCenters}
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups}
             saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
-            catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}/>
+            catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
+            bookAverageDue={bookAverageCheck.needed} bookAverageTriggerLeague={bookAverageCheck.league} bookAverageSuggestion={bookAverageSuggestion} acknowledgeBookAverageUpdate={acknowledgeBookAverageUpdate}/>
         )}
 
         {view==="settings"&&(
@@ -2554,6 +2614,7 @@ export default function BowlingTracker(){
             filtered={filtered} ballUniverse={ballUniverse}
             startEdit={startEdit} deleteShot={deleteShot}
             centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}
+            leagueDates={leagueDates} setLeagueDates={saveLeagueDates}
             hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
             shots={shots}
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam}/>

@@ -10,6 +10,27 @@ import {
   setProfileField, membershipFor, resolveHomeCenters,
 } from "./domain/profiles.js";
 
+function BookAverageUpdatePrompt({ currentAverage, suggestion, onSave, onDismiss }) {
+  const [value, setValue] = useState(String(suggestion.suggested));
+  return (
+    <div>
+      <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
+        Suggested new book average: <strong style={{ color: C.text }}>{suggestion.suggested}</strong> — {suggestion.basis}.
+        {currentAverage && ` Your current book average is ${currentAverage}.`}
+        {" "}Change the number below if this doesn't match your full season.
+      </div>
+      <input style={{ ...S.input, marginBottom: "10px" }} type="number" inputMode="decimal"
+        value={value} onChange={e => setValue(e.target.value)} />
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button style={{ ...S.btn("primary"), flex: 1 }} onClick={() => onSave(value)}>
+          Update to {value || suggestion.suggested}
+        </button>
+        <button style={{ ...S.btn(), flex: 1 }} onClick={onDismiss}>Not Now</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Profile({
   bowlers, activeBowler, selectBowler,
   profiles, setProfile, teams,
@@ -19,6 +40,7 @@ export default function Profile({
   centers, ensureCenter, searchCenters,
   ballSpecs, setBallSpec, ballGroups, saveBallGroup, deleteBallGroup, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
+  bookAverageDue, bookAverageTriggerLeague, bookAverageSuggestion, acknowledgeBookAverageUpdate,
 }) {
   const [addingCenter, setAddingCenter] = useState(false);
 
@@ -94,13 +116,46 @@ export default function Profile({
         </div>
       </CollapsibleCard>
 
+      {/* Fires when a league this bowler is in has an end date that's
+          passed and they haven't been asked about it yet -- see
+          domain/leagueSeasons.js for the anti-nag guarantee that stops
+          this from firing twice for the same season. Sits above the
+          regular Book Average card, always visible when due, regardless
+          of whether that card is collapsed. */}
+      {bookAverageDue && (
+        <div style={{ ...S.card, border: `1px solid ${C.accent}44` }}>
+          <div style={{ ...S.label, color: C.accent }}>
+            {bookAverageTriggerLeague?.name || "Your league"} season wrapped up
+          </div>
+          {bookAverageSuggestion?.eligible ? (
+            <BookAverageUpdatePrompt
+              currentAverage={profile.bookAverage}
+              suggestion={bookAverageSuggestion}
+              onSave={value => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate, value)}
+              onDismiss={() => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate)} />
+          ) : (
+            <>
+              <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
+                Not enough games logged here yet to suggest a new number
+                {bookAverageSuggestion?.basis ? ` (${bookAverageSuggestion.basis})` : ""}.
+                You can still update it yourself below, or skip for now.
+              </div>
+              <button style={{ ...S.btn(), width: "100%" }}
+                onClick={() => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate)}>
+                Skip — I'll update it myself
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <CollapsibleCard title="Book Average"
         summary={profile.bookAverage ? `${profile.bookAverage}${profile.bookGames ? ` (${profile.bookGames}g)` : ""}` : "Not set"}
         expanded={expanded.bookAverage} onToggle={() => toggle("bookAverage")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-          Your official average from last season. Shown until enough games are
-          logged here, then blended out — weighted by how many games sit
-          behind each number.
+          A static number from last season — the app never changes this on
+          its own. When a league's season ends, you'll be prompted here to
+          update it, with a suggested number you can accept or override.
         </div>
         <div style={S.row}>
           <input style={{ ...S.input, flex: 1 }} type="number" inputMode="decimal" placeholder="e.g. 213"

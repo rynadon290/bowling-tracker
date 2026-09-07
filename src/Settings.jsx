@@ -34,6 +34,7 @@ export default function Settings({
   filterResult, setFilterResult, filtered, ballUniverse,
   startEdit, deleteShot,
   centers, leagueCenters, setLeagueCenter, searchCenters,
+  leagueDates, setLeagueDates,
   hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
   shots,
 }) {
@@ -251,6 +252,21 @@ export default function Settings({
                   currentCenter={center}
                   onSelect={candidate => setLeagueCenter(league, candidate)}
                   onSearch={searchCenters} />
+
+                {/* Season dates, editable here in case they were skipped
+                    or typed wrong at creation -- this is what the
+                    book-average update prompt keys off of. */}
+                <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px", marginBottom: "4px" }}>
+                  Season dates
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input type="date" style={{ ...S.input, flex: 1, fontSize: "12px" }}
+                    value={leagueDates?.[league]?.startDate || ""}
+                    onChange={e => setLeagueDates(league, e.target.value, leagueDates?.[league]?.endDate || "")} />
+                  <input type="date" style={{ ...S.input, flex: 1, fontSize: "12px" }}
+                    value={leagueDates?.[league]?.endDate || ""}
+                    onChange={e => setLeagueDates(league, leagueDates?.[league]?.startDate || "", e.target.value)} />
+                </div>
 
                 {/* Hiding is personal and reversible: the league leaves
                     YOUR pickers, but teammates, rosters, and every past

@@ -181,6 +181,13 @@ export default function TeamManagement({
   const[editingTeamId, setEditingTeamId] = useState(null);
   const[editingName, setEditingName] = useState("");
   const[newLeagueName, setNewLeagueName] = useState("");
+  // Asked at creation because there's no other reliable way to know when a
+  // season ends -- leagues in this app have no automatic boundary, so this
+  // is what makes the book-average update prompt possible at all. Optional:
+  // an ongoing house shot with no fixed end just leaves these blank, and
+  // the prompt never fires for it.
+  const[newLeagueStart, setNewLeagueStart] = useState("");
+  const[newLeagueEnd, setNewLeagueEnd] = useState("");
   const[editingLeagueName, setEditingLeagueName] = useState("");
   // Per-team "add a teammate" search state: {[teamId]: {term, results, searching}}
   const[searchState, setSearchState] = useState({});
@@ -534,9 +541,11 @@ export default function TeamManagement({
     const name = newLeagueName.trim();
     if (!name) return;
     if (leagueList.some(league => league.toLowerCase() === name.toLowerCase())) { alert("A league with that name already exists."); return; }
-    onLeagueAdd?.(name);
+    onLeagueAdd?.(name, newLeagueStart, newLeagueEnd);
     setSelectedLeague(name);
     setNewLeagueName("");
+    setNewLeagueStart("");
+    setNewLeagueEnd("");
   }
 
   function startRenameLeague() {
@@ -630,9 +639,19 @@ export default function TeamManagement({
         )}
         <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
           <div style={S.label}>Add League</div>
-          <div style={{display:"flex",gap:"8px"}}>
+          <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
             <input value={newLeagueName} onChange={e=>setNewLeagueName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")createLeague();}} placeholder="League name" style={{...S.input,flex:1}}/>
             <button style={S.primary} onClick={createLeague}>Add</button>
+          </div>
+          {/* Season dates -- optional, but this is the only chance to set
+              them without a separate edit flow, and they're what makes the
+              book-average update prompt possible at all. */}
+          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
+            Season dates (optional) — lets the app prompt you to update your book average once the season wraps
+          </div>
+          <div style={{display:"flex",gap:"8px"}}>
+            <input type="date" value={newLeagueStart} onChange={e=>setNewLeagueStart(e.target.value)} style={{...S.input,flex:1}}/>
+            <input type="date" value={newLeagueEnd} onChange={e=>setNewLeagueEnd(e.target.value)} style={{...S.input,flex:1}}/>
           </div>
         </div>
       </div>
