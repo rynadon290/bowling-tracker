@@ -18,6 +18,9 @@
 // cut is a separate recorded fact, because the posted line can shift and is
 // often only final once the squad finishes.
 
+import { normalizeSidePots, sidePotTotals } from "./sidePots.js";
+import { normalizeMatchPlay, emptyMatchPlay, matchPlayTotals } from "./matchPlay.js";
+
 export function emptyTournamentGame(gameNumber = 1) {
   return { gameNumber, score: "", lanePair: "" };
 }
@@ -50,6 +53,11 @@ export function emptyTournament() {
     days: [emptyTournamentDay(1)],
     buyIn: "",
     winnings: "",
+    // Itemised side action, separate from the main entry above.
+    sidePots: [],
+    // The head-to-head phase after the cut. Empty until a bowler makes it
+    // -- most tournaments end at qualifying for most bowlers.
+    matchPlay: emptyMatchPlay(),
     notes: "",
   };
 }
@@ -85,6 +93,8 @@ export function normalizeTournament(raw) {
     days,
     buyIn: raw.buyIn ?? "",
     winnings: raw.winnings ?? "",
+    sidePots: normalizeSidePots(raw.sidePots),
+    matchPlay: normalizeMatchPlay(raw.matchPlay),
     notes: raw.notes || "",
   };
 }
@@ -210,7 +220,30 @@ export function tournamentAverage(tournament) {
 export function tournamentMoney(tournament) {
   const buyIn = num(tournament?.buyIn) ?? 0;
   const winnings = num(tournament?.winnings) ?? 0;
-  return { buyIn, winnings, net: winnings - buyIn };
+  const side = sidePotTotals(tournament?.sidePots);
+  // entryNet and net are both reported: the first answers "was the
+  // tournament itself worth entering", the second "did I leave up".
+  // Collapsing them would hide a bowler who cashes the main event every
+  // week and gives it all back in brackets.
+  const entryNet = Math.round((winnings - buyIn) * 100) / 100;
+  return {
+    buyIn,
+    winnings,
+    entryNet,
+    side,
+    totalCost: Math.round((buyIn + side.cost) * 100) / 100,
+    totalWon: Math.round((winnings + side.won) * 100) / 100,
+    net: Math.round((entryNet + side.net) * 100) / 100,
+  };
+}
+
+// Qualifying total plus the match-play block, which is what actually
+// decides a finish at events that have one.
+export function tournamentFinalTotal(tournament) {
+  const qualifying = tournamentTotal(tournament);
+  const mp = matchPlayTotals(tournament?.matchPlay);
+  if (!mp.played) return { qualifying, matchPlay: null, total: qualifying };
+  return { qualifying, matchPlay: mp, total: qualifying + mp.total };
 }
 
 // ── Supabase mapping ────────────────────────────────────────────────────
@@ -224,6 +257,8 @@ export function tournamentToRow(t, userId) {
     days: t.days || [],
     buy_in: num(t.buyIn),
     winnings: num(t.winnings),
+    side_pots: normalizeSidePots(t.sidePots),
+    match_play: normalizeMatchPlay(t.matchPlay),
     notes: t.notes || null,
   };
 }
@@ -238,6 +273,8 @@ export function tournamentFromRow(row) {
     days: row.days || [],
     buyIn: row.buy_in == null ? "" : String(row.buy_in),
     winnings: row.winnings == null ? "" : String(row.winnings),
+    sidePots: row.side_pots || [],
+    matchPlay: row.match_play || null,
     notes: row.notes || "",
   });
 }
