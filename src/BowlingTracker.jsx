@@ -39,7 +39,7 @@ import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEn
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
-import { normalizePattern, patternFromRow, patternToRow } from "./domain/oilPatterns.js";
+import { normalizePattern, patternFromRow, patternToRow, patternAverages } from "./domain/oilPatterns.js";
 import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSeasons.js";
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
@@ -640,7 +640,7 @@ export default function BowlingTracker(){
         // mapper: is_coach, and the four book-average columns, all existed in
         // the table and were mapped on the way out, but were never fetched --
         // so they came back undefined on every load and silently reset.
-        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,home_centers,notes,book_average,book_games,book_season,book_average_as_of"));
+        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,aliases,home_centers,notes,book_average,book_games,book_season,book_average_as_of"));
         if(profilesRes.online&&profilesRes.data){
           const rebuiltProfiles={};
           profilesRes.data.forEach(row=>{
