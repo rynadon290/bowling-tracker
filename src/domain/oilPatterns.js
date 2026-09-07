@@ -44,17 +44,46 @@ export function normalizePattern(raw) {
 // ratio for the bowler or the community to fill from the official PBA
 // pattern sheet for that season. Shipping guessed numbers here would put
 // wrong specs behind a verified-looking entry, which is worse than blank.
-export const PBA_ANIMAL_PATTERNS = ["Cheetah", "Viper", "Chameleon", "Scorpion", "Shark", "Bear", "Wolf", "Badger", "Dragon"];
+export const PBA_ANIMAL_PATTERNS = ["Wolf", "Cheetah", "Viper", "Bear", "Chameleon", "Scorpion", "Dragon", "Shark", "Badger"];
+
+// Where the authoritative year-tagged specs live. Kegel makes the
+// patterns and publishes each season's sheet, so a bowler filling these
+// in has one correct place to look rather than a search result.
+export const PATTERN_SPEC_SOURCE = "https://patternlibrary.kegel.net";
+
+// Specs verified against a year-tagged source. Deliberately sparse.
+//
+// Published lengths for the SAME animal differ by up to four feet
+// depending on the season and who published them -- Shark appears as 44',
+// 45' and 48'; Cheetah as 33' and 35'; Bear as 38', 39' and 41'. That's
+// not sloppy reporting, it's the patterns genuinely being re-cut between
+// seasons, which is exactly why the year belongs in the name.
+//
+// The consequence: a plausible-looking table assembled from memory would
+// be wrong for most bowler-year combinations, and wrong specs behind a
+// confident-looking entry are worse than a blank a bowler fills in
+// correctly. So only entries confirmed against a specific year's sheet
+// go here, keyed by "Name|Year".
+export const VERIFIED_PATTERN_SPECS = {
+  // Kegel Pattern Library, 2024 PBA Cheetah.
+  "Cheetah|2024": { lengthFeet: 35, ratio: "2.00:1", volumeMl: 33.55, forwardMl: 19.65, reverseMl: 13.9 },
+};
 
 export function pbaAnimalPatternSeeds(year = new Date().getFullYear()) {
-  return PBA_ANIMAL_PATTERNS.map(name => normalizePattern({
-    id: `pba-${name.toLowerCase()}-${year}`,
-    name,
-    series: "PBA Animal",
-    year,
-    verified: false,
-    sourceNote: `Specs change each season — fill from the PBA ${year} pattern sheet.`,
-  }));
+  return PBA_ANIMAL_PATTERNS.map(name => {
+    const verified = VERIFIED_PATTERN_SPECS[`${name}|${year}`];
+    return normalizePattern({
+      id: `pba-${name.toLowerCase()}-${year}`,
+      name,
+      series: "PBA Animal",
+      year,
+      ...(verified || {}),
+      verified: !!verified,
+      sourceNote: verified
+        ? `Specs from the ${year} Kegel pattern sheet.`
+        : `Specs change between seasons — fill from the ${year} sheet at patternlibrary.kegel.net.`,
+    });
+  });
 }
 
 // Display name: "Chameleon (2026)" when a year is set, so two seasons of
