@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   emptyMatchPlay, addMatch, removeMatch, setMatchField, setBonus,
   matchResult, matchPlayTotals, pinDifferential, normalizeMatchPlay,
-  DEFAULT_BONUS_PER_WIN,
+  DEFAULT_BONUS_PER_WIN, matchMargin, competitiveness, describeCompetitiveness,
 } from './matchPlay.js';
 
 function block() {
@@ -78,5 +78,66 @@ describe('block summary', () => {
     const after = removeMatch(block(), 2);
     expect(after.matches.map(m => m.matchNumber)).toEqual([1, 2]);
     expect(after.matches[1].yourScore).toBe('190');
+  });
+});
+
+// Win/loss record alone can't separate being outclassed from losing three
+// squeakers, and those call for completely different responses. This is
+// the whole reason opponent scores are captured.
+describe('how competitive the block was', () => {
+  const mk = pairs => {
+    let mp = emptyMatchPlay();
+    pairs.forEach((p, i) => {
+      mp = addMatch(mp);
+      mp = setMatchField(mp, i + 1, 'yourScore', String(p[0]));
+      mp = setMatchField(mp, i + 1, 'opponentScore', String(p[1]));
+    });
+    return mp;
+  };
+  const blowout = mk([[160, 220], [150, 215], [165, 225]]);
+  const close = mk([[205, 210], [198, 201], [212, 215]]);
+
+  it('gives a signed margin per match', () => {
+    expect(matchMargin(mk([[220, 200]]).matches[0])).toBe(20);
+    expect(matchMargin(mk([[180, 210]]).matches[0])).toBe(-30);
+  });
+
+  it('has no margin for a half-entered match', () => {
+    let mp = addMatch(emptyMatchPlay());
+    mp = setMatchField(mp, 1, 'yourScore', '200');
+    expect(matchMargin(mp.matches[0])).toBeNull();
+    expect(competitiveness(mp)).toBeNull();
+  });
+
+  it('separates two identical 0-3 records by margin', () => {
+    expect(matchPlayTotals(blowout).losses).toBe(3);
+    expect(matchPlayTotals(close).losses).toBe(3);
+    expect(competitiveness(blowout).avgLossMargin).toBe(61.7);
+    expect(competitiveness(close).avgLossMargin).toBe(3.7);
+  });
+
+  it('counts matches decided by under the close threshold', () => {
+    expect(competitiveness(close).closeCount).toBe(3);
+    expect(competitiveness(blowout).closeCount).toBe(0);
+  });
+
+  // Averaging wins and losses together would cancel out and say nothing.
+  it('reports win and loss margins separately', () => {
+    const mixed = mk([[220, 200], [180, 210], [215, 213]]);
+    const c = competitiveness(mixed);
+    expect(c.avgWinMargin).toBe(11);
+    expect(c.avgLossMargin).toBe(30);
+  });
+
+  it('identifies the best and worst matches', () => {
+    const c = competitiveness(mk([[220, 200], [180, 210], [215, 213]]));
+    expect(c.biggestWin.margin).toBe(20);
+    expect(c.worstLoss.margin).toBe(30);
+    expect(c.closest.margin).toBe(2);
+  });
+
+  it('describes a close sweep differently from a blowout sweep', () => {
+    expect(describeCompetitiveness(close)).toContain('under 10 pins');
+    expect(describeCompetitiveness(blowout)).toContain('61.7');
   });
 });

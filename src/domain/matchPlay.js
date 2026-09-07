@@ -178,3 +178,100 @@ export function pinDifferential(mp) {
   }
   return counted ? diff : null;
 }
+
+// ── How competitive was the block? ──────────────────────────────────────
+//
+// Win/loss record throws away the thing a bowler most wants to know after
+// a bad block: was I outclassed, or did I lose three matches by a handful
+// of pins? Those call for completely different responses -- the first is a
+// "my game wasn't there" night, the second is a "I was right there" night,
+// and a 0-3 looks identical in both.
+//
+// So margins are reported alongside the record, split by result. Average
+// margin across everything would blend a 60-pin loss with a 50-pin win
+// into something near zero and say nothing useful, which is why wins and
+// losses are summarised separately.
+
+// A match is called close when it was decided by fewer than this many
+// pins. Ten is a display convention for grouping, not a rule of the sport
+// -- roughly the margin a single mark swings, so below it the result could
+// plausibly have gone the other way.
+export const CLOSE_MATCH_MARGIN = 10;
+
+// Signed margin for one match: positive means you won by that much.
+// Null when the match isn't fully entered.
+export function matchMargin(match) {
+  if (matchResult(match) === null) return null;
+  return (gameScore(match.yourScore) ?? 0) - (gameScore(match.opponentScore) ?? 0);
+}
+
+function mean(values) {
+  if (!values.length) return null;
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+}
+
+export function competitiveness(mp) {
+  const base = normalizeMatchPlay(mp);
+  const played = base.matches
+    .map(m => ({ match: m, margin: matchMargin(m) }))
+    .filter(x => x.margin !== null);
+
+  if (!played.length) return null;
+
+  const winMargins = played.filter(x => x.margin > 0).map(x => x.margin);
+  const lossMargins = played.filter(x => x.margin < 0).map(x => Math.abs(x.margin));
+  const ties = played.filter(x => x.margin === 0).length;
+
+  // Sorted by margin so best and worst are just the ends.
+  const sorted = [...played].sort((a, b) => a.margin - b.margin);
+  const worst = sorted[0];
+  const best = sorted[sorted.length - 1];
+
+  // Closest match by absolute margin, whichever way it went.
+  const closest = [...played].sort((a, b) => Math.abs(a.margin) - Math.abs(b.margin))[0];
+
+  const closeCount = played.filter(x => Math.abs(x.margin) < CLOSE_MATCH_MARGIN).length;
+
+  return {
+    played: played.length,
+    // Averages kept apart -- blending them cancels out and hides both.
+    avgWinMargin: mean(winMargins),
+    avgLossMargin: mean(lossMargins),
+    ties,
+    closeCount,
+    closeThreshold: CLOSE_MATCH_MARGIN,
+    // Losses that were close: the "I was right there" count specifically.
+    closeLosses: played.filter(x => x.margin < 0 && Math.abs(x.margin) < CLOSE_MATCH_MARGIN).length,
+    biggestWin: best.margin > 0 ? { margin: best.margin, opponent: best.match.opponent, matchNumber: best.match.matchNumber } : null,
+    worstLoss: worst.margin < 0 ? { margin: Math.abs(worst.margin), opponent: worst.match.opponent, matchNumber: worst.match.matchNumber } : null,
+    closest: { margin: Math.abs(closest.margin), result: matchResult(closest.match), matchNumber: closest.match.matchNumber },
+  };
+}
+
+// One plain sentence for the block. Deliberately descriptive rather than
+// consoling -- "you were close" when someone lost by 40 a match is worse
+// than useless.
+export function describeCompetitiveness(mp) {
+  const c = competitiveness(mp);
+  if (!c) return "";
+  const t = matchPlayTotals(mp);
+
+  if (t.losses === 0 && t.wins > 0) {
+    return c.avgWinMargin != null
+      ? `Won every match, by ${c.avgWinMargin} pins on average.`
+      : "Won every match.";
+  }
+  if (t.wins === 0 && t.losses > 0) {
+    if (c.closeLosses === t.losses) {
+      return `Lost every match, but all of them by under ${c.closeThreshold} pins.`;
+    }
+    return `Lost every match, by ${c.avgLossMargin} pins on average.`;
+  }
+  const parts = [];
+  if (c.avgWinMargin != null) parts.push(`won by ${c.avgWinMargin} on average`);
+  if (c.avgLossMargin != null) parts.push(`lost by ${c.avgLossMargin}`);
+  const tail = c.closeCount
+    ? ` ${c.closeCount} of ${c.played} came down to under ${c.closeThreshold} pins.`
+    : "";
+  return `${parts.join(", ")}.${tail}`;
+}
