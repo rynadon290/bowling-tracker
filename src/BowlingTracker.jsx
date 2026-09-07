@@ -333,6 +333,10 @@ export default function BowlingTracker(){
   // Read-only here: accepting still happens on Social, which owns the
   // full friendship state. This copy just refreshes afterwards.
   const[incomingFriendRequests,setIncomingFriendRequests]=useState([]);
+  // Held locally while onboarding runs, then committed once. Writing to
+  // the real profile on every keystroke would create a bowler named "R"
+  // the moment someone starts typing.
+  const[onboardingProfile,setOnboardingProfile]=useState(()=>emptyProfile(""));
   const[tasksByRelationship,setTasksByRelationship]=useState({});
   const[notesByRelationship,setNotesByRelationship]=useState({});
   // Sessions for whichever bowler the coach currently has selected in the
@@ -1858,6 +1862,15 @@ export default function BowlingTracker(){
   }
 
   function finishOnboarding(){
+    // Commit what onboarding collected. The name creates the bowler --
+    // everything downstream keys off bowler name, so this has to happen
+    // before anything else can be logged.
+    const typed=(onboardingProfile.bowlerName||"").trim();
+    if(typed){
+      if(!bowlers.includes(typed))saveBowlers([...bowlers,typed]);
+      selectBowler(typed);
+      setProfile(typed,normalizeProfile({...onboardingProfile,bowlerName:typed},typed));
+    }
     setOnboarded(true);
     try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
     try{window.localStorage.setItem(ONBOARDED_KEY,"1");}catch{}
@@ -3403,7 +3416,12 @@ export default function BowlingTracker(){
       <Onboarding
         preferences={preferences}
         onApply={updatePreferences}
-        onFinish={finishOnboarding}/>
+        onFinish={finishOnboarding}
+        profile={onboardingProfile}
+        onProfileChange={setOnboardingProfile}
+        centers={centers}
+        searchCenters={searchCenters}
+        ensureCenter={ensureCenter}/>
     );
   }
 
