@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   categorizeCoaching, partitionTasks, taskProgress, sortNotes,
@@ -210,6 +210,7 @@ export default function CoachingView({
   onSearch, searchResults, searching, onRequest, onRespond, onEnd,
   onAddTask, onRemoveTask, onCompleteTask, onAttemptTask, onReopenTask,
   onAddNote, leftHandedByUserId = {},
+  onSelectBowler, bowlerSnapshots = {},
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [addingTask, setAddingTask] = useState(false);
@@ -222,6 +223,15 @@ export default function CoachingView({
   // the people who coach you. Same screen, opposite side of the table.
   const list = coachViewOn ? myBowlers : myCoaches;
   const selected = list.find(x => x.relationshipId === selectedId) || list[0] || null;
+
+  // Loads on-demand as each bowler is actually viewed, not eagerly for
+  // everyone the coach has -- see loadCoachBowlerSessions in
+  // BowlingTracker.jsx. Re-fires if the selection changes to a bowler
+  // whose sessions haven't been fetched yet; loadCoachBowlerSessions
+  // itself no-ops once a bowler's sessions are already cached.
+  useEffect(() => {
+    if (coachViewOn && selected && onSelectBowler) onSelectBowler(selected.userId);
+  }, [coachViewOn, selected?.userId]);
   const tasks = selected ? partitionTasks(tasksByRelationship?.[selected.relationshipId] || []) : null;
   const notes = selected ? (notesByRelationship?.[selected.relationshipId] || []) : [];
   const actingAsCoach = coachViewOn;
@@ -317,6 +327,50 @@ export default function CoachingView({
 
       {selected && (
         <>
+          {actingAsCoach && (
+            <Section title={`${selected.displayName}'s Game`}>
+              {(() => {
+                const snap = bowlerSnapshots[selected.userId];
+                if (snap === undefined) {
+                  return <div style={{ fontSize: "11px", color: C.textMuted }}>Loading…</div>;
+                }
+                if (snap === null) {
+                  return <div style={{ fontSize: "11px", color: C.textMuted }}>No sessions logged yet.</div>;
+                }
+                return (
+                  <>
+                    <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                      <div style={S.statBox}>
+                        <div style={{ ...S.statNum, fontSize: "18px" }}>{snap.average}</div>
+                        <div style={S.statLbl}>Average</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={{ ...S.statNum, fontSize: "18px", color: C.strike }}>{snap.high}</div>
+                        <div style={S.statLbl}>High</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={{ ...S.statNum, fontSize: "18px", color: C.textMuted }}>{snap.nights}</div>
+                        <div style={S.statLbl}>Nights</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: "12px", color: C.text, marginBottom: "10px" }}>{snap.trendSummary}</div>
+                    {snap.recent.length > 0 && (
+                      <div>
+                        <div style={{ ...S.label, marginBottom: "4px" }}>Recent</div>
+                        {snap.recent.map((r, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "3px" }}>
+                            <span style={{ color: C.textMuted }}>{r.league ? `${r.league} · ` : ""}{r.date}</span>
+                            <span style={{ color: C.text }}>{r.scores.join(" · ")}{r.total != null ? `  (${r.total})` : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </Section>
+          )}
+
           <Section title={`Tasks — ${selected.displayName}`}>
             {actingAsCoach && !addingTask && (
               <button style={{ ...S.btn(), width: "100%", marginBottom: "8px", padding: "8px", fontSize: "12px" }}

@@ -30,7 +30,7 @@ import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHa
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow } from "./domain/goals.js";
-import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask } from "./domain/coaching.js";
+import { taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot } from "./domain/coaching.js";
 import { coachViewActive, setCoachView } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -300,6 +300,12 @@ export default function BowlingTracker(){
   const[coachProfilesById,setCoachProfilesById]=useState({});
   const[tasksByRelationship,setTasksByRelationship]=useState({});
   const[notesByRelationship,setNotesByRelationship]=useState({});
+  // Sessions for whichever bowler the coach currently has selected in the
+  // Coach tab. Loaded on demand per bowler, not all at once for every
+  // bowler a coach has -- a coach could have many, and there's no reason
+  // to pull everyone's history before the coach has picked someone to look
+  // at.
+  const[coachBowlerSessions,setCoachBowlerSessions]=useState({});
   const[coachSearchResults,setCoachSearchResults]=useState([]);
   const[coachSearching,setCoachSearching]=useState(false);
   const coachSearchTimer=useRef(null);
@@ -524,7 +530,10 @@ export default function BowlingTracker(){
           const r=await window.storage.get(STORAGE_KEY);
           if(r){
             const loaded=JSON.parse(r.value);
-            migratedShots=migrateShots(loaded);
+            // Guarded: a corrupted or old-format value used to abort the
+            // ENTIRE remaining load, because every read below shares this
+            // one try block.
+            migratedShots=migrateShots(Array.isArray(loaded)?loaded:[]);
             setShots(migratedShots);
             if(JSON.stringify(migratedShots)!==JSON.stringify(loaded)){
               try{await window.storage.set(STORAGE_KEY,JSON.stringify(migratedShots));}catch{}
@@ -544,7 +553,7 @@ export default function BowlingTracker(){
           const s=await window.storage.get(SESSIONS_KEY);
           if(s){
             const loadedSessions=JSON.parse(s.value);
-            const migratedSessions=migrateSessions(loadedSessions);
+            const migratedSessions=migrateSessions(Array.isArray(loadedSessions)?loadedSessions:[]);
             setSessions(migratedSessions);
             if(JSON.stringify(migratedSessions)!==JSON.stringify(loadedSessions)){
               try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
@@ -568,7 +577,8 @@ export default function BowlingTracker(){
         }else{
           const b=await window.storage.get(BOWLERS_KEY);
           if(b){
-            const list=JSON.parse(b.value);
+            const raw=JSON.parse(b.value);
+            const list=Array.isArray(raw)?raw:[];
             setBowlers(list);
             if(list.length){
               setActiveBowler(list[0]);
@@ -598,9 +608,9 @@ export default function BowlingTracker(){
           try{await window.storage.set(LAYOUTS_KEY,JSON.stringify(rebuiltLayouts));}catch{}
         }else{
           const a=await window.storage.get(ARSENALS_KEY);
-          if(a)setArsenals(JSON.parse(a.value));
+          if(a){const v=JSON.parse(a.value);if(v&&typeof v==="object"&&!Array.isArray(v))setArsenals(v);}
           const bl=await window.storage.get(LAYOUTS_KEY);
-          if(bl)setBallLayouts(JSON.parse(bl.value));
+          if(bl){const v=JSON.parse(bl.value);if(v&&typeof v==="object"&&!Array.isArray(v))setBallLayouts(v);}
           const bsp=await readCached(BALL_SPECS_KEY,"object");
           if(bsp)setBallSpecs(bsp);
           const bb=await readCached(BALL_BAGS_KEY,"object");
@@ -787,7 +797,7 @@ export default function BowlingTracker(){
           try{await window.storage.set(BAGS_KEY,JSON.stringify(rebuiltBags));}catch{}
         }else{
           const bg=await window.storage.get(BAGS_KEY);
-          if(bg)setBags(JSON.parse(bg.value).map(b=>normalizeBag(b)));
+          if(bg){const v=JSON.parse(bg.value);if(Array.isArray(v))setBags(v.map(b=>normalizeBag(b)));}
         }
 
         const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score"));
@@ -820,7 +830,7 @@ export default function BowlingTracker(){
           try{await window.storage.set(MATCHES_KEY,JSON.stringify(mergedMatches));}catch{}
         }else{
           const m=await window.storage.get(MATCHES_KEY);
-          if(m)setMatches(JSON.parse(m.value));
+          if(m){const v=JSON.parse(m.value);if(Array.isArray(v))setMatches(v);}
         }
 
         const lanePatternsRes=await cloudRead("lane_patterns",q=>q.select("*"));
@@ -834,10 +844,10 @@ export default function BowlingTracker(){
           try{await window.storage.set(LANE_PATTERNS_KEY,JSON.stringify(mergedPatterns));}catch{}
         }else{
           const lp=await window.storage.get(LANE_PATTERNS_KEY);
-          if(lp)setLanePatterns(JSON.parse(lp.value));
+          if(lp){const v=JSON.parse(lp.value);if(v&&typeof v==="object")setLanePatterns(v);}
         }
         const bl=await window.storage.get("bowling-ball-lane-lines-v1");
-        if(bl)setBallLaneLines(JSON.parse(bl.value));
+        if(bl){const v=JSON.parse(bl.value);if(v&&typeof v==="object"&&!Array.isArray(v))setBallLaneLines(v);}
       }catch{}
     }
     load();
@@ -1524,6 +1534,21 @@ export default function BowlingTracker(){
       });
       setNotesByRelationship(byRel);
     }
+  }
+
+  async function loadCoachBowlerSessions(bowlerUserId){
+    if(!bowlerUserId||coachBowlerSessions[bowlerUserId])return;
+    const res=await cloudRead("sessions",q=>q.select("*").eq("user_id",bowlerUserId));
+    if(!res.online||!res.data)return;
+    // leagueIdsRef maps name->id for the SIGNED-IN user's own leagues, so
+    // it won't have every id a different bowler's rows might reference --
+    // inverted here as the best available mapping; a league id it doesn't
+    // recognize falls back to the raw id via sessionFromSupabaseRow's own
+    // handling rather than crashing.
+    const nameById={};
+    Object.entries(leagueIdsRef.current||{}).forEach(([name,id])=>{nameById[id]=name;});
+    const mapped=res.data.map(row=>sessionFromSupabaseRow(row,nameById));
+    setCoachBowlerSessions(prev=>({...prev,[bowlerUserId]:mapped}));
   }
 
   function searchCoachProfiles(term){
@@ -2679,6 +2704,17 @@ export default function BowlingTracker(){
   const g3score=getGameStrict(activeBowler,sessionLeague,sessionDate,3);
   const sessionTotal=getSessionTotal();
 
+  // Corner pin depends on which hand THREW the shot, and a "Stats" view
+  // can legitimately blend several bowlers (statsBowler === "" is
+  // Team/combined; a team-compare view is a whole roster). A single
+  // leftHanded flag would silently apply one person's hand to everyone
+  // else's shots, so this resolves it per bowler and the corner-pin
+  // filters below call it per shot.
+  function leftHandedForBowler(name){
+    const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&name in t.memberHandedness)?.memberHandedness?.[name];
+    return resolveHandedness(profiles[name],rosterLeftHanded);
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   // statsBowler === "" means Team/combined (everyone's shots together)
   const statsShots=shots.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
@@ -2706,10 +2742,15 @@ export default function BowlingTracker(){
   const splitR=tot?Math.round((splitCount/tot)*100):0;
   const splitConverted=splitShots.filter(s=>s.spareMade==="Yes").length;
   const splitConvR=splitCount?Math.round((splitConverted/splitCount)*100):0;
-  const tenPinAttempts=statsShots.filter(s=>isTenPinLeave(s)&&s.spareMade!=="");
+  // Uses each shot's OWN bowler's hand, not a single flag for the view --
+  // see leftHandedForBowler above. Was isTenPinLeave, which only matches
+  // the 10 pin and silently missed every left-handed bowler's 7-pin
+  // leaves logged by pin number (Weak/Ringing 10 stayed correct for both
+  // hands, since those are canonical stored values either way).
+  const tenPinAttempts=statsShots.filter(s=>isCornerPinLeave(s,leftHandedForBowler(s.bowler))&&s.spareMade!=="");
   const tenPinMade=tenPinAttempts.filter(s=>s.spareMade==="Yes").length;
   const tenPinSpareR=tenPinAttempts.length?Math.round((tenPinMade/tenPinAttempts.length)*100):0;
-  const tenPinLeaveCount=statsShots.filter(isTenPinLeave).length;
+  const tenPinLeaveCount=statsShots.filter(s=>isCornerPinLeave(s,leftHandedForBowler(s.bowler))).length;
   const singlePinAttempts=statsShots.filter(s=>isSinglePinLeave(s)&&s.spareMade!=="");
   const singlePinMade=singlePinAttempts.filter(s=>s.spareMade==="Yes").length;
   // Specifically the lone 5-pin (not any other single pin) — a shot the
@@ -2754,17 +2795,16 @@ export default function BowlingTracker(){
   })();
 
   const goalBowler=statsBowler||activeBowler;
-  // Handedness of the bowler being VIEWED, which isn't necessarily the one
-  // currently logging shots -- viewing a left-handed teammate's stats must
-  // use their corner pin, not yours.
-  const viewedRosterLeftHanded=!!teams.find(t=>t.memberHandedness&&goalBowler in t.memberHandedness)?.memberHandedness?.[goalBowler];
-  const viewedLeftHanded=resolveHandedness(profiles[goalBowler],viewedRosterLeftHanded);
-  // Corner-pin attempts for THIS bowler's hand. Separate from the
-  // tenPinAttempts above, which the existing Stats cards still use.
-  // Trends filters by the same statsBowler, so it resolves identically --
-  // aliased rather than recomputed so the two can't drift apart.
+  // Goals and Trends are always scoped to ONE bowler (goalBowler falls
+  // back to activeBowler, never to a blended team), so a single flag is
+  // correct here -- unlike the Stats cards above, which reuse
+  // leftHandedForBowler per shot because they can show a blended view.
+  const viewedLeftHanded=leftHandedForBowler(goalBowler);
   const trendsLeftHanded=viewedLeftHanded;
-  const cornerPinAttempts=statsShots.filter(s=>isCornerPinLeave(s,viewedLeftHanded)&&s.spareMade!=="");
+  // Reuses the Stats computation above rather than keeping a second copy
+  // that could drift from it -- both now go through the same
+  // leftHandedForBowler + isCornerPinLeave path.
+  const cornerPinAttempts=goalBowler===statsBowler?tenPinAttempts:statsShots.filter(s=>isCornerPinLeave(s,viewedLeftHanded)&&s.spareMade!=="");
   const cornerPinMade=cornerPinAttempts.filter(s=>s.spareMade==="Yes").length;
   const cornerPinSpareR=cornerPinAttempts.length?Math.round((cornerPinMade/cornerPinAttempts.length)*100):0;
   const goalHighGame=bowlerHighGame(sessions,goalBowler);
@@ -2950,9 +2990,9 @@ export default function BowlingTracker(){
   const teamSplitShotsAll=compareShots.filter(isSplit);
   const teamSplitR=teamTot?Math.round((teamSplitShotsAll.length/teamTot)*100):0;
   const teamSplitConvR=teamSplitShotsAll.length?Math.round((teamSplitShotsAll.filter(s=>s.spareMade==="Yes").length/teamSplitShotsAll.length)*100):0;
-  const teamTenPinAttemptsAll=compareShots.filter(s=>isTenPinLeave(s)&&s.spareMade!=="");
+  const teamTenPinAttemptsAll=compareShots.filter(s=>isCornerPinLeave(s,leftHandedForBowler(s.bowler))&&s.spareMade!=="");
   const teamTenPinSpareR=teamTenPinAttemptsAll.length?Math.round((teamTenPinAttemptsAll.filter(s=>s.spareMade==="Yes").length/teamTenPinAttemptsAll.length)*100):0;
-  const teamTenPinRate=teamTot?Math.round((compareShots.filter(isTenPinLeave).length/teamTot)*100):0;
+  const teamTenPinRate=teamTot?Math.round((compareShots.filter(s=>isCornerPinLeave(s,leftHandedForBowler(s.bowler))).length/teamTot)*100):0;
   const teamSinglePinAttemptsAll=compareShots.filter(s=>isSinglePinLeave(s)&&s.spareMade!=="");
   const teamSinglePinSpareR=teamSinglePinAttemptsAll.length?Math.round((teamSinglePinAttemptsAll.filter(s=>s.spareMade==="Yes").length/teamSinglePinAttemptsAll.length)*100):0;
   const teamFrameShotsAll=compareShots.filter(s=>!s.ballNum||s.ballNum===1);
@@ -3230,7 +3270,9 @@ export default function BowlingTracker(){
             onAttemptTask={attemptCoachingTask}
             onReopenTask={reopenCoachingTask}
             onAddNote={addCoachingNote}
-            leftHandedByUserId={{}}/>
+            leftHandedByUserId={{}}
+            onSelectBowler={loadCoachBowlerSessions}
+            bowlerSnapshots={Object.fromEntries(Object.entries(coachBowlerSessions).map(([id,sess])=>[id,bowlerSnapshot(sess)]))}/>
         )}
 
         {view==="trends"&&(
