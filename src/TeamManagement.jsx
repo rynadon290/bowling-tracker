@@ -169,7 +169,6 @@ export default function TeamManagement({
   leagues = [],
   onTeamsChange,
   onLeagueAdd,
-  onLeagueRename,
 }) {
   const{user,displayName,updateDisplayName}=useAuth();
   // Maps league name -> its Supabase row id, built from its own small fetch
@@ -192,7 +191,6 @@ export default function TeamManagement({
   // the prompt never fires for it.
   const[newLeagueStart, setNewLeagueStart] = useState("");
   const[newLeagueEnd, setNewLeagueEnd] = useState("");
-  const[editingLeagueName, setEditingLeagueName] = useState("");
   // Per-team "add a teammate" search state: {[teamId]: {term, results, searching}}
   const[searchState, setSearchState] = useState({});
   const searchTimers = useRef({});
@@ -561,20 +559,6 @@ export default function TeamManagement({
     setNewLeagueEnd("");
   }
 
-  function startRenameLeague() {
-    setEditingLeagueName(selectedLeague);
-  }
-
-  function saveLeagueRename() {
-    const name = editingLeagueName.trim();
-    if (!name || name === selectedLeague) { setEditingLeagueName(""); return; }
-    if (leagueList.some(league => league !== selectedLeague && league.toLowerCase() === name.toLowerCase())) { alert("A league with that name already exists."); return; }
-    const oldName = selectedLeague;
-    onLeagueRename?.(oldName, name);
-    setSelectedLeague(name);
-    setEditingLeagueName("");
-  }
-
   return (
     <div>
       {loading && (
@@ -638,16 +622,14 @@ export default function TeamManagement({
         <select value={selectedLeague} onChange={e=>setSelectedLeague(e.target.value)} style={{...S.input,appearance:"auto"}}>
           {leagueList.map(league=><option key={league} value={league}>{league}</option>)}
         </select>
-        {!editingLeagueName ? (
-          <button style={{...S.button,width:"100%",marginTop:"8px"}} onClick={startRenameLeague} disabled={!selectedLeague}>Rename League</button>
-        ) : (
-          <div style={{marginTop:"10px"}}>
-            <div style={S.label}>New League Name</div>
-            <div style={{display:"flex",gap:"8px"}}>
-              <input value={editingLeagueName} onChange={e=>setEditingLeagueName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveLeagueRename();}} autoFocus style={{...S.input,flex:1}}/>
-              <button style={S.primary} onClick={saveLeagueRename}>Save</button>
-              <button style={S.button} onClick={()=>setEditingLeagueName("")}>Cancel</button>
-            </div>
+        {/* Renaming a league lives in Settings > Leagues, alongside its
+            center, season dates and hide toggle. It used to be here too,
+            calling the same handler -- two places that rewrite every shot
+            and session to a new name is two places to keep correct, and
+            the duplicate was pure risk for no capability. */}
+        {selectedLeague&&(
+          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
+            Rename this league, set its center or season dates in Settings › Leagues.
           </div>
         )}
         <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>

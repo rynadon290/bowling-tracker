@@ -3870,7 +3870,6 @@ export default function BowlingTracker(){
                 leagues={leagues}
                 onTeamsChange={setTeams}
                 onLeagueAdd={addLeague}
-                onLeagueRename={renameLeague}
               />
             )}
             {socialTab==="friends"&&<Friends onRequestsChanged={loadFriendRequests}/>}
