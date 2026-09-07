@@ -678,7 +678,7 @@ export default function BowlingTracker(){
           }catch{}
         }
 
-        const tournamentsRes=await cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,notes"));
+        const tournamentsRes=await cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,side_pots,match_play,notes"));
         if(tournamentsRes.online&&tournamentsRes.data){
           const rebuilt=tournamentsRes.data.map(tournamentFromRow).filter(Boolean);
           setTournaments(rebuilt);

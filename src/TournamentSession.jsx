@@ -6,6 +6,12 @@ import {
   tournamentTotal, tournamentAverage, tournamentMoney,
 } from "./domain/tournaments.js";
 import { searchPatterns, describePattern, patternStats } from "./domain/oilPatterns.js";
+import {
+  SIDE_POT_TYPES, addSidePot, removeSidePot, setSidePotField, sidePotMoney, sidePotTotals,
+} from "./domain/sidePots.js";
+import {
+  addMatch, removeMatch, setMatchField, setBonus, matchResult, matchPlayTotals, pinDifferential,
+} from "./domain/matchPlay.js";
 
 function fieldLabel(text) {
   return (
@@ -313,6 +319,197 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
   );
 }
 
+// Itemised side action. Each row is one purchase -- four brackets at $5
+// is one row with entries=4, not four rows.
+function SidePots({ tournament, onChange }) {
+  const pots = tournament.sidePots || [];
+  const totals = sidePotTotals(pots);
+
+  return (
+    <div style={S.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+        <div style={S.label}>Brackets &amp; Side Pots</div>
+        {totals.count > 0 && (
+          <div style={{ fontSize: "12px", fontWeight: 700, color: totals.net >= 0 ? C.strike : C.miss }}>
+            {totals.net < 0 ? "\u2212" : ""}${Math.abs(totals.net).toFixed(2)}
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+        Tracked separately from the main entry, so you can see which of these actually pay for themselves.
+      </div>
+
+      {pots.map(pot => {
+        const m = sidePotMoney(pot);
+        return (
+          <div key={pot.id} style={{ padding: "10px", marginBottom: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              <select style={{ ...S.sel, flex: 1, fontSize: "12px" }}
+                value={pot.type}
+                onChange={e => onChange({ ...tournament, sidePots: setSidePotField(pots, pot.id, "type", e.target.value) })}>
+                {SIDE_POT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input style={{ ...S.input, flex: 1, fontSize: "12px" }} placeholder="Label (optional)"
+                value={pot.label}
+                onChange={e => onChange({ ...tournament, sidePots: setSidePotField(pots, pot.id, "label", e.target.value) })} />
+            </div>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              <div style={{ flex: 1 }}>
+                {fieldLabel("Entries")}
+                <input style={{ ...S.input, fontSize: "12px" }} type="number" inputMode="numeric" placeholder="1"
+                  value={pot.entries}
+                  onChange={e => onChange({ ...tournament, sidePots: setSidePotField(pots, pot.id, "entries", e.target.value) })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                {fieldLabel("$ Each")}
+                <input style={{ ...S.input, fontSize: "12px" }} type="number" inputMode="decimal" placeholder="5"
+                  value={pot.costPerEntry}
+                  onChange={e => onChange({ ...tournament, sidePots: setSidePotField(pots, pot.id, "costPerEntry", e.target.value) })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                {fieldLabel("Won")}
+                <input style={{ ...S.input, fontSize: "12px" }} type="number" inputMode="decimal" placeholder="0"
+                  value={pot.winnings}
+                  onChange={e => onChange({ ...tournament, sidePots: setSidePotField(pots, pot.id, "winnings", e.target.value) })} />
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: "11px", color: C.textMuted }}>
+                Cost ${m.cost.toFixed(2)} &middot;{" "}
+                <span style={{ color: m.net >= 0 ? C.strike : C.miss, fontWeight: 600 }}>
+                  {m.net < 0 ? "\u2212" : "+"}${Math.abs(m.net).toFixed(2)}
+                </span>
+              </div>
+              <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
+                onClick={() => onChange({ ...tournament, sidePots: removeSidePot(pots, pot.id) })}>
+                Remove
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {totals.byType.length > 1 && (
+        <div style={{ marginBottom: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}` }}>
+          {totals.byType.map(b => (
+            <div key={b.type} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
+              <span style={{ color: C.textMuted }}>{b.type} ({b.entries})</span>
+              <span style={{ color: b.net >= 0 ? C.strike : C.miss }}>
+                {b.net < 0 ? "\u2212" : "+"}${Math.abs(b.net).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={S.chips}>
+        {SIDE_POT_TYPES.slice(0, 3).map(t => (
+          <button key={t} style={{ ...S.btn(), padding: "6px 10px", fontSize: "12px" }}
+            onClick={() => onChange({ ...tournament, sidePots: addSidePot(pots, t) })}>
+            + {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Match play: the head-to-head block after the cut.
+function MatchPlay({ tournament, onChange }) {
+  const mp = tournament.matchPlay || {};
+  const matches = mp.matches || [];
+  const totals = matchPlayTotals(mp);
+  const diff = pinDifferential(mp);
+
+  function update(next) { onChange({ ...tournament, matchPlay: next }); }
+
+  return (
+    <div style={S.card}>
+      <div style={S.label}>Match Play</div>
+      <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+        The head-to-head block after the cut. Bonus pins vary by tournament — set them to whatever this event uses.
+      </div>
+
+      <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
+        <div style={{ flex: 1 }}>
+          {fieldLabel("Bonus per win")}
+          <input style={{ ...S.input, fontSize: "12px" }} type="number" inputMode="numeric"
+            value={mp.bonusPerWin ?? ""} onChange={e => update(setBonus(mp, "bonusPerWin", e.target.value))} />
+        </div>
+        <div style={{ flex: 1 }}>
+          {fieldLabel("Bonus per tie")}
+          <input style={{ ...S.input, fontSize: "12px" }} type="number" inputMode="numeric"
+            value={mp.bonusPerTie ?? ""} onChange={e => update(setBonus(mp, "bonusPerTie", e.target.value))} />
+        </div>
+      </div>
+
+      {matches.map(m => {
+        const result = matchResult(m);
+        const color = result === "win" ? C.strike : result === "loss" ? C.miss : result === "tie" ? C.spare : C.textMuted;
+        return (
+          <div key={m.matchNumber} style={{ padding: "10px", marginBottom: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 600 }}>
+                Match {m.matchNumber}
+                {result && <span style={{ color, marginLeft: "6px", textTransform: "uppercase", fontSize: "10px" }}>{result}</span>}
+              </div>
+              <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
+                onClick={() => update(removeMatch(mp, m.matchNumber))}>
+                Remove
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              <input style={{ ...S.input, flex: 2, fontSize: "12px" }} placeholder="Opponent"
+                value={m.opponent} onChange={e => update(setMatchField(mp, m.matchNumber, "opponent", e.target.value))} />
+              <input style={{ ...S.input, flex: 1, fontSize: "12px" }} placeholder="Lanes"
+                value={m.lanePair} onChange={e => update(setMatchField(mp, m.matchNumber, "lanePair", e.target.value))} />
+            </div>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <input style={{ ...S.input, flex: 1, fontSize: "14px", textAlign: "center" }} type="number" inputMode="numeric" placeholder="You"
+                value={m.yourScore} onChange={e => update(setMatchField(mp, m.matchNumber, "yourScore", e.target.value))} />
+              <span style={{ fontSize: "11px", color: C.textMuted }}>vs</span>
+              <input style={{ ...S.input, flex: 1, fontSize: "14px", textAlign: "center" }} type="number" inputMode="numeric" placeholder="Them"
+                value={m.opponentScore} onChange={e => update(setMatchField(mp, m.matchNumber, "opponentScore", e.target.value))} />
+            </div>
+          </div>
+        );
+      })}
+
+      <button style={{ ...S.btn(), width: "100%", marginBottom: matches.length ? "12px" : 0 }}
+        onClick={() => update(addMatch(mp))}>
+        + Add Match
+      </button>
+
+      {totals.played > 0 && (
+        <>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            <div style={S.statBox}>
+              <div style={{ ...S.statNum, fontSize: "16px" }}>{totals.wins}-{totals.losses}{totals.ties ? `-${totals.ties}` : ""}</div>
+              <div style={S.statLbl}>Record</div>
+            </div>
+            <div style={S.statBox}>
+              <div style={{ ...S.statNum, fontSize: "16px", color: C.textMuted }}>{totals.scratch}</div>
+              <div style={S.statLbl}>Scratch</div>
+            </div>
+            <div style={S.statBox}>
+              <div style={{ ...S.statNum, fontSize: "16px", color: C.spare }}>+{totals.bonusPins}</div>
+              <div style={S.statLbl}>Bonus</div>
+            </div>
+            <div style={{ ...S.statBox, border: `1px solid ${C.accent}44` }}>
+              <div style={{ ...S.statNum, fontSize: "16px", color: C.accent }}>{totals.total}</div>
+              <div style={S.statLbl}>Total</div>
+            </div>
+          </div>
+          <div style={{ fontSize: "11px", color: C.textMuted, textAlign: "center" }}>
+            {totals.average} average over {totals.played} match{totals.played === 1 ? "" : "es"}
+            {diff !== null && <> &middot; {diff >= 0 ? "+" : "\u2212"}{Math.abs(diff)} pins vs opponents</>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns, submitOilPattern, tournaments }) {
   const total = tournamentTotal(tournament);
   const avg = tournamentAverage(tournament);
@@ -382,12 +579,38 @@ export default function TournamentSession({ tournament, onChange, onSave, saved,
               value={tournament.winnings} onChange={e => onChange({ ...tournament, winnings: e.target.value })} />
           </div>
         </div>
-        {(money.buyIn !== 0 || money.winnings !== 0) && (
-          <div style={{ textAlign: "center", marginTop: "8px", fontSize: "13px", fontWeight: 700, color: money.net >= 0 ? C.strike : C.miss }}>
-            {money.net < 0 ? "−" : ""}${Math.abs(money.net).toFixed(2)} net
+        {(money.buyIn !== 0 || money.winnings !== 0 || money.side.count > 0) && (
+          <div style={{ marginTop: "8px" }}>
+            {/* Entry and side action shown apart before the combined
+                figure: a bowler who cashes the main event every week and
+                gives it back in brackets should be able to see that,
+                which one blended number would hide. */}
+            {money.side.count > 0 && (
+              <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Entry</span>
+                  <span style={{ color: money.entryNet >= 0 ? C.strike : C.miss }}>
+                    {money.entryNet < 0 ? "−" : "+"}${Math.abs(money.entryNet).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Side action</span>
+                  <span style={{ color: money.side.net >= 0 ? C.strike : C.miss }}>
+                    {money.side.net < 0 ? "−" : "+"}${Math.abs(money.side.net).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div style={{ textAlign: "center", fontSize: "13px", fontWeight: 700, color: money.net >= 0 ? C.strike : C.miss }}>
+              {money.net < 0 ? "−" : ""}${Math.abs(money.net).toFixed(2)} net
+            </div>
           </div>
         )}
       </div>
+
+      <SidePots tournament={tournament} onChange={onChange} />
+
+      <MatchPlay tournament={tournament} onChange={onChange} />
 
       <div style={S.card}>
         <div style={S.label}>Tournament Notes</div>
