@@ -70,6 +70,7 @@ const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
+const TOURNAMENTS_KEY = "bowling-tournaments-v1";
 const BAGS_KEY = "bowling-bags-v1";
 const BALL_BAGS_KEY = "bowling-ball-bag-assignments-v1";
 const BALL_SPECS_KEY = "bowling-ball-specs-v1";
@@ -282,6 +283,7 @@ export default function BowlingTracker(){
   // `leagues` (a plain string array) that half the app depends on.
   const[centers,setCenters]=useState([]);
   const[oilPatterns,setOilPatterns]=useState([]);
+  const[tournaments,setTournaments]=useState([]);
   const[leagueCenters,setLeagueCenters]=useState({});
   // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
   // Shared across everyone in the league (like center), unlike per-bowler
@@ -560,6 +562,16 @@ export default function BowlingTracker(){
         }else{
           const op=await readCached(OIL_PATTERNS_KEY,"array");
           if(op)setOilPatterns(op.map(normalizePattern).filter(Boolean));
+        }
+
+        const tournamentsRes=await cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,notes"));
+        if(tournamentsRes.online&&tournamentsRes.data){
+          const rebuilt=tournamentsRes.data.map(tournamentFromRow).filter(Boolean);
+          setTournaments(rebuilt);
+          try{await window.storage.set(TOURNAMENTS_KEY,JSON.stringify(rebuilt));}catch{}
+        }else{
+          const ts=await readCached(TOURNAMENTS_KEY,"array");
+          if(ts)setTournaments(ts.map(normalizeTournament).filter(Boolean));
         }
 
         const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id,start_date,end_date"));
@@ -1307,6 +1319,11 @@ export default function BowlingTracker(){
     const withIds={...activeTournament,id:activeTournament.id||crypto.randomUUID(),bowler:activeBowler};
     setActiveTournament(withIds);
     try{window.storage.set(TOURNAMENT_KEY,JSON.stringify(withIds));}catch{}
+    // Keep the saved-tournament list in sync so pattern history reflects
+    // this tournament immediately, not only after a reload.
+    const merged=[...tournaments.filter(t=>t.id!==withIds.id),withIds];
+    setTournaments(merged);
+    try{window.storage.set(TOURNAMENTS_KEY,JSON.stringify(merged));}catch{}
     cloudWrite("tournaments",tournamentToRow(withIds,user?.id||null));
     setTournamentSaved(true);
     setTimeout(()=>setTournamentSaved(false),1500);
@@ -2689,7 +2706,7 @@ export default function BowlingTracker(){
             activeTournament={activeTournament} updateTournament={updateTournament} saveTournament={saveTournament} tournamentSaved={tournamentSaved}
             manualScores={manualScores} updateManualScore={updateManualScore}
             ownerName={ownerName} scoringForOthers={scoringForOthers} setScoringForOthers={setScoringForOthers}
-            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern}
+            oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills}

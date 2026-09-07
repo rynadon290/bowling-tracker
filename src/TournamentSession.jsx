@@ -5,7 +5,7 @@ import {
   dayTotal, dayAverage, dayGamesEntered, cutMargin,
   tournamentTotal, tournamentAverage, tournamentMoney,
 } from "./domain/tournaments.js";
-import { searchPatterns, describePattern } from "./domain/oilPatterns.js";
+import { searchPatterns, describePattern, patternStats } from "./domain/oilPatterns.js";
 
 function fieldLabel(text) {
   return (
@@ -15,12 +15,74 @@ function fieldLabel(text) {
   );
 }
 
+// How the bowler has actually scored on this pattern before, across every
+// tournament day that named it. Only appears once there's something real
+// to show -- a pattern logged for the first time gets nothing rather than
+// a row of dashes, and the current tournament's own in-progress day is
+// excluded so it isn't comparing today against itself.
+function PatternHistory({ patternName, tournaments, excludeTournamentId }) {
+  const [open, setOpen] = useState(false);
+  const scoped = (tournaments || []).filter(t => !excludeTournamentId || t.id !== excludeTournamentId);
+  const stats = patternStats(scoped, patternName);
+  if (!stats || !stats.games) return null;
+
+  const cutText = stats.cutsTracked
+    ? `${stats.cutsMade}/${stats.cutsTracked} cuts`
+    : null;
+
+  return (
+    <div style={{ marginTop: "6px" }}>
+      <button
+        style={{ background: "none", border: "none", padding: 0, fontSize: "11px", color: C.accent, cursor: "pointer", textAlign: "left" }}
+        onClick={() => setOpen(o => !o)}>
+        {open ? "▾" : "▸"} Your history: {stats.average} avg over {stats.games} game{stats.games === 1 ? "" : "s"}
+        {cutText ? ` · ${cutText}` : ""}
+      </button>
+      {open && (
+        <div style={{ marginTop: "6px", padding: "8px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            <div style={{ ...S.statBox, padding: "6px" }}>
+              <div style={{ ...S.statNum, fontSize: "16px" }}>{stats.average}</div>
+              <div style={S.statLbl}>Average</div>
+            </div>
+            <div style={{ ...S.statBox, padding: "6px" }}>
+              <div style={{ ...S.statNum, fontSize: "16px", color: C.strike }}>{stats.high}</div>
+              <div style={S.statLbl}>High</div>
+            </div>
+            <div style={{ ...S.statBox, padding: "6px" }}>
+              <div style={{ ...S.statNum, fontSize: "16px", color: C.textMuted }}>{stats.low}</div>
+              <div style={S.statLbl}>Low</div>
+            </div>
+          </div>
+          {stats.days.map((d, i) => (
+            <div key={`${d.tournamentId}-${d.dayNumber}-${i}`}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", fontSize: "11px", paddingBottom: "4px", marginBottom: "4px", borderBottom: i < stats.days.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {d.tournamentName || "Untitled"}
+                </div>
+                <div style={{ color: C.textMuted, fontSize: "10px" }}>
+                  {d.date || "no date"}{d.center ? ` · ${d.center}` : ""}
+                  {d.madeCut === true ? " · made cut" : d.madeCut === false ? " · missed cut" : ""}
+                </div>
+              </div>
+              <div style={{ color: C.textMuted, flexShrink: 0 }}>
+                {d.scores.length ? d.scores.join(" · ") : "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Search-as-you-type over the seeded pattern library, falling back to
 // plain free text -- a PBA tournament pattern or a house shot won't be in
 // the seed set, and that's expected, not an error state. If it's genuinely
 // new, "Save this pattern" adds it to the shared table so it's searchable
 // next time, for this bowler or anyone else.
-function OilPatternField({ value, onChange, patterns, onSubmitPattern }) {
+function OilPatternField({ value, onChange, patterns, onSubmitPattern, tournaments, currentTournamentId }) {
   const [focused, setFocused] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newLength, setNewLength] = useState("");
@@ -63,6 +125,9 @@ function OilPatternField({ value, onChange, patterns, onSubmitPattern }) {
         <div style={{ fontSize: "11px", color: exact.verified ? C.accent : C.textMuted, marginTop: "4px" }}>
           {describePattern(exact)}
         </div>
+      )}
+      {!focused && (
+        <PatternHistory patternName={value} tournaments={tournaments} excludeTournamentId={currentTournamentId} />
       )}
       {focused && !exact && matches.length > 0 && (
         <div style={{ position: "absolute", zIndex: 10, left: 0, right: 0, marginTop: "2px", backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
@@ -109,7 +174,7 @@ function OilPatternField({ value, onChange, patterns, onSubmitPattern }) {
   );
 }
 
-function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay, oilPatterns, submitOilPattern }) {
+function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiDay, oilPatterns, submitOilPattern, tournaments }) {
   const total = dayTotal(day);
   const avg = dayAverage(day);
   const entered = dayGamesEntered(day);
@@ -165,7 +230,9 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
             value={day.oilPattern}
             onChange={v => update({ ...day, oilPattern: v })}
             patterns={oilPatterns}
-            onSubmitPattern={submitOilPattern} />
+            onSubmitPattern={submitOilPattern}
+            tournaments={tournaments}
+            currentTournamentId={tournament?.id} />
         </div>
       </div>
 
@@ -246,7 +313,7 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
   );
 }
 
-export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns, submitOilPattern }) {
+export default function TournamentSession({ tournament, onChange, onSave, saved, oilPatterns, submitOilPattern, tournaments }) {
   const total = tournamentTotal(tournament);
   const avg = tournamentAverage(tournament);
   const money = tournamentMoney(tournament);
@@ -277,7 +344,8 @@ export default function TournamentSession({ tournament, onChange, onSave, saved,
           onRemoveDay={() => onChange(removeDay(tournament, day.dayNumber))}
           onChange={next => onChange(updateDay(tournament, day.dayNumber, () => next))}
           oilPatterns={oilPatterns}
-          submitOilPattern={submitOilPattern} />
+          submitOilPattern={submitOilPattern}
+          tournaments={tournaments} />
       ))}
 
       <button style={{ ...S.btn(), width: "100%", marginBottom: "12px" }} onClick={() => onChange(addDay(tournament))}>

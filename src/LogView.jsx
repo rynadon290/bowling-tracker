@@ -30,7 +30,7 @@ export default function LogView({
   sessionStartDismissed, dismissSessionStart, updatePreferences,
   practiceMode, setPracticeMode, activeDrill, setActiveDrill, startDrill, saveDrill, drillSaved, drills,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
-  oilPatterns, submitOilPattern,
+  oilPatterns, submitOilPattern, tournaments,
   envBags, selectedBagId, setSelectedBagId, logBalls,
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
@@ -209,7 +209,7 @@ export default function LogView({
                 onChange={updateTournament}
                 onSave={saveTournament}
                 saved={tournamentSaved}
-                oilPatterns={oilPatterns} submitOilPattern={submitOilPattern}/>
+                oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments}/>
             )}
 
             {/* "Tonight's Session" is league framing -- series, money games,
