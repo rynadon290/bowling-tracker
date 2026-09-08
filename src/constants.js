@@ -1,6 +1,6 @@
 // The app's name, in one place so a rename doesn't mean hunting through
 // JSX for a hardcoded string.
-export const APP_NAME = "My Bowling Locker";
+export const APP_NAME = "My Bowling Vault";
 
 // Practice and casual nights aren't leagues, but every per-night record in
 // this app -- manual game scores, session recaps -- is keyed by
