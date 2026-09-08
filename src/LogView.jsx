@@ -8,6 +8,7 @@ import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import SessionRecap from "./SessionRecap.jsx";
 import ShareButton from "./ShareButton.jsx";
+import { sessionHighlights } from "./domain/shareCard.js";
 import { getManualScore, seriesTotal, getGameEquipment, defaultPracticeBall } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
@@ -449,6 +450,129 @@ export default function LogView({
               </div>
             )}
 
+            {/* Shot-form order, top to bottom:
+                  context (game, frame, lane) -> result -> ball -> surface
+                  -> line -> release & miss -> shoes -> notes.
+                Context first because it's what changes every shot; result
+                right under it because "frame 5: strike" is one thought;
+                equipment after because it changes rarely; shoes above
+                notes because both are things you set once and leave. */}
+            {showShotContext&&(
+            <div style={S.card}>
+              <div style={S.label}>
+                Shot Context
+                {inTenth&&<span style={{color:C.spare,marginLeft:"8px"}}>10th Frame{ballNumLabel}</span>}
+              </div>
+              {!editingId&&(
+                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
+                  {/* effectiveSessionLeague, not sessionLeague: practice and
+                      casual have a container league rather than one you
+                      pick, so keying off sessionLeague told a practice
+                      bowler to "pick a league above" -- something that
+                      doesn't exist in that mode. */}
+                  {activeBowler||"No bowler selected"}
+                  {effectiveSessionLeague
+                    ? ` — ${effectiveSessionLeague.replace(" House Shot","")}, ${formatDate(sessionDate)}`
+                    : preferences.environment==="league" ? " — pick a league above" : ` — ${formatDate(sessionDate)}`}
+                </div>
+              )}
+              {editingId&&(
+                <div style={S.row}>
+                  <input style={{...S.input,flex:1}} placeholder="League" value={form.league} onChange={e=>set("league",e.target.value)}/>
+                  <input style={{...S.input,flex:1}} type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
+                </div>
+              )}
+
+              {/* Live scores — moved here from Tonight's Session, so they're
+                  visible right alongside where you're actively logging. */}
+              {/* The series is the one loud thing on this screen. Four
+                  equal boxes made the total the same size as game 1 --
+                  which is the size of everything else -- so nothing on
+                  the page ever read as the thing you came for. */}
+              {!editingId&&sessionLeague&&(
+                <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:"12px",marginBottom:"14px"}}>
+                  <div>
+                    <div className="num" style={{fontSize:"56px",lineHeight:0.9,fontWeight:700,fontFamily:F.num,letterSpacing:"-0.02em",color:sessionTotal!=null?C.text:C.textMuted}}>
+                      {sessionTotal!=null?sessionTotal:"—"}
+                    </div>
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Series so far</div>
+                  </div>
+                  <div style={{display:"flex",gap:"14px",paddingBottom:"4px"}}>
+                    {[g1score,g2score,g3score].map((score,i)=>(
+                      <div key={i} style={{textAlign:"center"}}>
+                        <div className="num" style={{fontSize:"22px",lineHeight:1,fontWeight:700,fontFamily:F.num,color:score!=null?C.text:C.textMuted}}>
+                          {score!=null?score:"—"}
+                        </div>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>G{i+1}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Game stepper */}
+              <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Game</div>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                    <button style={S.btn("sm")} onClick={()=>{
+                      const v=String(Math.max(1,(parseInt(form.game)||1)-1));
+                      const line=!editingId?autoFillLine(form.ball,v,form.frame):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
+                      setForm(p=>({...p,game:v,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+                    }}>−</button>
+                    <div style={{flex:1,textAlign:"center",fontSize:"22px",fontWeight:700}}>{form.game||1}</div>
+                    <button style={S.btn("sm")} onClick={()=>{
+                      const v=String(Math.min(3,(parseInt(form.game)||1)+1));
+                      const line=!editingId?autoFillLine(form.ball,v,form.frame):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
+                      setForm(p=>({...p,game:v,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+                    }}>+</button>
+                  </div>
+                </div>
+
+                {/* Frame stepper — max 10 */}
+                <div style={{flex:1}}>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Frame</div>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                    <button style={S.btn("sm")} onClick={()=>{
+                      const v=String(Math.max(1,(parseInt(form.frame)||1)-1));
+                      const line=!editingId?autoFillLine(form.ball,form.game,v):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
+                      setForm(p=>({...p,frame:v,ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+                    }}>−</button>
+                    <div style={{flex:1,textAlign:"center",fontSize:"22px",fontWeight:700}}>{form.frame||1}</div>
+                    <button style={S.btn("sm")} onClick={()=>{
+                      const v=String(Math.min(10,(parseInt(form.frame)||1)+1));
+                      const line=!editingId?autoFillLine(form.ball,form.game,v):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
+                      setForm(p=>({...p,frame:v,ballNum:parseInt(v)===10?1:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
+                    }}>+</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 10th frame ball selector */}
+              {inTenth&&!editingId&&(
+                <div style={{marginBottom:"10px"}}>
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Ball in 10th</div>
+                  <div style={S.chips}>
+                    {tenthOptions.map(n=>(
+                      <Chip key={n} label={`Ball ${n}`} selected={form.ballNum===n} onToggle={()=>set("ballNum",n)} color={C.spare}/>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lane display */}
+              {!editingId&&startingLane&&(
+                <div style={{textAlign:"center",padding:"10px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${C.border}`}}>
+                  <span style={{fontSize:"12px",color:C.textMuted}}>Lane </span>
+                  <span style={{fontSize:"22px",fontWeight:700,color:C.accent}}>{currentLane||"—"}</span>
+                </div>
+              )}
+              {editingId&&(
+                <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
+              )}
+            </div>
+            )}
+
             {/* Enter game scores directly, without shot-by-shot logging.
                 Two cases: a screenshot that only showed game totals, and
                 bowlers who want score tracking without logging 30 shots a
@@ -854,10 +978,21 @@ export default function LogView({
                       league:cs.league,
                       date:formatDate(cs.date),
                       environment:"league",
-                      highlights:[
-                        cs.strikes&&cs.shotCount?`${Math.round((cs.strikes/cs.shotCount)*100)}% strikes`:null,
-                        cs.sparesMade&&cs.spareAttempts?`${Math.round((cs.sparesMade/cs.spareAttempts)*100)}% spares`:null,
-                      ],
+                      // Real achievements, not raw rates -- see
+                      // sessionHighlights. A goal you hit or money you won
+                      // is what someone actually wants to post; "48%
+                      // strikes" helps nobody.
+                      highlights:sessionHighlights({
+                        scores:cs.scores,
+                        strikes:cs.strikes,shotCount:cs.shotCount,
+                        sparesMade:cs.sparesMade,spareAttempts:cs.spareAttempts,
+                        cleanGames:cs.cleanGames||0,
+                        goalsHit:cs.goalsHit||[],
+                        moneyWon:cs.moneyWon||0,
+                        priorBest:cs.priorBest??null,
+                        priorAverage:cs.priorAverage??null,
+                        environment:"league",
+                      }),
                     }}/>
                   </div>
                 </div>
@@ -866,128 +1001,6 @@ export default function LogView({
 
             {!editingId&&<div style={S.divider}/>}
 
-            {/* Shot-form order, top to bottom:
-                  context (game, frame, lane) -> result -> ball -> surface
-                  -> line -> release & miss -> shoes -> notes.
-                Context first because it's what changes every shot; result
-                right under it because "frame 5: strike" is one thought;
-                equipment after because it changes rarely; shoes above
-                notes because both are things you set once and leave. */}
-            {showShotContext&&(
-            <div style={S.card}>
-              <div style={S.label}>
-                Shot Context
-                {inTenth&&<span style={{color:C.spare,marginLeft:"8px"}}>10th Frame{ballNumLabel}</span>}
-              </div>
-              {!editingId&&(
-                <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                  {/* effectiveSessionLeague, not sessionLeague: practice and
-                      casual have a container league rather than one you
-                      pick, so keying off sessionLeague told a practice
-                      bowler to "pick a league above" -- something that
-                      doesn't exist in that mode. */}
-                  {activeBowler||"No bowler selected"}
-                  {effectiveSessionLeague
-                    ? ` — ${effectiveSessionLeague.replace(" House Shot","")}, ${formatDate(sessionDate)}`
-                    : preferences.environment==="league" ? " — pick a league above" : ` — ${formatDate(sessionDate)}`}
-                </div>
-              )}
-              {editingId&&(
-                <div style={S.row}>
-                  <input style={{...S.input,flex:1}} placeholder="League" value={form.league} onChange={e=>set("league",e.target.value)}/>
-                  <input style={{...S.input,flex:1}} type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
-                </div>
-              )}
-
-              {/* Live scores — moved here from Tonight's Session, so they're
-                  visible right alongside where you're actively logging. */}
-              {/* The series is the one loud thing on this screen. Four
-                  equal boxes made the total the same size as game 1 --
-                  which is the size of everything else -- so nothing on
-                  the page ever read as the thing you came for. */}
-              {!editingId&&sessionLeague&&(
-                <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:"12px",marginBottom:"14px"}}>
-                  <div>
-                    <div className="num" style={{fontSize:"56px",lineHeight:0.9,fontWeight:700,fontFamily:F.num,letterSpacing:"-0.02em",color:sessionTotal!=null?C.text:C.textMuted}}>
-                      {sessionTotal!=null?sessionTotal:"—"}
-                    </div>
-                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Series so far</div>
-                  </div>
-                  <div style={{display:"flex",gap:"14px",paddingBottom:"4px"}}>
-                    {[g1score,g2score,g3score].map((score,i)=>(
-                      <div key={i} style={{textAlign:"center"}}>
-                        <div className="num" style={{fontSize:"22px",lineHeight:1,fontWeight:700,fontFamily:F.num,color:score!=null?C.text:C.textMuted}}>
-                          {score!=null?score:"—"}
-                        </div>
-                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>G{i+1}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Game stepper */}
-              <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Game</div>
-                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                    <button style={S.btn("sm")} onClick={()=>{
-                      const v=String(Math.max(1,(parseInt(form.game)||1)-1));
-                      const line=!editingId?autoFillLine(form.ball,v,form.frame):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-                      setForm(p=>({...p,game:v,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
-                    }}>−</button>
-                    <div style={{flex:1,textAlign:"center",fontSize:"22px",fontWeight:700}}>{form.game||1}</div>
-                    <button style={S.btn("sm")} onClick={()=>{
-                      const v=String(Math.min(3,(parseInt(form.game)||1)+1));
-                      const line=!editingId?autoFillLine(form.ball,v,form.frame):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-                      setForm(p=>({...p,game:v,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
-                    }}>+</button>
-                  </div>
-                </div>
-
-                {/* Frame stepper — max 10 */}
-                <div style={{flex:1}}>
-                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>Frame</div>
-                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                    <button style={S.btn("sm")} onClick={()=>{
-                      const v=String(Math.max(1,(parseInt(form.frame)||1)-1));
-                      const line=!editingId?autoFillLine(form.ball,form.game,v):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-                      setForm(p=>({...p,frame:v,ballNum:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
-                    }}>−</button>
-                    <div style={{flex:1,textAlign:"center",fontSize:"22px",fontWeight:700}}>{form.frame||1}</div>
-                    <button style={S.btn("sm")} onClick={()=>{
-                      const v=String(Math.min(10,(parseInt(form.frame)||1)+1));
-                      const line=!editingId?autoFillLine(form.ball,form.game,v):{startingBoard:form.startingBoard,targetArrows:form.targetArrows};
-                      setForm(p=>({...p,frame:v,ballNum:parseInt(v)===10?1:null,startingBoard:line.startingBoard,targetArrows:line.targetArrows}));
-                    }}>+</button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 10th frame ball selector */}
-              {inTenth&&!editingId&&(
-                <div style={{marginBottom:"10px"}}>
-                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Ball in 10th</div>
-                  <div style={S.chips}>
-                    {tenthOptions.map(n=>(
-                      <Chip key={n} label={`Ball ${n}`} selected={form.ballNum===n} onToggle={()=>set("ballNum",n)} color={C.spare}/>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Lane display */}
-              {!editingId&&startingLane&&(
-                <div style={{textAlign:"center",padding:"10px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${C.border}`}}>
-                  <span style={{fontSize:"12px",color:C.textMuted}}>Lane </span>
-                  <span style={{fontSize:"22px",fontWeight:700,color:C.accent}}>{currentLane||"—"}</span>
-                </div>
-              )}
-              {editingId&&(
-                <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
-              )}
-            </div>
-            )}
 
             {/* Result. Regression fix: the earlier card reorder moved this
                 block above its old wrapper without carrying the guard
