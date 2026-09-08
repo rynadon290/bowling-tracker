@@ -61,7 +61,7 @@ export function shareTitle({ bowler, scores } = {}) {
 // Sized for a phone share: 1080x1080 is what Instagram and most feeds
 // crop least. Colours come from the active theme so the card matches
 // what the bowler is looking at.
-// The Board & Arrow mark: one lane arrow. Same geometry as the app icon
+// The app mark: one lane arrow. Same geometry as the app icon
 // (a triangle in the accent), so a shared card and the icon on a phone
 // home screen are recognisably the same thing.
 export function drawArrowMark(ctx, x, y, size, color) {
