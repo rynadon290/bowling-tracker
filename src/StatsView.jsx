@@ -49,8 +49,13 @@ export default function StatsView({
   // The chips said "Tuesday Team" -- built from the LEAGUE name, not the
   // team's. A bowler whose team is called "Split Happens" saw "Tuesday
   // Team" everywhere, which is not what they call themselves.
+  // Match on the normalised name so a team stored against "Tuesday" still
+  // matches a league listed as "Tuesday House Shot" (and vice versa) --
+  // team.league comes from the raw cloud league name, which may or may not
+  // carry the suffix depending on when the row was written.
+  const normLeague = (v) => String(v || "").replace(" House Shot", "").trim().toLowerCase();
   const teamNameForLeague = (l) => {
-    const t = (teams || []).find(t => t.league === l && t.name);
+    const t = (teams || []).find(t => t.name && normLeague(t.league) === normLeague(l));
     return t ? t.name : `${String(l).replace(" House Shot", "")} Team`;
   };
 

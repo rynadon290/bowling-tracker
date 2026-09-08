@@ -4028,11 +4028,6 @@ export default function BowlingTracker(){
                 🧑‍🏫 Coach{coachViewOn&&unreadResponseCount>0?` · ${unreadResponseCount}`:""}
               </button>
             )}
-            {!coachViewOn&&(
-              <button style={{...S.btn(),flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("social")}>
-                👥 Friends &amp; teams
-              </button>
-            )}
           </div>
 
           {/* Goals live here now, not on the Log tab. A goal is something
@@ -4157,6 +4152,16 @@ export default function BowlingTracker(){
             with your equipment, not buried in app settings. Same Settings
             component in a card-filtered mode, so there is still exactly
             one Leagues editor rather than two that can drift. */}
+        {/* Friends and teams sit in Vault, not Improve: they're people you
+            manage, alongside your leagues and equipment. A coach is
+            different -- that IS improvement -- so the Coach button stays
+            on Improve. */}
+        {view==="locker"&&!coachViewOn&&(
+          <button style={{...S.btn(),width:"100%",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("social")}>
+            👥 Friends &amp; teams
+          </button>
+        )}
+
         {view==="locker"&&(
           <Settings
             mode="leagues"
@@ -4359,7 +4364,7 @@ export default function BowlingTracker(){
           "something needs you" and "here's where" become one signal. */}
       <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,display:"flex",backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"6px 2px calc(8px + env(safe-area-inset-bottom, 0px))"}}>
         {navTabs.map(t=>{
-          const on=view===t.id||(t.id==="insights"&&(view==="coaching"||view==="social"))||(t.id==="log"&&view==="import");
+          const on=view===t.id||(t.id==="insights"&&view==="coaching")||(t.id==="locker"&&view==="social")||(t.id==="log"&&view==="import");
           // History does NOT badge the inbox count -- the inbox is
           // "things waiting for you" and lives in the header; History is
           // for reviewing what already happened. Two different jobs.

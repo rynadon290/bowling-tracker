@@ -29,9 +29,16 @@ export default function TrendsView({
   // in this league" and "all my games" are both reachable.
   // Real team names, same source as the Stats tab -- a team called
   // "Split Happens" shouldn't show up as "Tuesday Team".
+  // Match on the normalised name -- team.league is the raw cloud league
+  // name, which may or may not carry the " House Shot" suffix.
+  const normLeague = (v) => String(v || "").replace(" House Shot", "").trim().toLowerCase();
   const teamChips = (leagues || [])
-    .filter(l => (teams || []).some(t => t.league === l))
-    .map(l => ({ league: l, label: (teams || []).find(t => t.league === l && t.name)?.name || `${String(l).replace(" House Shot", "")} Team` }));
+    .filter(l => (teams || []).some(t => normLeague(t.league) === normLeague(l)))
+    .map(l => ({
+      league: l,
+      label: (teams || []).find(t => t.name && normLeague(t.league) === normLeague(l))?.name
+        || `${String(l).replace(" House Shot", "")} Team`,
+    }));
 
   const gamePoints = allGamesSeries(sessions, statsBowler, statsLeague);
   const gameSummary = allGamesSummary(gamePoints);
