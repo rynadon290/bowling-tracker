@@ -1074,14 +1074,14 @@ preferences.showMoneyGames&&(()=>{
                       <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                         Season totals across every side game — what came in, what it cost to play, and what actually stuck.
                       </div>
-                      {/* Net leads: won and paid-in are its two components,
-                          not three peer figures. Net is also the only one
-                          anyone actually quotes. */}
+                      {/* Gross leads. Net was the earlier call, but league
+                          bowlers think in won-and-paid, not net -- "I won
+                          forty" is how the night gets described on the way
+                          home. Net is still here, one line down. */}
                       <StatLead
-                        value={fmt(m.net)}
-                        caption={m.net>=0?"up on the season":"down on the season"}
-                        color={m.net>=0?C.strike:C.miss}
-                        detail={`$${m.gross.toFixed(2)} won against $${m.cost.toFixed(2)} paid in.`}/>
+                        value={`$${m.gross.toFixed(2)}`}
+                        caption="won this season" color={C.strike}
+                        detail={`$${m.cost.toFixed(2)} paid in — ${m.net>=0?"up":"down"} ${fmt(Math.abs(m.net))} overall.`}/>
                       {rows.length>0&&(
                         <>
                           <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>By Game</div>

@@ -281,7 +281,7 @@ export default function LogView({
                 <div style={S.chips}>
                   {leagues.map(l=>(
                     <Chip key={l} label={l.replace(" House Shot","")} selected={sessionLeague===l}
-                      onToggle={()=>{const team=teams.find(t=>t.league===l&&t.members.includes(activeBowler));setSessionLeague(l);setForm(f=>({...f,league:l,teamId:team?.id||"",date:sessionDate}));setShowSummary(false);}}/>
+                      onToggle={()=>{const team=teams.find(t=>t.league===l&&(t.members||[]).includes(activeBowler));setSessionLeague(l);setForm(f=>({...f,league:l,teamId:team?.id||"",date:sessionDate}));setShowSummary(false);}}/>
                   ))}
                 </div>
                 <div style={{marginBottom:"10px"}}>
@@ -604,11 +604,20 @@ export default function LogView({
                   summary={total!=null?`${total} series`:""}
                   expanded={expandedSections.manualScores}
                   onToggle={()=>toggleSection("manualScores")}>
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
                     Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
+                    {preferences.environment!=="casual"&&arsenal.length>0&&(
+                      <> Noting a ball for a game attributes that whole game to it, so you can see how each ball held up as the lanes transitioned.</>
+                    )}
                   </div>
                   {gameNums.map(g=>{
-                    const isPracticeGames=preferences.environment==="practice";
+                    // Per-game ball is offered EVERYWHERE now, not only in
+                    // practice. Lane transition is exactly as real on a
+                    // league night: the same ball can average 210 in game
+                    // one and 190 in game three, and recording which ball
+                    // bowled which game is what makes that visible in
+                    // Trends without shot-by-shot logging.
+                    const isPracticeGames=preferences.environment!=="casual";
                     const arsenal=(arsenals?.[activeBowler]||[]);
                     const equip=isPracticeGames?getGameEquipment(gameEquipment,activeBowler,effectiveSessionLeague,sessionDate,g):null;
                     // One real ball means no choice to make -- it's pre-filled.
@@ -625,8 +634,8 @@ export default function LogView({
                       </div>
                       {/* Ball and surface per game, because that's what a
                           practice is for: which ball, which surface, what
-                          did it average. Only in practice; a league night
-                          entered as scores doesn't record equipment. */}
+                          did it average -- and how it held up as the lanes
+                          transitioned across the block. */}
                       {isPracticeGames&&arsenal.length>0&&(
                         <div style={{paddingLeft:"36px"}}>
                           <div style={{...S.chips,marginBottom:"4px"}}>
@@ -914,10 +923,9 @@ export default function LogView({
                         return(
                           <div style={{marginBottom:"12px"}}>
                             <StatLead
-                              value={`${m.net<0?"−":""}$${Math.abs(m.net).toFixed(2)}`}
-                              caption={m.net>=0?"up tonight":"down tonight"}
-                              color={m.net>=0?C.strike:C.miss}
-                              detail={`$${m.gross.toFixed(2)} won against $${m.cost.toFixed(2)} paid in.`}/>
+                              value={`$${m.gross.toFixed(2)}`}
+                              caption="won tonight" color={C.strike}
+                              detail={`$${m.cost.toFixed(2)} paid in — ${m.net>=0?"up":"down"} $${Math.abs(m.net).toFixed(2)} on the night.`}/>
                           </div>
                         );
                       })()}

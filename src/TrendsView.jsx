@@ -13,10 +13,27 @@ import { allGamesSeries, allGamesSummary,
 
 export default function TrendsView({
   sessions, shots, bowlers, leagues,
-  statsBowler, setStatsBowler, statsLeague, setStatsLeague, teams,
+  statsBowler, setStatsBowler, statsLeague, setStatsLeague, teams, arsenals, gameEquipment,
   isSplit, isCornerPinLeave, leftHanded = false,
 }) {
   const [metricId, setMetricId] = useState("average");
+  const [ballFilter, setBallFilter] = useState("");
+  // Balls this bowler has actually used, from both shot logs and
+  // per-game equipment -- offering their whole arsenal would list balls
+  // with no data behind them.
+  const ballOptions = (() => {
+    const seen = new Set();
+    (shots || []).forEach(s => { if (s?.ball && (!statsBowler || s.bowler === statsBowler)) seen.add(s.ball); });
+    Object.entries(gameEquipment || {}).forEach(([k, v]) => {
+      if (v?.ball && (!statsBowler || k.startsWith(`${statsBowler}|`))) seen.add(v.ball);
+    });
+    return [...seen].sort();
+  })();
+  // Only balls this bowler has actually thrown in this league -- listing
+  // the whole arsenal would offer filters that produce an empty graph.
+  const ballsUsed = [...new Set((shots || [])
+    .filter(s => s && s.ball && (!statsBowler || s.bowler === statsBowler) && (!statsLeague || s.league === statsLeague))
+    .map(s => s.ball))].sort();
   // "Every game" plots one point per game instead of one per night.
   // Nightly averages hide the spread: 190/190/190 and 140/240/190 are the
   // same point. Off by default because the averaged view is the better
@@ -51,7 +68,7 @@ export default function TrendsView({
 
   const points = showEveryGame
     ? gamePoints
-    : seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isCornerPinLeave });
+    : seriesFor(metricId, { sessions, shots, bowler: statsBowler, league: statsLeague, isSplit, isCornerPinLeave, ball: ballFilter, gameEquipment });
   const direction = trendDirection(points);
   const reliability = seriesReliability(metricId, points);
   const summary = describeTrend(metricId, points);
@@ -104,6 +121,43 @@ export default function TrendsView({
               onToggle={() => setMetricId(m.id)} />
           ))}
         </div>
+        {/* Ball filter, shot metrics only.
+            "Is my strike rate improving" is a fair question; "is THIS ball
+            still right as the lanes wear in" is the one a bowler with an
+            arsenal actually asks. Hidden for score metrics because a game
+            score isn't attributable to one ball. */}
+        {metric && metric.source !== "scores" && ballsUsed.length > 1 && (
+          <>
+            <div style={{ ...S.label, marginTop: "12px" }}>Ball</div>
+            <div style={S.chips}>
+              <Chip label="All balls" selected={!ballFilter} onToggle={() => setBallFilter("")} />
+              {ballsUsed.map(b => (
+                <Chip key={b} label={b} selected={ballFilter === b}
+                  onToggle={() => setBallFilter(ballFilter === b ? "" : b)} />
+              ))}
+            </div>
+          </>
+        )}
+        {/* Ball filter. Works on SCORE metrics too: a scores-only game can
+            still name its ball, and a ball that averages 210 in game one
+            and 190 in game three is exactly what a bowler wants to see. */}
+        {ballOptions.length > 0 && (
+          <>
+            <div style={{ ...S.label, marginTop: "12px" }}>Ball</div>
+            <div style={S.chips}>
+              <Chip label="All balls" selected={!ballFilter} onToggle={() => setBallFilter("")} />
+              {ballOptions.map(b => (
+                <Chip key={b} label={b} selected={ballFilter === b}
+                  onToggle={() => setBallFilter(ballFilter === b ? "" : b)} />
+              ))}
+            </div>
+            {ballFilter && (
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "4px" }}>
+                Only games and shots recorded with this ball. Games with no ball noted are left out.
+              </div>
+            )}
+          </>
+        )}
         {metric && !showEveryGame && (
           <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>{metric.help}</div>
         )}

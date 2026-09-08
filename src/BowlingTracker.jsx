@@ -1027,6 +1027,11 @@ export default function BowlingTracker(){
               id:row.id,
               name:row.name,
               league:leagueNameById[row.league_id]||byId[row.id]?.league||"",
+              // This fetch is names only -- the Teams screen loads the
+              // roster. Default to [] so callers doing
+              // team.members.includes(...) don't throw; an undefined here
+              // silently killed the league chip's tap handler.
+              members:byId[row.id]?.members||[],
             }));
           });
         }
@@ -2368,7 +2373,7 @@ export default function BowlingTracker(){
   }
 
   function selectBowler(name){
-    const team=teams.find(t=>t.league===sessionLeague&&t.members.includes(name));
+    const team=teams.find(t=>t.league===sessionLeague&&(t.members||[]).includes(name));
     const teamId=team?.id||"";
     setActiveBowler(name);
     setShowSummary(false);
@@ -3517,8 +3522,17 @@ export default function BowlingTracker(){
     // moment they flipped coach view.
     const iconViews=["profile","settings","inbox","social","coaching","import"];
     if(!navTabs.some(t=>t.id===view)&&!iconViews.includes(view))setView("log");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[coachViewOn,showCoachingTab]);
+  },[view,coachViewOn,showCoachingTab]);
+
+  // Every tab opens at the top.
+  //
+  // Swapping the view keeps the browser's scroll position, so tapping
+  // Stats from halfway down Bowl landed you halfway down Stats -- on
+  // whatever card happened to be there. Nothing was broken, which is
+  // exactly why it read as the app being arbitrary.
+  useEffect(()=>{
+    window.scrollTo(0,0);
+  },[view]);
 
   const scoreOptions=scorekeepingOptions({
     environment:preferences.environment,
@@ -4371,6 +4385,7 @@ export default function BowlingTracker(){
         {view==="data"&&dataTab==="trends"&&(
           <TrendsView
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues} teams={teams}
+            arsenals={arsenals} gameEquipment={gameEquipment}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
             isSplit={isSplit}
