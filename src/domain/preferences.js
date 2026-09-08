@@ -95,6 +95,20 @@ export const STATS_CARDS = [
 //
 // These are DEFAULTS. Anyone who has reordered their own cards keeps
 // their arrangement -- see normalizeStatsCardOrder.
+// Cards hidden by default in an environment because the figure they show
+// isn't meaningful there.
+//
+// Practice has no running average: practice games aren't a competitive
+// average -- cAvg already excludes them from the composite -- so showing
+// one invites reading it as "your average", which it isn't.
+//
+// Hidden rather than removed from the order, because reconcileCardOrder
+// appends any missing card back on load; the order list can't hide
+// anything on its own. Still unhideable in Settings if someone wants it.
+const HIDDEN_BY_ENVIRONMENT = {
+  practice: ["runningAverages"],
+};
+
 const ORDER_BY_ENVIRONMENT = {
   // League night: your own line first, then where the team stands, then
   // the technical detail behind it. Side pots last -- they matter, but
@@ -118,11 +132,10 @@ const ORDER_BY_ENVIRONMENT = {
     "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves",
     "loneFivePin", "byBall", "releaseQuality", "missDistribution",
     "ballChangeTriggers", "strikeQuality", "strikeStreak", "progress",
-    "consistency", "scoreDistribution", "runningAverages", "gameByGame",
-    "theoreticalAverage", "byCenter", "seasonRecord", "weeklyPoints",
-    "teamSeries", "teamLeaderboard", "headToHead", "teamRecords",
-    "giantKiller", "hung", "handicapImpact", "money",
-    "threeSixNine",
+    "consistency", "scoreDistribution", "gameByGame", "theoreticalAverage",
+    "byCenter", "seasonRecord", "weeklyPoints", "teamSeries",
+    "teamLeaderboard", "headToHead", "teamRecords", "giantKiller",
+    "hung", "handicapImpact", "money", "threeSixNine",
   ],
   // Tournament: you're on an unfamiliar pattern in an unfamiliar house,
   // so center and equipment come early, and the score-shape cards that
@@ -236,7 +249,7 @@ export function defaultPreferences(environment = "league") {
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
     statsCardOrder: defaultStatsCardOrder(safeEnvironment),
-    hiddenStatsCards: [],
+    hiddenStatsCards: [...(HIDDEN_BY_ENVIRONMENT[safeEnvironment] || [])],
     // Colour theme. Independent of environment: switching to practice
     // should not change what the app looks like.
     theme: DEFAULT_THEME,
