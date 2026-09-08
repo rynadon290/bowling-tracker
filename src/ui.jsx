@@ -47,6 +47,11 @@ export function applyTheme(id) {
     // styles.css reads this for :focus-visible rings, which inline
     // styles can't express.
     document.documentElement.style.setProperty("--ba-accent", C.accent);
+    // The browser chrome -- mobile address bar, task-switcher preview --
+    // should match whichever theme is active, not the static default
+    // baked into index.html for the moment before React mounts.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", C.bg);
   }
   return true;
 }
@@ -169,4 +174,63 @@ export function resultSym(r){
   if(r==="Weak 10")return"W";
   if(r==="Ringing 10")return"R";
   return"L";
+}
+
+// ── Stat card layout ────────────────────────────────────────────────────
+//
+// Every Stats card was a row of identical boxes -- 46 of them across the
+// screen -- which gave the eye nowhere to land and made no number more
+// important than any other. These two components express the shape the
+// cards actually want: one figure that leads, then supporting rows.
+//
+// Built as components rather than hand-editing each card because there
+// are ~20 of them; doing it by hand is how you end up with nineteen
+// slightly different paddings and one card that throws because someone
+// forgot an import.
+
+// The headline figure of a card, plus optional context line and badge.
+export function StatLead({ value, unit = "", caption, detail, badge, color }) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "2px" }}>
+        <div className="num" style={{ fontSize: "44px", fontWeight: 700, fontFamily: F.num, lineHeight: 0.9, color: color || C.text }}>
+          {value}{unit}
+        </div>
+        {caption && <span style={{ fontSize: "13px", color: C.textMuted }}>{caption}</span>}
+      </div>
+      {badge}
+      {detail && (
+        <div style={{ fontSize: "12.5px", color: C.textMuted, margin: "6px 0 10px", lineHeight: 1.5 }}>{detail}</div>
+      )}
+    </>
+  );
+}
+
+// A supporting row. `fill` (0-100) draws a proportional bar, which lets
+// the eye compare before it reads.
+export function StatRow({ label, value, sub, fill = null, color, badge, last = false }) {
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "7px 0", fontSize: "13.5px",
+                    borderBottom: last ? "none" : `1px solid ${C.border}` }}>
+        <span>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {fill != null && (
+            <div style={{ height: "5px", width: "64px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, fill))}%`, background: color || C.accent, borderRadius: "3px" }} />
+            </div>
+          )}
+          <b className="num" style={{ fontFamily: F.num, fontSize: "16px", color: color || C.text }}>{value}</b>
+          {sub && <span style={{ fontSize: "12px", color: C.textMuted }}>{sub}</span>}
+        </div>
+      </div>
+      {badge}
+    </>
+  );
+}
+
+// The divider between the lead figure and its supporting rows.
+export function StatRows({ children }) {
+  return <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "8px" }}>{children}</div>;
 }
