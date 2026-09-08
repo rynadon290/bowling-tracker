@@ -3200,7 +3200,15 @@ export default function BowlingTracker(){
     const spareMade=spareAtt.filter(s=>s.spareMade==="Yes").length;
     const tenPins=mine.filter(s=>s.result==="Weak 10"||s.result==="Ringing 10");
     const tenMade=tenPins.filter(s=>s.spareMade==="Yes").length;
-    const splits=firstBalls.filter(s=>isSplit(s.otherLeave||[])).length;
+    // isSplit takes the SHOT, not its leave array -- it checks
+    // shot.result === "Other Leave" before looking at the pins.
+    //
+    // Passing the bare array meant shot.result was undefined, the very
+    // first check failed, and isSplit returned false for every shot. The
+    // count was always exactly zero, so Insights reported a 0% split rate
+    // no matter what the bowler actually left. Everywhere else in the app
+    // calls isSplit(shot) correctly, which is why Stats showed the true 9%.
+    const splits=firstBalls.filter(isSplit).length;
     const mySessions=sessions.filter(s=>!who||s.bowler===who);
     const gameCount=mySessions.reduce((n,s)=>n+(s.scores?.length||0),0);
 
