@@ -606,7 +606,11 @@ export default function LogView({
                   onToggle={()=>toggleSection("manualScores")}>
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
                     Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
-                    {preferences.environment!=="casual"&&arsenal.length>0&&(
+                    {/* `arsenal` is defined further down, INSIDE the
+                        per-game loop -- referencing it here threw
+                        "arsenal is not defined" and crashed the whole
+                        card. Read from the prop directly instead. */}
+                    {preferences.environment!=="casual"&&(arsenals?.[activeBowler]||[]).length>0&&(
                       <> Noting a ball for a game attributes that whole game to it, so you can see how each ball held up as the lanes transitioned.</>
                     )}
                   </div>
