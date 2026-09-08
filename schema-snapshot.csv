@@ -1,0 +1,916 @@
+kind,object_name,detail,extra
+column,api_usage,called_at,timestamp with time zone NOT NULL
+column,api_usage,endpoint,text NOT NULL
+column,api_usage,id,uuid NOT NULL
+column,api_usage,user_id,uuid NOT NULL
+column,arsenals,ball,text
+column,arsenals,bowler_name,text
+column,arsenals,core_type,text
+column,arsenals,coverstock,text
+column,arsenals,created_at,timestamp with time zone NOT NULL
+column,arsenals,created_by,uuid
+column,arsenals,diff,numeric
+column,arsenals,group_id,uuid
+column,arsenals,id,uuid NOT NULL
+column,arsenals,int_diff,numeric
+column,arsenals,layout_system,text
+column,arsenals,layout_values,jsonb
+column,arsenals,rg,numeric
+column,arsenals,weight,numeric
+column,bags,bag_type,text NOT NULL
+column,bags,ball_limit,integer
+column,bags,bowler_name,text NOT NULL
+column,bags,created_at,timestamp with time zone NOT NULL
+column,bags,created_by,uuid
+column,bags,id,uuid NOT NULL
+column,bags,includes_plastic,boolean NOT NULL
+column,bags,name,text NOT NULL
+column,ball_bags,bag_id,uuid NOT NULL
+column,ball_bags,ball,text NOT NULL
+column,ball_bags,bowler_name,text NOT NULL
+column,ball_bags,created_at,timestamp with time zone NOT NULL
+column,ball_bags,created_by,uuid
+column,ball_bags,id,uuid NOT NULL
+column,ball_confirmations,confirmed_by,uuid
+column,ball_confirmations,created_at,timestamp with time zone NOT NULL
+column,ball_confirmations,id,uuid NOT NULL
+column,ball_confirmations,submission_id,uuid NOT NULL
+column,ball_confirmations,vote,text NOT NULL
+column,ball_groups,bowler_name,text NOT NULL
+column,ball_groups,created_at,timestamp with time zone NOT NULL
+column,ball_groups,created_by,uuid
+column,ball_groups,id,uuid NOT NULL
+column,ball_groups,name,text NOT NULL
+column,ball_groups,sort_order,integer NOT NULL
+column,ball_submissions,ball_key,text NOT NULL
+column,ball_submissions,ball_name,text NOT NULL
+column,ball_submissions,brand,text
+column,ball_submissions,core_type,text
+column,ball_submissions,coverstock,text
+column,ball_submissions,created_at,timestamp with time zone NOT NULL
+column,ball_submissions,diff,numeric
+column,ball_submissions,id,uuid NOT NULL
+column,ball_submissions,int_diff,numeric
+column,ball_submissions,official,boolean NOT NULL
+column,ball_submissions,rg,numeric
+column,ball_submissions,source_note,text
+column,ball_submissions,submitted_by,uuid
+column,ball_submissions,updated_at,timestamp with time zone NOT NULL
+column,ball_submissions,weight,numeric
+column,ball_submissions,weight_specs,jsonb
+column,bowler_goals,bowler_name,text NOT NULL
+column,bowler_goals,created_at,timestamp with time zone NOT NULL
+column,bowler_goals,created_by,uuid
+column,bowler_goals,goals,jsonb NOT NULL
+column,bowler_goals,id,uuid NOT NULL
+column,bowler_goals,updated_at,timestamp with time zone NOT NULL
+column,bowler_names,created_at,timestamp with time zone NOT NULL
+column,bowler_names,created_by,uuid
+column,bowler_names,id,uuid NOT NULL
+column,bowler_names,left_handed,boolean NOT NULL
+column,bowler_names,name,text
+column,bowler_profiles,aliases,jsonb
+column,bowler_profiles,book_average,numeric
+column,bowler_profiles,book_average_as_of,date
+column,bowler_profiles,book_games,integer
+column,bowler_profiles,book_season,text
+column,bowler_profiles,bowler_name,text NOT NULL
+column,bowler_profiles,created_at,timestamp with time zone NOT NULL
+column,bowler_profiles,created_by,uuid
+column,bowler_profiles,home_centers,ARRAY NOT NULL
+column,bowler_profiles,id,uuid NOT NULL
+column,bowler_profiles,is_coach,boolean NOT NULL
+column,bowler_profiles,left_handed,boolean NOT NULL
+column,bowler_profiles,notes,text
+column,bowler_profiles,two_handed,boolean NOT NULL
+column,bowler_profiles,updated_at,timestamp with time zone NOT NULL
+column,bowling_centers,address,text
+column,bowling_centers,city,text
+column,bowling_centers,country,text
+column,bowling_centers,created_at,timestamp with time zone NOT NULL
+column,bowling_centers,created_by,uuid
+column,bowling_centers,here_id,text
+column,bowling_centers,id,uuid NOT NULL
+column,bowling_centers,lat,numeric
+column,bowling_centers,lng,numeric
+column,bowling_centers,name,text NOT NULL
+column,bowling_centers,postal_code,text
+column,bowling_centers,state,text
+column,coaching_notes,author_id,uuid NOT NULL
+column,coaching_notes,body,text NOT NULL
+column,coaching_notes,created_at,timestamp with time zone NOT NULL
+column,coaching_notes,id,uuid NOT NULL
+column,coaching_notes,relationship_id,uuid NOT NULL
+column,coaching_relationships,bowler_id,uuid NOT NULL
+column,coaching_relationships,coach_id,uuid NOT NULL
+column,coaching_relationships,created_at,timestamp with time zone NOT NULL
+column,coaching_relationships,id,uuid NOT NULL
+column,coaching_relationships,next_session,date
+column,coaching_relationships,next_session_note,text
+column,coaching_relationships,requested_by,uuid NOT NULL
+column,coaching_relationships,status,text NOT NULL
+column,coaching_relationships,updated_at,timestamp with time zone NOT NULL
+column,coaching_tasks,assigned_by,uuid NOT NULL
+column,coaching_tasks,bowler_note,text
+column,coaching_tasks,completed_at,timestamp with time zone
+column,coaching_tasks,created_at,timestamp with time zone NOT NULL
+column,coaching_tasks,detail,text
+column,coaching_tasks,due_date,date
+column,coaching_tasks,id,uuid NOT NULL
+column,coaching_tasks,metric_id,text
+column,coaching_tasks,relationship_id,uuid NOT NULL
+column,coaching_tasks,result,numeric
+column,coaching_tasks,status,text NOT NULL
+column,coaching_tasks,target,numeric
+column,coaching_tasks,title,text NOT NULL
+column,coaching_tasks,updated_at,timestamp with time zone NOT NULL
+column,drills,ball,text
+column,drills,bowler_name,text NOT NULL
+column,drills,created_at,timestamp with time zone NOT NULL
+column,drills,custom_pins,jsonb
+column,drills,custom_target,text
+column,drills,date,date NOT NULL
+column,drills,id,uuid NOT NULL
+column,drills,made,integer NOT NULL
+column,drills,missed,integer NOT NULL
+column,drills,notes,text
+column,drills,target,text NOT NULL
+column,drills,user_id,uuid
+column,friendships,addressee_id,uuid NOT NULL
+column,friendships,created_at,timestamp with time zone NOT NULL
+column,friendships,id,uuid NOT NULL
+column,friendships,requester_id,uuid NOT NULL
+column,friendships,responded_at,timestamp with time zone
+column,friendships,status,text NOT NULL
+column,hidden_leagues,created_at,timestamp with time zone NOT NULL
+column,hidden_leagues,id,uuid NOT NULL
+column,hidden_leagues,league_id,uuid
+column,hidden_leagues,user_id,uuid
+column,imported_scores,bowler_name,text NOT NULL
+column,imported_scores,bowler_user_id,uuid
+column,imported_scores,corrected_by,uuid
+column,imported_scores,corrected_scores,jsonb
+column,imported_scores,created_at,timestamp with time zone NOT NULL
+column,imported_scores,date,date NOT NULL
+column,imported_scores,id,uuid NOT NULL
+column,imported_scores,imported_scores,jsonb NOT NULL
+column,imported_scores,league_id,uuid
+column,imported_scores,note,text
+column,imported_scores,responded_at,timestamp with time zone
+column,imported_scores,status,text NOT NULL
+column,imported_scores,team_id,uuid
+column,imported_scores,updated_at,timestamp with time zone NOT NULL
+column,imported_scores,uploaded_by,uuid NOT NULL
+column,lane_patterns,created_at,timestamp with time zone NOT NULL
+column,lane_patterns,date,date NOT NULL
+column,lane_patterns,id,uuid NOT NULL
+column,lane_patterns,lane,text NOT NULL
+column,lane_patterns,league_id,uuid
+column,lane_patterns,length,text NOT NULL
+column,lane_patterns,pattern_name,text NOT NULL
+column,lane_patterns,pattern_type,text NOT NULL
+column,lane_patterns,ratio,text NOT NULL
+column,lane_patterns,team_id,uuid
+column,lane_patterns,updated_at,timestamp with time zone NOT NULL
+column,lane_patterns,volume,text NOT NULL
+column,leagues,center_id,uuid
+column,leagues,created_at,timestamp with time zone NOT NULL
+column,leagues,created_by,uuid
+column,leagues,end_date,date
+column,leagues,id,uuid NOT NULL
+column,leagues,name,text NOT NULL
+column,leagues,start_date,date
+column,manual_scores,ball,text
+column,manual_scores,bowler_name,text NOT NULL
+column,manual_scores,created_at,timestamp with time zone NOT NULL
+column,manual_scores,date,date NOT NULL
+column,manual_scores,game,integer NOT NULL
+column,manual_scores,id,uuid NOT NULL
+column,manual_scores,league_id,uuid
+column,manual_scores,score,integer NOT NULL
+column,manual_scores,surface,text
+column,manual_scores,updated_at,timestamp with time zone NOT NULL
+column,manual_scores,user_id,uuid
+column,matches,created_at,timestamp with time zone NOT NULL
+column,matches,date,date NOT NULL
+column,matches,games,jsonb NOT NULL
+column,matches,handicap,text NOT NULL
+column,matches,id,uuid NOT NULL
+column,matches,league_id,uuid
+column,matches,opponent,text NOT NULL
+column,matches,series,boolean
+column,matches,team_id,uuid
+column,matches,updated_at,timestamp with time zone NOT NULL
+column,oil_patterns,created_at,timestamp with time zone NOT NULL
+column,oil_patterns,created_by,uuid
+column,oil_patterns,forward_ml,numeric
+column,oil_patterns,id,uuid NOT NULL
+column,oil_patterns,length_feet,numeric
+column,oil_patterns,name,text NOT NULL
+column,oil_patterns,ratio,text
+column,oil_patterns,reverse_ml,numeric
+column,oil_patterns,series,text
+column,oil_patterns,source_note,text
+column,oil_patterns,verified,boolean NOT NULL
+column,oil_patterns,volume_ml,numeric
+column,oil_patterns,year,integer
+column,pending_invites,accepted_at,timestamp with time zone
+column,pending_invites,accepted_user_id,uuid
+column,pending_invites,created_at,timestamp with time zone NOT NULL
+column,pending_invites,created_by,uuid
+column,pending_invites,declined_at,timestamp with time zone
+column,pending_invites,id,uuid NOT NULL
+column,pending_invites,invited_email,text
+column,pending_invites,invited_name,text NOT NULL
+column,pending_invites,is_sub,boolean NOT NULL
+column,pending_invites,left_handed,boolean NOT NULL
+column,pending_invites,lineup_position,integer
+column,pending_invites,team_id,uuid NOT NULL
+column,profiles,created_at,timestamp with time zone NOT NULL
+column,profiles,display_name,text NOT NULL
+column,profiles,id,uuid NOT NULL
+column,sessions,average,integer
+column,sessions,balls_used,jsonb NOT NULL
+column,sessions,bowler_name,text NOT NULL
+column,sessions,created_at,timestamp with time zone NOT NULL
+column,sessions,date,date NOT NULL
+column,sessions,high_game_cost,ARRAY NOT NULL
+column,sessions,high_game_winnings,ARRAY NOT NULL
+column,sessions,id,uuid NOT NULL
+column,sessions,jackpot_winnings,numeric NOT NULL
+column,sessions,league_id,uuid
+column,sessions,misses,jsonb NOT NULL
+column,sessions,poker_dollar,jsonb NOT NULL
+column,sessions,poker_dollar_cost,ARRAY NOT NULL
+column,sessions,poker_quarter,jsonb NOT NULL
+column,sessions,poker_quarter_cost,ARRAY NOT NULL
+column,sessions,releases,jsonb NOT NULL
+column,sessions,ringing_tens,integer NOT NULL
+column,sessions,scores,ARRAY NOT NULL
+column,sessions,shot_count,integer NOT NULL
+column,sessions,single_pin_leaves,integer NOT NULL
+column,sessions,single_pin_spares,integer NOT NULL
+column,sessions,spare_attempts,integer NOT NULL
+column,sessions,spares_made,integer NOT NULL
+column,sessions,splits,integer NOT NULL
+column,sessions,splits_converted,integer NOT NULL
+column,sessions,strikes,integer NOT NULL
+column,sessions,team_id,uuid
+column,sessions,ten_pin_leaves,integer NOT NULL
+column,sessions,three_six_nine_cost,numeric NOT NULL
+column,sessions,three_six_nine_winnings,numeric NOT NULL
+column,sessions,total,integer
+column,sessions,updated_at,timestamp with time zone NOT NULL
+column,sessions,user_id,uuid NOT NULL
+column,sessions,weak_tens,integer NOT NULL
+column,shots,actual_arrows,numeric
+column,shots,actual_board,numeric
+column,shots,axis_rotation,numeric
+column,shots,ball,text
+column,shots,ball_change_reason,jsonb NOT NULL
+column,shots,ball_num,integer
+column,shots,ball_speed,numeric
+column,shots,bowler_name,text NOT NULL
+column,shots,created_at,timestamp with time zone NOT NULL
+column,shots,date,date NOT NULL
+column,shots,display_leave,jsonb NOT NULL
+column,shots,display_result,text NOT NULL
+column,shots,frame,integer NOT NULL
+column,shots,game,integer NOT NULL
+column,shots,heel_number,text
+column,shots,id,uuid NOT NULL
+column,shots,lane,text
+column,shots,league_id,uuid
+column,shots,miss,jsonb NOT NULL
+column,shots,notes,text NOT NULL
+column,shots,other_leave,jsonb NOT NULL
+column,shots,pin_count,text NOT NULL
+column,shots,release,text NOT NULL
+column,shots,result,text NOT NULL
+column,shots,rev_rate,numeric
+column,shots,sole_number,text
+column,shots,spare_made,text NOT NULL
+column,shots,starting_board,text
+column,shots,strike_description,text NOT NULL
+column,shots,surface,text
+column,shots,target_arrows,text
+column,shots,team_id,uuid
+column,shots,updated_at,timestamp with time zone NOT NULL
+column,shots,user_id,uuid NOT NULL
+column,team_members,is_sub,boolean NOT NULL
+column,team_members,joined_at,timestamp with time zone NOT NULL
+column,team_members,left_handed,boolean NOT NULL
+column,team_members,lineup_position,integer
+column,team_members,team_id,uuid NOT NULL
+column,team_members,user_id,uuid NOT NULL
+column,teams,created_at,timestamp with time zone NOT NULL
+column,teams,created_by,uuid
+column,teams,id,uuid NOT NULL
+column,teams,league_id,uuid NOT NULL
+column,teams,name,text NOT NULL
+column,tournaments,bowler_name,text NOT NULL
+column,tournaments,buy_in,numeric
+column,tournaments,center,text
+column,tournaments,created_at,timestamp with time zone NOT NULL
+column,tournaments,days,jsonb NOT NULL
+column,tournaments,id,uuid NOT NULL
+column,tournaments,match_play,jsonb NOT NULL
+column,tournaments,name,text NOT NULL
+column,tournaments,notes,text
+column,tournaments,side_pots,jsonb NOT NULL
+column,tournaments,updated_at,timestamp with time zone NOT NULL
+column,tournaments,user_id,uuid
+column,tournaments,winnings,numeric
+column,user_preferences,preferences,jsonb NOT NULL
+column,user_preferences,updated_at,timestamp with time zone
+column,user_preferences,user_id,uuid NOT NULL
+constraint,api_usage,2200_18997_1_not_null,CHECK ()
+constraint,api_usage,2200_18997_2_not_null,CHECK ()
+constraint,api_usage,2200_18997_3_not_null,CHECK ()
+constraint,api_usage,2200_18997_4_not_null,CHECK ()
+constraint,api_usage,api_usage_pkey,PRIMARY KEY (id)
+constraint,api_usage,api_usage_user_id_fkey,FOREIGN KEY (user_id)
+constraint,arsenals,2200_18416_1_not_null,CHECK ()
+constraint,arsenals,2200_18416_2_not_null,CHECK ()
+constraint,arsenals,arsenal_pkey,PRIMARY KEY (id)
+constraint,arsenals,arsenals_core_type_check,CHECK ()
+constraint,arsenals,arsenals_coverstock_check,CHECK ()
+constraint,arsenals,arsenals_group_id_fkey,FOREIGN KEY (group_id)
+constraint,arsenals,arsenals_layout_system_check,CHECK ()
+constraint,bags,2200_18583_1_not_null,CHECK ()
+constraint,bags,2200_18583_3_not_null,CHECK ()
+constraint,bags,2200_18583_4_not_null,CHECK ()
+constraint,bags,2200_18583_5_not_null,CHECK ()
+constraint,bags,2200_18583_7_not_null,CHECK ()
+constraint,bags,2200_18583_8_not_null,CHECK ()
+constraint,bags,bags_bag_type_check,CHECK ()
+constraint,bags,bags_created_by_bowler_name_name_key,"UNIQUE (created_by,bowler_name,name)"
+constraint,bags,bags_created_by_fkey,FOREIGN KEY (created_by)
+constraint,bags,bags_pkey,PRIMARY KEY (id)
+constraint,ball_bags,2200_18613_1_not_null,CHECK ()
+constraint,ball_bags,2200_18613_3_not_null,CHECK ()
+constraint,ball_bags,2200_18613_4_not_null,CHECK ()
+constraint,ball_bags,2200_18613_5_not_null,CHECK ()
+constraint,ball_bags,2200_18613_6_not_null,CHECK ()
+constraint,ball_bags,ball_bags_bag_id_fkey,FOREIGN KEY (bag_id)
+constraint,ball_bags,ball_bags_created_by_bowler_name_ball_bag_id_key,"UNIQUE (created_by,bowler_name,ball,bag_id)"
+constraint,ball_bags,ball_bags_created_by_fkey,FOREIGN KEY (created_by)
+constraint,ball_bags,ball_bags_pkey,PRIMARY KEY (id)
+constraint,ball_confirmations,2200_18689_1_not_null,CHECK ()
+constraint,ball_confirmations,2200_18689_2_not_null,CHECK ()
+constraint,ball_confirmations,2200_18689_4_not_null,CHECK ()
+constraint,ball_confirmations,2200_18689_5_not_null,CHECK ()
+constraint,ball_confirmations,ball_confirmations_confirmed_by_fkey,FOREIGN KEY (confirmed_by)
+constraint,ball_confirmations,ball_confirmations_pkey,PRIMARY KEY (id)
+constraint,ball_confirmations,ball_confirmations_submission_id_confirmed_by_key,"UNIQUE (submission_id,confirmed_by)"
+constraint,ball_confirmations,ball_confirmations_submission_id_fkey,FOREIGN KEY (submission_id)
+constraint,ball_confirmations,ball_confirmations_vote_check,CHECK ()
+constraint,ball_groups,2200_18641_1_not_null,CHECK ()
+constraint,ball_groups,2200_18641_3_not_null,CHECK ()
+constraint,ball_groups,2200_18641_4_not_null,CHECK ()
+constraint,ball_groups,2200_18641_5_not_null,CHECK ()
+constraint,ball_groups,2200_18641_6_not_null,CHECK ()
+constraint,ball_groups,ball_groups_created_by_bowler_name_name_key,"UNIQUE (created_by,bowler_name,name)"
+constraint,ball_groups,ball_groups_created_by_fkey,FOREIGN KEY (created_by)
+constraint,ball_groups,ball_groups_pkey,PRIMARY KEY (id)
+constraint,ball_submissions,2200_18671_12_not_null,CHECK ()
+constraint,ball_submissions,2200_18671_13_not_null,CHECK ()
+constraint,ball_submissions,2200_18671_14_not_null,CHECK ()
+constraint,ball_submissions,2200_18671_1_not_null,CHECK ()
+constraint,ball_submissions,2200_18671_3_not_null,CHECK ()
+constraint,ball_submissions,2200_18671_4_not_null,CHECK ()
+constraint,ball_submissions,ball_submissions_pkey,PRIMARY KEY (id)
+constraint,ball_submissions,ball_submissions_submitted_by_ball_key_key,"UNIQUE (submitted_by,ball_key)"
+constraint,ball_submissions,ball_submissions_submitted_by_fkey,FOREIGN KEY (submitted_by)
+constraint,bowler_goals,2200_18824_1_not_null,CHECK ()
+constraint,bowler_goals,2200_18824_3_not_null,CHECK ()
+constraint,bowler_goals,2200_18824_4_not_null,CHECK ()
+constraint,bowler_goals,2200_18824_5_not_null,CHECK ()
+constraint,bowler_goals,2200_18824_6_not_null,CHECK ()
+constraint,bowler_goals,bowler_goals_created_by_bowler_name_key,"UNIQUE (created_by,bowler_name)"
+constraint,bowler_goals,bowler_goals_created_by_fkey,FOREIGN KEY (created_by)
+constraint,bowler_goals,bowler_goals_pkey,PRIMARY KEY (id)
+constraint,bowler_names,2200_18399_1_not_null,CHECK ()
+constraint,bowler_names,2200_18399_2_not_null,CHECK ()
+constraint,bowler_names,2200_18399_5_not_null,CHECK ()
+constraint,bowler_names,bowler_names_pkey,PRIMARY KEY (id)
+constraint,bowler_profiles,2200_18508_14_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_1_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_3_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_4_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_5_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_6_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_8_not_null,CHECK ()
+constraint,bowler_profiles,2200_18508_9_not_null,CHECK ()
+constraint,bowler_profiles,bowler_profiles_created_by_bowler_name_key,"UNIQUE (created_by,bowler_name)"
+constraint,bowler_profiles,bowler_profiles_created_by_fkey,FOREIGN KEY (created_by)
+constraint,bowler_profiles,bowler_profiles_owner_name_key,"UNIQUE (created_by,bowler_name)"
+constraint,bowler_profiles,bowler_profiles_pkey,PRIMARY KEY (id)
+constraint,bowling_centers,2200_18727_12_not_null,CHECK ()
+constraint,bowling_centers,2200_18727_1_not_null,CHECK ()
+constraint,bowling_centers,2200_18727_3_not_null,CHECK ()
+constraint,bowling_centers,bowling_centers_created_by_fkey,FOREIGN KEY (created_by)
+constraint,bowling_centers,bowling_centers_here_id_key,UNIQUE (here_id)
+constraint,bowling_centers,bowling_centers_pkey,PRIMARY KEY (id)
+constraint,coaching_notes,2200_18906_1_not_null,CHECK ()
+constraint,coaching_notes,2200_18906_2_not_null,CHECK ()
+constraint,coaching_notes,2200_18906_3_not_null,CHECK ()
+constraint,coaching_notes,2200_18906_4_not_null,CHECK ()
+constraint,coaching_notes,2200_18906_5_not_null,CHECK ()
+constraint,coaching_notes,coaching_notes_author_id_fkey,FOREIGN KEY (author_id)
+constraint,coaching_notes,coaching_notes_pkey,PRIMARY KEY (id)
+constraint,coaching_notes,coaching_notes_relationship_id_fkey,FOREIGN KEY (relationship_id)
+constraint,coaching_relationships,2200_18854_1_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_2_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_3_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_4_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_5_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_6_not_null,CHECK ()
+constraint,coaching_relationships,2200_18854_7_not_null,CHECK ()
+constraint,coaching_relationships,coaching_relationships_bowler_id_fkey,FOREIGN KEY (bowler_id)
+constraint,coaching_relationships,coaching_relationships_check,CHECK ()
+constraint,coaching_relationships,coaching_relationships_coach_id_bowler_id_key,"UNIQUE (coach_id,bowler_id)"
+constraint,coaching_relationships,coaching_relationships_coach_id_fkey,FOREIGN KEY (coach_id)
+constraint,coaching_relationships,coaching_relationships_pkey,PRIMARY KEY (id)
+constraint,coaching_relationships,coaching_relationships_requested_by_fkey,FOREIGN KEY (requested_by)
+constraint,coaching_relationships,coaching_relationships_status_check,CHECK ()
+constraint,coaching_tasks,2200_18884_13_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_14_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_1_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_2_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_3_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_4_not_null,CHECK ()
+constraint,coaching_tasks,2200_18884_9_not_null,CHECK ()
+constraint,coaching_tasks,coaching_tasks_assigned_by_fkey,FOREIGN KEY (assigned_by)
+constraint,coaching_tasks,coaching_tasks_pkey,PRIMARY KEY (id)
+constraint,coaching_tasks,coaching_tasks_relationship_id_fkey,FOREIGN KEY (relationship_id)
+constraint,coaching_tasks,coaching_tasks_status_check,CHECK ()
+constraint,drills,2200_18776_11_not_null,CHECK ()
+constraint,drills,2200_18776_1_not_null,CHECK ()
+constraint,drills,2200_18776_3_not_null,CHECK ()
+constraint,drills,2200_18776_4_not_null,CHECK ()
+constraint,drills,2200_18776_5_not_null,CHECK ()
+constraint,drills,2200_18776_8_not_null,CHECK ()
+constraint,drills,2200_18776_9_not_null,CHECK ()
+constraint,drills,drills_pkey,PRIMARY KEY (id)
+constraint,drills,drills_user_id_fkey,FOREIGN KEY (user_id)
+constraint,friendships,2200_17856_1_not_null,CHECK ()
+constraint,friendships,2200_17856_2_not_null,CHECK ()
+constraint,friendships,2200_17856_3_not_null,CHECK ()
+constraint,friendships,2200_17856_4_not_null,CHECK ()
+constraint,friendships,2200_17856_5_not_null,CHECK ()
+constraint,friendships,friendships_addressee_id_fkey,FOREIGN KEY (addressee_id)
+constraint,friendships,friendships_check,CHECK ()
+constraint,friendships,friendships_pkey,PRIMARY KEY (id)
+constraint,friendships,friendships_requester_id_addressee_id_key,"UNIQUE (requester_id,addressee_id)"
+constraint,friendships,friendships_requester_id_fkey,FOREIGN KEY (requester_id)
+constraint,friendships,friendships_status_check,CHECK ()
+constraint,hidden_leagues,2200_18752_1_not_null,CHECK ()
+constraint,hidden_leagues,2200_18752_4_not_null,CHECK ()
+constraint,hidden_leagues,hidden_leagues_league_id_fkey,FOREIGN KEY (league_id)
+constraint,hidden_leagues,hidden_leagues_pkey,PRIMARY KEY (id)
+constraint,hidden_leagues,hidden_leagues_user_id_fkey,FOREIGN KEY (user_id)
+constraint,hidden_leagues,hidden_leagues_user_id_league_id_key,"UNIQUE (user_id,league_id)"
+constraint,imported_scores,2200_18950_10_not_null,CHECK ()
+constraint,imported_scores,2200_18950_14_not_null,CHECK ()
+constraint,imported_scores,2200_18950_15_not_null,CHECK ()
+constraint,imported_scores,2200_18950_1_not_null,CHECK ()
+constraint,imported_scores,2200_18950_3_not_null,CHECK ()
+constraint,imported_scores,2200_18950_4_not_null,CHECK ()
+constraint,imported_scores,2200_18950_7_not_null,CHECK ()
+constraint,imported_scores,2200_18950_8_not_null,CHECK ()
+constraint,imported_scores,imported_scores_bowler_user_id_fkey,FOREIGN KEY (bowler_user_id)
+constraint,imported_scores,imported_scores_corrected_by_fkey,FOREIGN KEY (corrected_by)
+constraint,imported_scores,imported_scores_pkey,PRIMARY KEY (id)
+constraint,imported_scores,imported_scores_status_check,CHECK ()
+constraint,imported_scores,imported_scores_uploaded_by_fkey,FOREIGN KEY (uploaded_by)
+constraint,lane_patterns,2200_18185_10_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_11_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_12_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_1_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_4_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_5_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_6_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_7_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_8_not_null,CHECK ()
+constraint,lane_patterns,2200_18185_9_not_null,CHECK ()
+constraint,lane_patterns,lane_patterns_league_id_fkey,FOREIGN KEY (league_id)
+constraint,lane_patterns,lane_patterns_pkey,PRIMARY KEY (id)
+constraint,lane_patterns,lane_patterns_team_id_date_lane_key,"UNIQUE (team_id,date,lane)"
+constraint,lane_patterns,lane_patterns_team_id_fkey,FOREIGN KEY (team_id)
+constraint,leagues,2200_17793_1_not_null,CHECK ()
+constraint,leagues,2200_17793_2_not_null,CHECK ()
+constraint,leagues,2200_17793_4_not_null,CHECK ()
+constraint,leagues,leagues_center_id_fkey,FOREIGN KEY (center_id)
+constraint,leagues,leagues_created_by_fkey,FOREIGN KEY (created_by)
+constraint,leagues,leagues_pkey,PRIMARY KEY (id)
+constraint,manual_scores,2200_18555_1_not_null,CHECK ()
+constraint,manual_scores,2200_18555_3_not_null,CHECK ()
+constraint,manual_scores,2200_18555_5_not_null,CHECK ()
+constraint,manual_scores,2200_18555_6_not_null,CHECK ()
+constraint,manual_scores,2200_18555_7_not_null,CHECK ()
+constraint,manual_scores,2200_18555_8_not_null,CHECK ()
+constraint,manual_scores,2200_18555_9_not_null,CHECK ()
+constraint,manual_scores,manual_scores_league_id_fkey,FOREIGN KEY (league_id)
+constraint,manual_scores,manual_scores_pkey,PRIMARY KEY (id)
+constraint,manual_scores,manual_scores_slot_key,"UNIQUE (user_id,bowler_name,league_id,date,game)"
+constraint,manual_scores,manual_scores_user_id_bowler_name_league_id_date_game_key,"UNIQUE (user_id,bowler_name,league_id,date,game)"
+constraint,manual_scores,manual_scores_user_id_fkey,FOREIGN KEY (user_id)
+constraint,matches,2200_18154_10_not_null,CHECK ()
+constraint,matches,2200_18154_1_not_null,CHECK ()
+constraint,matches,2200_18154_4_not_null,CHECK ()
+constraint,matches,2200_18154_5_not_null,CHECK ()
+constraint,matches,2200_18154_7_not_null,CHECK ()
+constraint,matches,2200_18154_8_not_null,CHECK ()
+constraint,matches,2200_18154_9_not_null,CHECK ()
+constraint,matches,matches_league_id_fkey,FOREIGN KEY (league_id)
+constraint,matches,matches_pkey,PRIMARY KEY (id)
+constraint,matches,matches_team_id_date_key,"UNIQUE (team_id,date)"
+constraint,matches,matches_team_id_fkey,FOREIGN KEY (team_id)
+constraint,oil_patterns,2200_18800_12_not_null,CHECK ()
+constraint,oil_patterns,2200_18800_1_not_null,CHECK ()
+constraint,oil_patterns,2200_18800_2_not_null,CHECK ()
+constraint,oil_patterns,2200_18800_9_not_null,CHECK ()
+constraint,oil_patterns,oil_patterns_created_by_fkey,FOREIGN KEY (created_by)
+constraint,oil_patterns,oil_patterns_name_key,UNIQUE (name)
+constraint,oil_patterns,oil_patterns_pkey,PRIMARY KEY (id)
+constraint,pending_invites,2200_18123_10_not_null,CHECK ()
+constraint,pending_invites,2200_18123_11_not_null,CHECK ()
+constraint,pending_invites,2200_18123_1_not_null,CHECK ()
+constraint,pending_invites,2200_18123_2_not_null,CHECK ()
+constraint,pending_invites,2200_18123_3_not_null,CHECK ()
+constraint,pending_invites,2200_18123_7_not_null,CHECK ()
+constraint,pending_invites,pending_invites_accepted_user_id_fkey,FOREIGN KEY (accepted_user_id)
+constraint,pending_invites,pending_invites_created_by_fkey,FOREIGN KEY (created_by)
+constraint,pending_invites,pending_invites_pkey,PRIMARY KEY (id)
+constraint,pending_invites,pending_invites_team_id_fkey,FOREIGN KEY (team_id)
+constraint,pending_invites,pending_invites_team_id_invited_email_key,"UNIQUE (team_id,invited_email)"
+constraint,profiles,2200_17776_1_not_null,CHECK ()
+constraint,profiles,2200_17776_2_not_null,CHECK ()
+constraint,profiles,2200_17776_3_not_null,CHECK ()
+constraint,profiles,profiles_id_fkey,FOREIGN KEY (id)
+constraint,profiles,profiles_pkey,PRIMARY KEY (id)
+constraint,sessions,2200_18065_10_not_null,CHECK ()
+constraint,sessions,2200_18065_11_not_null,CHECK ()
+constraint,sessions,2200_18065_12_not_null,CHECK ()
+constraint,sessions,2200_18065_13_not_null,CHECK ()
+constraint,sessions,2200_18065_14_not_null,CHECK ()
+constraint,sessions,2200_18065_15_not_null,CHECK ()
+constraint,sessions,2200_18065_16_not_null,CHECK ()
+constraint,sessions,2200_18065_17_not_null,CHECK ()
+constraint,sessions,2200_18065_18_not_null,CHECK ()
+constraint,sessions,2200_18065_19_not_null,CHECK ()
+constraint,sessions,2200_18065_1_not_null,CHECK ()
+constraint,sessions,2200_18065_20_not_null,CHECK ()
+constraint,sessions,2200_18065_21_not_null,CHECK ()
+constraint,sessions,2200_18065_22_not_null,CHECK ()
+constraint,sessions,2200_18065_23_not_null,CHECK ()
+constraint,sessions,2200_18065_24_not_null,CHECK ()
+constraint,sessions,2200_18065_25_not_null,CHECK ()
+constraint,sessions,2200_18065_26_not_null,CHECK ()
+constraint,sessions,2200_18065_27_not_null,CHECK ()
+constraint,sessions,2200_18065_28_not_null,CHECK ()
+constraint,sessions,2200_18065_29_not_null,CHECK ()
+constraint,sessions,2200_18065_2_not_null,CHECK ()
+constraint,sessions,2200_18065_30_not_null,CHECK ()
+constraint,sessions,2200_18065_31_not_null,CHECK ()
+constraint,sessions,2200_18065_32_not_null,CHECK ()
+constraint,sessions,2200_18065_33_not_null,CHECK ()
+constraint,sessions,2200_18065_34_not_null,CHECK ()
+constraint,sessions,2200_18065_5_not_null,CHECK ()
+constraint,sessions,2200_18065_6_not_null,CHECK ()
+constraint,sessions,2200_18065_7_not_null,CHECK ()
+constraint,sessions,sessions_bowler_name_league_id_date_key,"UNIQUE (bowler_name,league_id,date)"
+constraint,sessions,sessions_league_id_fkey,FOREIGN KEY (league_id)
+constraint,sessions,sessions_pkey,PRIMARY KEY (id)
+constraint,sessions,sessions_team_id_fkey,FOREIGN KEY (team_id)
+constraint,sessions,sessions_user_id_fkey,FOREIGN KEY (user_id)
+constraint,shots,2200_17887_14_not_null,CHECK ()
+constraint,shots,2200_17887_15_not_null,CHECK ()
+constraint,shots,2200_17887_16_not_null,CHECK ()
+constraint,shots,2200_17887_17_not_null,CHECK ()
+constraint,shots,2200_17887_18_not_null,CHECK ()
+constraint,shots,2200_17887_19_not_null,CHECK ()
+constraint,shots,2200_17887_1_not_null,CHECK ()
+constraint,shots,2200_17887_20_not_null,CHECK ()
+constraint,shots,2200_17887_21_not_null,CHECK ()
+constraint,shots,2200_17887_22_not_null,CHECK ()
+constraint,shots,2200_17887_23_not_null,CHECK ()
+constraint,shots,2200_17887_24_not_null,CHECK ()
+constraint,shots,2200_17887_25_not_null,CHECK ()
+constraint,shots,2200_17887_26_not_null,CHECK ()
+constraint,shots,2200_17887_27_not_null,CHECK ()
+constraint,shots,2200_17887_2_not_null,CHECK ()
+constraint,shots,2200_17887_5_not_null,CHECK ()
+constraint,shots,2200_17887_6_not_null,CHECK ()
+constraint,shots,2200_17887_7_not_null,CHECK ()
+constraint,shots,shots_league_id_fkey,FOREIGN KEY (league_id)
+constraint,shots,shots_pkey,PRIMARY KEY (id)
+constraint,shots,shots_team_id_fkey,FOREIGN KEY (team_id)
+constraint,shots,shots_user_id_fkey,FOREIGN KEY (user_id)
+constraint,team_members,2200_17834_1_not_null,CHECK ()
+constraint,team_members,2200_17834_2_not_null,CHECK ()
+constraint,team_members,2200_17834_4_not_null,CHECK ()
+constraint,team_members,2200_17834_5_not_null,CHECK ()
+constraint,team_members,2200_17834_6_not_null,CHECK ()
+constraint,team_members,team_members_pkey,"PRIMARY KEY (team_id,user_id)"
+constraint,team_members,team_members_team_id_fkey,FOREIGN KEY (team_id)
+constraint,team_members,team_members_user_id_fkey,FOREIGN KEY (user_id)
+constraint,teams,2200_17812_1_not_null,CHECK ()
+constraint,teams,2200_17812_2_not_null,CHECK ()
+constraint,teams,2200_17812_3_not_null,CHECK ()
+constraint,teams,2200_17812_5_not_null,CHECK ()
+constraint,teams,teams_created_by_fkey,FOREIGN KEY (created_by)
+constraint,teams,teams_league_id_fkey,FOREIGN KEY (league_id)
+constraint,teams,teams_pkey,PRIMARY KEY (id)
+constraint,tournaments,2200_18533_10_not_null,CHECK ()
+constraint,tournaments,2200_18533_11_not_null,CHECK ()
+constraint,tournaments,2200_18533_12_not_null,CHECK ()
+constraint,tournaments,2200_18533_13_not_null,CHECK ()
+constraint,tournaments,2200_18533_1_not_null,CHECK ()
+constraint,tournaments,2200_18533_3_not_null,CHECK ()
+constraint,tournaments,2200_18533_4_not_null,CHECK ()
+constraint,tournaments,2200_18533_6_not_null,CHECK ()
+constraint,tournaments,tournaments_pkey,PRIMARY KEY (id)
+constraint,tournaments,tournaments_user_id_fkey,FOREIGN KEY (user_id)
+constraint,user_preferences,2200_18485_1_not_null,CHECK ()
+constraint,user_preferences,2200_18485_2_not_null,CHECK ()
+constraint,user_preferences,user_preferences_pkey,PRIMARY KEY (user_id)
+constraint,user_preferences,user_preferences_user_id_fkey,FOREIGN KEY (user_id)
+constraint,user_preferences,user_preferences_user_id_key,UNIQUE (user_id)
+function,accept_team_invite,invite_id uuid,security definer
+function,are_friends,other_user uuid,security definer
+function,check_api_rate_limit,"p_endpoint text, p_limit integer, p_window interval",security definer
+function,coached_bowler_handedness,,security definer
+function,handle_new_user,,security definer
+function,is_accepted_coach_of,target_bowler_id uuid,security definer
+function,is_league_member,check_league_id uuid,security definer
+function,is_team_member,check_team_id uuid,security definer
+function,prune_api_usage,,security definer
+function,teammate_bowler_profiles,,security definer
+index,api_usage,api_usage_lookup_idx,"CREATE INDEX api_usage_lookup_idx ON public.api_usage USING btree (user_id, endpoint, called_at DESC)"
+index,api_usage,api_usage_pkey,CREATE UNIQUE INDEX api_usage_pkey ON public.api_usage USING btree (id)
+index,arsenals,arsenal_pkey,CREATE UNIQUE INDEX arsenal_pkey ON public.arsenals USING btree (id)
+index,bags,bags_created_by_bowler_name_name_key,"CREATE UNIQUE INDEX bags_created_by_bowler_name_name_key ON public.bags USING btree (created_by, bowler_name, name)"
+index,bags,bags_lookup_idx,"CREATE INDEX bags_lookup_idx ON public.bags USING btree (created_by, bowler_name)"
+index,bags,bags_pkey,CREATE UNIQUE INDEX bags_pkey ON public.bags USING btree (id)
+index,ball_bags,ball_bags_created_by_bowler_name_ball_bag_id_key,"CREATE UNIQUE INDEX ball_bags_created_by_bowler_name_ball_bag_id_key ON public.ball_bags USING btree (created_by, bowler_name, ball, bag_id)"
+index,ball_bags,ball_bags_lookup_idx,"CREATE INDEX ball_bags_lookup_idx ON public.ball_bags USING btree (created_by, bowler_name)"
+index,ball_bags,ball_bags_pkey,CREATE UNIQUE INDEX ball_bags_pkey ON public.ball_bags USING btree (id)
+index,ball_confirmations,ball_confirmations_pkey,CREATE UNIQUE INDEX ball_confirmations_pkey ON public.ball_confirmations USING btree (id)
+index,ball_confirmations,ball_confirmations_submission_id_confirmed_by_key,"CREATE UNIQUE INDEX ball_confirmations_submission_id_confirmed_by_key ON public.ball_confirmations USING btree (submission_id, confirmed_by)"
+index,ball_confirmations,ball_confirmations_submission_idx,CREATE INDEX ball_confirmations_submission_idx ON public.ball_confirmations USING btree (submission_id)
+index,ball_groups,ball_groups_created_by_bowler_name_name_key,"CREATE UNIQUE INDEX ball_groups_created_by_bowler_name_name_key ON public.ball_groups USING btree (created_by, bowler_name, name)"
+index,ball_groups,ball_groups_lookup_idx,"CREATE INDEX ball_groups_lookup_idx ON public.ball_groups USING btree (created_by, bowler_name)"
+index,ball_groups,ball_groups_pkey,CREATE UNIQUE INDEX ball_groups_pkey ON public.ball_groups USING btree (id)
+index,ball_submissions,ball_submissions_key_idx,CREATE INDEX ball_submissions_key_idx ON public.ball_submissions USING btree (ball_key)
+index,ball_submissions,ball_submissions_official_key_idx,CREATE UNIQUE INDEX ball_submissions_official_key_idx ON public.ball_submissions USING btree (ball_key) WHERE (official = true)
+index,ball_submissions,ball_submissions_pkey,CREATE UNIQUE INDEX ball_submissions_pkey ON public.ball_submissions USING btree (id)
+index,ball_submissions,ball_submissions_submitted_by_ball_key_key,"CREATE UNIQUE INDEX ball_submissions_submitted_by_ball_key_key ON public.ball_submissions USING btree (submitted_by, ball_key)"
+index,bowler_goals,bowler_goals_created_by_bowler_name_key,"CREATE UNIQUE INDEX bowler_goals_created_by_bowler_name_key ON public.bowler_goals USING btree (created_by, bowler_name)"
+index,bowler_goals,bowler_goals_pkey,CREATE UNIQUE INDEX bowler_goals_pkey ON public.bowler_goals USING btree (id)
+index,bowler_names,bowler_names_pkey,CREATE UNIQUE INDEX bowler_names_pkey ON public.bowler_names USING btree (id)
+index,bowler_profiles,bowler_profiles_created_by_bowler_name_key,"CREATE UNIQUE INDEX bowler_profiles_created_by_bowler_name_key ON public.bowler_profiles USING btree (created_by, bowler_name)"
+index,bowler_profiles,bowler_profiles_owner_name_key,"CREATE UNIQUE INDEX bowler_profiles_owner_name_key ON public.bowler_profiles USING btree (created_by, bowler_name)"
+index,bowler_profiles,bowler_profiles_pkey,CREATE UNIQUE INDEX bowler_profiles_pkey ON public.bowler_profiles USING btree (id)
+index,bowling_centers,bowling_centers_here_id_key,CREATE UNIQUE INDEX bowling_centers_here_id_key ON public.bowling_centers USING btree (here_id)
+index,bowling_centers,bowling_centers_name_idx,CREATE INDEX bowling_centers_name_idx ON public.bowling_centers USING btree (lower(name))
+index,bowling_centers,bowling_centers_pkey,CREATE UNIQUE INDEX bowling_centers_pkey ON public.bowling_centers USING btree (id)
+index,coaching_notes,coaching_notes_pkey,CREATE UNIQUE INDEX coaching_notes_pkey ON public.coaching_notes USING btree (id)
+index,coaching_notes,coaching_notes_relationship_idx,CREATE INDEX coaching_notes_relationship_idx ON public.coaching_notes USING btree (relationship_id)
+index,coaching_relationships,coaching_relationships_coach_id_bowler_id_key,"CREATE UNIQUE INDEX coaching_relationships_coach_id_bowler_id_key ON public.coaching_relationships USING btree (coach_id, bowler_id)"
+index,coaching_relationships,coaching_relationships_pkey,CREATE UNIQUE INDEX coaching_relationships_pkey ON public.coaching_relationships USING btree (id)
+index,coaching_tasks,coaching_tasks_pkey,CREATE UNIQUE INDEX coaching_tasks_pkey ON public.coaching_tasks USING btree (id)
+index,coaching_tasks,coaching_tasks_relationship_idx,CREATE INDEX coaching_tasks_relationship_idx ON public.coaching_tasks USING btree (relationship_id)
+index,drills,drills_lookup_idx,"CREATE INDEX drills_lookup_idx ON public.drills USING btree (user_id, bowler_name, target)"
+index,drills,drills_pkey,CREATE UNIQUE INDEX drills_pkey ON public.drills USING btree (id)
+index,friendships,friendships_addressee_idx,CREATE INDEX friendships_addressee_idx ON public.friendships USING btree (addressee_id)
+index,friendships,friendships_pkey,CREATE UNIQUE INDEX friendships_pkey ON public.friendships USING btree (id)
+index,friendships,friendships_requester_id_addressee_id_key,"CREATE UNIQUE INDEX friendships_requester_id_addressee_id_key ON public.friendships USING btree (requester_id, addressee_id)"
+index,friendships,friendships_requester_idx,CREATE INDEX friendships_requester_idx ON public.friendships USING btree (requester_id)
+index,hidden_leagues,hidden_leagues_pkey,CREATE UNIQUE INDEX hidden_leagues_pkey ON public.hidden_leagues USING btree (id)
+index,hidden_leagues,hidden_leagues_user_id_league_id_key,"CREATE UNIQUE INDEX hidden_leagues_user_id_league_id_key ON public.hidden_leagues USING btree (user_id, league_id)"
+index,hidden_leagues,hidden_leagues_user_idx,CREATE INDEX hidden_leagues_user_idx ON public.hidden_leagues USING btree (user_id)
+index,imported_scores,imported_scores_bowler_idx,CREATE INDEX imported_scores_bowler_idx ON public.imported_scores USING btree (bowler_user_id)
+index,imported_scores,imported_scores_pkey,CREATE UNIQUE INDEX imported_scores_pkey ON public.imported_scores USING btree (id)
+index,imported_scores,imported_scores_team_idx,"CREATE INDEX imported_scores_team_idx ON public.imported_scores USING btree (team_id, date)"
+index,lane_patterns,lane_patterns_league_id_idx,CREATE INDEX lane_patterns_league_id_idx ON public.lane_patterns USING btree (league_id)
+index,lane_patterns,lane_patterns_pkey,CREATE UNIQUE INDEX lane_patterns_pkey ON public.lane_patterns USING btree (id)
+index,lane_patterns,lane_patterns_team_id_date_lane_key,"CREATE UNIQUE INDEX lane_patterns_team_id_date_lane_key ON public.lane_patterns USING btree (team_id, date, lane)"
+index,lane_patterns,lane_patterns_team_id_idx,CREATE INDEX lane_patterns_team_id_idx ON public.lane_patterns USING btree (team_id)
+index,leagues,leagues_name_per_user_idx,"CREATE UNIQUE INDEX leagues_name_per_user_idx ON public.leagues USING btree (created_by, name)"
+index,leagues,leagues_pkey,CREATE UNIQUE INDEX leagues_pkey ON public.leagues USING btree (id)
+index,manual_scores,manual_scores_lookup_idx,"CREATE INDEX manual_scores_lookup_idx ON public.manual_scores USING btree (user_id, bowler_name, date)"
+index,manual_scores,manual_scores_pkey,CREATE UNIQUE INDEX manual_scores_pkey ON public.manual_scores USING btree (id)
+index,manual_scores,manual_scores_slot_key,"CREATE UNIQUE INDEX manual_scores_slot_key ON public.manual_scores USING btree (user_id, bowler_name, league_id, date, game)"
+index,manual_scores,manual_scores_user_id_bowler_name_league_id_date_game_key,"CREATE UNIQUE INDEX manual_scores_user_id_bowler_name_league_id_date_game_key ON public.manual_scores USING btree (user_id, bowler_name, league_id, date, game)"
+index,matches,matches_league_id_idx,CREATE INDEX matches_league_id_idx ON public.matches USING btree (league_id)
+index,matches,matches_pkey,CREATE UNIQUE INDEX matches_pkey ON public.matches USING btree (id)
+index,matches,matches_team_id_date_key,"CREATE UNIQUE INDEX matches_team_id_date_key ON public.matches USING btree (team_id, date)"
+index,matches,matches_team_id_idx,CREATE INDEX matches_team_id_idx ON public.matches USING btree (team_id)
+index,oil_patterns,oil_patterns_name_idx,CREATE INDEX oil_patterns_name_idx ON public.oil_patterns USING btree (lower(name))
+index,oil_patterns,oil_patterns_name_key,CREATE UNIQUE INDEX oil_patterns_name_key ON public.oil_patterns USING btree (name)
+index,oil_patterns,oil_patterns_pkey,CREATE UNIQUE INDEX oil_patterns_pkey ON public.oil_patterns USING btree (id)
+index,pending_invites,pending_invites_email_idx,CREATE INDEX pending_invites_email_idx ON public.pending_invites USING btree (invited_email)
+index,pending_invites,pending_invites_pkey,CREATE UNIQUE INDEX pending_invites_pkey ON public.pending_invites USING btree (id)
+index,pending_invites,pending_invites_team_id_idx,CREATE INDEX pending_invites_team_id_idx ON public.pending_invites USING btree (team_id)
+index,pending_invites,pending_invites_team_id_invited_email_key,"CREATE UNIQUE INDEX pending_invites_team_id_invited_email_key ON public.pending_invites USING btree (team_id, invited_email)"
+index,profiles,profiles_pkey,CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)
+index,sessions,sessions_bowler_name_idx,CREATE INDEX sessions_bowler_name_idx ON public.sessions USING btree (bowler_name)
+index,sessions,sessions_bowler_name_league_id_date_key,"CREATE UNIQUE INDEX sessions_bowler_name_league_id_date_key ON public.sessions USING btree (bowler_name, league_id, date)"
+index,sessions,sessions_pkey,CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
+index,sessions,sessions_team_id_idx,CREATE INDEX sessions_team_id_idx ON public.sessions USING btree (team_id)
+index,sessions,sessions_user_id_idx,CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id)
+index,shots,shots_bowler_name_idx,CREATE INDEX shots_bowler_name_idx ON public.shots USING btree (bowler_name)
+index,shots,shots_pkey,CREATE UNIQUE INDEX shots_pkey ON public.shots USING btree (id)
+index,shots,shots_team_id_idx,CREATE INDEX shots_team_id_idx ON public.shots USING btree (team_id)
+index,shots,shots_user_date_idx,"CREATE INDEX shots_user_date_idx ON public.shots USING btree (user_id, date)"
+index,shots,shots_user_id_idx,CREATE INDEX shots_user_id_idx ON public.shots USING btree (user_id)
+index,team_members,team_members_pkey,"CREATE UNIQUE INDEX team_members_pkey ON public.team_members USING btree (team_id, user_id)"
+index,team_members,team_members_user_id_idx,CREATE INDEX team_members_user_id_idx ON public.team_members USING btree (user_id)
+index,teams,teams_league_id_idx,CREATE INDEX teams_league_id_idx ON public.teams USING btree (league_id)
+index,teams,teams_pkey,CREATE UNIQUE INDEX teams_pkey ON public.teams USING btree (id)
+index,tournaments,tournaments_pkey,CREATE UNIQUE INDEX tournaments_pkey ON public.tournaments USING btree (id)
+index,tournaments,tournaments_user_bowler_idx,"CREATE INDEX tournaments_user_bowler_idx ON public.tournaments USING btree (user_id, bowler_name)"
+index,user_preferences,user_preferences_pkey,CREATE UNIQUE INDEX user_preferences_pkey ON public.user_preferences USING btree (user_id)
+index,user_preferences,user_preferences_user_id_key,CREATE UNIQUE INDEX user_preferences_user_id_key ON public.user_preferences USING btree (user_id)
+policy,arsenals,authenticated users can view arsenals,SELECT :: true
+policy,arsenals,users can add their own arsenal entries,INSERT :: no using
+policy,arsenals,users can remove their own arsenal entries,DELETE :: (created_by = auth.uid())
+policy,arsenals,users can update their own arsenal entries,UPDATE :: (created_by = auth.uid())
+policy,bags,teammates can view each other's bags,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bags.created_by))))"
+policy,bags,users can delete their own bags,DELETE :: (created_by = auth.uid())
+policy,bags,users can insert their own bags,INSERT :: no using
+policy,bags,users can update their own bags,UPDATE :: (created_by = auth.uid())
+policy,bags,users can view their own bags,SELECT :: (created_by = auth.uid())
+policy,ball_bags,teammates can view each other's ball bag assignments,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_bags.created_by))))"
+policy,ball_bags,users can delete their own ball bag assignments,DELETE :: (created_by = auth.uid())
+policy,ball_bags,users can insert their own ball bag assignments,INSERT :: no using
+policy,ball_bags,users can update their own ball bag assignments,UPDATE :: (created_by = auth.uid())
+policy,ball_bags,users can view their own ball bag assignments,SELECT :: (created_by = auth.uid())
+policy,ball_confirmations,anyone can read confirmations,SELECT :: (auth.uid() IS NOT NULL)
+policy,ball_confirmations,users can change their own vote,UPDATE :: (confirmed_by = auth.uid())
+policy,ball_confirmations,users can confirm as themselves,INSERT :: no using
+policy,ball_confirmations,users can withdraw their own confirmation,DELETE :: (confirmed_by = auth.uid())
+policy,ball_groups,teammates can view each other's ball groups,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_groups.created_by))))"
+policy,ball_groups,users can delete their own ball groups,DELETE :: (created_by = auth.uid())
+policy,ball_groups,users can insert their own ball groups,INSERT :: no using
+policy,ball_groups,users can update their own ball groups,UPDATE :: (created_by = auth.uid())
+policy,ball_groups,users can view their own ball groups,SELECT :: (created_by = auth.uid())
+policy,ball_submissions,anyone can read ball submissions,SELECT :: (auth.uid() IS NOT NULL)
+policy,ball_submissions,users can delete only their own submission,DELETE :: (submitted_by = auth.uid())
+policy,ball_submissions,users can insert their own submission,INSERT :: no using
+policy,ball_submissions,users can update only their own submission,UPDATE :: (submitted_by = auth.uid())
+policy,bowler_goals,users can delete their own bowler goals,DELETE :: (created_by = auth.uid())
+policy,bowler_goals,users can insert their own bowler goals,INSERT :: no using
+policy,bowler_goals,users can update their own bowler goals,UPDATE :: (created_by = auth.uid())
+policy,bowler_goals,users can view their own bowler goals,SELECT :: (created_by = auth.uid())
+policy,bowler_names,authenticated users can view bowler names,SELECT :: true
+policy,bowler_names,users can add their own bowler names,INSERT :: no using
+policy,bowler_names,users can remove their own bowler names,DELETE :: (created_by = auth.uid())
+policy,bowler_names,users can update their own bowler names,UPDATE :: (created_by = auth.uid())
+policy,bowler_profiles,users can delete their own bowler profiles,DELETE :: (created_by = auth.uid())
+policy,bowler_profiles,users can insert their own bowler profiles,INSERT :: no using
+policy,bowler_profiles,users can update their own bowler profiles,UPDATE :: (created_by = auth.uid())
+policy,bowler_profiles,users can view their own bowler profiles,SELECT :: (created_by = auth.uid())
+policy,bowling_centers,anyone can read bowling centers,SELECT :: (auth.uid() IS NOT NULL)
+policy,bowling_centers,creators can correct their own hand-entered centers,UPDATE :: ((created_by = auth.uid()) AND (here_id IS NULL))
+policy,bowling_centers,signed-in users can add centers,INSERT :: no using
+policy,coaching_notes,authors can delete their own notes,DELETE :: (author_id = auth.uid())
+policy,coaching_notes,both sides can view notes,"SELECT :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
+policy,coaching_notes,both sides can write notes,INSERT :: no using
+policy,coaching_relationships,either side can end a coaching relationship,DELETE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
+policy,coaching_relationships,either side can update their coaching relationship,UPDATE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
+policy,coaching_relationships,either side can view their coaching relationship,SELECT :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
+policy,coaching_relationships,users can request a coaching relationship,INSERT :: no using
+policy,coaching_tasks,both sides can update tasks,"UPDATE :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
+policy,coaching_tasks,both sides can view tasks,"SELECT :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
+policy,coaching_tasks,the coach can assign tasks,INSERT :: no using
+policy,coaching_tasks,the coach can remove tasks,"DELETE :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid()))))"
+policy,drills,users manage their own drills,ALL :: (user_id = auth.uid())
+policy,friendships,either side can delete a friendship,DELETE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
+policy,friendships,either side can respond to or cancel a request,UPDATE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
+policy,friendships,users can send friend requests,INSERT :: no using
+policy,friendships,users can view friendships they're part of,SELECT :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
+policy,hidden_leagues,users can hide leagues for themselves,INSERT :: no using
+policy,hidden_leagues,users can unhide their own leagues,DELETE :: (user_id = auth.uid())
+policy,hidden_leagues,users can update their own hidden leagues,UPDATE :: (user_id = auth.uid())
+policy,hidden_leagues,users can view their own hidden leagues,SELECT :: (user_id = auth.uid())
+policy,imported_scores,team can update imported scores,UPDATE :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id)))
+policy,imported_scores,team can view imported scores,SELECT :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id)))
+policy,imported_scores,teammates can upload scores,INSERT :: no using
+policy,imported_scores,uploader can delete their upload,DELETE :: (uploaded_by = auth.uid())
+policy,lane_patterns,team members can delete their team's lane patterns,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,lane_patterns,team members can log lane patterns for their team,INSERT :: no using
+policy,lane_patterns,team members can update their team's lane patterns,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,lane_patterns,team members can view their team's lane patterns,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,leagues,authenticated users can create leagues,INSERT :: no using
+policy,leagues,league members can rename their league,UPDATE :: is_league_member(id)
+policy,leagues,leagues are viewable by any authenticated user,SELECT :: true
+policy,manual_scores,teammates can view each other's manual scores,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = manual_scores.user_id))))"
+policy,manual_scores,users can delete their own manual scores,DELETE :: (user_id = auth.uid())
+policy,manual_scores,users can insert their own manual scores,INSERT :: no using
+policy,manual_scores,users can update their own manual scores,UPDATE :: (user_id = auth.uid())
+policy,manual_scores,users can view their own manual scores,SELECT :: (user_id = auth.uid())
+policy,matches,team members can delete their team's matches,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,matches,team members can log matches for their team,INSERT :: no using
+policy,matches,team members can update their team's matches,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,matches,team members can view their team's matches,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,oil_patterns,anyone can read oil patterns,SELECT :: (auth.uid() IS NOT NULL)
+policy,oil_patterns,creators can correct their own unverified patterns,UPDATE :: ((created_by = auth.uid()) AND (verified = false))
+policy,oil_patterns,signed-in users can add patterns,INSERT :: no using
+policy,pending_invites,invitees can answer their own invites,UPDATE :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text)))
+policy,pending_invites,invitees can view their own invites,SELECT :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text)))
+policy,pending_invites,team members can create invites for their teams,INSERT :: no using
+policy,pending_invites,team members can delete pending invites for their teams,DELETE :: is_team_member(team_id)
+policy,pending_invites,team members can manually link a placeholder to any account,UPDATE :: (is_team_member(team_id) AND (accepted_at IS NULL))
+policy,pending_invites,team members can view pending invites for their teams,SELECT :: is_team_member(team_id)
+policy,pending_invites,users can claim invites addressed to their own email,UPDATE :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text)))
+policy,pending_invites,users can view invites addressed to their own email,SELECT :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text)))
+policy,profiles,profiles are viewable by any authenticated user,SELECT :: true
+policy,profiles,users can insert their own profile,INSERT :: no using
+policy,profiles,users can update their own profile,UPDATE :: (id = auth.uid())
+policy,sessions,coaches can view their bowler's sessions,SELECT :: is_accepted_coach_of(user_id)
+policy,sessions,friends can view each other's sessions,SELECT :: are_friends(user_id)
+policy,sessions,teammates can view each other's sessions,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,sessions,users can delete their own sessions,DELETE :: (user_id = auth.uid())
+policy,sessions,users can insert their own sessions,INSERT :: no using
+policy,sessions,users can update their own sessions,UPDATE :: (user_id = auth.uid())
+policy,sessions,users can view their own sessions,SELECT :: (user_id = auth.uid())
+policy,shots,coaches can view their bowler's shots,SELECT :: is_accepted_coach_of(user_id)
+policy,shots,friends can view each other's shots,SELECT :: are_friends(user_id)
+policy,shots,teammates can view each other's shots,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
+policy,shots,users can delete their own shots,DELETE :: (user_id = auth.uid())
+policy,shots,users can insert their own shots,INSERT :: no using
+policy,shots,users can update their own shots,UPDATE :: (user_id = auth.uid())
+policy,shots,users can view their own shots,SELECT :: (user_id = auth.uid())
+policy,team_members,"team members can add rosters, creators can bootstrap, invitees ",INSERT :: no using
+policy,team_members,team members can remove roster entries,DELETE :: is_team_member(team_id)
+policy,team_members,team members can reorder the lineup,UPDATE :: is_team_member(team_id)
+policy,team_members,team members can reorder their team's roster,UPDATE :: is_team_member(team_id)
+policy,team_members,team rosters are viewable by any authenticated user,SELECT :: true
+policy,teams,authenticated users can create teams,INSERT :: no using
+policy,teams,team members can rename their team,UPDATE :: is_team_member(id)
+policy,teams,teams are viewable by any authenticated user,SELECT :: true
+policy,tournaments,teammates can view each other's tournaments,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = tournaments.user_id))))"
+policy,tournaments,users can delete their own tournaments,DELETE :: (user_id = auth.uid())
+policy,tournaments,users can insert their own tournaments,INSERT :: no using
+policy,tournaments,users can update their own tournaments,UPDATE :: (user_id = auth.uid())
+policy,tournaments,users can view their own tournaments,SELECT :: (user_id = auth.uid())
+policy,user_preferences,users can insert their own preferences,INSERT :: no using
+policy,user_preferences,users can update their own preferences,UPDATE :: (user_id = auth.uid())
+policy,user_preferences,users can view their own preferences,SELECT :: (user_id = auth.uid())
+rls,api_usage,enabled,
+rls,arsenals,enabled,
+rls,bags,enabled,
+rls,ball_bags,enabled,
+rls,ball_confirmations,enabled,
+rls,ball_groups,enabled,
+rls,ball_submissions,enabled,
+rls,bowler_goals,enabled,
+rls,bowler_names,enabled,
+rls,bowler_profiles,enabled,
+rls,bowling_centers,enabled,
+rls,coaching_notes,enabled,
+rls,coaching_relationships,enabled,
+rls,coaching_tasks,enabled,
+rls,drills,enabled,
+rls,friendships,enabled,
+rls,hidden_leagues,enabled,
+rls,imported_scores,enabled,
+rls,lane_patterns,enabled,
+rls,leagues,enabled,
+rls,manual_scores,enabled,
+rls,matches,enabled,
+rls,oil_patterns,enabled,
+rls,pending_invites,enabled,
+rls,profiles,enabled,
+rls,sessions,enabled,
+rls,shots,enabled,
+rls,team_members,enabled,
+rls,teams,enabled,
+rls,tournaments,enabled,
+rls,user_preferences,enabled,
