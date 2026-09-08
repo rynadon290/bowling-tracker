@@ -94,11 +94,29 @@ function groupByDate(rows) {
 }
 
 // Score-based series, one point per night.
-export function scoreSeries(sessions, bowler, league, metricId) {
+export function scoreSeries(sessions, bowler, league, metricId, ball = "", gameEquipment = null) {
   const rows = bySession(sessions, bowler, league);
   const out = [];
+
+  // Ball filtering on SCORE metrics.
+  //
+  // A game logged scores-only can still name the ball used, and that's
+  // real signal: a ball can average 210 in game one and 190 in game
+  // three as the lanes transition. Filtering games by their recorded
+  // ball captures that without needing shot-by-shot.
+  //
+  // A game with no ball recorded is excluded when a filter is on --
+  // it's unknown, not "not that ball".
+  const gameUsedBall = (session, gameIdx) => {
+    if (!ball) return true;
+    if (!gameEquipment) return false;
+    const e = gameEquipment[`${session.bowler}|${session.league}|${session.date}|${gameIdx + 1}`];
+    return !!e && e.ball === ball;
+  };
+
   for (const [date, group] of groupByDate(rows)) {
-    const scores = group.flatMap(s => Array.isArray(s.scores) ? s.scores : [])
+    const scores = group.flatMap(s => (Array.isArray(s.scores) ? s.scores : [])
+        .filter((v, i) => Number.isFinite(v) && gameUsedBall(s, i)))
       .filter(v => Number.isFinite(v));
     if (!scores.length) continue;
     const metric = trendMetric(metricId);
@@ -136,8 +154,14 @@ const isFrameShot = s => !s.ballNum || s.ballNum === 1;
 
 // Shot-based rate series, one point per night. `sample` travels with each
 // point so the UI can be honest about how thin any given night is.
-export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false, isCornerPinLeave = () => false) {
-  const rows = bySession(shots, bowler, league);
+export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => false, isCornerPinLeave = () => false, ball = "") {
+  // `ball` narrows every shot metric to one piece of equipment, which is
+  // the question a serious bowler actually asks: not "is my strike rate
+  // improving" but "is THIS ball still the right one as the season wears
+  // the lanes in". Applied here rather than per-metric so it works for
+  // every shot-sourced metric at once.
+  const filtered = ball ? (shots || []).filter(s => s && s.ball === ball) : shots;
+  const rows = bySession(filtered, bowler, league);
   const out = [];
   for (const [date, group] of groupByDate(rows)) {
     const frames = group.filter(isFrameShot);
@@ -169,12 +193,15 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
   return out;
 }
 
-export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isCornerPinLeave }) {
+export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isCornerPinLeave, ball = "", gameEquipment = null }) {
   const metric = trendMetric(metricId);
   if (!metric) return [];
+  // Score metrics are per-NIGHT totals, so a ball filter is meaningless
+  // there -- you don't bowl a game with one ball and score it separately.
+  // Selecting a ball therefore only narrows shot-sourced metrics.
   return metric.source === "scores"
-    ? scoreSeries(sessions, bowler, league, metricId)
-    : shotRateSeries(shots, bowler, league, metricId, isSplit, isCornerPinLeave);
+    ? scoreSeries(sessions, bowler, league, metricId, ball, gameEquipment)
+    : shotRateSeries(shots, bowler, league, metricId, isSplit, isCornerPinLeave, ball);
 }
 
 // Least-squares slope of value against position in the series.
