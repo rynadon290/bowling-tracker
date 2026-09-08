@@ -247,7 +247,7 @@ async function readCached(key,expect){
 }
 
 export default function BowlingTracker(){
-  const{user,preferences,updatePreferences,displayName}=useAuth();
+  const{user,preferences,updatePreferences,displayName,updateDisplayName}=useAuth();
 
   // Theme. Applied synchronously during render rather than in an effect,
   // so the FIRST paint is already in the chosen theme -- an effect would
@@ -2239,6 +2239,20 @@ export default function BowlingTracker(){
       // average that onboarding never asks about.
       const prior=profiles[typed];
       setProfile(typed,normalizeProfile({...(prior||{}),...onboardingProfile,bowlerName:typed},typed));
+
+      // Push the name to the CLOUD profile too, not just the local one.
+      //
+      // Onboarding tells the bowler "your name is how teammates find
+      // you", but it only ever wrote a local bowler profile. The cloud
+      // profiles.display_name row stayed empty, so teammates saw
+      // "Unknown" and name search couldn't find them -- until they
+      // happened to open Team Management, which was the ONLY place that
+      // called updateDisplayName.
+      //
+      // Fire-and-forget: a failure here must not block finishing setup,
+      // and the sync queue retries it. Team Management still lets them
+      // change it later.
+      if(updateDisplayName)updateDisplayName(typed).catch(()=>{});
     }
     setOnboarded(true);
     try{window.storage.set(ONBOARDED_KEY,"1");}catch{}
@@ -3161,7 +3175,46 @@ export default function BowlingTracker(){
     };
   }
 
-  const curSession=[...sessions].reverse().find(s=>s.bowler===activeBowler&&s.league===sessionLeague&&s.date===sessionDate);
+  // Tonight's session row, if one exists yet.
+  //
+  // Uses effectiveSessionLeague, not sessionLeague: practice and casual
+  // have no league to pick, so sessionLeague is "" there and this never
+  // matched -- meaning neither environment could ever find its own
+  // session.
+  const curSession=[...sessions].reverse().find(s=>s.bowler===activeBowler&&s.league===effectiveSessionLeague&&s.date===sessionDate);
+
+  // Money games need a session row to attach winnings to, and that row
+  // was only created by "End session". So poker and bracket winnings --
+  // the things you settle up game by game, at the lanes -- were invisible
+  // for the entire night and only appeared in the recap afterwards.
+  //
+  // Create the row as soon as there are scores, so the money card is
+  // there while it's useful. submitSession updates this same row rather
+  // than adding a second one, because it matches on the same
+  // (bowler, league, date) key.
+  const anyScoreEntered=[1,2,3].some(g=>getGameStrict(activeBowler,effectiveSessionLeague,sessionDate,g)!=null);
+  const startedSessionRef=useRef("");
+  useEffect(()=>{
+    if(!preferences.showMoneyGames)return;
+    if(!anyScoreEntered||curSession)return;
+    if(!activeBowler||!effectiveSessionLeague)return;
+    const key=`${activeBowler}|${effectiveSessionLeague}|${sessionDate}`;
+    if(startedSessionRef.current===key)return;
+    startedSessionRef.current=key;
+    const scores=[1,2,3].map(g=>getGameStrict(activeBowler,effectiveSessionLeague,sessionDate,g)).filter(v=>v!=null);
+    const draft={
+      id:crypto.randomUUID(),bowler:activeBowler,league:effectiveSessionLeague,date:sessionDate,
+      scores,total:scores.reduce((a,b)=>a+b,0),
+      average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0,
+      pokerQuarter:[0,0,0],pokerDollar:[0,0,0],threeSixNineWinnings:0,jackpotWinnings:0,
+      highGameWinnings:[0,0,0],pokerQuarterCost:[0,0,0],pokerDollarCost:[0,0,0],
+      highGameCost:[0,0,0],threeSixNineCost:0,
+    };
+    const updated=[...sessions,draft];
+    setSessions(updated);
+    try{window.storage.set(SESSIONS_KEY,JSON.stringify(updated));}catch{}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[anyScoreEntered,curSession,activeBowler,effectiveSessionLeague,sessionDate,preferences.showMoneyGames]);
   const currentLane=calcLane(startingLane,form.game,form.frame,form.ballNum);
   // Handedness comes from the team roster (set in Team Management). A
   // lefty's mechanics mirror a righty's, so their weak/ringing corner pin
@@ -3244,6 +3297,29 @@ export default function BowlingTracker(){
     statsBowlerDefaulted.current=true;
     setStatsBowler(prev=>prev||displayName);
   },[displayName]);
+
+  // Keep the cloud name and the local bowler list in step.
+  //
+  // The two were only ever written independently: onboarding created a
+  // local bowler, Team Management wrote the cloud profile, and neither
+  // told the other. A bowler who set their name on one device and opened
+  // the app on another got a cloud name with no matching bowler, so
+  // nothing they logged was attributed to them.
+  //
+  // Runs once per name change, and only ADDS -- it never renames or
+  // removes an existing bowler, since guests and teammates live in the
+  // same list.
+  const nameSyncedRef=useRef("");
+  useEffect(()=>{
+    if(!displayName)return;
+    if(nameSyncedRef.current===displayName)return;
+    nameSyncedRef.current=displayName;
+    if(!bowlers.includes(displayName)){
+      saveBowlers([...bowlers,displayName]);
+      if(!activeBowler)selectBowler(displayName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[displayName,bowlers.length]);
 
   const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
   const bookAverageCheck=needsBookAverageUpdate(
