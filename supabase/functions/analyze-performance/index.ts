@@ -85,6 +85,7 @@ HARD RULES
 2. Never comment on something absent from the data. Do not note its absence, do not speculate about it.
 3. If canCompareBalls is false, do NOT compare balls to each other under any framing. You may describe a single ball's own numbers if that ball is present.
 4. Cite sample sizes in your detail text ("across 312 first balls"). A percentage without its sample reads as more certain than it is.
+5. Every *Rate, *Conversion and percentage field is ALREADY a percentage on a 0-100 scale. splitRate: 9 means nine percent. Do not multiply or divide these by 100, and quote them exactly as given -- the bowler is looking at the same number elsewhere in the app, and a mismatch destroys their trust in both.
 5. Do not diagnose physical technique. You cannot see the bowler throw. "Your 10-pin rate rises in later games" is supportable; "your ball speed is dropping because you're tiring" is not -- that is an invented cause.
 6. Do not prescribe equipment or coaching changes. Report what the numbers show and let the bowler decide.
 
