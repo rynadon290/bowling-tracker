@@ -3,11 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f1117" />
-    <title>Bowling Tracker</title>
+    <!-- Was #0f1117 -- the old Classic-theme slate. The browser chrome
+         (address bar on mobile, task switcher preview) should match
+         whichever theme is actually active, but that's only known once
+         React has mounted and read the stored preference. This is the
+         best static default: the current default theme's background,
+         Lane. main.jsx can still update it at runtime via
+         document.querySelector('meta[name="theme-color"]') once
+         applyTheme runs, so this is just what shows before that. -->
+    <meta name="theme-color" content="#14110E" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>My Bowling Vault</title>
   </head>
   <body>
-    <div id="root">Loading Bowling Tracker…</div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div id="root">Opening My Bowling Vault…</div>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>

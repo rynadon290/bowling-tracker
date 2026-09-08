@@ -1,0 +1,25 @@
+{
+  "name": "My Bowling Vault",
+  "short_name": "Vault",
+  "description": "Your complete bowling record — scores, shots, equipment and history, all in one place.",
+  "start_url": "https://rynadon290.github.io/bowling-tracker/",
+  "scope": "https://rynadon290.github.io/bowling-tracker/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14110E",
+  "theme_color": "#14110E",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
