@@ -496,18 +496,7 @@ export default function LogView({
                     <div className="num" style={{fontSize:"56px",lineHeight:0.9,fontWeight:700,fontFamily:F.num,letterSpacing:"-0.02em",color:sessionTotal!=null?C.text:C.textMuted}}>
                       {sessionTotal!=null?sessionTotal:"—"}
                     </div>
-                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>
-                      Series so far
-                      {/* The ceiling on the game in progress. This is the
-                          number a bowler works out in their head from
-                          about the sixth frame on, and it's the reason
-                          anyone keeps bowling a game they've opened in.
-                          Only shown shot by shot -- a game entered as a
-                          final score has no remaining balls to project. */}
-                      {maxScoreThisGame!=null&&(
-                        <span style={{color:C.accent}}> · {maxScoreThisGame} if you strike out</span>
-                      )}
-                    </div>
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Series so far</div>
                   </div>
                   <div style={{display:"flex",gap:"14px",paddingBottom:"4px"}}>
                     {[g1score,g2score,g3score].map((score,i)=>(
@@ -581,6 +570,141 @@ export default function LogView({
               )}
               {editingId&&(
                 <input style={S.input} placeholder="Lane" type="number" value={form.lane} onChange={e=>set("lane",e.target.value)}/>
+              )}
+            </div>
+            )}
+
+            {showShotContext&&(
+            <div style={S.card}>
+              {/* The ceiling on the game in progress: strike out from here
+                  and this is what you finish with.
+                  
+                  Lives on the Result card, not in the session header. The
+                  header sits inside "Tonight's Session", which collapses
+                  once setup is answered -- so it was hidden for the entire
+                  time a bowler is actually throwing, which is exactly when
+                  this number matters. It was also gated on sessionLeague,
+                  so practice never saw it at all. */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}}>
+                <div style={{...S.label,marginBottom:0}}>Result</div>
+                {maxScoreThisGame!=null&&(
+                  <span style={{fontSize:"11.5px",color:C.accent}}>
+                    {maxScoreThisGame} max
+                  </span>
+                )}
+              </div>
+              <div style={S.chips}>
+                {resultsForHandedness(activeBowlerLeftHanded).map(label=>{
+                  // `label` is what the bowler sees (e.g. "Weak 7" for a
+                  // lefty); `stored` is what actually gets saved, which is
+                  // always the canonical "Weak 10"/"Ringing 10" value.
+                  const stored=storedResultFor(label);
+                  return(
+                    <Chip key={label} label={label} selected={form.result===stored}
+                      onToggle={()=>{
+                        const newResult=form.result===stored?"":stored;
+                        setForm(f=>({
+                          ...f,
+                          result:newResult,
+                          otherLeave:newResult==="Other Leave"?f.otherLeave:[],
+                          spareMade:"",
+                          // Weak/Ringing always leave a single corner pin:
+                          // first ball = 9, and if missed, adds 0 — so the frame total is
+                          // deterministic and doesn't need a manual pin-count entry.
+                          pinCount:(newResult==="Weak 10"||newResult==="Ringing 10")?"9":"",
+                        }));
+                      }}
+                      color={stored==="Strike"?C.strike:stored.includes("10")?C.miss:C.spare}/>
+                  );
+                })}
+              </div>
+
+              {form.result==="Other Leave"&&(
+                <>
+                  <div style={S.label}>Pins Standing</div>
+                  <div style={S.chips}>
+                    {/* Gutter — a one-tap shortcut for all 10 pins standing,
+                        rather than tapping each pin chip individually. Not a
+                        separate stored result value; it produces the exact
+                        same underlying state (otherLeave=all 10,
+                        pinCount="0") that manually tapping every pin would,
+                        so the scoring engine needs no changes and this
+                        chip's "selected" state just reflects whether that
+                        state currently holds. */}
+                    <Chip label="Gutter"
+                      selected={form.otherLeave.length===10}
+                      onToggle={()=>{
+                        const isGutter=form.otherLeave.length===10;
+                        setForm(f=>(isGutter
+                          ?{...f,otherLeave:[],pinCount:"",spareMade:""}
+                          :{...f,otherLeave:["1","2","3","4","5","6","7","8","9","10"],pinCount:"0",spareMade:""}
+                        ));
+                      }}
+                      color={C.miss}/>
+                    <Chip label="9 Pin No-Tap"
+                      selected={Array.isArray(form.otherLeave)&&form.otherLeave.includes("9 Pin No-Tap")}
+                      onToggle={()=>handleLeaveToggle("9 Pin No-Tap")}
+                      color={C.strike}/>
+                  </div>
+                  <PinDeck
+                    selected={Array.isArray(form.otherLeave)?form.otherLeave:[]}
+                    onToggle={p=>handleLeaveToggle(p)}/>
+                  {isNoTap&&<div style={{fontSize:"13px",color:C.strike,fontWeight:600,marginTop:"4px"}}>9 Pin No-Tap → scored as Strike</div>}
+                  {!isNoTap&&Array.isArray(form.otherLeave)&&form.otherLeave.length>0&&(
+                    <div style={{fontSize:"13px",color:C.spare,fontWeight:600,marginTop:"4px"}}>
+                      Leave: {[...form.otherLeave].sort((a,b)=>Number(a)-Number(b)).join("-")}
+                      {standingPins>0&&<span style={{color:C.textMuted,fontWeight:400}}> · First ball: {firstBallPins}</span>}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {isStrike&&(
+                <>
+                  <div style={S.divider}/>
+                  <div style={S.label}>Strike Description</div>
+                  <div style={S.chips}>
+                    {strikeDescriptionsForHand(activeBowlerLeftHanded).map(label=>(
+                      <Chip key={label} label={label}
+                        selected={storedStrikeDescriptionFor(label)===form.strikeDescription}
+                        onToggle={()=>{
+                          const stored=storedStrikeDescriptionFor(label);
+                          set("strikeDescription",form.strikeDescription===stored?"":stored);
+                        }} color={C.strike}/>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {hasLeave&&!(inTenth&&form.ballNum===3)&&(
+                <>
+                  <div style={S.divider}/>
+                  <div style={S.label}>Spare Made</div>
+                  <div style={S.chips}>
+                    {["Yes","No"].map(s=>(
+                      <Chip key={s} label={s} selected={form.spareMade===s} onToggle={()=>handleSpareMadeToggle(s)}
+                        color={s==="Yes"?C.strike:C.miss}/>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {showPinCount&&(
+                <>
+                  <div style={S.divider}/>
+                  <div style={S.label}>Total Pins This Frame</div>
+                  <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
+                    <button style={{...S.btn("sm"),padding:"10px 18px",fontSize:"20px"}} onClick={()=>stepPinCount(-1)}>−</button>
+                    <div style={{flex:1,textAlign:"center",fontSize:"30px",fontWeight:700,color:C.spare}}>
+                      {form.pinCount!==""?form.pinCount:"—"}
+                    </div>
+                    <button style={{...S.btn("sm"),padding:"10px 18px",fontSize:"20px"}} onClick={()=>stepPinCount(1)}>+</button>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-around",fontSize:"12px",color:C.textMuted}}>
+                    <span>First ball: <strong style={{color:C.text}}>{firstBallPins}</strong></span>
+                    <span>Second ball: <strong style={{color:C.text}}>{form.pinCount!==""?parseInt(form.pinCount)-firstBallPins:"—"}</strong></span>
+                  </div>
+                </>
               )}
             </div>
             )}
@@ -1044,124 +1168,6 @@ export default function LogView({
                 with it, so Result rendered unconditionally in every
                 tracking mode -- including scores-only, where there is no
                 per-shot result to record. */}
-            {showShotContext&&(
-            <div style={S.card}>
-              <div style={S.label}>Result</div>
-              <div style={S.chips}>
-                {resultsForHandedness(activeBowlerLeftHanded).map(label=>{
-                  // `label` is what the bowler sees (e.g. "Weak 7" for a
-                  // lefty); `stored` is what actually gets saved, which is
-                  // always the canonical "Weak 10"/"Ringing 10" value.
-                  const stored=storedResultFor(label);
-                  return(
-                    <Chip key={label} label={label} selected={form.result===stored}
-                      onToggle={()=>{
-                        const newResult=form.result===stored?"":stored;
-                        setForm(f=>({
-                          ...f,
-                          result:newResult,
-                          otherLeave:newResult==="Other Leave"?f.otherLeave:[],
-                          spareMade:"",
-                          // Weak/Ringing always leave a single corner pin:
-                          // first ball = 9, and if missed, adds 0 — so the frame total is
-                          // deterministic and doesn't need a manual pin-count entry.
-                          pinCount:(newResult==="Weak 10"||newResult==="Ringing 10")?"9":"",
-                        }));
-                      }}
-                      color={stored==="Strike"?C.strike:stored.includes("10")?C.miss:C.spare}/>
-                  );
-                })}
-              </div>
-
-              {form.result==="Other Leave"&&(
-                <>
-                  <div style={S.label}>Pins Standing</div>
-                  <div style={S.chips}>
-                    {/* Gutter — a one-tap shortcut for all 10 pins standing,
-                        rather than tapping each pin chip individually. Not a
-                        separate stored result value; it produces the exact
-                        same underlying state (otherLeave=all 10,
-                        pinCount="0") that manually tapping every pin would,
-                        so the scoring engine needs no changes and this
-                        chip's "selected" state just reflects whether that
-                        state currently holds. */}
-                    <Chip label="Gutter"
-                      selected={form.otherLeave.length===10}
-                      onToggle={()=>{
-                        const isGutter=form.otherLeave.length===10;
-                        setForm(f=>(isGutter
-                          ?{...f,otherLeave:[],pinCount:"",spareMade:""}
-                          :{...f,otherLeave:["1","2","3","4","5","6","7","8","9","10"],pinCount:"0",spareMade:""}
-                        ));
-                      }}
-                      color={C.miss}/>
-                    <Chip label="9 Pin No-Tap"
-                      selected={Array.isArray(form.otherLeave)&&form.otherLeave.includes("9 Pin No-Tap")}
-                      onToggle={()=>handleLeaveToggle("9 Pin No-Tap")}
-                      color={C.strike}/>
-                  </div>
-                  <PinDeck
-                    selected={Array.isArray(form.otherLeave)?form.otherLeave:[]}
-                    onToggle={p=>handleLeaveToggle(p)}/>
-                  {isNoTap&&<div style={{fontSize:"13px",color:C.strike,fontWeight:600,marginTop:"4px"}}>9 Pin No-Tap → scored as Strike</div>}
-                  {!isNoTap&&Array.isArray(form.otherLeave)&&form.otherLeave.length>0&&(
-                    <div style={{fontSize:"13px",color:C.spare,fontWeight:600,marginTop:"4px"}}>
-                      Leave: {[...form.otherLeave].sort((a,b)=>Number(a)-Number(b)).join("-")}
-                      {standingPins>0&&<span style={{color:C.textMuted,fontWeight:400}}> · First ball: {firstBallPins}</span>}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {isStrike&&(
-                <>
-                  <div style={S.divider}/>
-                  <div style={S.label}>Strike Description</div>
-                  <div style={S.chips}>
-                    {strikeDescriptionsForHand(activeBowlerLeftHanded).map(label=>(
-                      <Chip key={label} label={label}
-                        selected={storedStrikeDescriptionFor(label)===form.strikeDescription}
-                        onToggle={()=>{
-                          const stored=storedStrikeDescriptionFor(label);
-                          set("strikeDescription",form.strikeDescription===stored?"":stored);
-                        }} color={C.strike}/>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {hasLeave&&!(inTenth&&form.ballNum===3)&&(
-                <>
-                  <div style={S.divider}/>
-                  <div style={S.label}>Spare Made</div>
-                  <div style={S.chips}>
-                    {["Yes","No"].map(s=>(
-                      <Chip key={s} label={s} selected={form.spareMade===s} onToggle={()=>handleSpareMadeToggle(s)}
-                        color={s==="Yes"?C.strike:C.miss}/>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {showPinCount&&(
-                <>
-                  <div style={S.divider}/>
-                  <div style={S.label}>Total Pins This Frame</div>
-                  <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
-                    <button style={{...S.btn("sm"),padding:"10px 18px",fontSize:"20px"}} onClick={()=>stepPinCount(-1)}>−</button>
-                    <div style={{flex:1,textAlign:"center",fontSize:"30px",fontWeight:700,color:C.spare}}>
-                      {form.pinCount!==""?form.pinCount:"—"}
-                    </div>
-                    <button style={{...S.btn("sm"),padding:"10px 18px",fontSize:"20px"}} onClick={()=>stepPinCount(1)}>+</button>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-around",fontSize:"12px",color:C.textMuted}}>
-                    <span>First ball: <strong style={{color:C.text}}>{firstBallPins}</strong></span>
-                    <span>Second ball: <strong style={{color:C.text}}>{form.pinCount!==""?parseInt(form.pinCount)-firstBallPins:"—"}</strong></span>
-                  </div>
-                </>
-              )}
-            </div>
-            )}
 
             {showEquipment&&(<>
             {/* Ball — collapsible. Once a bowler settles on a ball they may
