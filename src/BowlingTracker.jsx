@@ -649,6 +649,7 @@ export default function BowlingTracker(){
           manualRes,
           matchesRes,
           lanePatternsRes,
+          teamsRes,
         ] = await Promise.all([
           cloudRead("shots",q=>q.select("*")),
           cloudRead("sessions",q=>q.select("*")),
@@ -670,6 +671,11 @@ export default function BowlingTracker(){
           cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score,ball,surface")),
           cloudRead("matches",q=>q.select("*")),
           cloudRead("lane_patterns",q=>q.select("*")),
+          // Teams, so a team's NAME is known from first paint. Without
+          // this the list stayed empty until the bowler opened the Teams
+          // screen, and every team label fell back to the league name.
+          // MUST stay last, matching teamsRes in the destructuring above.
+          cloudRead("teams",q=>q.select("id,name,league_id")),
         ]);
 
 
@@ -1007,6 +1013,22 @@ export default function BowlingTracker(){
         }else{
           const m=await window.storage.get(MATCHES_KEY);
           if(m){const v=JSON.parse(m.value);if(Array.isArray(v))setMatches(v);}
+        }
+
+        // Team names, resolved to league NAMES so every lookup can match
+        // on the name rather than an id. Members aren't loaded here --
+        // nothing on Stats or Trends needs them, and the Teams screen
+        // loads the full roster when it opens.
+        if(teamsRes.online&&teamsRes.data){
+          setTeams(prev=>{
+            const byId=Object.fromEntries((prev||[]).map(t=>[t.id,t]));
+            return teamsRes.data.map(row=>({
+              ...(byId[row.id]||{}),
+              id:row.id,
+              name:row.name,
+              league:leagueNameById[row.league_id]||byId[row.id]?.league||"",
+            }));
+          });
         }
 
                 if(lanePatternsRes.online&&lanePatternsRes.data){
@@ -1522,6 +1544,17 @@ export default function BowlingTracker(){
   // may be a teammate being proxy-logged. Using activeBowler here would show
   // the teammate removed while the cloud actually removed the signed-in
   // user: two different people, silently.
+  // Teams were READ from localStorage at startup but never WRITTEN, so
+  // the list was empty on every load until the bowler happened to open
+  // the Teams screen. Everything that looks up a team name -- the Viewing
+  // chips, comparison badges, running averages, season record -- silently
+  // fell back to the league name, which is why "Split Happens" kept
+  // showing as "Tuesday".
+  function persistTeams(next){
+    setTeams(next);
+    try{window.localStorage.setItem("bowling-teams-v1",JSON.stringify(next));}catch{}
+  }
+
   async function leaveTeam(team,leagueName){
     if(!user?.id||!displayName)return;
     if(!(team.members||[]).includes(displayName)){
@@ -1533,7 +1566,7 @@ export default function BowlingTracker(){
     const updatedTeams=teams.map(t=>t.id===team.id
       ?{...t,members:(t.members||[]).filter(m=>m!==displayName)}
       :t);
-    setTeams(updatedTeams);
+    persistTeams(updatedTeams);
     cloudDelete("team_members",{team_id:team.id,user_id:user.id});
   }
 
@@ -4092,7 +4125,7 @@ export default function BowlingTracker(){
             {socialTab==="teams"&&(
               <TeamManagement
                 leagues={leagues}
-                onTeamsChange={setTeams}
+                onTeamsChange={persistTeams}
                 onLeagueAdd={addLeague}
               />
             )}
