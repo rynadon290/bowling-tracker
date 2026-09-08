@@ -59,6 +59,9 @@ describe('share card', () => {
       // Path methods: the logo is drawn rather than loaded, so a share
       // works offline.
       beginPath() { calls.push(['path']); }, moveTo() {}, lineTo() {}, closePath() {}, fill() { calls.push(['fill']); },
+      // The vault wheel strokes spokes and arcs the hub.
+      stroke() { calls.push(['stroke']); }, arc() { calls.push(['arc']); },
+      set strokeStyle(v) {}, set lineWidth(v) {}, set lineCap(v) {},
       set fillStyle(v) {}, set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {},
     };
   }
@@ -79,11 +82,21 @@ describe('share card', () => {
     expect(texts).toContain('203');
   });
 
-  // The lane: 39 boards, so 39 rects (plus the background).
-  it('draws a real 39-board lane, not a decorative stripe', () => {
+  // Replaced: the 39-board lane belonged to "Board & Arrow". The app is
+  // My Bowling Vault now, and a shared card should look like the app it
+  // came from -- that's the point of putting it on someone's feed.
+  it('draws the vault wheel: 8 spokes, a hub and three finger holes', () => {
     const ctx = fakeCtx();
     drawShareCard(ctx, { scores: [200] });
-    expect(ctx.calls.filter(c => c[0] === 'rect').length).toBe(40);
+    expect(ctx.calls.filter(c => c[0] === 'stroke')).toHaveLength(8);
+    expect(ctx.calls.filter(c => c[0] === 'arc')).toHaveLength(4);
+  });
+
+  it('draws highlights onto the image, not just into the text', () => {
+    const ctx = fakeCtx();
+    drawShareCard(ctx, { scores: [200], highlights: ['Won $45 in side pots'] });
+    const texts = ctx.calls.filter(c => c[0] === 'text').map(c => c[1]);
+    expect(texts).toContain('Won $45 in side pots');
   });
 
   // The mark is drawn, not loaded, so a share that happens offline still
