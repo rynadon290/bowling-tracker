@@ -1,21 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-import TeamManagement from "./TeamManagement.jsx";
-import Friends from "./Friends.jsx";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import HistoryView from "./HistoryView.jsx";
 import LogView from "./LogView.jsx";
-import StatsView from "./StatsView.jsx";
-import ImportScorecard from "./ImportScorecard.jsx";
-import Settings from "./Settings.jsx";
-import Profile from "./Profile.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
-import TrendsView from "./TrendsView.jsx";
-import CoachingView from "./CoachingView.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
 import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
-import InsightsView from "./InsightsView.jsx";
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
@@ -58,6 +49,28 @@ import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
 } from "./domain/supabaseMapping.js";
+
+// Screens behind a tab or icon are loaded ON DEMAND, not at startup.
+//
+// The Bowl tab is what opens when the app launches, and it needs none of
+// these. Loading them eagerly meant every bowler downloaded the entire
+// app -- including recharts, ~400KB and by far the heaviest dependency,
+// pulled in by StatsView and TrendsView -- before they could log a shot
+// at the lanes on centre wifi.
+//
+// Each still renders exactly as before; only WHEN its code arrives
+// changes. Suspense shows a brief placeholder on first visit to a tab,
+// then it's cached for the session.
+const TeamManagement = lazy(() => import("./TeamManagement.jsx"));
+const Friends = lazy(() => import("./Friends.jsx"));
+const StatsView = lazy(() => import("./StatsView.jsx"));
+const ImportScorecard = lazy(() => import("./ImportScorecard.jsx"));
+const Settings = lazy(() => import("./Settings.jsx"));
+const Profile = lazy(() => import("./Profile.jsx"));
+const TrendsView = lazy(() => import("./TrendsView.jsx"));
+const CoachingView = lazy(() => import("./CoachingView.jsx"));
+const InsightsView = lazy(() => import("./InsightsView.jsx"));
+
 
 // Browser persistence adapter. The original app used the ChatGPT host
 // storage API; GitHub Pages needs a browser-native equivalent. Guarded by
@@ -3947,6 +3960,11 @@ export default function BowlingTracker(){
       )}
 
       <div style={S.content}>
+      {/* One boundary around every view. A lazy screen shows this for the
+          moment its code is fetched on first visit, then it's cached for
+          the session. Deliberately plain -- a spinner that flashes for
+          80ms is more distracting than a quiet gap. */}
+      <Suspense fallback={<div style={{padding:"32px 0",textAlign:"center",color:C.textMuted,fontSize:"13px"}}>Loading…</div>}>
         
         {view==="insights"&&(<>
           {/* Improve is the whole improvement loop, so the two things
@@ -4289,6 +4307,7 @@ export default function BowlingTracker(){
             viewedLeftHanded={viewedLeftHanded}
           />
         )}
+      </Suspense>
       </div>
 
       {/* Bottom nav. At the bottom because the top of a phone is out of
