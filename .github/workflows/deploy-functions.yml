@@ -16,16 +16,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Both actions pinned to versions that run natively on Node 24.
+      #
+      # GitHub removes Node 20 from the runners on 16 September 2026. Since
+      # June they've been force-running Node 20 actions on Node 24, which
+      # is why the deploy still succeeded and only warned -- but the
+      # warning is the last notice before removal.
+      - uses: actions/checkout@v5
 
-      - uses: supabase/setup-cli@v1
+      # v2 is the Node 24 native release. If this ever fails to install
+      # the CLI, dropping back to @v1 is safe -- v1 still works today,
+      # it just warns.
+      - uses: supabase/setup-cli@v2
         with:
           version: latest
 
       - name: Deploy all functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          # The project ref isn't a secret -- it appears in every API URL for
+          # this project. Hardcoded so the workflow has no setup step beyond
+          # the access token.
+          PROJECT_REF: fqjeaxmrzlhczstcdiqs
         run: |
           set -euo pipefail
           for dir in supabase/functions/*/; do
