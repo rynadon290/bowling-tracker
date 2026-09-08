@@ -93,6 +93,14 @@ if (typeof window !== "undefined" && !window.storage) {
 }
 
 const STORAGE_KEY = "bowling-shots-v2";
+// Tonight's context: which league, which date, which lane pair.
+//
+// Shots were always saved, but the context needed to FIND them was not --
+// sessionLeague reset to "" on every refresh, so a bowler mid-session who
+// reloaded (or whose phone reclaimed the tab, which happens constantly at
+// an alley) came back to a screen showing no scores. The data was intact
+// the whole time; nothing could locate it.
+const SESSION_CONTEXT_KEY = "bowling-session-context-v1";
 const SESSIONS_KEY = "bowling-sessions-v2";
 const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
@@ -477,7 +485,30 @@ export default function BowlingTracker(){
     catch{return true;}
   });
   const[newBallName,setNewBallName]=useState("");
-  const[form,setForm]=useState(emptyShot());
+  // Restored from the last session context, so a refresh mid-night lands
+  // back where you were. Only restored when the saved date is TODAY --
+  // reopening the app on a new day should start a new night, not resume
+  // last Tuesday's.
+  const savedContext=(()=>{
+    try{
+      const raw=window.localStorage.getItem(SESSION_CONTEXT_KEY);
+      if(!raw)return null;
+      const c=JSON.parse(raw);
+      return c&&c.date===localDateString()?c:null;
+    }catch{return null;}
+  })();
+
+  // Resume where the bowler was, not frame 1 -- see SESSION_CONTEXT_KEY.
+  const[form,setForm]=useState(()=>{
+    const base=emptyShot();
+    if(!savedContext)return base;
+    return{...base,
+      game:savedContext.game||base.game,
+      frame:savedContext.frame||base.frame,
+      ballNum:savedContext.ballNum??base.ballNum,
+      league:savedContext.league||base.league,
+      date:savedContext.date||base.date};
+  });
   const[editingId,setEditingId]=useState(null);
   const[preEditForm,setPreEditForm]=useState(null);
   const[saved,setSaved]=useState(false);
@@ -498,9 +529,9 @@ export default function BowlingTracker(){
   const[compareBowler,setCompareBowler]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
   const[compareLeague,setCompareLeague]=useState("");
-  const[sessionLeague,setSessionLeague]=useState("");
-  const[sessionDate,setSessionDate]=useState(localDateString());
-  const[startingLane,setStartingLane]=useState("");
+  const[sessionLeague,setSessionLeague]=useState(savedContext?.league||"");
+  const[sessionDate,setSessionDate]=useState(savedContext?.date||localDateString());
+  const[startingLane,setStartingLane]=useState(savedContext?.lane||"");
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
@@ -3330,6 +3361,25 @@ export default function BowlingTracker(){
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[displayName,bowlers.length]);
+
+  // Persist tonight's context so a refresh doesn't lose the session.
+  //
+  // localStorage rather than window.storage: this has to be readable
+  // SYNCHRONOUSLY on the very first render, before any async load
+  // resolves, or the first paint shows an empty session and the scores
+  // appear to vanish even though they arrive a moment later.
+  useEffect(()=>{
+    try{
+      window.localStorage.setItem(SESSION_CONTEXT_KEY,JSON.stringify({
+        league:sessionLeague,date:sessionDate,lane:startingLane,
+        // Where they'd got to. Without this the form reset to game 1
+        // frame 1 on refresh, and since saving matches on
+        // (bowler, league, date, game, frame), the NEXT shot silently
+        // overwrote frame 1 instead of continuing the game.
+        game:form.game,frame:form.frame,ballNum:form.ballNum??null,
+      }));
+    }catch{}
+  },[sessionLeague,sessionDate,startingLane,form.game,form.frame,form.ballNum]);
 
   const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
   const bookAverageCheck=needsBookAverageUpdate(
