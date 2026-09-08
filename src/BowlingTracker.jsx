@@ -755,6 +755,28 @@ export default function BowlingTracker(){
             const p=profileFromRow(row);
             if(p&&p.bowlerName)rebuiltProfiles[p.bowlerName]=p;
           });
+
+          // Teammates' profiles come from an RPC, not the table.
+          //
+          // The table read now returns only YOUR rows: the broad teammate
+          // policy was dropped because it exposed the whole row, including
+          // private `notes` and book average. The RPC returns just the
+          // columns a teammate legitimately needs -- name, handedness,
+          // two-handed, aliases -- so name matching and left-handed leave
+          // rendering keep working without handing over private notes.
+          //
+          // Own rows win on conflict: never let a teammate's limited copy
+          // overwrite your full profile.
+          try{
+            const{data:mates,error:matesErr}=await supabase.rpc("teammate_bowler_profiles");
+            if(!matesErr&&Array.isArray(mates)){
+              mates.forEach(row=>{
+                const p=profileFromRow(row);
+                if(p&&p.bowlerName&&!rebuiltProfiles[p.bowlerName])rebuiltProfiles[p.bowlerName]=p;
+              });
+            }
+          }catch{}
+
           setProfiles(rebuiltProfiles);
           try{await window.storage.set(PROFILES_KEY,JSON.stringify(rebuiltProfiles));}catch{}
         }else{
