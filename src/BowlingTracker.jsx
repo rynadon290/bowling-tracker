@@ -3335,7 +3335,7 @@ export default function BowlingTracker(){
     {id:"history", label:"History", icon:"📖"},
     {id:"data",    label:"Stats",   icon:"📈"},
     {id:"insights",label:"Improve", icon:"🎯"},
-    {id:"locker",  label:"Vault",   icon:"🎒"}, // internal id stays "locker" -- plumbing, not shown
+    {id:"locker",  label:"Vault",   icon:"🔒"}, // internal id stays "locker" -- plumbing, not shown
   ];
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and

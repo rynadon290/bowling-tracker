@@ -6,6 +6,14 @@ import SignIn from './SignIn.jsx';
 import './styles.css';
 import { C } from './ui.jsx';
 
+// Registered for installability, not for offline support -- see sw.js.
+// Guarded: some embedded/preview contexts don't expose the API at all.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
 function AuthGate() {
   const { user, loading } = useAuth();
 
