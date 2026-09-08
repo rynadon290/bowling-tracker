@@ -14,7 +14,6 @@ import { setTheme,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
-import { describeUsualNights } from "./domain/launchPrompt.js";
 
 const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
 const ENVIRONMENT_DESCRIPTIONS = {

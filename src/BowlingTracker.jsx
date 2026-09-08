@@ -30,7 +30,7 @@ import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/s
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
-import { shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
+import { todaysRoutine, shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./domain/goals.js";
 import { scoreStats } from "./domain/scoreInsights.js";
 import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insightGating.js";
@@ -3132,6 +3132,36 @@ export default function BowlingTracker(){
     dismissedDate:sessionStartDismissedDate,
   });
 
+  // What this bowler usually does on today's weekday, learned from what
+  // they've actually bowled. Tuesday means league, Thursday means
+  // practice -- and on a day with no clear routine it stays null rather
+  // than guessing.
+  const routine=todaysRoutine(sessions,tournaments,activeBowler);
+  const DAY_NAMES_SHORT=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  // Set the mode to match the routine on a recognised night.
+  //
+  // This closes a hole the guided prompt opened: on an established night
+  // the prompt stays quiet, so a bowler who chose Tournament on Saturday
+  // arrived at Tuesday league night still in tournament mode, with
+  // nothing asking and -- now that mode lives on the prompt rather than
+  // in Settings -- nowhere obvious to fix it.
+  //
+  // Only when the prompt is NOT showing: if it's up, the bowler is
+  // answering for themselves and the app shouldn't move under them. And
+  // only once per day, so it never fights a deliberate mid-session change.
+  const routineAppliedRef=useRef("");
+  useEffect(()=>{
+    if(showSessionStart)return;
+    if(!routine.mode)return;
+    const today=localDateString();
+    if(routineAppliedRef.current===today)return;
+    routineAppliedRef.current=today;
+    if(preferences.environment!==routine.mode){
+      updatePreferences(prev=>applyEnvironment(prev,routine.mode));
+    }
+  },[showSessionStart,routine.mode,preferences.environment]);
+
   const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
   const bookAverageCheck=needsBookAverageUpdate(
     bowlerLeaguesWithDates,activeBowlerProfile.bookAverageAsOf||"",
@@ -4168,6 +4198,7 @@ export default function BowlingTracker(){
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             showSessionStart={showSessionStart} dismissSessionStart={dismissSessionStart}
             sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={()=>setSessionEnvChosen(true)}
+            routineNote={routine.mode&&!showSessionStart?`Your usual ${DAY_NAMES_SHORT[routine.weekday]}`:""}
             updatePreferences={updatePreferences}
           />
         )}

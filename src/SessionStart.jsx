@@ -29,7 +29,7 @@ const ENVIRONMENT_DESCRIPTIONS = {
 // and skipping left people on a screen configured for whatever they last
 // bowled -- which is how a tournament ends up logged into Tuesday league.
 // Choosing takes one tap.
-export default function SessionStart({ preferences, onApply, onDismiss, envChosen, onEnvChosen, collapsed = false }) {
+export default function SessionStart({ preferences, onApply, onDismiss, envChosen, onEnvChosen, collapsed = false, routineNote = "" }) {
   const [open, setOpen] = useState(!collapsed);
 
   // Casual needs no tracking question -- it's scores-only by definition.
@@ -53,7 +53,12 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
               </span>
             )}
           </div>
-          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>Tonight's setup</div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>
+            {/* Says WHY it's set this way when the app picked it from a
+                routine. "The app decided for me" is only reassuring if
+                you can see what it decided and why. */}
+            {routineNote || "Tonight's setup"}
+          </div>
         </div>
         <span style={{ color: C.accent, fontSize: "12px", flexShrink: 0 }}>Change</span>
       </button>

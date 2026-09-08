@@ -31,7 +31,7 @@ export default function LogView({
   ballLayouts, setBallLayout,
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
-  showSessionStart, dismissSessionStart, updatePreferences, sessionEnvChosen, onSessionEnvChosen,
+  showSessionStart, dismissSessionStart, updatePreferences, sessionEnvChosen, onSessionEnvChosen, routineNote,
   goalsPanel, practiceMode, setPracticeMode, gameEquipment, updateGameEquipment, practiceTracking, setPracticeTracking, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
@@ -104,6 +104,7 @@ export default function LogView({
             {!editingId&&!showSessionStart&&(
               <SessionStart
                 collapsed
+                routineNote={routineNote}
                 preferences={preferences}
                 onApply={updatePreferences}
                 onDismiss={dismissSessionStart}
