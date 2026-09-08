@@ -10,8 +10,7 @@ import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domai
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
 import { setTheme,
-  ENVIRONMENTS, TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODES,
-  TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS, setTrackingMode, applyEnvironment,
+  TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
@@ -288,45 +287,12 @@ export default function Settings({
       </CollapsibleCard>
       )}
 
-      {showCard("environment") && (
-      <CollapsibleCard title="Environment" summary={ENVIRONMENT_LABELS[preferences.environment]}
-        expanded={expanded.environment} onToggle={() => toggle("environment")}>
-        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Sets sensible defaults for the toggles below — you can still adjust any of them afterward.
-        </div>
-        <div style={S.chips}>
-          {ENVIRONMENTS.map(env => (
-            <Chip key={env} label={ENVIRONMENT_LABELS[env]} selected={preferences.environment === env}
-              onToggle={() => apply(prev => applyEnvironment(prev, env))} />
-          ))}
-        </div>
-        {preferences.environment && (
-          <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px" }}>
-            {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
-          </div>
-        )}
-        {/* Why the "Bowling today?" prompt does or doesn't appear. It's
-            derived from bowling history rather than a setting, so without
-            this it would look arbitrary. */}
-        <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
-          <div style={{ ...S.label, marginBottom: "4px" }}>The "Bowling today?" prompt</div>
-          <div style={{ fontSize: "12px", color: C.textMuted }}>
-            {describeUsualNights(sessions, activeBowler)}
-          </div>
-        </div>
-        {restartOnboarding && (
-          <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
-            <div style={{ ...S.label, marginBottom: "4px" }}>First-launch setup</div>
-            <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "8px" }}>
-              Walk through the welcome screens again.
-            </div>
-            <button style={{ ...S.btn(), width: "100%" }} onClick={restartOnboarding}>
-              Run setup again
-            </button>
-          </div>
-        )}
-      </CollapsibleCard>
-      )}
+      {/* Environment and Tracking Detail are NOT here any more. They live
+          on the Bowl tab's "Bowling today?" card, which stays on screen
+          collapsed after you answer it -- so there's one place to set
+          them, and it's the screen where they matter. Two places to change
+          what mode you're bowling in was how you'd end up with Settings
+          saying one thing and the Log tab behaving like another. */}
 
       {/* Centers attach to LEAGUES, not sessions -- a league bowls at one
           house for a season, so this is one entry per season instead of a
@@ -453,24 +419,6 @@ export default function Settings({
 
       {/* Not offered in casual: "Just Bowling" exists to be scores-only,
           so a tracking choice there is a control that does nothing. */}
-      {showCard("trackingDetail") && preferences.environment !== "casual" && (
-      <CollapsibleCard title="Tracking Detail" summary={TRACKING_MODE_LABELS[preferences.trackingMode]}
-        expanded={expanded.trackingDetail} onToggle={() => toggle("trackingDetail")}>
-        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Independent of environment — you can bowl league by-game and practice shot-by-shot.
-        </div>
-        <div style={S.chips}>
-          {TRACKING_MODES.map(mode => (
-            <Chip key={mode} label={TRACKING_MODE_LABELS[mode]}
-              selected={preferences.trackingMode === mode}
-              onToggle={() => apply(prev => setTrackingMode(prev, mode))} />
-          ))}
-        </div>
-        <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px" }}>
-          {TRACKING_MODE_DESCRIPTIONS[preferences.trackingMode]}
-        </div>
-      </CollapsibleCard>
-      )}
 
       {showCard("accessoryFields") && (
       <CollapsibleCard title="Accessory Fields"

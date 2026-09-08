@@ -95,6 +95,21 @@ export default function LogView({
               </div>
             )}
 
+            {/* Once answered the card COLLAPSES rather than disappearing.
+                Removing it entirely meant changing your mind -- wrong
+                environment, or you decided to log shot by shot after all
+                -- meant a trip to Settings. Collapsed, the answers stay
+                visible and one tap re-opens them. */}
+            {!editingId&&!showSessionStart&&(
+              <SessionStart
+                collapsed
+                preferences={preferences}
+                onApply={updatePreferences}
+                onDismiss={dismissSessionStart}
+                envChosen
+                onEnvChosen={onSessionEnvChosen}/>
+            )}
+
             {/* Everything below waits for the prompt to be answered. */}
             {!(!editingId&&showSessionStart)&&(<>
 
@@ -415,10 +430,13 @@ export default function LogView({
                 and would still be counted by any average that doesn't
                 filter by league. Silent loss plus a polluted composite --
                 worse than asking for one tap first. */}
+            {/* LEAGUE ONLY. Practice and casual have no league to pick --
+                their container league is created for them -- so telling a
+                practice bowler to "pick tonight's league" is asking for
+                something that doesn't exist in that mode. */}
             {!editingId&&activeBowler&&!effectiveSessionLeague
-              &&preferences.environment!=="tournament"
-              &&preferences.trackingMode==="game"
-              &&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
+              &&preferences.environment==="league"
+              &&preferences.trackingMode==="game"&&(
               <div style={{...S.card,backgroundColor:C.surface}}>
                 <div style={S.label}>Enter Game Scores</div>
                 <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>

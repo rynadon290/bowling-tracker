@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
   ENVIRONMENTS, TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
@@ -28,16 +29,43 @@ const ENVIRONMENT_DESCRIPTIONS = {
 // and skipping left people on a screen configured for whatever they last
 // bowled -- which is how a tournament ends up logged into Tuesday league.
 // Choosing takes one tap.
-export default function SessionStart({ preferences, onApply, onDismiss, envChosen, onEnvChosen }) {
+export default function SessionStart({ preferences, onApply, onDismiss, envChosen, onEnvChosen, collapsed = false }) {
+  const [open, setOpen] = useState(!collapsed);
+
   // Casual needs no tracking question -- it's scores-only by definition.
   const needsTracking = envChosen && preferences.environment !== "casual";
+
+  // Answered state: a one-line summary that reopens on tap. Keeps the
+  // answers changeable without a trip to Settings, and without the card
+  // taking a screenful once it's served its purpose.
+  if (collapsed && !open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        style={{ ...S.card, width: "100%", textAlign: "left", cursor: "pointer", border: "none",
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}
+        aria-label="Change tonight's setup">
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>
+            {ENVIRONMENT_LABELS[preferences.environment]}
+            {preferences.environment !== "casual" && (
+              <span style={{ color: C.textMuted, fontWeight: 400 }}>
+                {" · "}{TRACKING_MODE_LABELS[preferences.trackingMode]}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>Tonight's setup</div>
+        </div>
+        <span style={{ color: C.accent, fontSize: "12px", flexShrink: 0 }}>Change</span>
+      </button>
+    );
+  }
 
   return (
     <div style={{ ...S.card, border: `1px solid ${C.accent}44`, marginBottom: "12px" }}>
       <div style={{ ...S.label, color: C.accent, marginBottom: "4px" }}>Bowling today?</div>
       <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "14px" }}>
         {envChosen
-          ? "You can change any of this later in Settings."
+          ? "Tap Change on this card any time to switch."
           : "Two quick questions and the app sets itself up for tonight."}
       </div>
 
@@ -51,7 +79,7 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
               onEnvChosen();
               // Just Bowling has no second question, so choosing it
               // finishes the flow outright.
-              if (env === "casual") onDismiss();
+              if (env === "casual") { if (collapsed) setOpen(false); else onDismiss(); }
             }} />
         ))}
       </div>
@@ -73,7 +101,7 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
                   onApply(prev => setTrackingMode(prev, mode));
                   // Both questions answered -- collapse and get out of the
                   // way rather than making them tap a third time.
-                  onDismiss();
+                  if (collapsed) setOpen(false); else onDismiss();
                 }} />
             ))}
           </div>
