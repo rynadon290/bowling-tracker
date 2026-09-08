@@ -26,10 +26,21 @@ const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 
-function json(body: unknown, status = 200) {
+// Takes its CORS headers as an argument rather than reading a module-level
+// constant.
+//
+// CORS used to be a module-level object, so this helper closed over it.
+// Making the origin per-request moved CORS INSIDE the handler, which left
+// this reference dangling -- and because it only evaluates when json() is
+// actually called, it compiled and deployed fine, then threw
+// "ReferenceError: CORS is not defined" on the first real request.
+//
+// Passing it in makes the dependency explicit and impossible to break the
+// same way again.
+function json(body: unknown, cors: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }
 
@@ -197,7 +208,7 @@ Deno.serve(async (req) => {
   }
 
   if (!GEMINI_API_KEY) {
-    return json({ error: "Insights aren't configured on the server." }, 500);
+    return json({ error: "Insights aren't configured on the server." }, CORS, 500);
   }
 
   try {
@@ -208,7 +219,7 @@ Deno.serve(async (req) => {
     // and it would invent something to fill the space.
     const included = payload?.included ?? {};
     if (!payload || Object.keys(included).length === 0) {
-      return json({ error: "Not enough data yet to analyse." }, 400);
+      return json({ error: "Not enough data yet to analyse." }, CORS, 400);
     }
 
     // The client gates the payload to a handful of summary figures. A
@@ -218,7 +229,7 @@ Deno.serve(async (req) => {
     const serialised = JSON.stringify(included);
     if (serialised.length > 8_000) {
       console.warn("analyze-performance: oversized payload rejected", serialised.length);
-      return json({ error: "Payload too large." }, 413);
+      return json({ error: "Payload too large." }, CORS, 413);
     }
 
     const userPrompt = [
@@ -248,14 +259,14 @@ Deno.serve(async (req) => {
     if (!res.ok) {
       const detail = await res.text();
       console.error("Gemini error", res.status, detail);
-      return json({ error: `Analysis failed (${res.status}).` }, 502);
+      return json({ error: `Analysis failed (${res.status}).` }, CORS, 502);
     }
 
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
       console.error("Gemini returned no text", JSON.stringify(data).slice(0, 500));
-      return json({ error: "Analysis came back empty. Try again." }, 502);
+      return json({ error: "Analysis came back empty. Try again." }, CORS, 502);
     }
 
     let parsed;
@@ -263,7 +274,7 @@ Deno.serve(async (req) => {
       parsed = JSON.parse(text);
     } catch {
       console.error("Unparseable analysis", text.slice(0, 500));
-      return json({ error: "Analysis came back malformed. Try again." }, 502);
+      return json({ error: "Analysis came back malformed. Try again." }, CORS, 502);
     }
 
     return json({
@@ -276,9 +287,9 @@ Deno.serve(async (req) => {
         gameCount: payload.gameCount ?? null,
         statistics: Object.keys(included),
       },
-    });
+    }, CORS);
   } catch (err) {
     console.error("analyze-performance failed", err);
-    return json({ error: "Couldn't generate insights right now." }, 500);
+    return json({ error: "Couldn't generate insights right now." }, CORS, 500);
   }
 });
