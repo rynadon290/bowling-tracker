@@ -978,15 +978,26 @@ export default function LogView({
                       // sessionHighlights. A goal you hit or money you won
                       // is what someone actually wants to post; "48%
                       // strikes" helps nobody.
+                      // These are DERIVED at share time from data that
+                      // exists, not read from fields on the session -- an
+                      // earlier version read cs.moneyWon, cs.goalsHit and
+                      // cs.priorBest, none of which were ever written, so
+                      // the card silently never showed money or goals.
                       highlights:sessionHighlights({
                         scores:cs.scores,
                         strikes:cs.strikes,shotCount:cs.shotCount,
                         sparesMade:cs.sparesMade,spareAttempts:cs.spareAttempts,
-                        cleanGames:cs.cleanGames||0,
-                        goalsHit:cs.goalsHit||[],
-                        moneyWon:cs.moneyWon||0,
-                        priorBest:cs.priorBest??null,
-                        priorAverage:cs.priorAverage??null,
+                        // Money: net winnings on the night, from the same
+                        // calculation the Money Games card uses.
+                        moneyWon:Math.max(0,sessionMoney(cs)?.net||0),
+                        // Personal best: the best series BEFORE tonight, so
+                        // tonight can be compared against it.
+                        priorBest:(()=>{
+                          const others=sessions.filter(s=>s.bowler===cs.bowler&&s.id!==cs.id&&Array.isArray(s.scores)&&s.scores.length>1);
+                          return others.length?Math.max(...others.map(s=>s.total||s.scores.reduce((a,b)=>a+b,0))):null;
+                        })(),
+                        // Average before tonight, competitive only.
+                        priorAverage:cAvg(sessions.filter(s=>s.id!==cs.id),cs.bowler,null),
                         environment:"league",
                       }),
                     }}/>
