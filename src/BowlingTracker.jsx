@@ -3273,6 +3273,10 @@ export default function BowlingTracker(){
     // Casual is scores-only, so the score card is the whole screen --
     // it opens by default there and nowhere else.
     if(preferences.environment==="casual")setExpandedSections(e=>({...e,manualScores:true}));
+    // League: Tonight's Session open by default. It's the first thing you
+    // set on a league night -- which league, which lane -- so making it a
+    // tap to reach put a step in front of every session.
+    if(preferences.environment==="league")setExpandedSections(e=>({...e,tonightSession:true}));
     if(preferences.environment!=="practice")setPracticeTracking(null);
     if(preferences.environment==="practice"&&user?.id)ensurePracticeLeague();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -451,7 +451,9 @@ export default function Settings({
         </CollapsibleCard>
       )}
 
-      {showCard("trackingDetail") && (
+      {/* Not offered in casual: "Just Bowling" exists to be scores-only,
+          so a tracking choice there is a control that does nothing. */}
+      {showCard("trackingDetail") && preferences.environment !== "casual" && (
       <CollapsibleCard title="Tracking Detail" summary={TRACKING_MODE_LABELS[preferences.trackingMode]}
         expanded={expanded.trackingDetail} onToggle={() => toggle("trackingDetail")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>

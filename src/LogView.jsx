@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { C, S, F, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
 import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
@@ -47,15 +48,25 @@ export default function LogView({
   //     need the separate ball and surface cards under them.
   const env=preferences.environment;
   const isDrill=env==="practice"&&practiceMode==="drill";
+  // Extra game rows the bowler asked for beyond what's been entered.
+  // Session-local: a practice where you added a 4th game shouldn't make
+  // every future session start with four empty boxes.
+  const [extraGames,setExtraGames]=useState(0);
+
   const showGoals=env==="league"||(env==="practice"&&!isDrill);
   // Bug fix: showEquipment checked environment but never trackingMode, so
   // switching League from shot-by-shot to game-scores-only left the Ball/
   // Surface/Line cards showing -- there was nothing gating them on HOW
   // the bowler is tracking, only WHERE they're bowling.
-  const showEquipment=env!=="tournament"&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
+  // Tournament CAN track shot by shot now. Most tournament bowlers won't
+  // -- there's no time between games -- but excluding the environment
+  // meant the option in Settings did nothing there, which is worse than
+  // not offering it. Casual stays excluded: scores-only is the entire
+  // point of that mode, so it doesn't get the choice at all.
+  const showEquipment=env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
   // Shot Context (game/frame/lane) is meaningless without shots -- a
   // scores-only night has games, not frames. It had no gate at all.
-  const showShotContext=env!=="tournament"&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
+  const showShotContext=env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
 
   return (
     <>
@@ -401,8 +412,24 @@ export default function LogView({
                 bowlers who want score tracking without logging 30 shots a
                 night. A score entered here overrides whatever the shots
                 would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
-              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
+            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
+              // How many game rows to show.
+              //
+              // Was hardcoded to 3, which is right for a league night and
+              // wrong for practice -- people bowl one game, or five, or
+              // stop after two. Derived from what's actually been entered
+              // so it grows with real data, with a floor of 1 rather than
+              // three empty boxes on a fresh session.
+              //
+              // League and tournament keep a floor of 3, because a
+              // standard night IS three games and pre-showing them saves
+              // two taps.
+              const standardGames=preferences.environment==="practice"||preferences.environment==="casual"?1:3;
+              const highestEntered=[1,2,3,4,5,6,7,8,9,10].reduce((hi,g)=>
+                getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g)!=null?g:hi,0);
+              const gameCount=Math.max(standardGames,highestEntered,extraGames);
+              const gameNums=Array.from({length:gameCount},(_,i)=>i+1);
+              const entered=gameNums.map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
               const total=seriesTotal(entered);
               return(
                 <CollapsibleCard
@@ -413,7 +440,7 @@ export default function LogView({
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                     Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
                   </div>
-                  {[1,2,3].map(g=>{
+                  {gameNums.map(g=>{
                     const isPracticeGames=preferences.environment==="practice";
                     const arsenal=(arsenals?.[activeBowler]||[]);
                     const equip=isPracticeGames?getGameEquipment(gameEquipment,activeBowler,effectiveSessionLeague,sessionDate,g):null;
@@ -454,6 +481,27 @@ export default function LogView({
                     </div>
                     );
                   })}
+
+                  {/* Add and remove game rows. Practice especially isn't
+                      always three games -- people bowl one, or five, or
+                      stop after two. Removing clears that game's score so
+                      the row and its data go together; without that a
+                      "deleted" game would still count toward the series. */}
+                  <div style={{display:"flex",gap:"8px",marginTop:"4px"}}>
+                    <button style={{...S.btn(),flex:1,fontSize:"13px",padding:"9px"}}
+                      onClick={()=>setExtraGames(gameCount+1)}>
+                      + Add game
+                    </button>
+                    {gameCount>1&&(
+                      <button style={{...S.btn(),flex:1,fontSize:"13px",padding:"9px"}}
+                        onClick={()=>{
+                          updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,gameCount,"");
+                          setExtraGames(gameCount-1);
+                        }}>
+                        − Remove game {gameCount}
+                      </button>
+                    )}
+                  </div>
                   {total!=null&&(
                     <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
                       <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
@@ -1245,8 +1293,15 @@ export default function LogView({
             <div style={{height:`${footerHeight}px`}}/>
             </>)}
           </>
+          {/* Sits ABOVE the bottom nav, not under it. The nav is fixed at
+              bottom:0 with zIndex 100, so this bar -- also fixed at
+              bottom:0, zIndex 50 -- was rendering behind it and looked
+              like the Save Shot button had vanished, which stopped
+              shot-by-shot logging from advancing at all.
+              64px clears the nav; the safe-area inset clears the iOS
+              home indicator underneath it. */}
           {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(
-          <div ref={footerRef} style={{position:"fixed",bottom:0,left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:50,maxWidth:"480px",margin:"0 auto"}}>
+          <div ref={footerRef} style={{position:"fixed",bottom:"calc(64px + env(safe-area-inset-bottom, 0px))",left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:90,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}
             </button>
