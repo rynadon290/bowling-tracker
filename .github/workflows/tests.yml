@@ -1,0 +1,61 @@
+name: Tests
+
+# Runs on every push and every pull request to main.
+#
+# The point is that a regression cannot reach main whether or not anyone
+# is paying attention. Several bugs this codebase has shipped were caught
+# only because someone happened to test the right screen by hand -- the
+# split rate reading 0%, the season export reporting no poker winnings,
+# the league chip that silently stopped working. Tests that only run when
+# someone remembers to run them are a hope, not a check.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets you re-run from the Actions tab without pushing a commit.
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Both pinned to versions that run natively on Node 24. GitHub
+      # removed Node 20 from the runners on 16 September 2026.
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          # Caches ~/.npm keyed on package-lock.json, so a run that
+          # changes no dependencies skips the download entirely.
+          cache: 'npm'
+
+      # `npm ci` rather than `npm install`: it installs exactly what
+      # package-lock.json specifies and fails if the lock file and
+      # package.json disagree. That disagreement is worth failing on --
+      # it means CI would otherwise test different code than you do.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # A passing test suite does not mean the app builds. A missing
+      # import or a bad path can pass every unit test and still fail the
+      # production bundle, which is the thing users actually get.
+      - name: Build
+        run: npm run build
+
+      # Static audits. These catch classes of bug that unit tests
+      # structurally cannot: a field that is read but never written
+      # anywhere passes every test you can write for the function that
+      # reads it.
+      - name: Data-flow audit
+        run: node audit_dataflow.mjs
+
+      # Reads schema-snapshot.csv if present. Skips cleanly when it
+      # isn't, rather than failing the build -- the snapshot is refreshed
+      # by hand, and a stale-or-absent one shouldn't block a code change.
+      - name: Schema audit
+        run: node audit_live_schema.mjs
