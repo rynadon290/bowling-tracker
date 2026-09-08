@@ -1,3 +1,4 @@
+import { inferLeagueDay } from "./reminders.js";
 // Coaching: pairing, tasks, and notes.
 //
 // PAIRING follows the same shape as friendships (requester/addressee/
@@ -52,6 +53,11 @@ export function categorizeCoaching(rows, myUserId, profilesById = {}) {
       displayName: profilesById[otherId] || "Unknown",
       // Their role, not mine -- what the UI wants to label them as.
       theirRole: iAmCoach ? "bowler" : "coach",
+      // When the coach next sees this bowler. Distinct from their next
+      // league night: a coach doesn't necessarily attend league, and a
+      // session is usually on a practice lane on another day.
+      nextSession: r.next_session || "",
+      nextSessionNote: r.next_session_note || "",
       myRole: iAmCoach ? "coach" : "bowler",
       status: r.status,
     };
@@ -446,4 +452,87 @@ export function latestResponseAt(tasksByRelationship) {
     }
   }
   return latest || null;
+}
+
+// ── Coach roster summary ────────────────────────────────────────────────
+//
+// A coach with six bowlers had to tap into each one in turn to see what
+// they were working on. This is the one-screen answer: every bowler, what
+// they're on, how far along, and when they next bowl.
+//
+// Composed from data the app already has -- open tasks, their progress,
+// and the league night inferred from actual session history -- so it adds
+// no new tracking burden and can't drift from the underlying records.
+
+// The next occurrence of a weekday, from today. Returns null when the
+// bowler has no established night rather than guessing one.
+export function nextDateForWeekday(weekday, today = new Date()) {
+  if (weekday === null || weekday === undefined) return null;
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const delta = (weekday - d.getDay() + 7) % 7;
+  // A session TODAY still counts as today's night, not next week's.
+  d.setDate(d.getDate() + delta);
+  return d;
+}
+
+// One row per coached bowler.
+//
+// `tasks` is every task across all relationships; each row picks that
+// bowler's most urgent open one -- soonest due date first, then oldest --
+// because a coach looking at a roster wants the thing that needs
+// attention, not an arbitrary pick.
+export function coachRoster({
+  bowlers = [], tasks = [], sessions = [], leagues = [],
+  handednessByBowler = {}, today = new Date(),
+} = {}) {
+  return bowlers.map(b => {
+    const name = typeof b === "string" ? b : b?.name;
+    const relationshipId = typeof b === "string" ? "" : b?.relationshipId || "";
+
+    const mine = (tasks || []).filter(t =>
+      t && t.status === "open" &&
+      (relationshipId ? t.relationshipId === relationshipId : true) &&
+      (t.bowlerName ? t.bowlerName === name : true));
+
+    // Soonest due first; undated tasks sort last rather than first, since
+    // a task with a deadline is the one that needs attention.
+    const sorted = [...mine].sort((a, c) => {
+      const ad = a.dueDate || "9999-99-99", cd = c.dueDate || "9999-99-99";
+      return ad === cd ? 0 : (ad < cd ? -1 : 1);
+    });
+    const current = sorted[0] || null;
+
+    const progress = current
+      ? taskProgress(current, !!handednessByBowler[name])
+      : null;
+
+    // The SCHEDULED coaching session -- set by the coach, not inferred.
+    // Their next league night is shown separately because it's useful
+    // context ("they bowl Tuesday, I see them Thursday"), but it is not
+    // the same thing and must never stand in for it.
+    const scheduled = typeof b === "string" ? "" : (b?.nextSession || "");
+
+    let nextLeagueNight = null, nextLeague = "";
+    for (const league of leagues) {
+      const day = inferLeagueDay(sessions.filter(s => s.bowler === name), league);
+      if (day === null) continue;
+      const d = nextDateForWeekday(day, today);
+      if (d && (!nextLeagueNight || d < nextLeagueNight)) { nextLeagueNight = d; nextLeague = league; }
+    }
+
+    return {
+      bowler: name,
+      relationshipId,
+      currentTask: current,
+      progress,
+      openTaskCount: mine.length,
+      // The scheduled session, as a plain date string, or "" when the
+      // coach hasn't set one. Deliberately NOT defaulted to the league
+      // night -- an invented date is worse than a blank.
+      nextSession: scheduled,
+      nextSessionNote: typeof b === "string" ? "" : (b?.nextSessionNote || ""),
+      nextLeagueNight,
+      nextLeague,
+    };
+  });
 }

@@ -6,6 +6,7 @@ import {
   shotBreakdown,
   respondedSince,
   latestResponseAt,
+  coachRoster,
 } from './coaching.js';
 import { isSplit, isSinglePinLeave, isCornerPinLeave } from './splits.js';
 
@@ -216,5 +217,57 @@ describe('unread task responses', () => {
 
   it('goes quiet once marked seen', () => {
     expect(Object.keys(respondedSince(tasks, latestResponseAt(tasks)))).toHaveLength(0);
+  });
+});
+
+// A coach with six bowlers had to tap into each one to see what they were
+// working on. The roster is the one-screen answer.
+describe('coachRoster', () => {
+  const today = new Date(2026, 8, 8); // Tue 8 Sep 2026
+  const sessions = ['2026-08-04', '2026-08-11', '2026-08-18']
+    .map(date => ({ bowler: 'Kim', league: 'Tuesday House Shot', date }));
+
+  const bowlers = [
+    { name: 'Kim', relationshipId: 'r1', nextSession: '2026-09-10', nextSessionNote: '6pm lanes 9-10' },
+    { name: 'Sam', relationshipId: 'r2', nextSession: '' },
+  ];
+  const tasks = [
+    { id: '1', status: 'open', relationshipId: 'r1', title: 'Ten pin', metricId: 'tenPinSpareRate', target: 90, result: 84, dueDate: '2026-09-15' },
+    { id: '2', status: 'open', relationshipId: 'r1', title: 'Clean frames', metricId: 'cleanFrameRate', target: 75, result: '', dueDate: '2026-10-01' },
+    { id: '3', status: 'completed', relationshipId: 'r1', title: 'Done', dueDate: '2026-08-01' },
+  ];
+  const roster = () => coachRoster({ bowlers, tasks, sessions, leagues: ['Tuesday House Shot'], today });
+
+  it('picks the most urgent open task, by soonest due date', () => {
+    expect(roster()[0].currentTask.title).toBe('Ten pin');
+    expect(roster()[0].openTaskCount).toBe(2); // the completed one is excluded
+  });
+
+  it('reports progress against the target', () => {
+    const p = roster()[0].progress;
+    expect(p.reached).toBe(84);
+    expect(p.target).toBe(90);
+    expect(p.met).toBe(false);
+  });
+
+  // The whole point of the field: a coaching session is NOT the bowler's
+  // league night. Inferring one from the other was the original mistake.
+  it('uses the scheduled session, never the league night', () => {
+    expect(roster()[0].nextSession).toBe('2026-09-10');
+    // Kim bowls Tuesdays; today IS Tuesday. The session must not become today.
+    expect(roster()[0].nextLeagueNight.getDay()).toBe(2);
+    expect(roster()[0].nextSession).not.toBe('2026-09-08');
+  });
+
+  it('leaves the session blank rather than inventing one', () => {
+    const sam = roster()[1];
+    expect(sam.nextSession).toBe('');
+    expect(sam.currentTask).toBeNull();
+  });
+
+  it('handles a bowler with no tasks and no history', () => {
+    const r = coachRoster({ bowlers: [{ name: 'New', relationshipId: 'r9' }], tasks: [], sessions: [], leagues: [], today });
+    expect(r[0].currentTask).toBeNull();
+    expect(r[0].nextLeagueNight).toBeNull();
   });
 });
