@@ -3340,7 +3340,6 @@ export default function BowlingTracker(){
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and
   // prompted stacking in the first place; four fits comfortably.
-  const stackHeaderIcons=false;
 
   // Everything outstanding, from every source -- coaching invitations,
   // friend and team requests, coach tasks, imported scores, the book
@@ -3808,52 +3807,57 @@ export default function BowlingTracker(){
 
   return(
     <div style={S.app}>
-      {/* Header */}
+      {/* Header.
+          
+          Rebuilt around the two things a header is actually for: telling
+          you where you are, and surfacing anything that needs you.
+
+          What went:
+          - The wordmark on every screen. You know what app you opened;
+            repeating it on all five tabs bought nothing and cost the
+            most valuable row on the page. It stays on the Bowl tab,
+            which is the closest thing to a home screen.
+          - stackHeaderIcons. It was hardcoded false once the nav moved
+            to the bottom, so the whole stacked-layout branch was dead
+            code pretending to be a layout decision.
+          - The permanent "Saved & backed up" line. Confirming success
+            on every screen forever trains people to stop reading it.
+            It now speaks up only when something is actually pending. */}
       <div style={S.header}>
-        {/* Profile and settings sit beside the title, on the title's own
-            line rather than wherever the sync text below happens to end.
-            They only STACK when the nav is wide enough to need the room
-            back -- see stackHeaderIcons. At four tabs a row fits fine,
-            and stacking permanently just made the header taller for no
-            reason. */}
-        <div style={{display:"flex",alignItems:"flex-start",gap:"8px",minWidth:0}}>
-          <div style={{minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-              <div style={S.title}>🎳 {APP_NAME}</div>
-              {/* Inline with the title when there's room. */}
-              {!stackHeaderIcons&&(
-                <div style={{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}}>
-                  {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
-                    📥
-                    <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:C.bg,fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
-                  </button>}
-                  <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
-                  <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
-                </div>
-              )}
-            </div>
-          {/* "3 pending" made people wonder if their night was saved. It is --
-              locally, always, the moment they tap Save. The cloud copy is
-              the only thing in flight. Say that plainly. */}
-          {pendingSyncCount>0?(
-            <button onClick={openSyncDetail} style={{background:"none",border:"none",padding:0,fontSize:"10px",fontWeight:600,color:C.spare,marginTop:"2px",cursor:"pointer",textDecoration:"underline"}}>
-              ✓ Saved on this phone · backing up to cloud…
-            </button>
-          ):(
-            <div style={{fontSize:"10px",fontWeight:600,color:C.strike,marginTop:"2px"}}>✓ Saved &amp; backed up</div>
-          )}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px",minWidth:0,width:"100%"}}>
+          <div style={{minWidth:0,display:"flex",alignItems:"baseline",gap:"8px"}}>
+            {view==="log"
+              ? <div style={S.title}>🎳 {APP_NAME}</div>
+              : <div style={S.title}>{navTabs.find(t=>t.id===view)?.label
+                  ||(view==="settings"?"Settings":view==="profile"?"Profile"
+                    :view==="inbox"?"Inbox":view==="coaching"?"Coach"
+                    :view==="social"?"Friends & teams":view==="import"?"Import scorecard":"")}</div>}
           </div>
-          {/* Stacked only when the nav needs the horizontal space back. */}
-          {stackHeaderIcons&&(
-            <div style={{display:"flex",flexDirection:"column",gap:"6px",flexShrink:0,alignItems:"center"}}>
-              {inboxCount>0&&<button onClick={()=>setView("inbox")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1,position:"relative"}} aria-label={`${inboxCount} scores to review`}>
-                  📥
-                  <span style={{position:"absolute",top:"-3px",right:"-4px",minWidth:"13px",height:"13px",borderRadius:"7px",backgroundColor:C.spare,color:C.bg,fontSize:"9px",fontWeight:700,lineHeight:"13px",textAlign:"center",padding:"0 2px"}}>{inboxCount}</span>
-                </button>}
-              <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
-              <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"15px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
-            </div>
-          )}
+
+          <div style={{display:"flex",gap:"12px",flexShrink:0,alignItems:"center"}}>
+            {/* Only shown when something is genuinely in flight. */}
+            {pendingSyncCount>0&&(
+              <button onClick={openSyncDetail}
+                style={{background:"none",border:"none",padding:0,fontSize:"11px",fontWeight:600,color:C.spare,cursor:"pointer"}}
+                aria-label={`${pendingSyncCount} changes backing up`}>
+                ⟳ Backing up
+              </button>
+            )}
+            {/* Inbox stays in the header with profile and settings: it's
+                "things waiting for you", which is a different job from
+                reviewing past scores. Shown only when there IS something
+                waiting -- a permanently-empty tray is just noise. */}
+            {inboxCount>0&&(
+              <button onClick={()=>setView("inbox")}
+                style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1,position:"relative"}}
+                aria-label={`Inbox, ${inboxCount} waiting`}>
+                📥
+                <span style={{position:"absolute",top:"-4px",right:"-6px",minWidth:"15px",height:"15px",borderRadius:"8px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"15px",textAlign:"center",padding:"0 3px"}}>{inboxCount}</span>
+              </button>
+            )}
+            <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
+            <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
+          </div>
         </div>
       </div>
 
@@ -4071,6 +4075,17 @@ export default function BowlingTracker(){
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
         )}
 
+        {/* The History tab carries the inbox badge, so tapping it has to
+            lead somewhere that shows what's waiting. Rather than a second
+            destination, the pending items sit at the top of History --
+            imported scores are history anyway, just unconfirmed. */}
+        {view==="history"&&inboxCount>0&&(
+          <button style={{...S.btn(),width:"100%",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}
+            onClick={()=>setView("inbox")}>
+            📥 {inboxCount} waiting for you
+          </button>
+        )}
+
         {(view==="settings"||view==="history")&&(
           <Settings
             mode={view==="history"?"history":"settings"}
@@ -4236,8 +4251,10 @@ export default function BowlingTracker(){
       <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,display:"flex",backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"6px 2px calc(8px + env(safe-area-inset-bottom, 0px))"}}>
         {navTabs.map(t=>{
           const on=view===t.id||(t.id==="insights"&&(view==="coaching"||view==="social"))||(t.id==="log"&&view==="import");
+          // History does NOT badge the inbox count -- the inbox is
+          // "things waiting for you" and lives in the header; History is
+          // for reviewing what already happened. Two different jobs.
           const badge=
-            t.id==="history"?(inboxCount||0):
             t.id==="insights"?((newInsights.length>0&&view!=="insights"?1:0)+(coachViewOn?unreadResponseCount:0)):
             0;
           return(
