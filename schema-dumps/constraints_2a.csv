@@ -1,0 +1,54 @@
+table_name,constraint_name,constraint_type,column_name,ordinal_position,references_table,references_column,update_rule,delete_rule,check_clause
+arsenals,2200_18416_1_not_null,CHECK,null,null,null,null,null,null,id IS NOT NULL
+arsenals,2200_18416_2_not_null,CHECK,null,null,null,null,null,null,created_at IS NOT NULL
+arsenals,arsenal_pkey,PRIMARY KEY,id,1,null,null,null,null,null
+arsenals,arsenals_core_type_check,CHECK,null,null,null,null,null,null,"((core_type IS NULL) OR (core_type = ANY (ARRAY['symmetric'::text, 'asymmetric'::text])))"
+arsenals,arsenals_coverstock_check,CHECK,null,null,null,null,null,null,"((coverstock IS NULL) OR (coverstock = ANY (ARRAY['solid'::text, 'pearl'::text, 'hybrid'::text])))"
+arsenals,arsenals_group_id_fkey,FOREIGN KEY,group_id,1,ball_groups,id,NO ACTION,SET NULL,null
+arsenals,arsenals_layout_system_check,CHECK,null,null,null,null,null,null,"((layout_system IS NULL) OR (layout_system = ANY (ARRAY['dual_angle'::text, 'vls'::text, '2ls'::text])))"
+friendships,2200_17856_1_not_null,CHECK,null,null,null,null,null,null,id IS NOT NULL
+friendships,2200_17856_2_not_null,CHECK,null,null,null,null,null,null,requester_id IS NOT NULL
+friendships,2200_17856_3_not_null,CHECK,null,null,null,null,null,null,addressee_id IS NOT NULL
+friendships,2200_17856_4_not_null,CHECK,null,null,null,null,null,null,status IS NOT NULL
+friendships,2200_17856_5_not_null,CHECK,null,null,null,null,null,null,created_at IS NOT NULL
+friendships,friendships_addressee_id_fkey,FOREIGN KEY,addressee_id,1,profiles,id,NO ACTION,CASCADE,null
+friendships,friendships_check,CHECK,null,null,null,null,null,null,(requester_id <> addressee_id)
+friendships,friendships_pkey,PRIMARY KEY,id,1,null,null,null,null,null
+friendships,friendships_requester_id_addressee_id_key,UNIQUE,requester_id,1,null,null,null,null,null
+friendships,friendships_requester_id_addressee_id_key,UNIQUE,addressee_id,2,null,null,null,null,null
+friendships,friendships_requester_id_fkey,FOREIGN KEY,requester_id,1,profiles,id,NO ACTION,CASCADE,null
+friendships,friendships_status_check,CHECK,null,null,null,null,null,null,"(status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text]))"
+lane_patterns,2200_18185_10_not_null,CHECK,null,null,null,null,null,null,ratio IS NOT NULL
+lane_patterns,2200_18185_11_not_null,CHECK,null,null,null,null,null,null,created_at IS NOT NULL
+lane_patterns,2200_18185_12_not_null,CHECK,null,null,null,null,null,null,updated_at IS NOT NULL
+lane_patterns,2200_18185_1_not_null,CHECK,null,null,null,null,null,null,id IS NOT NULL
+lane_patterns,2200_18185_4_not_null,CHECK,null,null,null,null,null,null,date IS NOT NULL
+lane_patterns,2200_18185_5_not_null,CHECK,null,null,null,null,null,null,lane IS NOT NULL
+lane_patterns,2200_18185_6_not_null,CHECK,null,null,null,null,null,null,pattern_type IS NOT NULL
+lane_patterns,2200_18185_7_not_null,CHECK,null,null,null,null,null,null,pattern_name IS NOT NULL
+lane_patterns,2200_18185_8_not_null,CHECK,null,null,null,null,null,null,length IS NOT NULL
+lane_patterns,2200_18185_9_not_null,CHECK,null,null,null,null,null,null,volume IS NOT NULL
+lane_patterns,lane_patterns_league_id_fkey,FOREIGN KEY,league_id,1,leagues,id,NO ACTION,SET NULL,null
+lane_patterns,lane_patterns_pkey,PRIMARY KEY,id,1,null,null,null,null,null
+lane_patterns,lane_patterns_team_id_date_lane_key,UNIQUE,team_id,1,null,null,null,null,null
+lane_patterns,lane_patterns_team_id_date_lane_key,UNIQUE,date,2,null,null,null,null,null
+lane_patterns,lane_patterns_team_id_date_lane_key,UNIQUE,lane,3,null,null,null,null,null
+lane_patterns,lane_patterns_team_id_fkey,FOREIGN KEY,team_id,1,teams,id,NO ACTION,CASCADE,null
+leagues,2200_17793_1_not_null,CHECK,null,null,null,null,null,null,id IS NOT NULL
+leagues,2200_17793_2_not_null,CHECK,null,null,null,null,null,null,name IS NOT NULL
+leagues,2200_17793_4_not_null,CHECK,null,null,null,null,null,null,created_at IS NOT NULL
+leagues,leagues_center_id_fkey,FOREIGN KEY,center_id,1,bowling_centers,id,NO ACTION,SET NULL,null
+leagues,leagues_created_by_fkey,FOREIGN KEY,created_by,1,profiles,id,NO ACTION,SET NULL,null
+leagues,leagues_pkey,PRIMARY KEY,id,1,null,null,null,null,null
+matches,2200_18154_10_not_null,CHECK,null,null,null,null,null,null,updated_at IS NOT NULL
+matches,2200_18154_1_not_null,CHECK,null,null,null,null,null,null,id IS NOT NULL
+matches,2200_18154_4_not_null,CHECK,null,null,null,null,null,null,date IS NOT NULL
+matches,2200_18154_5_not_null,CHECK,null,null,null,null,null,null,games IS NOT NULL
+matches,2200_18154_7_not_null,CHECK,null,null,null,null,null,null,opponent IS NOT NULL
+matches,2200_18154_8_not_null,CHECK,null,null,null,null,null,null,handicap IS NOT NULL
+matches,2200_18154_9_not_null,CHECK,null,null,null,null,null,null,created_at IS NOT NULL
+matches,matches_league_id_fkey,FOREIGN KEY,league_id,1,leagues,id,NO ACTION,SET NULL,null
+matches,matches_pkey,PRIMARY KEY,id,1,null,null,null,null,null
+matches,matches_team_id_date_key,UNIQUE,team_id,1,null,null,null,null,null
+matches,matches_team_id_date_key,UNIQUE,date,2,null,null,null,null,null
+matches,matches_team_id_fkey,FOREIGN KEY,team_id,1,teams,id,NO ACTION,CASCADE,null

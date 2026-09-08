@@ -1,0 +1,16 @@
+tablename,indexname,indexdef
+arsenals,arsenal_pkey,CREATE UNIQUE INDEX arsenal_pkey ON public.arsenals USING btree (id)
+friendships,friendships_addressee_idx,CREATE INDEX friendships_addressee_idx ON public.friendships USING btree (addressee_id)
+friendships,friendships_pkey,CREATE UNIQUE INDEX friendships_pkey ON public.friendships USING btree (id)
+friendships,friendships_requester_id_addressee_id_key,"CREATE UNIQUE INDEX friendships_requester_id_addressee_id_key ON public.friendships USING btree (requester_id, addressee_id)"
+friendships,friendships_requester_idx,CREATE INDEX friendships_requester_idx ON public.friendships USING btree (requester_id)
+lane_patterns,lane_patterns_league_id_idx,CREATE INDEX lane_patterns_league_id_idx ON public.lane_patterns USING btree (league_id)
+lane_patterns,lane_patterns_pkey,CREATE UNIQUE INDEX lane_patterns_pkey ON public.lane_patterns USING btree (id)
+lane_patterns,lane_patterns_team_id_date_lane_key,"CREATE UNIQUE INDEX lane_patterns_team_id_date_lane_key ON public.lane_patterns USING btree (team_id, date, lane)"
+lane_patterns,lane_patterns_team_id_idx,CREATE INDEX lane_patterns_team_id_idx ON public.lane_patterns USING btree (team_id)
+leagues,leagues_name_per_user_idx,"CREATE UNIQUE INDEX leagues_name_per_user_idx ON public.leagues USING btree (created_by, name)"
+leagues,leagues_pkey,CREATE UNIQUE INDEX leagues_pkey ON public.leagues USING btree (id)
+matches,matches_league_id_idx,CREATE INDEX matches_league_id_idx ON public.matches USING btree (league_id)
+matches,matches_pkey,CREATE UNIQUE INDEX matches_pkey ON public.matches USING btree (id)
+matches,matches_team_id_date_key,"CREATE UNIQUE INDEX matches_team_id_date_key ON public.matches USING btree (team_id, date)"
+matches,matches_team_id_idx,CREATE INDEX matches_team_id_idx ON public.matches USING btree (team_id)

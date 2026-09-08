@@ -1,0 +1,21 @@
+table_name,constraint_name,type,definition
+profiles,profiles_id_fkey,f,FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+profiles,profiles_pkey,p,PRIMARY KEY (id)
+sessions,sessions_bowler_name_league_id_date_key,u,"UNIQUE (bowler_name, league_id, date)"
+sessions,sessions_league_id_fkey,f,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
+sessions,sessions_pkey,p,PRIMARY KEY (id)
+sessions,sessions_team_id_fkey,f,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+sessions,sessions_user_id_fkey,f,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+shots,shots_league_id_fkey,f,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
+shots,shots_pkey,p,PRIMARY KEY (id)
+shots,shots_team_id_fkey,f,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+shots,shots_user_id_fkey,f,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+team_members,team_members_pkey,p,"PRIMARY KEY (team_id, user_id)"
+team_members,team_members_team_id_fkey,f,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+team_members,team_members_user_id_fkey,f,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+teams,teams_created_by_fkey,f,FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL
+teams,teams_league_id_fkey,f,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
+teams,teams_pkey,p,PRIMARY KEY (id)
+user_preferences,user_preferences_pkey,p,PRIMARY KEY (user_id)
+user_preferences,user_preferences_user_id_fkey,f,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+user_preferences,user_preferences_user_id_key,u,UNIQUE (user_id)

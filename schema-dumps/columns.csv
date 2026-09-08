@@ -1,0 +1,115 @@
+table_name,ordinal_position,column_name,data_type,udt_name,character_maximum_length,numeric_precision,numeric_scale,is_nullable,column_default,is_generated,generation_expression
+arsenals,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+arsenals,2,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+arsenals,3,bowler_name,text,text,null,null,null,YES,null,NEVER,null
+arsenals,4,ball,text,text,null,null,null,YES,null,NEVER,null
+arsenals,5,created_by,uuid,uuid,null,null,null,YES,gen_random_uuid(),NEVER,null
+arsenals,6,layout_system,text,text,null,null,null,YES,null,NEVER,null
+arsenals,7,layout_values,jsonb,jsonb,null,null,null,YES,null,NEVER,null
+arsenals,9,group_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+arsenals,10,coverstock,text,text,null,null,null,YES,null,NEVER,null
+arsenals,11,core_type,text,text,null,null,null,YES,null,NEVER,null
+arsenals,12,weight,numeric,numeric,null,null,null,YES,null,NEVER,null
+arsenals,13,rg,numeric,numeric,null,null,null,YES,null,NEVER,null
+arsenals,14,diff,numeric,numeric,null,null,null,YES,null,NEVER,null
+arsenals,15,int_diff,numeric,numeric,null,null,null,YES,null,NEVER,null
+friendships,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+friendships,2,requester_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+friendships,3,addressee_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+friendships,4,status,text,text,null,null,null,NO,'pending'::text,NEVER,null
+friendships,5,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+friendships,6,responded_at,timestamp with time zone,timestamptz,null,null,null,YES,null,NEVER,null
+lane_patterns,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+lane_patterns,2,team_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+lane_patterns,3,league_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+lane_patterns,4,date,date,date,null,null,null,NO,null,NEVER,null
+lane_patterns,5,lane,text,text,null,null,null,NO,null,NEVER,null
+lane_patterns,6,pattern_type,text,text,null,null,null,NO,'house'::text,NEVER,null
+lane_patterns,7,pattern_name,text,text,null,null,null,NO,''::text,NEVER,null
+lane_patterns,8,length,text,text,null,null,null,NO,''::text,NEVER,null
+lane_patterns,9,volume,text,text,null,null,null,NO,''::text,NEVER,null
+lane_patterns,10,ratio,text,text,null,null,null,NO,''::text,NEVER,null
+lane_patterns,11,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+lane_patterns,12,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+leagues,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+leagues,2,name,text,text,null,null,null,NO,null,NEVER,null
+leagues,3,created_by,uuid,uuid,null,null,null,YES,null,NEVER,null
+leagues,4,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+leagues,5,center_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+leagues,6,start_date,date,date,null,null,null,YES,null,NEVER,null
+leagues,7,end_date,date,date,null,null,null,YES,null,NEVER,null
+matches,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+matches,2,team_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+matches,3,league_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+matches,4,date,date,date,null,null,null,NO,null,NEVER,null
+matches,5,games,jsonb,jsonb,null,null,null,NO,"'[null, null, null]'::jsonb",NEVER,null
+matches,6,series,boolean,bool,null,null,null,YES,null,NEVER,null
+matches,7,opponent,text,text,null,null,null,NO,''::text,NEVER,null
+matches,8,handicap,text,text,null,null,null,NO,''::text,NEVER,null
+matches,9,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+matches,10,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+profiles,1,id,uuid,uuid,null,null,null,NO,null,NEVER,null
+profiles,2,display_name,text,text,null,null,null,NO,null,NEVER,null
+profiles,3,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+sessions,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+sessions,2,user_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+sessions,3,team_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+sessions,4,league_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+sessions,5,bowler_name,text,text,null,null,null,NO,''::text,NEVER,null
+sessions,6,date,date,date,null,null,null,NO,null,NEVER,null
+sessions,7,scores,ARRAY,_int4,null,null,null,NO,'{}'::integer[],NEVER,null
+sessions,8,total,integer,int4,null,32,0,YES,null,NEVER,null
+sessions,9,average,integer,int4,null,32,0,YES,null,NEVER,null
+sessions,10,shot_count,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,11,strikes,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,12,weak_tens,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,13,ringing_tens,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,14,ten_pin_leaves,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,15,single_pin_leaves,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,16,single_pin_spares,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,17,spare_attempts,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,18,spares_made,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,19,splits,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,20,splits_converted,integer,int4,null,32,0,NO,0,NEVER,null
+sessions,21,balls_used,jsonb,jsonb,null,null,null,NO,'[]'::jsonb,NEVER,null
+sessions,22,misses,jsonb,jsonb,null,null,null,NO,'[]'::jsonb,NEVER,null
+sessions,23,releases,jsonb,jsonb,null,null,null,NO,'[]'::jsonb,NEVER,null
+sessions,24,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+sessions,25,updated_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+sessions,26,poker_quarter,jsonb,jsonb,null,null,null,NO,"'[0, 0, 0]'::jsonb",NEVER,null
+sessions,27,poker_dollar,jsonb,jsonb,null,null,null,NO,"'[0, 0, 0]'::jsonb",NEVER,null
+sessions,28,three_six_nine_winnings,numeric,numeric,null,null,null,NO,0,NEVER,null
+sessions,29,jackpot_winnings,numeric,numeric,null,null,null,NO,0,NEVER,null
+sessions,30,high_game_winnings,ARRAY,_numeric,null,null,null,NO,"'{0,0,0}'::numeric[]",NEVER,null
+sessions,31,high_game_cost,ARRAY,_numeric,null,null,null,NO,"'{0,0,0}'::numeric[]",NEVER,null
+sessions,32,poker_quarter_cost,ARRAY,_numeric,null,null,null,NO,"'{0,0,0}'::numeric[]",NEVER,null
+sessions,33,poker_dollar_cost,ARRAY,_numeric,null,null,null,NO,"'{0,0,0}'::numeric[]",NEVER,null
+sessions,34,three_six_nine_cost,numeric,numeric,null,null,null,NO,0,NEVER,null
+shots,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+shots,2,user_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+shots,3,team_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+shots,4,league_id,uuid,uuid,null,null,null,YES,null,NEVER,null
+shots,5,date,date,date,null,null,null,NO,null,NEVER,null
+shots,6,game,integer,int4,null,32,0,NO,null,NEVER,null
+shots,7,frame,integer,int4,null,32,0,NO,null,NEVER,null
+shots,8,ball_num,integer,int4,null,32,0,YES,null,NEVER,null
+shots,9,lane,text,text,null,null,null,YES,null,NEVER,null
+shots,10,ball,text,text,null,null,null,YES,null,NEVER,null
+shots,11,surface,text,text,null,null,null,YES,null,NEVER,null
+shots,12,starting_board,text,text,null,null,null,YES,null,NEVER,null
+shots,13,target_arrows,text,text,null,null,null,YES,null,NEVER,null
+shots,14,result,text,text,null,null,null,NO,null,NEVER,nulltable_name,ordinal_position,column_name,data_type,udt_name,character_maximum_length,numeric_precision,numeric_scale,is_nullable,column_default,is_generated,generation_expression
+team_members,1,team_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+team_members,2,user_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+team_members,3,lineup_position,integer,int4,null,32,0,YES,null,NEVER,null
+team_members,4,joined_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+team_members,5,left_handed,boolean,bool,null,null,null,NO,false,NEVER,null
+team_members,6,is_sub,boolean,bool,null,null,null,NO,false,NEVER,null
+teams,1,id,uuid,uuid,null,null,null,NO,gen_random_uuid(),NEVER,null
+teams,2,name,text,text,null,null,null,NO,null,NEVER,null
+teams,3,league_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+teams,4,created_by,uuid,uuid,null,null,null,YES,null,NEVER,null
+teams,5,created_at,timestamp with time zone,timestamptz,null,null,null,NO,now(),NEVER,null
+user_preferences,1,user_id,uuid,uuid,null,null,null,NO,null,NEVER,null
+user_preferences,2,preferences,jsonb,jsonb,null,null,null,NO,'{}'::jsonb,NEVER,null
+user_preferences,3,updated_at,timestamp with time zone,timestamptz,null,null,null,YES,now(),NEVER,null
