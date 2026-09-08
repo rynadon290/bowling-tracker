@@ -32,6 +32,11 @@ export default function TrendsView({
   // Match on the normalised name -- team.league is the raw cloud league
   // name, which may or may not carry the " House Shot" suffix.
   const normLeague = (v) => String(v || "").replace(" House Shot", "").trim().toLowerCase();
+  const teamNameForLeague = (l) => {
+    const t = (teams || []).find(t => t.name && normLeague(t.league) === normLeague(l));
+    return t ? t.name : String(l || "").replace(" House Shot", "");
+  };
+
   const teamChips = (leagues || [])
     .filter(l => (teams || []).some(t => normLeague(t.league) === normLeague(l)))
     .map(l => ({
@@ -112,7 +117,7 @@ export default function TrendsView({
             </div>
             {showEveryGame && gameSummary && (
               <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px", lineHeight: 1.5 }}>
-                {gameSummary.games} games{statsLeague ? ` in ${statsLeague.replace(" House Shot", "")}` : " across every league"} ·
+                {gameSummary.games} games{statsLeague ? ` in ${!statsBowler ? teamNameForLeague(statsLeague) : statsLeague.replace(" House Shot", "")}` : " across every league"} ·
                 {" "}averaging {gameSummary.average} · high {gameSummary.high}, low {gameSummary.low}.
                 The spread is {gameSummary.spread} pins — that's what a nightly average hides.
               </div>
@@ -126,7 +131,7 @@ export default function TrendsView({
             <div style={S.chips}>
               <Chip label="All" selected={!statsLeague} onToggle={() => setStatsLeague("")} color={C.accent} />
               {leagues.map(l => (
-                <Chip key={l} label={l.replace(" House Shot", "")} selected={statsLeague === l}
+                <Chip key={l} label={!statsBowler ? teamNameForLeague(l) : l.replace(" House Shot", "")} selected={statsLeague === l}
                   onToggle={() => setStatsLeague(statsLeague === l ? "" : l)} color={C.accent} />
               ))}
             </div>

@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, F, Chip, CompareBadge, StatLead, StatRow, StatRows } from "./ui.jsx";
-import { PRACTICE_SESSION_KEY, formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY, formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
   gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, pinsForNextSession,
@@ -70,8 +70,12 @@ export default function StatsView({
 
   const baseOrder = ["viewing", ...visibleStatsCardOrder(preferences)];
   const comparing = !!compareBowler || isTeamView;
+  // Records rides up with head-to-head. Promoting only headToHead left
+  // Records stranded further down, when it's the other half of "how do we
+  // stack up" and belongs immediately after the comparison.
+  const promoted = ["headToHead", "teamRecords"];
   const renderOrder = comparing
-    ? ["viewing", "headToHead", ...baseOrder.filter(id => id !== "viewing" && id !== "headToHead")]
+    ? ["viewing", ...promoted, ...baseOrder.filter(id => id !== "viewing" && !promoted.includes(id))]
     : baseOrder;
 
   return (
@@ -231,14 +235,14 @@ showTeamCompare&&(()=>{
                   const otherRecords=leagues.filter(l=>l!==statsLeague).map(league=>({league,record:seasonRecord(matches,league)})).filter(x=>x.record.gameWins+x.record.gameLosses+x.record.seriesWins+x.record.seriesLosses>0);
                   return(
                     <div style={S.card}>
-                      <div style={S.label}>{statsLeague?`${statsLeague.replace(" House Shot","")} Season Record`:"Season Record"}</div>
+                      <div style={S.label}>{statsLeague?`${teamNameForLeague(statsLeague)} season record`:"Season record"}</div>
                       {/* Points lead -- that's what decides the standings.
                           Games and pinfall are how the points were earned. */}
                       <StatLead
                         value={`${rMain.pointsWon}/${rMain.pointsAvailable}`}
                         caption="points won" color={C.accent}
                         detail={`${rMain.gameWins}-${rMain.gameLosses} on games, ${rMain.seriesWins}-${rMain.seriesLosses} on pinfall.`}/>
-                      {!statsLeague&&otherRecords.map(({league,record})=><div key={league} style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>{league.replace(" House Shot","")}: {record.pointsWon}/{record.pointsAvailable} points ({record.gameWins}-{record.gameLosses} games, {record.seriesWins}-{record.seriesLosses} pinfall)</div>)}
+                      {!statsLeague&&otherRecords.map(({league,record})=><div key={league} style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>{teamNameForLeague(league)}: {record.pointsWon}/{record.pointsAvailable} points ({record.gameWins}-{record.gameLosses} games, {record.seriesWins}-{record.seriesLosses} pinfall)</div>)}
                     </div>
                   );
                 })()
@@ -857,7 +861,13 @@ fivePinAttempts.length>0&&(
                 );
                 byId["runningAverages"] = (
 sessions.length>0&&(()=>{
-                  const leagueAvgs=leagues.map(league=>({league,avg:rAvg(sessions,statsBowler,league)})).filter(x=>x.avg!=null);
+                  // Practice and casual are excluded: this card is about
+                  // competitive averages, and cAvg already leaves them out
+                  // of the composite below -- listing them as rows made the
+                  // rows and the composite disagree with each other.
+                  const leagueAvgs=leagues
+                    .filter(l=>l!==PRACTICE_SESSION_KEY&&l!==CASUAL_SESSION_KEY)
+                    .map(league=>({league,avg:rAvg(sessions,statsBowler,league)})).filter(x=>x.avg!=null);
                   const combined=cAvg(sessions,statsBowler);
                   if(!leagueAvgs.length&&!combined)return null;
                   return(
@@ -873,7 +883,7 @@ sessions.length>0&&(()=>{
                       <StatRows>
                         {leagueAvgs.map(({league,avg},i)=>(
                           <StatRow key={league}
-                            label={league.replace(" House Shot","")}
+                            label={isTeamView?teamNameForLeague(league):league.replace(" House Shot","")}
                             value={avg}
                             sub={isTeamView&&teamGameTotalAvg(sessions,league)!=null?`team ${teamGameTotalAvg(sessions,league)}`:null}
                             last={i===leagueAvgs.length-1&&!(!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined)}

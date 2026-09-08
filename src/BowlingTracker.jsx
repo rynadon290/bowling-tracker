@@ -3859,7 +3859,19 @@ export default function BowlingTracker(){
   const teamNonStrikeFirstBalls=teamFreshRackCount.filter(s=>s.result!=="Strike").map(firstBallOf).filter(v=>v!=null);
   const teamLeaveAvg=teamNonStrikeFirstBalls.length?(teamNonStrikeFirstBalls.reduce((a,b)=>a+b,0)/teamNonStrikeFirstBalls.length):null;
   const showTeamCompare=!!compareBowler||!!compareLeague;
-  const compareLabel=compareBowler||(compareLeague?compareLeague.replace(" House Shot",""):"");
+  // The comparison label. When comparing against a TEAM rather than a
+  // bowler, this must be the team's name -- it was the league's, so every
+  // "▲ 4 vs Tuesday" badge named a league the bowler doesn't think of as
+  // the thing they're being compared to.
+  //
+  // Matched on the normalised name because team.league is the raw cloud
+  // league name, which may or may not carry the " House Shot" suffix.
+  const teamNameForLeagueName=(l)=>{
+    const norm=v=>String(v||"").replace(" House Shot","").trim().toLowerCase();
+    const t=(teams||[]).find(t=>t.name&&norm(t.league)===norm(l));
+    return t?t.name:String(l||"").replace(" House Shot","");
+  };
+  const compareLabel=compareBowler||(compareLeague?teamNameForLeagueName(compareLeague):"");
   const hideIndividualOnly=isTeamView||!!compareBowler;
   const SHOT_SAMPLE_THRESHOLD=20;
   const bStats=ballUniverse(statsBowler).map(ball=>{
