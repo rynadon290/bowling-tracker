@@ -19,16 +19,13 @@
 // Secret required: gemini_api_key (lowercase -- Supabase forces it)
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GEMINI_API_KEY = Deno.env.get("gemini_api_key");
 const MODEL = "gemini-3.6-flash";
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -87,8 +84,107 @@ Direct and factual. A knowledgeable friend reading the same spreadsheet, not a c
 CONFIDENCE
 Mark an observation "tentative" when its sample is near the minimum, "moderate" for a comfortable sample, "clear" only for a large sample showing a large effect. Err toward the lower rating.`;
 
+// Requires a real, signed-in user before spending anything.
+//
+// These functions bill against an external API key held on the server.
+// Without this check, anyone who discovers the URL can spend that budget
+// -- the client-side gating is a UX and data-quality mechanism, not a
+// security boundary, because nothing stops a caller skipping the client
+// entirely and POSTing here directly.
+//
+// Mirrors the check import-scorecard has always had. The anon key plus
+// the caller's own Authorization header is deliberate: getUser() then
+// validates that JWT rather than trusting it, and the function never
+// needs service-role privileges to do this.
+async function requireUser(req, cors) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return { user: null, response: new Response(JSON.stringify({ error: "Not authenticated" }), {
+      status: 401, headers: { ...cors, "Content-Type": "application/json" } }) };
+  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL"),
+    Deno.env.get("SUPABASE_ANON_KEY"),
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    return { user: null, response: new Response(JSON.stringify({ error: "Not authenticated" }), {
+      status: 401, headers: { ...cors, "Content-Type": "application/json" } }) };
+  }
+  return { user, response: null };
+}
+
+// Per-user ceiling, checked in the database.
+//
+// Authentication stops a stranger spending your budget; this stops one
+// signed-in account looping. Stateless functions can't count in memory --
+// an in-process counter resets on cold start and isn't shared between
+// instances -- so the count lives in a table.
+//
+// Fails OPEN on an unexpected error: a rate limiter that breaks should
+// degrade to "no limit", not "nobody can use the app". The auth check
+// above is the security boundary; this is cost control.
+async function withinRateLimit(req, endpoint, limit, windowInterval) {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_ANON_KEY"),
+      { global: { headers: { Authorization: req.headers.get("Authorization") } } },
+    );
+    const { data, error } = await supabase.rpc("check_api_rate_limit", {
+      p_endpoint: endpoint,
+      p_limit: limit,
+      p_window: windowInterval,
+    });
+    if (error) return true;
+    return data !== false;
+  } catch {
+    return true;
+  }
+}
+
+// Allowed origins, rather than "*".
+//
+// Auth is the real boundary -- a stranger's browser now gets a 401 -- but
+// "*" lets any site on the internet make credentialed calls to these
+// endpoints from a victim's browser, and these three spend money against
+// external API keys. Pinning the origin is cheap defence in depth.
+//
+// ALLOWED_ORIGINS is a comma-separated env var so the origin can change
+// (custom domain, preview deploys) without a code change. If it isn't set
+// the function falls back to "*" -- deliberately, so an unconfigured
+// deploy keeps working rather than locking every request out; set it in
+// production.
+function corsFor(req) {
+  const configured = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const origin = req.headers.get("Origin") || "";
+  const allow = configured.length === 0
+    ? "*"
+    : (configured.includes(origin) ? origin : configured[0]);
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    // Tells caches the response varies per origin, so a permissive cached
+    // response can't be served to a different site.
+    "Vary": "Origin",
+  };
+}
+
 serve(async (req) => {
+  const CORS = corsFor(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  // Auth BEFORE the key check: an unauthenticated caller should get
+  // 401, not a hint about whether the server is configured.
+  const auth = await requireUser(req, CORS);
+  if (auth.response) return auth.response;
+
+  if (!(await withinRateLimit(req, "analyze-performance", 30, "1 hour"))) {
+    return new Response(JSON.stringify({
+      error: "You've used this quite a lot in the last hour. Give it a little while and try again.",
+    }), { status: 429, headers: { ...CORS, "Content-Type": "application/json" } });
+  }
 
   if (!GEMINI_API_KEY) {
     return json({ error: "Insights aren't configured on the server." }, 500);
