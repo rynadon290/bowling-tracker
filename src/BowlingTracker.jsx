@@ -3210,7 +3210,9 @@ export default function BowlingTracker(){
       return{
         name,
         firstBalls:bs.length,
-        strikeRate:bs.length?bs.filter(s=>s.result==="Strike").length/bs.length:null,
+        // Percentage, matching every other rate in this payload and what
+        // the Stats view shows for the same ball.
+        strikeRate:bs.length?Math.round((bs.filter(s=>s.result==="Strike").length/bs.length)*100):null,
         coverstock:spec.coverstock||"",
         coreType:spec.coreType||"",
       };
@@ -3219,12 +3221,22 @@ export default function BowlingTracker(){
     return{
       gameCount,
       firstBalls:firstBalls.length,
-      strikeRate:firstBalls.length?strikes/firstBalls.length:null,
+      // PERCENTAGES (0-100), not fractions.
+      //
+      // These were 0-1 fractions while everything the bowler sees -- the
+      // Stats view, per-ball rows, goals -- is a percentage. The model got
+      // splitRate: 0.09, read it as a percentage, and reported "0%" for a
+      // split rate the app was showing as 9%. Same silent error applied to
+      // strike rate, spare conversion and ten pins.
+      //
+      // Rounding here too, so the model can't produce spurious precision
+      // like "8.9743% of first balls".
+      strikeRate:firstBalls.length?Math.round((strikes/firstBalls.length)*100):null,
       spareAttempts:spareAtt.length,
-      spareConversion:spareAtt.length?spareMade/spareAtt.length:null,
+      spareConversion:spareAtt.length?Math.round((spareMade/spareAtt.length)*100):null,
       tenPinAttempts:tenPins.length,
-      tenPinRate:tenPins.length?tenMade/tenPins.length:null,
-      splitRate:firstBalls.length?splits/firstBalls.length:null,
+      tenPinRate:tenPins.length?Math.round((tenMade/tenPins.length)*100):null,
+      splitRate:firstBalls.length?Math.round((splits/firstBalls.length)*100):null,
       sessionCount:mySessions.length,
       recentAverages:mySessions.slice(-8).map(s=>s.average).filter(v=>typeof v==="number"),
       balls:ballRows,
