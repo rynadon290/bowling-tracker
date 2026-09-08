@@ -572,3 +572,37 @@ describe('practice and casual do not pollute competitive averages', () => {
     expect(gameAvg(sessions, 'R', 0, 'Practice')).toBe(120);
   });
 });
+
+// "Rounded down" hid the real average, which made the pin count look
+// arbitrary: at a true 196.98 the jump to 197 is small, at 196.02 it's
+// large, and both displayed as 196.
+describe('pinsForNextSession exposes the exact average', () => {
+  const build = (targetAvg, games) => {
+    const pins = Math.round(targetAvg * games);
+    const each = Math.floor(pins / games), rem = pins - each * games;
+    const scores = Array.from({ length: games }, (_, i) => each + (i < rem ? 1 : 0));
+    return [{ bowler: 'R', league: 'L', date: '2026-01-01', scores }];
+  };
+
+  it('reports the unrounded average alongside the quoted one', () => {
+    const r = pinsForNextSession(build(196.98, 30), 'R', 'L');
+    expect(r.current).toBe(196);
+    expect(r.exact).toBeCloseTo(196.97, 1);
+  });
+
+  // Two bowlers who both "average 196" need very different sets.
+  it('needs fewer pins when the true average is nearly there', () => {
+    const high = pinsForNextSession(build(196.98, 30), 'R', 'L');
+    const low = pinsForNextSession(build(196.02, 30), 'R', 'L');
+    expect(high.current).toBe(low.current);
+    expect(high.toGain).toBeLessThan(low.toGain);
+  });
+
+  // Truncation is right -- that IS how a bowling average is quoted -- so
+  // the target must still be the next whole number.
+  it('still targets the next whole number', () => {
+    const r = pinsForNextSession(build(196.98, 30), 'R', 'L');
+    const after = (196.97 * 30 + r.toGain) / 33;
+    expect(Math.trunc(after)).toBeGreaterThanOrEqual(197);
+  });
+});

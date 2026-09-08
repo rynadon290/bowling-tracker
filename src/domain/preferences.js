@@ -100,57 +100,57 @@ const ORDER_BY_ENVIRONMENT = {
   // the technical detail behind it. Side pots last -- they matter, but
   // not before you know how you bowled.
   league: [
-    "headlineStats", "runningAverages", "cleanFrames",
+    "headlineStats", "runningAverages", "gameByGame", "cleanFrames",
     "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
-    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
-    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves", "loneFivePin",
-    "firstBallAverage", "framePosition", "strikeStreak", "strikeQuality",
-    "byBall", "releaseQuality", "missDistribution", "ballChangeTriggers",
-    "byCenter", "theoreticalAverage", "progress", "consistency",
-    "scoreDistribution", "gameByGame",
-    "money", "threeSixNine",
+    "headToHead", "giantKiller", "hung", "handicapImpact",
+    "teamRecords", "tenPinLeaves", "singlePinSpares", "splits",
+    "nonSplitLeaves", "loneFivePin", "firstBallAverage", "framePosition",
+    "strikeStreak", "strikeQuality", "byBall", "releaseQuality",
+    "missDistribution", "ballChangeTriggers", "byCenter", "theoreticalAverage",
+    "progress", "consistency", "scoreDistribution", "money",
+    "threeSixNine",
   ],
   // Practice: execution quality and what to change, since that's the
   // entire point of being there. Team cards sink to the bottom -- there
   // is no team in a practice session, so they're almost always empty.
   practice: [
     "headlineStats", "cleanFrames", "firstBallAverage", "framePosition",
-    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves", "loneFivePin",
-    "byBall", "releaseQuality", "missDistribution", "ballChangeTriggers", "strikeQuality",
-    "strikeStreak", "progress", "consistency", "gameByGame", "scoreDistribution",
-    "runningAverages", "theoreticalAverage", "byCenter",
-    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
-    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
-    "money", "threeSixNine",
+    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves",
+    "loneFivePin", "byBall", "releaseQuality", "missDistribution",
+    "ballChangeTriggers", "strikeQuality", "strikeStreak", "progress",
+    "consistency", "scoreDistribution", "runningAverages", "gameByGame",
+    "theoreticalAverage", "byCenter", "seasonRecord", "weeklyPoints",
+    "teamSeries", "teamLeaderboard", "headToHead", "giantKiller",
+    "hung", "handicapImpact", "teamRecords", "money",
+    "threeSixNine",
   ],
   // Tournament: you're on an unfamiliar pattern in an unfamiliar house,
   // so center and equipment come early, and the score-shape cards that
   // tell you whether you're cashing come before technical detail.
   tournament: [
-    "headlineStats", "byCenter", "byBall",
-    "scoreDistribution", "consistency", "gameByGame", "runningAverages",
-    "money",
+    "headlineStats", "byCenter", "byBall", "scoreDistribution",
+    "consistency", "runningAverages", "gameByGame", "money",
     "cleanFrames", "tenPinLeaves", "singlePinSpares", "splits",
     "nonSplitLeaves", "loneFivePin", "firstBallAverage", "framePosition",
     "strikeStreak", "strikeQuality", "releaseQuality", "missDistribution",
-    "ballChangeTriggers", "theoreticalAverage", "progress",
-    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
-    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
+    "ballChangeTriggers", "theoreticalAverage", "progress", "seasonRecord",
+    "weeklyPoints", "teamSeries", "teamLeaderboard", "headToHead",
+    "giantKiller", "hung", "handicapImpact", "teamRecords",
     "threeSixNine",
   ],
   // Casual is scores-only, so almost every shot-derived card is empty.
   // The few that work off game scores come first; the rest stay in a
   // sensible order for the rare casual bowler who turns tracking up.
   casual: [
-    "headlineStats", "runningAverages", "gameByGame",
-    "scoreDistribution", "consistency", "progress", "theoreticalAverage",
-    "cleanFrames", "tenPinLeaves", "singlePinSpares", "splits",
-    "nonSplitLeaves", "loneFivePin", "firstBallAverage", "framePosition",
-    "strikeStreak", "strikeQuality", "byBall", "byCenter",
-    "releaseQuality", "missDistribution", "ballChangeTriggers",
-    "seasonRecord", "weeklyPoints", "teamSeries", "teamLeaderboard",
-    "headToHead", "giantKiller", "hung", "handicapImpact", "teamRecords",
-    "money", "threeSixNine",
+    "headlineStats", "runningAverages", "gameByGame", "scoreDistribution",
+    "consistency", "progress", "theoreticalAverage", "cleanFrames",
+    "tenPinLeaves", "singlePinSpares", "splits", "nonSplitLeaves",
+    "loneFivePin", "firstBallAverage", "framePosition", "strikeStreak",
+    "strikeQuality", "byBall", "byCenter", "releaseQuality",
+    "missDistribution", "ballChangeTriggers", "seasonRecord", "weeklyPoints",
+    "teamSeries", "teamLeaderboard", "headToHead", "giantKiller",
+    "hung", "handicapImpact", "teamRecords", "money",
+    "threeSixNine",
   ],
 };
 

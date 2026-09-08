@@ -230,6 +230,12 @@ export function pinsForNextSession(sessions,bowler,league,gamesPerSession=3){
 
   return{
     current,
+    // The real, unrounded average. Truncation is correct -- that IS how a
+    // bowling average is quoted -- but showing only "196 (rounded down)"
+    // made the pin count look arbitrary: at a true 196.98 the jump to 197
+    // is small, at 196.02 it's large, and both displayed as 196. Exposing
+    // the exact figure is what makes the number below it make sense.
+    exact:pins/games,
     games,
     gamesPerSession,
     toGain,
