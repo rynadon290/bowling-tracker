@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults, pinsForNextSession } from './stats.js';
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults, pinsForNextSession,
+  isCompetitiveSession,
+} from './stats.js';
 
 describe('bowlerHighGame', () => {
   const sessions = [
@@ -534,5 +536,39 @@ describe('pinsForNextSession', () => {
 
   it('returns null when there is no history to compute from', () => {
     expect(pinsForNextSession([], 'Ryan', 'Thursday House Shot')).toBeNull();
+  });
+});
+
+// Practice and casual are stored as sessions, which is right for history
+// and wrong for "what do I average" -- every bowler means that
+// competitively. A 200 league average read as 146 once practice games
+// were mixed in, and got worse the more someone practised.
+describe('practice and casual do not pollute competitive averages', () => {
+  const sessions = [
+    { bowler: 'R', league: 'Tuesday House Shot', date: '2026-09-01', scores: [200, 210, 190] },
+    { bowler: 'R', league: 'Practice', date: '2026-09-02', scores: [120, 130, 125] },
+    { bowler: 'R', league: 'Practice\u00b7user-abc', date: '2026-09-04', scores: [110, 115] },
+    { bowler: 'R', league: 'Casual', date: '2026-09-03', scores: [95, 100] },
+  ];
+
+  it('excludes them from the composite average', () => {
+    expect(cAvg(sessions, 'R', null)).toBe(200);
+  });
+
+  it('excludes per-user practice leagues too', () => {
+    expect(isCompetitiveSession({ league: 'Practice\u00b7user-abc' })).toBe(false);
+    expect(isCompetitiveSession({ league: 'Tuesday House Shot' })).toBe(true);
+  });
+
+  it('excludes them from per-game averages and score distributions', () => {
+    expect(gameAvg(sessions, 'R', 0, null)).toBe(200);
+    expect(scoreValues(sessions, 'R', null)).toHaveLength(3);
+  });
+
+  // Asking for practice on purpose must still work -- this is a default,
+  // not a ban.
+  it('still returns practice when practice is asked for explicitly', () => {
+    expect(cAvg(sessions, 'R', 'Practice')).toBe(125);
+    expect(gameAvg(sessions, 'R', 0, 'Practice')).toBe(120);
   });
 });

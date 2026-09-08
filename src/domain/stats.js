@@ -1,3 +1,24 @@
+// Sessions that should never count toward a COMPETITIVE average.
+//
+// Practice and casual are stored as sessions like any other night, under
+// their own container leagues. That's right for history -- you want to
+// see them -- but wrong for "what do I average", which every bowler
+// means competitively. Without this, a 200 league average read as 146
+// once practice games were mixed in, and the number silently got worse
+// the more someone practised. Punishing practice is precisely backwards.
+//
+// Passing an explicit league still filters to exactly that league, so
+// asking for the practice average on purpose still works.
+const NON_COMPETITIVE_LEAGUES = new Set(["Practice", "Casual"]);
+
+export function isCompetitiveSession(s) {
+  if (!s) return false;
+  const name = String(s.league || "");
+  // Per-user practice leagues are stored as "Practice·<user id>".
+  if (name.startsWith("Practice\u00b7")) return false;
+  return !NON_COMPETITIVE_LEAGUES.has(name);
+}
+
 // Every exported function here runs during render, so a bad argument is a
 // white screen rather than a caught error. `arr()` coerces anything that
 // isn't an array to an empty one -- corrupted or old-format persisted data
@@ -106,7 +127,8 @@ export function weeklyPointsData(matches,league){
 // game of the night) across every session on file, optionally scoped to
 // one league. bowler="" or omitted pools every bowler together.
 export function gameAvg(sessions,bowler,gameIdx,league){
-  const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true));
+  const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
+    &&(league?s.league===league:isCompetitiveSession(s)));
   const vals=ls.map(s=>s.scores[gameIdx]).filter(v=>v!=null);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
@@ -145,7 +167,8 @@ export function rAvg(sessions,bowler,league){
 // rAvg in that case, but also supports the no-league "combined" view rAvg
 // doesn't).
 export function cAvg(sessions,bowler,league){
-  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
+    &&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
   if(!all.length)return null;
   return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
 }
@@ -155,7 +178,8 @@ export function cAvg(sessions,bowler,league){
 // the raw (unrounded) average, and a 0-100% progress figure through the
 // current 5-pin band, for a progress-bar-style display.
 export function avgProgress(sessions,bowler,league){
-  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
+    &&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
   if(!all.length)return null;
   const raw=all.reduce((a,b)=>a+b,0)/all.length;
   const current=Math.trunc(raw);
@@ -185,7 +209,8 @@ export function avgProgress(sessions,bowler,league){
 // `gainAchievable`/`dropAchievable` rather than displaying an impossible
 // target as if it were in reach.
 export function pinsForNextSession(sessions,bowler,league,gamesPerSession=3){
-  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&(league?s.league===league:true)).flatMap(s=>s.scores);
+  const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
+    &&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
   if(!all.length)return null;
 
   const games=all.length;
@@ -304,8 +329,8 @@ export function beatHighBowlerStats(sessions,league){
 // a whole team's summed total was never a fair comparison in the first
 // place, so that case intentionally uses team totals instead of raw scores.
 export function scoreValues(sessions,bowler,league,pooled){
-  if(bowler)return arr(sessions).filter(s=>s.bowler===bowler&&(league?s.league===league:true)).flatMap(s=>s.scores);
-  if(pooled)return arr(sessions).filter(s=>league?s.league===league:true).flatMap(s=>s.scores);
+  if(bowler)return arr(sessions).filter(s=>s.bowler===bowler&&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
+  if(pooled)return arr(sessions).filter(s=>league?s.league===league:isCompetitiveSession(s)).flatMap(s=>s.scores);
   return teamDateGroups(sessions,league).flatMap(g=>g.gameTotals.filter(v=>v!=null));
 }
 
