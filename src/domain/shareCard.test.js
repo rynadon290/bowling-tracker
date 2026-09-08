@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { shareText, shareTitle, drawShareCard, APP_URL,
   drawTrendCard,
   trendShareText,
+  drawShareQr,
 } from './shareCard.js';
 import { APP_NAME } from '../constants.js';
 
@@ -171,5 +172,46 @@ describe('trend share card', () => {
     expect(t).toContain('high');
     expect(t).toContain('low');
     expect(t).not.toContain('9825');
+  });
+});
+
+// The trend card was missing the url -- mark and name were drawn, but a
+// screenshot said what app made it, not where to get it.
+describe('trend card attribution', () => {
+  function fakeCtx() {
+    const calls = [];
+    return { calls,
+      fillRect() {}, fillText(t) { calls.push(String(t)); },
+      beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {},
+      set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
+      set lineCap(v) {}, set lineJoin(v) {}, set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {},
+    };
+  }
+  it('draws the app name AND the url, matching the score card', () => {
+    const ctx = fakeCtx();
+    drawTrendCard(ctx, { label: 'Average', points: [{ value: 200 }, { value: 210 }] });
+    expect(ctx.calls).toContain(APP_NAME);
+    expect(ctx.calls.some(t => APP_URL.includes(t) && t.length > 5)).toBe(true);
+  });
+});
+
+describe('share QR code', () => {
+  it('draws the app url as a scannable code when a generator is available', async () => {
+    const calls = [];
+    const ctx = { fillRect() { calls.push('rect'); }, drawImage() { calls.push('image'); }, set fillStyle(v) {} };
+    global.Image = class { set src(v) { this.onload?.(); } };
+    const QRCode = { toDataURL: async () => 'data:image/png;base64,x' };
+    const ok = await drawShareQr(ctx, 10, 10, 100, QRCode);
+    expect(ok).toBe(true);
+    expect(calls).toContain('image');
+  });
+
+  it('fails quietly with no generator, rather than throwing', async () => {
+    expect(await drawShareQr({}, 0, 0, 100, null)).toBe(false);
+  });
+
+  it('fails quietly when generation itself throws', async () => {
+    const QRCode = { toDataURL: async () => { throw new Error('offline'); } };
+    expect(await drawShareQr({ fillRect(){}, set fillStyle(v){} }, 0, 0, 100, QRCode)).toBe(false);
   });
 });

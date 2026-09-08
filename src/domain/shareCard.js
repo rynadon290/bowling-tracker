@@ -314,10 +314,16 @@ export function drawTrendCard(ctx, { bowler, label, points, league, colors, font
   ctx.font = `500 28px ${fonts?.body || "system-ui, sans-serif"}`;
   ctx.fillText(`${vals.length} games`, 80, 934);
 
-  drawArrowMark(ctx, 80, 990, 38, c.accent || "#E8A33D");
+  // Mark, name AND url -- the score card already had all three; this
+  // card was missing the url, so a screenshot of it said what app made
+  // it but not where to get it.
+  drawArrowMark(ctx, 80, 985, 34, c.accent || "#E8A33D");
   ctx.fillStyle = c.accent || "#E8A33D";
-  ctx.font = `700 36px ${fonts?.display || "system-ui, sans-serif"}`;
-  ctx.fillText(APP_NAME, 134, 1000);
+  ctx.font = `700 34px ${fonts?.display || "system-ui, sans-serif"}`;
+  ctx.fillText(APP_NAME, 128, 978);
+  ctx.fillStyle = c.textMuted || "#9A8F80";
+  ctx.font = `500 26px ${fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText(APP_URL.replace(/^https?:\/\//, ""), 128, 1015);
 
   return true;
 }
@@ -337,4 +343,36 @@ export function trendShareText({ bowler, label, points, league } = {}) {
     "",
     `Tracked with ${APP_NAME} — ${APP_URL}`,
   ].join("\n");
+}
+
+// ── QR code, for a card that gets printed or just looked at ─────────────
+//
+// The url text works when the card is viewed on a phone -- someone can
+// read it and type it in. It does nothing for a screenshot posted to
+// Instagram, a photo of a phone screen, or a printed scoresheet pinned to
+// a league board. A QR code is tappable from a photo of a photo.
+//
+// Optional and drawn last, so it's additive to the mark+name+url that
+// already carry attribution -- if the QR can't be generated (offline, the
+// qrcode package unavailable) the card still says where it came from.
+export async function drawShareQr(ctx, x, y, size, QRCode) {
+  if (!ctx || !QRCode) return false;
+  try {
+    const dataUrl = await QRCode.toDataURL(APP_URL, { width: size, margin: 0 });
+    const img = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = dataUrl;
+    });
+    // A small quiet plate behind it: a QR code needs contrast to scan,
+    // and it's drawn near the accent-colored wordmark, not guaranteed
+    // to sit on the plain background.
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(x - 8, y - 8, size + 16, size + 16);
+    ctx.drawImage(img, x, y, size, size);
+    return true;
+  } catch {
+    return false;
+  }
 }
