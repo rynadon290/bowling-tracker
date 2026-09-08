@@ -416,7 +416,11 @@ export default function LogView({
 
             {/* Importing a scorecard has nothing to do with a drill -- a drill
                 isn't a game and produces no scorecard. */}
-            {!editingId&&activeBowler&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
+            {/* Hidden in league until a league is chosen: an imported
+                scorecard is filed against (bowler, league, date) like any
+                other score, so importing first would have nowhere to put
+                it. leagueReady is true immediately everywhere else. */}
+            {!editingId&&activeBowler&&leagueReady&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
               <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
                 📷 Import Scorecard
               </button>
@@ -877,7 +881,15 @@ export default function LogView({
               </div>
               {!editingId&&(
                 <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                  {activeBowler||"No bowler selected"}{sessionLeague?` — ${sessionLeague.replace(" House Shot","")}, ${formatDate(sessionDate)}`:" — pick a league above"}
+                  {/* effectiveSessionLeague, not sessionLeague: practice and
+                      casual have a container league rather than one you
+                      pick, so keying off sessionLeague told a practice
+                      bowler to "pick a league above" -- something that
+                      doesn't exist in that mode. */}
+                  {activeBowler||"No bowler selected"}
+                  {effectiveSessionLeague
+                    ? ` — ${effectiveSessionLeague.replace(" House Shot","")}, ${formatDate(sessionDate)}`
+                    : preferences.environment==="league" ? " — pick a league above" : ` — ${formatDate(sessionDate)}`}
                 </div>
               )}
               {editingId&&(
