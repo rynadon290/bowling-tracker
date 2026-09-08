@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, F } from "./ui.jsx";
-import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText } from "./domain/shareCard.js";
+import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText, drawShareQr } from "./domain/shareCard.js";
 
 // One tap to share a night's scores.
 //
@@ -26,6 +26,13 @@ async function renderCardBlob(summary) {
     // card instead of the score card.
     if (summary?.trend) drawTrendCard(ctx, { ...summary, colors: C, fonts: F });
     else drawShareCard(ctx, { ...summary, colors: C, fonts: F });
+    // Additive: mark+name+url are already drawn above, so a QR that
+    // fails to load (offline, package unavailable) still leaves a card
+    // that says where it came from -- it just can't be scanned.
+    try {
+      const { default: QRCode } = await import("qrcode");
+      await drawShareQr(ctx, 900, summary?.trend ? 940 : 890, 130, QRCode);
+    } catch {}
     return await new Promise(res => canvas.toBlob(res, "image/png"));
   } catch {
     return null;
