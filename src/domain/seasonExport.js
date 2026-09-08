@@ -1,3 +1,8 @@
+
+// Money fields are per-game triples, not a single winnings array.
+function sum3(v) {
+  return (Array.isArray(v) ? v : []).reduce((a, b) => a + (Number(b) || 0), 0);
+}
 // Season summary and export.
 //
 // Both exist because a season's worth of logging deserves to leave the app:
@@ -24,7 +29,11 @@ export function sessionsToCsv(sessions, bowler) {
     .filter(s => !bowler || s.bowler === bowler)
     .map(s => {
       const scores = s.scores || [];
-      const poker = (s.pokerWinnings || []).reduce((a, b) => a + (Number(b) || 0), 0);
+      // s.pokerWinnings does not exist. The real fields are pokerQuarter
+      // and pokerDollar -- so every season export has been reporting $0
+      // of poker winnings while correctly subtracting the poker COSTS,
+      // making every export look like a season-long loss.
+      const poker = sum3(s.pokerQuarter) + sum3(s.pokerDollar);
       const highGame = (s.highGameWinnings || []).reduce((a, b) => a + (Number(b) || 0), 0);
       const costs = [
         ...(s.pokerQuarterCost || []), ...(s.pokerDollarCost || []),
@@ -84,7 +93,7 @@ export function seasonSummary(sessions, shots, bowler, league) {
   const spareMade = spareAtt.filter(s => s.spareMade === "Yes").length;
 
   const won = mine.reduce((a, s) =>
-    a + (s.pokerWinnings || []).reduce((x, y) => x + (Number(y) || 0), 0)
+    a + sum3(s.pokerQuarter) + sum3(s.pokerDollar)
       + (s.highGameWinnings || []).reduce((x, y) => x + (Number(y) || 0), 0), 0);
   const paid = mine.reduce((a, s) =>
     a + [...(s.pokerQuarterCost || []), ...(s.pokerDollarCost || []), ...(s.highGameCost || []), s.threeSixNineCost]
