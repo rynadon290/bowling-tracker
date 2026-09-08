@@ -131,11 +131,59 @@ Repeat bowlerName and lineupPosition on EVERY game belonging to that bowler -- n
 
 Respond with valid JSON matching the provided schema exactly. If a screenshot shows partial or cut-off games, only include complete frames you can actually read clearly from the pin-deck graphic -- do not guess or fabricate a frame or ball you can't clearly see.`;
 
-Deno.serve(async (req) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+// Per-user ceiling. This is the most expensive of the three functions --
+// up to six images through a vision model per call -- so it gets the
+// tightest limit. Auth already stops a stranger; this stops one account
+// looping.
+//
+// Fails OPEN: a broken rate limiter should degrade to "no limit", not
+// "nobody can import". Auth is the security boundary; this is cost control.
+async function withinRateLimit(req, endpoint, limit, windowInterval) {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_ANON_KEY"),
+      { global: { headers: { Authorization: req.headers.get("Authorization") } } },
+    );
+    const { data, error } = await supabase.rpc("check_api_rate_limit", {
+      p_endpoint: endpoint, p_limit: limit, p_window: windowInterval,
+    });
+    if (error) return true;
+    return data !== false;
+  } catch {
+    return true;
+  }
+}
+
+// Allowed origins, rather than "*".
+//
+// Auth is the real boundary -- a stranger's browser now gets a 401 -- but
+// "*" lets any site on the internet make credentialed calls to these
+// endpoints from a victim's browser, and these three spend money against
+// external API keys. Pinning the origin is cheap defence in depth.
+//
+// ALLOWED_ORIGINS is a comma-separated env var so the origin can change
+// (custom domain, preview deploys) without a code change. If it isn't set
+// the function falls back to "*" -- deliberately, so an unconfigured
+// deploy keeps working rather than locking every request out; set it in
+// production.
+function corsFor(req) {
+  const configured = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const origin = req.headers.get("Origin") || "";
+  const allow = configured.length === 0
+    ? "*"
+    : (configured.includes(origin) ? origin : configured[0]);
+  return {
+    "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    // Tells caches the response varies per origin, so a permissive cached
+    // response can't be served to a different site.
+    "Vary": "Origin",
   };
+}
+
+Deno.serve(async (req) => {
+  const corsHeaders = corsFor(req);
 
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -173,6 +221,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (!(await withinRateLimit(req, "import-scorecard", 20, "1 hour"))) {
+      return new Response(JSON.stringify({
+        error: "You've imported a lot in the last hour. Give it a little while and try again.",
+      }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { images } = await req.json();
     // images: array of { base64: string, mimeType: string } -- one entry per uploaded screenshot
     if (!Array.isArray(images) || !images.length) {
@@ -186,6 +240,45 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Size limits enforced HERE, not just in the client.
+    //
+    // The app downscales before uploading, but that's a courtesy to the
+    // bowler's data plan, not a control -- nothing stops a caller skipping
+    // the client and POSTing a 200MB body straight at this function, which
+    // would then forward it to Gemini and bill for it.
+    //
+    // 8MB per image and 20MB total: comfortably above a downscaled
+    // 1600px photo, far below anything worth paying to process.
+    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+
+    let totalBytes = 0;
+    for (const img of images) {
+      if (typeof img?.base64 !== "string" || !img.base64) {
+        return new Response(JSON.stringify({ error: "One of the images was empty or malformed." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const type = (img.mimeType || "image/jpeg").toLowerCase();
+      if (!ALLOWED_TYPES.includes(type)) {
+        return new Response(JSON.stringify({ error: `Unsupported image type: ${type}` }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      // base64 encodes 3 bytes as 4 characters, so decoded size is ~3/4
+      // of the string length. Measured on the string to avoid decoding a
+      // huge payload just to find out it's too big.
+      const bytes = Math.floor(img.base64.length * 0.75);
+      if (bytes > MAX_IMAGE_BYTES) {
+        return new Response(JSON.stringify({ error: "One of the images is too large. Try a smaller photo." }), {
+          status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      totalBytes += bytes;
+    }
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      return new Response(JSON.stringify({ error: "Those images come to too much to send at once. Try fewer at a time." }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const parts = [
@@ -244,8 +337,12 @@ Deno.serve(async (req) => {
         error: "Gemini API error",
         reason,
         upstreamStatus: status,
+        // Raw upstream text is useful while developing and is not
+        // something to expose indefinitely on a public endpoint -- it can
+        // carry internal quota details and request identifiers. The
+        // `reason` above is what the client actually branches on.
         retries,
-        detail: lastErrText,
+        detail: Deno.env.get("EXPOSE_UPSTREAM_ERRORS") === "true" ? lastErrText : undefined,
       }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
