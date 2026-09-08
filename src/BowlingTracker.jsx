@@ -487,7 +487,14 @@ export default function BowlingTracker(){
   const[filterBall,setFilterBall]=useState("");
   const[filterResult,setFilterResult]=useState("");
   const[filterBowler,setFilterBowler]=useState("");
-  const[statsBowler,setStatsBowler]=useState("");
+  // Stats opens on YOUR numbers, not the team's.
+  //
+  // isTeamView is `!statsBowler && bowlers.length > 1`, so an empty
+  // default meant anyone with a team set up landed on team stats -- and
+  // the Stats tab is overwhelmingly opened to check your own game. The
+  // team is one tap away and still fully available; it just isn't the
+  // thing you have to navigate away from.
+  const[statsBowler,setStatsBowler]=useState(displayName||"");
   const[compareBowler,setCompareBowler]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
   const[compareLeague,setCompareLeague]=useState("");
@@ -3174,6 +3181,19 @@ export default function BowlingTracker(){
       updatePreferences(prev=>applyEnvironment(prev,routine.mode));
     }
   },[showSessionStart,routine.mode,preferences.environment]);
+
+  // displayName loads asynchronously from the profile, so the useState
+  // initialiser above sees "" on first render and never re-runs. This
+  // fills it in when it arrives -- but only if the bowler hasn't already
+  // picked someone, so it never overrides a deliberate choice or snaps
+  // back while they're looking at a teammate.
+  const statsBowlerDefaulted=useRef(false);
+  useEffect(()=>{
+    if(statsBowlerDefaulted.current)return;
+    if(!displayName)return;
+    statsBowlerDefaulted.current=true;
+    setStatsBowler(prev=>prev||displayName);
+  },[displayName]);
 
   const activeBowlerProfile=normalizeProfile(profiles[activeBowler],activeBowler);
   const bookAverageCheck=needsBookAverageUpdate(
