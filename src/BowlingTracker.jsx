@@ -3296,7 +3296,17 @@ export default function BowlingTracker(){
     async function analyzePerformance(payload){
     try{
       const{data,error}=await supabase.functions.invoke("analyze-performance",{body:{payload}});
-      if(error)return{error:error.message||"Analysis failed."};
+      if(error){
+        // "Failed to send a request to the Edge Function" means the
+        // request never reached Supabase at all -- the function isn't
+        // deployed, failed to boot, or the phone is offline. That string
+        // tells a bowler nothing they can act on, so translate it.
+        const raw=error.message||"";
+        if(/failed to send a request|failed to fetch|networkerror/i.test(raw)){
+          return{error:"Couldn't reach the analysis service. If you're online and this keeps happening, it needs redeploying."};
+        }
+        return{error:raw||"Analysis failed."};
+      }
       if(data?.error)return{error:data.error};
       return data;
     }catch(e){return{error:e.message||"Couldn't generate insights right now."};}
