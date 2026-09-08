@@ -62,8 +62,16 @@ export default function CenterPicker({ leagueName, currentCenter, onSelect, onSe
         </div>
       ) : (
         <>
+          {/* Practice and Casual are container "leagues", not real ones, so
+              the league phrasing reads as if Practice were a person --
+              "Where does Practice bowl?". Same question, asked the way it
+              makes sense for each. */}
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-            Where does {leagueName || "this league"} bowl? Set once per season — it lets you compare how you score house to house.
+            {leagueName === "Practice"
+              ? "Where do you usually practice? Setting it lets you compare how you score house to house."
+              : leagueName === "Casual"
+                ? "Where do you usually bowl for fun? Setting it lets you compare how you score house to house."
+                : `Where does ${leagueName || "this league"} bowl? Set once per season — it lets you compare how you score house to house.`}
           </div>
 
           <input style={S.input} placeholder="Search by name, e.g. Arsenal Bowl"
