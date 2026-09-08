@@ -95,7 +95,12 @@ function buildStyles() { return {
   shotCard:{backgroundColor:C.card,borderRadius:"12px",padding:"12px",marginBottom:"8px",display:"flex",gap:"12px",alignItems:"flex-start"},
   dot:(r)=>({width:"32px",height:"32px",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:700,flexShrink:0,backgroundColor:r==="Strike"?C.strike+"22":r?.includes("10")?C.miss+"22":C.spare+"22",color:r==="Strike"?C.strike:r?.includes("10")?C.miss:C.spare}),
   tag:(c)=>({display:"inline-block",padding:"3px 9px",borderRadius:"10px",fontSize:"12px",fontWeight:500,backgroundColor:(c||C.accent)+"22",color:c||C.accent,marginRight:"4px",marginBottom:"4px"}),
-  statBox:{backgroundColor:C.surface,borderRadius:"12px",padding:"12px 10px",textAlign:"center",flex:1},
+  // Peer groups (Shots/Strike%/Spare%, Game 1/2/3) still use boxes -- those
+  // ARE equals, so a row of them is the right shape. But they were filled
+  // surface panels while every redesigned card sits flat on the card
+  // background, so they read as a different component. Same tone as the
+  // cards around them, separated by a hairline instead of a fill.
+  statBox:{backgroundColor:"transparent",borderRadius:"12px",padding:"10px 8px",textAlign:"center",flex:1,border:`1px solid ${C.border}`},
   // Numbers are the point. Condensed, big, in the text colour -- accent
   // is reserved for the one number on a screen that matters most, not
   // sprayed across every stat so that none of them stands out.

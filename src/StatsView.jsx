@@ -42,6 +42,19 @@ export default function StatsView({
   // opponent somewhere below fifteen cards about you. The saved order
   // still governs everything else, and is untouched when no comparison
   // is running.
+  // The team chips are labelled `${league} Team`, built from the bowler's
+  // actual leagues -- so hardcoding "Tuesday Team or Thursday Team" was
+  // wrong for anyone whose leagues aren't named that. Build the prompt
+  // from the same source the chips use.
+  const teamChoiceNames = (leagues || [])
+    .filter(l => l !== PRACTICE_SESSION_KEY)
+    .map(l => `"${l.replace(" House Shot", "")} Team"`);
+  const pickATeam = teamChoiceNames.length === 0
+    ? "Pick a league above"
+    : teamChoiceNames.length === 1
+      ? `Select ${teamChoiceNames[0]} above`
+      : `Select ${teamChoiceNames.slice(0, -1).join(", ")} or ${teamChoiceNames[teamChoiceNames.length - 1]} above`;
+
   const baseOrder = ["viewing", ...visibleStatsCardOrder(preferences)];
   const comparing = !!compareBowler || isTeamView;
   const renderOrder = comparing
@@ -176,7 +189,7 @@ showTeamCompare&&(()=>{
                     return(
                       <div style={S.card}>
                         <div style={S.label}>Team Records</div>
-                        <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — high game/series need one specific roster, since combining different-sized teams would unfairly favor whichever has more bowlers.</div>
+                        <div style={{fontSize:"12px",color:C.textMuted}}>{pickATeam} to see this — high game/series need one specific roster, since combining different-sized teams would unfairly favor whichever has more bowlers.</div>
                       </div>
                     );
                   }
@@ -252,7 +265,7 @@ showTeamCompare&&(()=>{
                     return(
                       <div style={S.card}>
                         <div style={S.label}>Handicap Impact</div>
-                        <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — "the team" needs to mean one specific roster, not Tuesday and Thursday's matches blended together.</div>
+                        <div style={{fontSize:"12px",color:C.textMuted}}>{pickATeam} to see this — "the team" needs to mean one specific roster, not several leagues' matches blended together.</div>
                       </div>
                     );
                   }
@@ -329,7 +342,7 @@ showTeamCompare&&(()=>{
                   if(!statsLeague)return(
                     <div style={S.card}>
                       <div style={S.label}>Giant Killer</div>
-                      <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — it needs a specific roster to know who's on top.</div>
+                      <div style={{fontSize:"12px",color:C.textMuted}}>{pickATeam} to see this — it needs a specific roster to know who's on top.</div>
                     </div>
                   );
                   const tally=beatHighBowlerStats(sessions,statsLeague);
@@ -372,7 +385,7 @@ showTeamCompare&&(()=>{
                   if(!statsLeague)return(
                     <div style={S.card}>
                       <div style={S.label}>🎣 Hung</div>
-                      <div style={{fontSize:"12px",color:C.textMuted}}>Select "Tuesday Team" or "Thursday Team" above to see this — it needs a specific roster to know who else was bowling that frame.</div>
+                      <div style={{fontSize:"12px",color:C.textMuted}}>{pickATeam} to see this — it needs a specific roster to know who else was bowling that frame.</div>
                     </div>
                   );
                   const counts=hungCounts(shots,statsLeague);
@@ -906,7 +919,7 @@ sessions.length>0&&(()=>{
                             <div style={S.divider}/>
                             <div style={S.label}>Next Session ({next.gamesPerSession} Games)</div>
                             <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                              Average currently reads {next.current} (rounded down). Here's what the next set does to it.
+                              You're averaging {next.exact!=null?next.exact.toFixed(2):next.current} across {next.games} games. Here's what the next set does to it.
                             </div>
                             {/* A gain/drop pair reads better as two rows than
                                 two boxes -- the labels are sentences, and
