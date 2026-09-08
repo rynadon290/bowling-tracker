@@ -125,16 +125,102 @@ export function shouldShowLaunchPrompt(options) {
 // arbitrary.
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function describeUsualNights(sessions, bowler, today = new Date()) {
+const MODE_NAMES = { league: "league", practice: "practice", tournament: "a tournament", casual: "just for fun" };
+
+export function describeUsualNights(sessions, bowler, today = new Date(), tournaments = []) {
   const usual = [...usualNights(sessions, bowler, today)].sort((a, b) => a - b);
   if (!usual.length) {
     return "Not enough history yet — you'll be asked once a day until a pattern shows up.";
   }
-  const names = usual.map(d => DAY_NAMES[d]);
-  const list = names.length === 1
-    ? names[0]
-    : names.length === 2
-      ? `${names[0]} and ${names[1]}`
-      : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-  return `You usually bowl ${list}. You won't be asked on those days.`;
+  // Naming the MODE, not just the day, so the bowler can see what the app
+  // will set for them and correct it if the guess is wrong. "You won't be
+  // asked on Tuesdays" is unnerving without saying what happens instead.
+  const parts = usual.map(d => {
+    const mode = usualModeFor(sessions, tournaments, bowler, d, today);
+    return mode ? `${DAY_NAMES[d]}s (${MODE_NAMES[mode] || mode})` : `${DAY_NAMES[d]}s`;
+  });
+  const list = parts.length === 1
+    ? parts[0]
+    : parts.length === 2
+      ? `${parts[0]} and ${parts[1]}`
+      : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+  return `You usually bowl ${list}. The app sets itself up for you on those days instead of asking.`;
+}
+
+// ── Which MODE, not just which night ────────────────────────────────────
+//
+// usualNights answers "does this bowler bowl on Tuesdays". It does not
+// answer "does Tuesday mean league", and that gap had a real cost: the
+// prompt goes quiet on an established night, so a bowler who set
+// Tournament on Saturday arrived at Tuesday league night still in
+// tournament mode, with nothing asking and -- since the mode moved out of
+// Settings onto the prompt -- nowhere obvious to fix it.
+//
+// So: learn the mode per weekday too, and pre-set it.
+//
+// Environment is derived from the session's league rather than stored on
+// it. Practice and casual have container leagues with known names;
+// anything else is a real league. Tournaments live in their own table, so
+// they're passed in separately rather than inferred.
+export function environmentOfSession(s) {
+  const name = String(s?.league || "");
+  if (name === "Casual") return "casual";
+  if (name === "Practice" || name.startsWith("Practice\u00b7")) return "practice";
+  return "league";
+}
+
+// The mode this bowler usually bowls on a given weekday, or null when
+// there's no clear pattern.
+//
+// Requires the same evidence bar as usualNights (3 distinct dates) AND a
+// clear majority -- if someone's Saturdays are half practice and half
+// tournament, guessing wrong is worse than asking. Counts distinct dates,
+// not sessions, for the same reason usualNights does.
+export function usualModeFor(sessions, tournaments, bowler, weekday, today = new Date()) {
+  const cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  cutoff.setDate(cutoff.getDate() - USUAL_NIGHT_LOOKBACK_DAYS);
+
+  const datesByMode = new Map();
+  const note = (mode, dateStr) => {
+    if (!datesByMode.has(mode)) datesByMode.set(mode, new Set());
+    datesByMode.get(mode).add(dateStr);
+  };
+
+  for (const s of (Array.isArray(sessions) ? sessions : [])) {
+    if (!s) continue;
+    if (bowler && s.bowler && s.bowler !== bowler) continue;
+    const d = parseLocalDate(s.date);
+    if (!d || d < cutoff || d > today || d.getDay() !== weekday) continue;
+    note(environmentOfSession(s), s.date);
+  }
+  for (const t of (Array.isArray(tournaments) ? tournaments : [])) {
+    if (!t) continue;
+    if (bowler && t.bowler && t.bowler !== bowler) continue;
+    // A tournament's days are its own list of dates.
+    for (const day of (Array.isArray(t.days) ? t.days : [])) {
+      const dateStr = day?.date || day;
+      const d = parseLocalDate(dateStr);
+      if (!d || d < cutoff || d > today || d.getDay() !== weekday) continue;
+      note("tournament", dateStr);
+    }
+  }
+
+  let best = null, bestCount = 0, total = 0;
+  for (const [mode, dates] of datesByMode) {
+    total += dates.size;
+    if (dates.size > bestCount) { best = mode; bestCount = dates.size; }
+  }
+
+  if (bestCount < USUAL_NIGHT_MIN_SESSIONS) return null;
+  // Clear majority, not just a plurality: a 3-2 split is a coin flip.
+  if (bestCount / total < 0.6) return null;
+  return best;
+}
+
+// Everything the Bowl tab needs on open: is there a routine for today,
+// and if so what is it.
+export function todaysRoutine(sessions, tournaments, bowler, today = new Date()) {
+  const weekday = today.getDay();
+  const mode = usualModeFor(sessions, tournaments, bowler, weekday, today);
+  return { weekday, mode, isUsual: usualNights(sessions, bowler, today).has(weekday) };
 }

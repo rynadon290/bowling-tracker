@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseLocalDate, weekdayOf, usualNights, shouldShowLaunchPrompt, describeUsualNights,
+  usualModeFor,
+  environmentOfSession,
+  todaysRoutine,
 } from './launchPrompt.js';
 
 // Tuesdays in June 2026: 2, 9, 16, 23, 30
@@ -108,5 +111,69 @@ describe('explaining the behaviour in Settings', () => {
       ...['2026-06-06', '2026-06-13', '2026-06-20'].map(d => ({ bowler: 'Ryan', date: d })),
     ];
     expect(describeUsualNights(many, 'Ryan', TUE)).toContain(', and');
+  });
+});
+
+// usualNights answers "does this bowler bowl Tuesdays". It never answered
+// "does Tuesday mean league" -- and once mode moved onto the prompt, and
+// the prompt goes quiet on established nights, that gap meant arriving at
+// league night still in whatever mode you last picked.
+describe('which mode, not just which night', () => {
+  const sessions = [
+    { bowler: 'R', league: 'Tuesday House Shot', date: '2026-08-04' },
+    { bowler: 'R', league: 'Tuesday House Shot', date: '2026-08-11' },
+    { bowler: 'R', league: 'Tuesday House Shot', date: '2026-08-18' },
+    { bowler: 'R', league: 'Practice', date: '2026-08-06' },
+    { bowler: 'R', league: 'Practice', date: '2026-08-13' },
+    { bowler: 'R', league: 'Practice', date: '2026-08-20' },
+  ];
+  const tuesday = new Date(2026, 7, 25);
+
+  it('learns the mode per weekday', () => {
+    expect(usualModeFor(sessions, [], 'R', 2, tuesday)).toBe('league');
+    expect(usualModeFor(sessions, [], 'R', 4, tuesday)).toBe('practice');
+  });
+
+  it('derives the environment from the container league', () => {
+    expect(environmentOfSession({ league: 'Practice' })).toBe('practice');
+    expect(environmentOfSession({ league: 'Practice\u00b7user-1' })).toBe('practice');
+    expect(environmentOfSession({ league: 'Casual' })).toBe('casual');
+    expect(environmentOfSession({ league: 'Tuesday House Shot' })).toBe('league');
+  });
+
+  it('counts tournaments, which live in their own table', () => {
+    const t = [{ bowler: 'R', days: [{ date: '2026-08-01' }, { date: '2026-08-08' }, { date: '2026-08-15' }] }];
+    expect(usualModeFor([], t, 'R', 6, new Date(2026, 7, 29))).toBe('tournament');
+  });
+
+  // Guessing wrong is worse than asking, so the bar is a clear majority.
+  it('refuses to guess when the day is split', () => {
+    const mixed = [
+      { bowler: 'R', league: 'Practice', date: '2026-08-01' },
+      { bowler: 'R', league: 'Practice', date: '2026-08-08' },
+      { bowler: 'R', league: 'Practice', date: '2026-08-15' },
+      { bowler: 'R', league: 'Casual', date: '2026-08-22' },
+      { bowler: 'R', league: 'Casual', date: '2026-07-25' },
+      { bowler: 'R', league: 'Casual', date: '2026-07-18' },
+    ];
+    expect(usualModeFor(mixed, [], 'R', 6, new Date(2026, 7, 29))).toBeNull();
+  });
+
+  it('refuses to guess on thin evidence', () => {
+    const thin = [
+      { bowler: 'R', league: 'Practice', date: '2026-08-01' },
+      { bowler: 'R', league: 'Practice', date: '2026-08-08' },
+    ];
+    expect(usualModeFor(thin, [], 'R', 6, new Date(2026, 7, 29))).toBeNull();
+  });
+
+  it('reports the routine for today', () => {
+    expect(todaysRoutine(sessions, [], 'R', tuesday)).toEqual({ weekday: 2, mode: 'league', isUsual: true });
+  });
+
+  // Telling someone "you won't be asked on Tuesdays" without saying what
+  // happens instead is unnerving.
+  it('names the mode in the explanation', () => {
+    expect(describeUsualNights(sessions, 'R', tuesday, [])).toContain('Tuesdays (league)');
   });
 });
