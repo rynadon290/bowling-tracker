@@ -26,7 +26,7 @@ export default function LogView({
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
-  stepPinCount, submitSession, submitShot, theoreticalScoreForGame, toggle, toggleMulti, toggleSection,
+  stepPinCount, submitSession, submitShot, theoreticalScoreForGame, maxScoreThisGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
   activeTournament, updateTournament, saveTournament, tournamentSaved,
@@ -496,7 +496,18 @@ export default function LogView({
                     <div className="num" style={{fontSize:"56px",lineHeight:0.9,fontWeight:700,fontFamily:F.num,letterSpacing:"-0.02em",color:sessionTotal!=null?C.text:C.textMuted}}>
                       {sessionTotal!=null?sessionTotal:"—"}
                     </div>
-                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Series so far</div>
+                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>
+                      Series so far
+                      {/* The ceiling on the game in progress. This is the
+                          number a bowler works out in their head from
+                          about the sixth frame on, and it's the reason
+                          anyone keeps bowling a game they've opened in.
+                          Only shown shot by shot -- a game entered as a
+                          final score has no remaining balls to project. */}
+                      {maxScoreThisGame!=null&&(
+                        <span style={{color:C.accent}}> · {maxScoreThisGame} if you strike out</span>
+                      )}
+                    </div>
                   </div>
                   <div style={{display:"flex",gap:"14px",paddingBottom:"4px"}}>
                     {[g1score,g2score,g3score].map((score,i)=>(

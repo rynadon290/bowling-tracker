@@ -12,7 +12,7 @@ import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { classifySyncError, cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
-import {
+import { maxPossibleScore,
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
   nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots,
   freshRackShots, theoreticalFillBallValue,
@@ -3897,6 +3897,22 @@ export default function BowlingTracker(){
   // scored had every makeable spare (including the 10th frame's first
   // ball, filled with their own recent first-ball average) been converted.
   // Returns null if that game isn't fully logged yet.
+  // The ceiling on the game being bowled right now: strike out from here
+  // and this is what you finish with.
+  //
+  // Only meaningful shot by shot -- a game entered as a final score has
+  // no remaining balls to project. Returns null once the tenth is
+  // complete, since there's nothing left to throw.
+  const maxScoreThisGame=(()=>{
+    if(preferences.trackingMode!=="shot")return null;
+    if(!activeBowler||!effectiveSessionLeague)return null;
+    const gameShots=shots.filter(s=>s.bowler===activeBowler
+      &&s.league===effectiveSessionLeague&&s.date===sessionDate
+      &&s.game===String(form.game));
+    if(!gameShots.length)return null;
+    return maxPossibleScore(gameShots);
+  })();
+
   function theoreticalScoreForGame(bowler,league,date,game){
     const gameShots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===String(game));
     if(!gameShots.length)return null;
@@ -4439,7 +4455,7 @@ export default function BowlingTracker(){
             getLanePattern={getLanePattern} getMatch={getMatch} handleBallChange={handleBallChange} handleLeaveToggle={handleLeaveToggle} handleLineChange={handleLineChange}
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
-            stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
+            stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} maxScoreThisGame={maxScoreThisGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
             preferences={logPreferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
             activeBowlerLeftHanded={activeBowlerLeftHanded}
