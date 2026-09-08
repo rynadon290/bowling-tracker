@@ -466,16 +466,13 @@ showTeamCompare&&(()=>{
                 </div>
                 );
                 byId["cleanFrames"] = (
-<div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                  <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                    <div style={{...S.statNum,color:C.accent}}>{frameShots.length?`${cleanFrameR}%`:"—"}</div>
-                    <div style={S.statLbl}>Clean Frame %</div>
-                    {showTeamCompare&&<CompareBadge value={cleanFrameR} teamValue={teamCleanFrameR} label={compareLabel}/>}
-                  </div>
-                  <div style={S.statBox}>
-                    <div style={{...S.statNum,color:C.textMuted}}>{cleanFrameCount}/{frameShots.length}</div>
-                    <div style={S.statLbl}>Clean Frames</div>
-                  </div>
+<div style={S.card}>
+                  <div style={S.label}>Clean frames</div>
+                  <StatLead
+                    value={frameShots.length?cleanFrameR:"—"} unit={frameShots.length?"%":""}
+                    caption="of frames closed out" color={C.accent}
+                    badge={showTeamCompare?<CompareBadge value={cleanFrameR} teamValue={teamCleanFrameR} label={compareLabel}/>:null}
+                    detail={`${cleanFrameCount} of ${frameShots.length} frames with no open.`}/>
                 </div>
                 );
                 byId["framePosition"] = (
@@ -536,47 +533,38 @@ showTeamCompare&&(()=>{
 <div style={S.card}>
                   <div style={S.label}>First-Ball Average</div>
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Average pins on every fresh-rack delivery — every frame's first ball, plus any 10th-frame bonus ball thrown at a full reset rack — strikes counted as 10. The standard metric, comparable to LaneTalk and other scoring apps.</div>
-                  <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                    <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                      <div style={{...S.statNum,color:C.accent}}>{firstBallAvg!=null?firstBallAvg.toFixed(2):"—"}</div>
-                      <div style={S.statLbl}>First-Ball Avg</div>
-                      {showTeamCompare&&firstBallAvg!=null&&teamFirstBallAvg!=null&&(()=>{
-                        const diff=Math.round((firstBallAvg-teamFirstBallAvg)*100)/100;
-                        if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {compareLabel}</div>;
-                        return(
-                          <div style={{fontSize:"10px",color:diff>0?C.strike:C.miss,marginTop:"2px",fontWeight:600,whiteSpace:"nowrap"}}>
-                            {diff>0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {compareLabel}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div style={S.statBox}>
-                      <div style={{...S.statNum,color:C.textMuted}}>{allFirstBalls.length}</div>
-                      <div style={S.statLbl}>Fresh Racks</div>
-                    </div>
-                  </div>
+                  {/* Decimal compare kept inline rather than via CompareBadge:
+                      that rounds to whole numbers, and 0.4 pins of first-ball
+                      average is a real difference worth showing. */}
+                  <StatLead
+                    value={firstBallAvg!=null?firstBallAvg.toFixed(2):"—"}
+                    caption="pins per fresh rack" color={C.accent}
+                    badge={showTeamCompare&&firstBallAvg!=null&&teamFirstBallAvg!=null?(()=>{
+                      const diff=Math.round((firstBallAvg-teamFirstBallAvg)*100)/100;
+                      if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {compareLabel}</div>;
+                      return(
+                        <div style={{fontSize:"10px",color:diff>0?C.strike:C.miss,marginTop:"2px",fontWeight:600}}>
+                          {diff>0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {compareLabel}
+                        </div>
+                      );
+                    })():null}
+                    detail={`Across ${allFirstBalls.length} fresh racks.`}/>
                   <div style={S.divider}/>
                   <div style={{...S.label,marginBottom:"6px"}}>Leave Average</div>
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Same fresh-rack deliveries, but only the ones that weren't a strike — isolates how good the leave is on a miss, separate from strike rate.</div>
-                  <div style={{display:"flex",gap:"8px"}}>
-                    <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
-                      <div style={{...S.statNum,color:C.spare}}>{leaveAvg!=null?leaveAvg.toFixed(2):"—"}</div>
-                      <div style={S.statLbl}>Leave Avg</div>
-                      {showTeamCompare&&leaveAvg!=null&&teamLeaveAvg!=null&&(()=>{
-                        const diff=Math.round((leaveAvg-teamLeaveAvg)*100)/100;
-                        if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {compareLabel}</div>;
-                        return(
-                          <div style={{fontSize:"10px",color:diff>0?C.strike:C.miss,marginTop:"2px",fontWeight:600,whiteSpace:"nowrap"}}>
-                            {diff>0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {compareLabel}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div style={S.statBox}>
-                      <div style={{...S.statNum,color:C.textMuted}}>{nonStrikeFirstBalls.length}</div>
-                      <div style={S.statLbl}>Non-Strike Balls</div>
-                    </div>
-                  </div>
+                  <StatLead
+                    value={leaveAvg!=null?leaveAvg.toFixed(2):"—"}
+                    caption="pins when you don't strike" color={C.spare}
+                    badge={showTeamCompare&&leaveAvg!=null&&teamLeaveAvg!=null?(()=>{
+                      const diff=Math.round((leaveAvg-teamLeaveAvg)*100)/100;
+                      if(diff===0)return <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>≈ {compareLabel}</div>;
+                      return(
+                        <div style={{fontSize:"10px",color:diff>0?C.strike:C.miss,marginTop:"2px",fontWeight:600}}>
+                          {diff>0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {compareLabel}
+                        </div>
+                      );
+                    })():null}
+                    detail={`Across ${nonStrikeFirstBalls.length} non-strike balls.`}/>
                 </div>
                 );
                 byId["tenPinLeaves"] = (
@@ -619,18 +607,14 @@ showTeamCompare&&(()=>{
                 byId["splits"] = (
 fivePinAttempts.length>0&&(
                   <div style={S.card}>
-                    <div style={S.label}>Lone 5-Pin</div>
-                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>The 5-pin standing completely alone, nothing else in the way.</div>
-                    <div style={{display:"flex",gap:"8px"}}>
-                      <div style={{...S.statBox,border:`1px solid ${C.miss}44`}}>
-                        <div style={{...S.statNum,color:C.miss,fontSize:"20px"}}>{fivePinMisses}</div>
-                        <div style={S.statLbl}>Misses</div>
-                      </div>
-                      <div style={S.statBox}>
-                        <div style={{...S.statNum,color:C.textMuted,fontSize:"20px"}}>{fivePinAttempts.length-fivePinMisses}/{fivePinAttempts.length}</div>
-                        <div style={S.statLbl}>Made / Attempts</div>
-                      </div>
-                    </div>
+                    <div style={S.label}>Lone 5-pin</div>
+                    {/* Conversion leads, consistent with the other spare
+                        cards -- misses become the supporting figure. */}
+                    <StatLead
+                      value={fivePinAttempts.length?Math.round(((fivePinAttempts.length-fivePinMisses)/fivePinAttempts.length)*100):"—"}
+                      unit={fivePinAttempts.length?"%":""}
+                      caption="converted" color={C.strike}
+                      detail={`${fivePinAttempts.length-fivePinMisses} of ${fivePinAttempts.length} made, ${fivePinMisses} missed. The 5-pin standing completely alone, nothing else in the way.`}/>
                   </div>
                 )
                 );
@@ -712,15 +696,12 @@ fivePinAttempts.length>0&&(
                 byId["strikeStreak"] = (
 !isTeamView&&(
                   <div style={S.card}>
-                    <div style={S.label}>Longest Strike Streak</div>
-                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Consecutive strikes, carrying across games within the same night.</div>
-                    <div style={{display:"flex",gap:"8px"}}>
-                      <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
-                        <div style={{...S.statNum,color:C.strike}}>{longestStrikeStreak(statsBowler)}</div>
-                        <div style={S.statLbl}>Best Streak</div>
-                        {compareBowler&&<CompareBadge value={longestStrikeStreak(statsBowler)} teamValue={longestStrikeStreak(compareBowler)} label={compareLabel}/>}
-                      </div>
-                    </div>
+                    <div style={S.label}>Longest strike streak</div>
+                    <StatLead
+                      value={longestStrikeStreak(statsBowler)}
+                      caption="in a row" color={C.strike}
+                      badge={compareBowler?<CompareBadge value={longestStrikeStreak(statsBowler)} teamValue={longestStrikeStreak(compareBowler)} label={compareLabel}/>:null}
+                      detail="Consecutive strikes, carrying across games within the same night."/>
                   </div>
                 )
                 );
@@ -772,13 +753,20 @@ fivePinAttempts.length>0&&(
 !hideIndividualOnly&&preferences.trackedFields.release&&(
                   <div style={S.card}>
                     <div style={S.label}>Release Quality</div>
-                    <div style={{display:"flex",gap:"8px"}}>
-                      {RELEASES.map(r=>{
+                    {/* A distribution -- three parts of one whole -- so rows
+                        with bars rather than three boxes that look like
+                        three unrelated figures. */}
+                    <StatRows>
+                      {RELEASES.map((r,i)=>{
                         const count=statsShots.filter(s=>s.release===r).length;
                         const pct=tot?Math.round((count/tot)*100):0;
-                        return(<div key={r} style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:r==="Good"?C.strike:r==="Bad"?C.miss:C.spare}}>{pct}%</div><div style={S.statLbl}>{r}</div></div>);
+                        return(
+                          <StatRow key={r} label={r} value={`${pct}%`} sub={`${count}`} fill={pct}
+                            color={r==="Good"?C.strike:r==="Bad"?C.miss:C.spare}
+                            last={i===RELEASES.length-1}/>
+                        );
                       })}
-                    </div>
+                    </StatRows>
                   </div>
                 )
                 );
