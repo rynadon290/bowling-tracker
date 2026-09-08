@@ -21,10 +21,14 @@ const DISCOVER_URL = "https://discover.search.hereapi.com/v1/discover";
 const BOWLING_CATEGORY = "800-8600-0184";
 
 
-function json(body: unknown, status = 200) {
+// Takes its CORS headers as an argument -- see the same note in
+// analyze-performance. Making the origin per-request moved CORS inside
+// the handler, leaving this module-level reference dangling. It compiles
+// fine and throws "CORS is not defined" on the first real request.
+function json(body: unknown, cors: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }
 
@@ -165,7 +169,7 @@ Deno.serve(async (req) => {
   }
 
   if (!HERE_API_KEY) {
-    return json({ error: "Location search isn't configured on the server." }, 500);
+    return json({ error: "Location search isn't configured on the server." }, CORS, 500);
   }
 
   try {
@@ -176,7 +180,7 @@ Deno.serve(async (req) => {
     // Requiring one is better than silently returning centres in another
     // state.
     if (typeof lat !== "number" || typeof lng !== "number") {
-      return json({ error: "A location is needed to search nearby centers." }, 400);
+      return json({ error: "A location is needed to search nearby centers." }, CORS, 400);
     }
 
     const params = new URLSearchParams({
@@ -192,7 +196,7 @@ Deno.serve(async (req) => {
     if (!res.ok) {
       const detail = await res.text();
       console.error("HERE error", res.status, detail);
-      return json({ error: `Location search failed (${res.status}).` }, 502);
+      return json({ error: `Location search failed (${res.status}).` }, CORS, 502);
     }
 
     const data = await res.json();
@@ -205,9 +209,9 @@ Deno.serve(async (req) => {
       .map(toCenter)
       .filter((c: any) => c.name && c.lat !== null);
 
-    return json({ centers });
+    return json({ centers }, CORS);
   } catch (err) {
     console.error("find-centers failed", err);
-    return json({ error: "Couldn't search for centers right now." }, 500);
+    return json({ error: "Couldn't search for centers right now." }, CORS, 500);
   }
 });
