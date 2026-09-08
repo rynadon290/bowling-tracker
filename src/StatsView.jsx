@@ -186,18 +186,14 @@ showTeamCompare&&(()=>{
                   return(
                     <div style={S.card}>
                       <div style={S.label}>{recordsBowler?`${recordsBowler}'s Records`:"Team Records"}</div>
-                      <div style={{display:"flex",gap:"8px"}}>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.strike}}>{hg?hg.value:"—"}</div>
-                          <div style={S.statLbl}>High Game</div>
-                          {hg&&<div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{hg.date}{hg.game?` · G${hg.game}`:""}</div>}
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.accent}}>{hs?hs.value:"—"}</div>
-                          <div style={S.statLbl}>High Series</div>
-                          {hs&&<div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{formatDate(hs.date)}</div>}
-                        </div>
-                      </div>
+                      {/* Rows, which also lets the date read as a sentence
+                          instead of "2026-09-01 · G2". */}
+                      <StatRows>
+                        <StatRow label="High game" value={hg?hg.value:"—"} color={C.strike}
+                          sub={hg?`${formatDate(hg.date)}${hg.game?`, game ${hg.game}`:""}`:null}/>
+                        <StatRow label="High series" value={hs?hs.value:"—"} color={C.accent} last
+                          sub={hs?formatDate(hs.date):null}/>
+                      </StatRows>
                     </div>
                   );
                 })()
@@ -210,16 +206,12 @@ showTeamCompare&&(()=>{
                   return(
                     <div style={S.card}>
                       <div style={S.label}>{statsLeague?`${statsLeague.replace(" House Shot","")} Season Record`:"Season Record"}</div>
-                      <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                          <div style={{...S.statNum,color:C.accent}}>{rMain.pointsWon}/{rMain.pointsAvailable}</div>
-                          <div style={S.statLbl}>Points</div>
-                        </div>
-                      </div>
-                      <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                        <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.strike}}>{rMain.gameWins}-{rMain.gameLosses}</div><div style={S.statLbl}>Games</div></div>
-                        <div style={S.statBox}><div style={{...S.statNum,fontSize:"18px",color:C.spare}}>{rMain.seriesWins}-{rMain.seriesLosses}</div><div style={S.statLbl}>Pinfall</div></div>
-                      </div>
+                      {/* Points lead -- that's what decides the standings.
+                          Games and pinfall are how the points were earned. */}
+                      <StatLead
+                        value={`${rMain.pointsWon}/${rMain.pointsAvailable}`}
+                        caption="points won" color={C.accent}
+                        detail={`${rMain.gameWins}-${rMain.gameLosses} on games, ${rMain.seriesWins}-${rMain.seriesLosses} on pinfall.`}/>
                       {!statsLeague&&otherRecords.map(({league,record})=><div key={league} style={{fontSize:"12px",color:C.textMuted,marginBottom:"4px"}}>{league.replace(" House Shot","")}: {record.pointsWon}/{record.pointsAvailable} points ({record.gameWins}-{record.gameLosses} games, {record.seriesWins}-{record.seriesLosses} pinfall)</div>)}
                     </div>
                   );
@@ -273,18 +265,20 @@ showTeamCompare&&(()=>{
                       <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                         Points-won rate split by handicap size — shows whether the team does better closer to scratch or with a bigger handicap cushion.
                       </div>
-                      <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.accent}}>{split.smaller.rate!=null?`${split.smaller.rate}%`:"—"}</div>
-                          <div style={S.statLbl}>Smaller HDCP</div>
-                          <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>avg {split.smaller.avgHandicap} · {split.smaller.count} nights</div>
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.accent}}>{split.larger.rate!=null?`${split.larger.rate}%`:"—"}</div>
-                          <div style={S.statLbl}>Larger HDCP</div>
-                          <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>avg {split.larger.avgHandicap} · {split.larger.count} nights</div>
-                        </div>
-                      </div>
+                      {/* A direct two-way comparison, so bars let you see
+                          which side wins before reading either number. The
+                          dot-joined meta becomes a sentence. */}
+                      <StatRows>
+                        <StatRow label={`Smaller handicap (avg ${split.smaller.avgHandicap})`}
+                          value={split.smaller.rate!=null?`${split.smaller.rate}%`:"—"}
+                          sub={`${split.smaller.count} nights`}
+                          fill={split.smaller.rate??0} color={C.accent}/>
+                        <StatRow label={`Larger handicap (avg ${split.larger.avgHandicap})`}
+                          value={split.larger.rate!=null?`${split.larger.rate}%`:"—"}
+                          sub={`${split.larger.count} nights`}
+                          fill={split.larger.rate??0} color={C.accent} last/>
+                      </StatRows>
+                      <div style={{height:"12px"}}/>
                       {data.length>=2&&(
                         <div style={{height:"200px"}}>
                           <ResponsiveContainer width="100%" height="100%">
@@ -582,6 +576,7 @@ showTeamCompare&&(()=>{
                 );
                 byId["tenPinLeaves"] = (
 <div style={S.card}>
+                  <div style={S.label}>Ten pins</div>
                   {(()=>{
                     const rate=tot>0?Math.round((tenPinLeaveCount/tot)*100):0;
                     const spareRate=tenPinAttempts.length?tenPinSpareR:null;
@@ -873,16 +868,10 @@ sessions.length>0&&(()=>{
                     <div style={S.card}>
                       <div style={S.label}>Theoretical Average</div>
                       <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>What the average would be if every makeable spare (not a split, not a washout) had been made — including a theoretical 10th-frame fill ball, estimated from each game's own recent first-ball average at that point.</div>
-                      <div style={{display:"flex",gap:"8px"}}>
-                        <div style={{...S.statBox,border:`1px solid ${C.spare}44`}}>
-                          <div style={{...S.statNum,color:C.spare}}>{Math.floor(theoreticalAvg)}</div>
-                          <div style={S.statLbl}>Theoretical Avg</div>
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.textMuted}}>{theoreticalGameScores.length}</div>
-                          <div style={S.statLbl}>Games</div>
-                        </div>
-                      </div>
+                      <StatLead
+                        value={Math.floor(theoreticalAvg)}
+                        caption="if you'd made every makeable spare" color={C.spare}
+                        detail={`Across ${theoreticalGameScores.length} games.`}/>
                     </div>
                   );
                 })()
@@ -919,26 +908,21 @@ sessions.length>0&&(()=>{
                             <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                               Average currently reads {next.current} (rounded down). Here's what the next set does to it.
                             </div>
-                            <div style={{display:"flex",gap:"6px"}}>
-                              <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
-                                <div style={{...S.statNum,fontSize:"18px",color:next.gainAchievable?C.strike:C.textMuted}}>
-                                  {next.gainAchievable?next.toGain:"—"}
-                                </div>
-                                <div style={S.statLbl}>Pins to reach {next.current+1}</div>
-                                {next.gainAchievable&&(
-                                  <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>{next.gainAvgNeeded}/game</div>
-                                )}
-                              </div>
-                              <div style={{...S.statBox,border:`1px solid ${C.miss}44`}}>
-                                <div style={{...S.statNum,fontSize:"18px",color:next.dropAchievable?C.miss:C.textMuted}}>
-                                  {next.dropAchievable?next.maxToDrop:"—"}
-                                </div>
-                                <div style={S.statLbl}>Drops to {next.current-1} at or below</div>
-                                {next.dropAchievable&&(
-                                  <div style={{fontSize:"10px",color:C.textMuted,marginTop:"2px"}}>under {next.dropAvgThreshold}/game</div>
-                                )}
-                              </div>
-                            </div>
+                            {/* A gain/drop pair reads better as two rows than
+                                two boxes -- the labels are sentences, and
+                                they were being squeezed into box captions. */}
+                            <StatRows>
+                              <StatRow
+                                label={`To reach ${next.current+1}`}
+                                value={next.gainAchievable?next.toGain:"—"}
+                                sub={next.gainAchievable?`${next.gainAvgNeeded}/game`:null}
+                                color={next.gainAchievable?C.strike:C.textMuted}/>
+                              <StatRow
+                                label={`Drops to ${next.current-1} at or below`}
+                                value={next.dropAchievable?next.maxToDrop:"—"}
+                                sub={next.dropAchievable?`under ${next.dropAvgThreshold}/game`:null}
+                                color={next.dropAchievable?C.miss:C.textMuted} last/>
+                            </StatRows>
                             {!next.gainAchievable&&(
                               <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px",textAlign:"center"}}>
                                 Gaining a full point isn't reachable in one set at this average.
@@ -969,21 +953,11 @@ sessions.length>0&&(()=>{
                           ?"How steady their game scores are night to night, independent of the average itself. Lower is steadier."
                           :"How steady the team's combined game totals are night to night — not each bowler's individual scores. Lower is steadier."}
                       </div>
-                      <div style={{display:"flex",gap:"8px"}}>
-                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                          <div style={{...S.statNum,color:C.accent}}>±{consistency.stdDev}</div>
-                          <div style={S.statLbl}>Std. Dev.</div>
-                          {showTeamCompare&&compareConsistency&&<CompareBadge value={consistency.stdDev} teamValue={compareConsistency.stdDev} lowerIsBetter label={compareLabel}/>}
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.textMuted}}>{consistency.min}–{consistency.max}</div>
-                          <div style={S.statLbl}>Range</div>
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,color:C.textMuted}}>{consistency.games}</div>
-                          <div style={S.statLbl}>{statsBowler?"Games":"Team Games"}</div>
-                        </div>
-                      </div>
+                      <StatLead
+                        value={`\u00b1${consistency.stdDev}`}
+                        caption="pins either side of your average" color={C.accent}
+                        badge={showTeamCompare&&compareConsistency?<CompareBadge value={consistency.stdDev} teamValue={compareConsistency.stdDev} lowerIsBetter label={compareLabel}/>:null}
+                        detail={`Across ${consistency.games} ${statsBowler?"games":"team games"}, ranging ${consistency.min}\u2013${consistency.max}.`}/>
                     </div>
                   );
                 })()
@@ -1057,20 +1031,14 @@ preferences.showMoneyGames&&(()=>{
                       <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                         Season totals across every side game — what came in, what it cost to play, and what actually stuck.
                       </div>
-                      <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,fontSize:"18px",color:C.strike}}>${m.gross.toFixed(2)}</div>
-                          <div style={S.statLbl}>Won</div>
-                        </div>
-                        <div style={S.statBox}>
-                          <div style={{...S.statNum,fontSize:"18px",color:C.miss}}>${m.cost.toFixed(2)}</div>
-                          <div style={S.statLbl}>Paid In</div>
-                        </div>
-                        <div style={{...S.statBox,border:`1px solid ${m.net>=0?C.strike:C.miss}44`}}>
-                          <div style={{...S.statNum,fontSize:"18px",color:m.net>=0?C.strike:C.miss}}>{fmt(m.net)}</div>
-                          <div style={S.statLbl}>Net</div>
-                        </div>
-                      </div>
+                      {/* Net leads: won and paid-in are its two components,
+                          not three peer figures. Net is also the only one
+                          anyone actually quotes. */}
+                      <StatLead
+                        value={fmt(m.net)}
+                        caption={m.net>=0?"up on the season":"down on the season"}
+                        color={m.net>=0?C.strike:C.miss}
+                        detail={`$${m.gross.toFixed(2)} won against $${m.cost.toFixed(2)} paid in.`}/>
                       {rows.length>0&&(
                         <>
                           <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>By Game</div>
@@ -1117,11 +1085,11 @@ preferences.showMoneyGames&&statsBowler&&(()=>{
                       <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
                         Strike frames 3, 6, and 9 of every game (games 1, 2, and 3 -- all 9 strikes) to win the pot for the night. Also throw a full turkey in game 3's 10th frame to additionally earn the jackpot.
                       </div>
-                      <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                        <div style={S.statBox}><div style={{...S.statNum,color:C.strike}}>{totalWins}</div><div style={S.statLbl}>Wins</div></div>
-                        <div style={S.statBox}><div style={{...S.statNum,color:C.spare}}>{totalJackpots}</div><div style={S.statLbl}>Jackpots</div></div>
-                        <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>${total369Money}</div><div style={S.statLbl}>Total Won</div></div>
-                      </div>
+                      {/* Money leads -- same call as the Money Games card;
+                          wins and jackpots are how it was won. */}
+                      <StatLead
+                        value={`$${total369Money}`} caption="won on 3-6-9" color={C.accent}
+                        detail={`${totalWins} win${totalWins===1?"":"s"} and ${totalJackpots} jackpot${totalJackpots===1?"":"s"}.`}/>
                       {nightResults.map(({session:s,result})=>(
                         <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"8px",marginBottom:"8px"}}>
                           <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
