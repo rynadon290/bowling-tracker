@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { shareText, shareTitle, drawShareCard, APP_URL } from './shareCard.js';
+import { shareText, shareTitle, drawShareCard, APP_URL,
+  drawTrendCard,
+  trendShareText,
+} from './shareCard.js';
 import { APP_NAME } from '../constants.js';
 
 describe('share text', () => {
@@ -110,5 +113,63 @@ describe('share card', () => {
 
   it('returns null with no canvas so the caller can fall back to text', () => {
     expect(drawShareCard(null, {})).toBeNull();
+  });
+});
+
+// A trend is a shape over time, not a scoreline. Routing its points
+// through drawShareCard as `scores` summed a season into a nonsense
+// "9825 series" and drew 50 games 220px apart -- ~11,000px on a 1080px
+// card, which rendered as a black bar.
+describe('trend share card', () => {
+  function fakeCtx() {
+    const calls = [];
+    return { calls,
+      fillRect() { calls.push(['rect']); },
+      fillText(t) { calls.push(['text', String(t)]); },
+      beginPath() { calls.push(['path']); }, moveTo() {}, lineTo() {}, closePath() {},
+      fill() { calls.push(['fill']); }, stroke() { calls.push(['stroke']); }, arc() { calls.push(['arc']); },
+      set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
+      set lineCap(v) {}, set lineJoin(v) {}, set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {},
+    };
+  }
+  const fifty = Array.from({ length: 50 }, (_, i) => ({ value: 180 + ((i * 7) % 45) }));
+
+  it('draws high, average and low — not a series total', () => {
+    const ctx = fakeCtx();
+    drawTrendCard(ctx, { bowler: 'Ryan', label: 'Average', points: fifty });
+    const texts = ctx.calls.filter(c => c[0] === 'text').map(c => c[1]);
+    expect(texts).toContain('High');
+    expect(texts).toContain('Average');
+    expect(texts).toContain('Low');
+    // The bug: 50 games summed to 9825.
+    expect(texts).not.toContain('9825');
+  });
+
+  it('draws one continuous line rather than 50 separate labels', () => {
+    const ctx = fakeCtx();
+    drawTrendCard(ctx, { label: 'Average', points: fifty });
+    const texts = ctx.calls.filter(c => c[0] === 'text').map(c => c[1]);
+    expect(texts.filter(t => t.startsWith('Game ')).length).toBe(0);
+    expect(ctx.calls.filter(c => c[0] === 'stroke').length).toBeGreaterThan(0);
+  });
+
+  // At 50 points dots merge into a caterpillar; below 20 they aid reading.
+  it('omits point dots on a long series', () => {
+    const many = fakeCtx(); drawTrendCard(many, { points: fifty });
+    const few = fakeCtx(); drawTrendCard(few, { points: fifty.slice(0, 8) });
+    expect(few.calls.filter(c => c[0] === 'arc').length)
+      .toBeGreaterThan(many.calls.filter(c => c[0] === 'arc').length);
+  });
+
+  it('survives an empty or single-point series', () => {
+    expect(drawTrendCard(fakeCtx(), { points: [] })).toBe(true);
+    expect(drawTrendCard(fakeCtx(), { points: [{ value: 200 }] })).toBe(true);
+  });
+
+  it('text names high, low and average without a total', () => {
+    const t = trendShareText({ bowler: 'Ryan', label: 'Average', points: fifty });
+    expect(t).toContain('high');
+    expect(t).toContain('low');
+    expect(t).not.toContain('9825');
   });
 });

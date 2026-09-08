@@ -233,3 +233,108 @@ export function sessionHighlights({
 
   return out.slice(0, 4);
 }
+
+// ── Sharing a TREND, which is a different picture ───────────────────────
+//
+// A trend is a shape over time, not a scoreline. Feeding its points into
+// drawShareCard as `scores` produced two bugs at once: the games were
+// summed into a nonsense "9825 series", and 50 of them drawn 220px apart
+// ran ~11,000px wide on a 1080px card -- the overflow being the black bar.
+//
+// So a trend gets its own card: the line itself, with high, low and
+// average, and no series total anywhere.
+export function drawTrendCard(ctx, { bowler, label, points, league, colors, fonts }) {
+  if (!ctx) return null;
+  const W = 1080, H = 1080;
+  const c = colors || {};
+  const vals = (Array.isArray(points) ? points : []).map(p => (typeof p === "number" ? p : p?.value))
+    .filter(v => Number.isFinite(v));
+
+  ctx.fillStyle = c.bg || "#14110E";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = c.textMuted || "#9A8F80";
+  ctx.font = `500 34px ${fonts?.body || "system-ui, sans-serif"}`;
+  ctx.textBaseline = "top";
+  ctx.fillText([bowler, league ? league.replace(" House Shot", "") : ""].filter(Boolean).join("   "), 80, 84);
+
+  ctx.fillStyle = c.text || "#F4F0E6";
+  ctx.font = `700 60px ${fonts?.display || fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText(label || "Trend", 80, 132);
+
+  if (!vals.length) return true;
+
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+
+  // The graph. Padded so a flat line doesn't sit on the axis, and scaled
+  // to the data rather than to zero -- a bowling average never starts at
+  // zero, and anchoring there flattens every real change into a
+  // straight line.
+  const left = 90, right = W - 90, top = 300, bottom = 720;
+  const span = Math.max(1, hi - lo);
+  const x = i => left + (vals.length === 1 ? (right - left) / 2 : (i / (vals.length - 1)) * (right - left));
+  const y = v => bottom - ((v - lo) / span) * (bottom - top);
+
+  ctx.strokeStyle = c.border || "#332B22";
+  ctx.lineWidth = 2;
+  for (let g = 0; g <= 3; g++) {
+    const gy = top + (g / 3) * (bottom - top);
+    ctx.beginPath(); ctx.moveTo(left, gy); ctx.lineTo(right, gy); ctx.stroke();
+  }
+
+  ctx.strokeStyle = c.accent || "#E8A33D";
+  ctx.lineWidth = 6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  vals.forEach((v, i) => (i === 0 ? ctx.moveTo(x(i), y(v)) : ctx.lineTo(x(i), y(v))));
+  ctx.stroke();
+
+  // Dots only when there are few enough to be distinguishable; at 50
+  // points they merge into a caterpillar and hurt readability.
+  if (vals.length <= 20) {
+    ctx.fillStyle = c.accent || "#E8A33D";
+    vals.forEach((v, i) => { ctx.beginPath(); ctx.arc(x(i), y(v), 9, 0, Math.PI * 2); ctx.fill(); });
+  }
+
+  // High / low / average, which is what a trend is actually about.
+  const stats = [["High", hi], ["Average", avg], ["Low", lo]];
+  stats.forEach(([name, val], i) => {
+    const sx = 80 + i * 320;
+    ctx.fillStyle = c.text || "#F4F0E6";
+    ctx.font = `700 76px ${fonts?.num || "system-ui, sans-serif"}`;
+    ctx.fillText(String(val), sx, 790);
+    ctx.fillStyle = c.textMuted || "#9A8F80";
+    ctx.font = `500 30px ${fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText(name, sx, 880);
+  });
+
+  ctx.fillStyle = c.textMuted || "#9A8F80";
+  ctx.font = `500 28px ${fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText(`${vals.length} games`, 80, 934);
+
+  drawArrowMark(ctx, 80, 990, 38, c.accent || "#E8A33D");
+  ctx.fillStyle = c.accent || "#E8A33D";
+  ctx.font = `700 36px ${fonts?.display || "system-ui, sans-serif"}`;
+  ctx.fillText(APP_NAME, 134, 1000);
+
+  return true;
+}
+
+// Text for a shared trend. No series total -- summing a season of games
+// produces a number that means nothing.
+export function trendShareText({ bowler, label, points, league } = {}) {
+  const vals = (Array.isArray(points) ? points : []).map(p => (typeof p === "number" ? p : p?.value))
+    .filter(v => Number.isFinite(v));
+  if (!vals.length) return `${label || "Trend"}\n\nTracked with ${APP_NAME} — ${APP_URL}`;
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  const where = league ? ` at ${league.replace(" House Shot", "")}` : "";
+  return [
+    `${bowler ? bowler + "'s " : ""}${label || "trend"}${where}`,
+    `${vals.length} games — averaging ${avg}, high ${hi}, low ${lo}.`,
+    "",
+    `Tracked with ${APP_NAME} — ${APP_URL}`,
+  ].join("\n");
+}
