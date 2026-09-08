@@ -194,3 +194,26 @@ describe('full-rack mirroring', () => {
     expect(cornerPinLabel(false)).toBe('10');
   });
 });
+
+// isSplit takes the SHOT, not its leave array. Passing the array meant
+// shot.result was undefined, the first check failed, and it returned
+// false for every shot -- Insights reported a 0% split rate forever while
+// Stats showed the true number.
+describe('isSplit argument shape', () => {
+  const realSplit = { result: 'Other Leave', otherLeave: ['4', '7', '10'] };
+
+  it('recognises a split from the shot', () => {
+    expect(isSplit(realSplit)).toBe(true);
+  });
+
+  it('returns false when handed a bare leave array', () => {
+    // Documents the trap rather than endorsing it: this is the shape that
+    // silently zeroed the count.
+    expect(isSplit(realSplit.otherLeave)).toBe(false);
+  });
+
+  it('counts correctly when filtering shots directly', () => {
+    const shots = [realSplit, realSplit, { result: 'Strike', otherLeave: [] }];
+    expect(shots.filter(isSplit)).toHaveLength(2);
+  });
+});
