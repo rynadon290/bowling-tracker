@@ -3335,7 +3335,7 @@ export default function BowlingTracker(){
     {id:"history", label:"History", icon:"📖"},
     {id:"data",    label:"Stats",   icon:"📈"},
     {id:"insights",label:"Improve", icon:"🎯"},
-    {id:"gear",    label:"Gear",    icon:"🎒"},
+    {id:"locker",  label:"Locker",  icon:"🎒"},
   ];
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and
@@ -3994,9 +3994,9 @@ export default function BowlingTracker(){
           </>
         )}
 
-        {(view==="profile"||view==="gear")&&(
+        {(view==="profile"||view==="locker")&&(
           <Profile
-            only={view==="gear"
+            only={view==="locker"
               ?["teamsLeagues","arsenal","bags"]
               :["whoseProfile","identity","aliases","coaching","bookAverage","homeCenters","notes"]}
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
@@ -4180,7 +4180,7 @@ export default function BowlingTracker(){
           thumb reach and this app is used standing up holding a ball.
           One badge per tab, on the tab where the waiting thing lives:
           "something needs you" and "here's where" become one signal. */}
-      <nav style={{position:"sticky",bottom:0,zIndex:100,display:"flex",backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"6px 2px 8px"}}>
+      <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,display:"flex",backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"6px 2px calc(8px + env(safe-area-inset-bottom, 0px))"}}>
         {navTabs.map(t=>{
           const on=view===t.id||(t.id==="insights"&&(view==="coaching"||view==="social"))||(t.id==="log"&&view==="import");
           const badge=

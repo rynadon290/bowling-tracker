@@ -67,7 +67,10 @@ function buildStyles() { return {
   // filled pill competes with every button on the page for "the thing
   // to press"; an underline just says where you are.
   navBtn:(a)=>({padding:"8px 10px 9px",whiteSpace:"nowrap",flexShrink:0,border:"none",borderBottom:`2px solid ${a?C.accent:"transparent"}`,borderRadius:0,cursor:"pointer",fontSize:"13px",fontWeight:a?600:500,backgroundColor:"transparent",color:a?C.text:C.textMuted,fontFamily:F.body}),
-  content:{padding:"16px",maxWidth:"480px",margin:"0 auto"},
+  // Bottom padding clears the fixed nav (and the iOS home indicator via
+  // safe-area). Without it the last card on every screen sits underneath
+  // the tab bar and can't be reached.
+  content:{padding:"16px",paddingBottom:"calc(84px + env(safe-area-inset-bottom, 0px))",maxWidth:"480px",margin:"0 auto"},
   // No hairline border. On a dark ground the card tone already separates
   // it; a border on every card is what made every screen read at the same
   // volume, because nothing was allowed to be quieter than anything else.

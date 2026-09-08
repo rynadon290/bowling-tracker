@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { APP_NAME } from './constants.js';
 
 // A green build does NOT mean the app runs. A prop that references an
 // undefined identifier compiles cleanly and then throws on first render --
@@ -81,7 +82,9 @@ describe('app renders', () => {
     );
     expect(html.length).toBeGreaterThan(100);
     // Proves it really is the app shell and not the onboarding screen.
-    expect(html).toContain('Board &amp; Arrow');
+    // Asserts the wordmark renders, not what it says -- pinning the
+    // literal name meant a rename broke a test that isn't about naming.
+    expect(html).toContain(APP_NAME.replace(/&/g, '&amp;'));
   });
 
   it('mounts the first-launch flow without throwing, for a new bowler', async () => {
