@@ -10,7 +10,7 @@ import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./doma
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
-import { cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
+import { classifySyncError, cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
 import { isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import {
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -1129,6 +1129,8 @@ export default function BowlingTracker(){
   },[]);
 
   const[showSyncDetail,setShowSyncDetail]=useState(false);
+  // Technical detail is opt-in: the default view explains, not debugs.
+  const[showSyncTechnical,setShowSyncTechnical]=useState(false);
   const[syncBreakdown,setSyncBreakdown]=useState(null);
   async function openSyncDetail(){
     const inspection=await inspectPendingQueue();
@@ -4032,16 +4034,51 @@ export default function BowlingTracker(){
         </div>
       </div>
 
-      {showSyncDetail&&syncBreakdown&&(
-        <div style={{...S.card,margin:"12px 16px",border:`1px solid ${C.spare}44`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-            <div style={S.label}>Pending Sync — {syncBreakdown.total} total</div>
+      {showSyncDetail&&syncBreakdown&&(()=>{
+        // Plain language first, technical detail on request.
+        //
+        // This used to show the raw Postgres error, the table name and a
+        // Discard button by default. A bowler seeing
+        // `duplicate key value violates unique constraint ... (23505)`
+        // has no way to know whether their scores are safe or what to tap.
+        //
+        // Auto-clearing instead would be worse: a queued write is a game
+        // that hasn't reached the cloud, and silently dropping it loses a
+        // score with nothing to tell them. So it explains, retries, and
+        // only discards on a deliberate tap.
+        const firstErr=syncBreakdown.firstError||null;
+        const info=classifySyncError(firstErr);
+        return(
+        <div style={{...S.card,margin:"12px 16px",border:`1px solid ${info.kind==="transient"?C.border:C.spare+"44"}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+            <div style={{fontSize:"14px",fontWeight:600}}>{info.title}</div>
             <button style={{...S.btn(),padding:"4px 10px",fontSize:"11px"}} onClick={()=>setShowSyncDetail(false)}>Close</button>
           </div>
-          {Object.entries(syncBreakdown.byTable).length===0?(
-            <div style={{fontSize:"12px",color:C.textMuted}}>Nothing queued.</div>
-          ):(
-            <div style={{marginBottom:"10px"}}>
+
+          <div style={{fontSize:"12.5px",color:C.textMuted,lineHeight:1.5,marginBottom:"10px"}}>
+            {info.detail}
+          </div>
+
+          {/* The reassurance that matters most, stated plainly. */}
+          <div style={{fontSize:"12px",color:C.strike,marginBottom:"12px"}}>
+            ✓ {syncBreakdown.total} {syncBreakdown.total===1?"change is":"changes are"} saved on this phone. Nothing is lost.
+          </div>
+
+          {info.canRetry&&(
+            <button style={{...S.btn("primary"),marginBottom:"8px"}} onClick={handleSyncNow} disabled={syncingNow}>
+              {syncingNow?"Trying…":"Try again now"}
+            </button>
+          )}
+
+          {/* Technical detail behind a tap, for when you're debugging --
+              not the first thing a bowler reads. */}
+          <button style={{...S.btn(),width:"100%",fontSize:"11px",padding:"6px"}}
+            onClick={()=>setShowSyncTechnical(v=>!v)}>
+            {showSyncTechnical?"Hide details":"Show technical details"}
+          </button>
+
+          {showSyncTechnical&&(
+            <div style={{marginTop:"10px"}}>
               {Object.entries(syncBreakdown.byTable).map(([table,count])=>(
                 <div key={table} style={{padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px"}}>
@@ -4049,34 +4086,29 @@ export default function BowlingTracker(){
                     <span style={{color:C.textMuted}}>{count}</span>
                   </div>
                   {syncBreakdown.reasonsByTable?.[table]&&(
-                    <div style={{fontSize:"11px",color:C.miss,marginTop:"3px",fontFamily:"monospace"}}>
+                    <div style={{fontSize:"11px",color:C.miss,marginTop:"3px",fontFamily:"monospace",wordBreak:"break-word"}}>
                       {syncBreakdown.reasonsByTable[table]}
                     </div>
                   )}
-                  {/* Discarding one table's writes leaves the rest of the
-                      backlog intact -- the usual failure is one wedged
-                      feature blocking otherwise-good writes behind it. */}
-                  <button style={{...S.btn(),padding:"3px 8px",fontSize:"10px",marginTop:"4px"}}
-                    onClick={()=>handleDiscardTable(table)}>
-                    Discard just {table}
-                  </button>
+                  {info.canDiscard&&(
+                    <button style={{...S.btn(),padding:"3px 8px",fontSize:"10px",marginTop:"4px"}}
+                      onClick={()=>handleDiscardTable(table)}>
+                      Discard just {table}
+                    </button>
+                  )}
                 </div>
               ))}
+              <div style={{fontSize:"11px",color:C.textMuted,margin:"10px 0"}}>
+                Discarding drops these writes without saving them to the cloud. Your local data stays, but it won't reach your other devices. This can't be undone.
+              </div>
+              <button style={{...S.btn(),width:"100%",color:C.accent,borderColor:C.accent+"44"}} onClick={handleDiscardAndResyncAll}>
+                Discard &amp; resync everything
+              </button>
             </div>
           )}
-          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-            These writes haven't been confirmed as reaching the cloud. Sync Now retries them immediately instead of waiting for the automatic retry — if the underlying issue is actually fixed, this drains the queue without losing anything. If it's still stuck after retrying, clearing discards all of it without syncing, which can't be undone.
-          </div>
-          <button style={{...S.btn("primary"),marginBottom:"8px"}} onClick={handleSyncNow} disabled={syncingNow}>
-            {syncingNow?"Syncing…":"Sync Now"}
-          </button>
-          <button style={S.btn("warn")} onClick={handleClearPendingQueue}>Discard All Queued Writes</button>
-          <div style={{fontSize:"11px",color:C.textMuted,margin:"10px 0"}}>
-            If a stuck item's error message looks like bad data rather than a connection issue (e.g. a value that clearly shouldn't be there), Sync Now will keep failing on it forever — it resends exactly what's already stored, not a fresh attempt. This clears the queue AND re-attempts your actual local shots, sessions, matches, and lane conditions fresh, using whatever the app currently does.
-          </div>
-          <button style={{...S.btn(),width:"100%",color:C.accent,borderColor:C.accent+"44"}} onClick={handleDiscardAndResyncAll}>Discard &amp; Resync Everything</button>
         </div>
-      )}
+        );
+      })()}
 
       <div style={S.content}>
       {/* One boundary around every view. A lazy screen shows this for the
