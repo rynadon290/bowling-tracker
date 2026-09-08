@@ -39,7 +39,7 @@ import { categorizeCoaching, taskFromRow, taskToRow, noteFromRow, noteToRow, com
 import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
   correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
   pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
-import { coachViewActive, setCoachView } from "./domain/preferences.js";
+import { coachViewActive, setCoachView, applyEnvironment } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
@@ -3923,6 +3923,37 @@ export default function BowlingTracker(){
               </button>
             )}
           </div>
+
+          {/* Goals live here now, not on the Log tab. A goal is something
+              you set and review between sessions, not while standing on
+              the approach mid-frame -- and Improve is where the whole
+              loop lives: see what's costing you, set a target, drill it,
+              check the trend. */}
+          {activeBowler&&logGoals.length>0&&(
+            <GoalsPanel
+              goals={logGoals}
+              measurements={logGoalMeasurements}
+              leftHanded={leftHandedForBowler(activeBowler)}
+              onChange={next=>saveGoals(activeBowler,next)}/>
+          )}
+
+          {/* Practice drills, reachable without first switching the app
+              into practice mode and hunting for the toggle. */}
+          {activeBowler&&(
+            <button style={{...S.btn(),width:"100%",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}
+              onClick={()=>{
+                // Drills only make sense in practice, so switch the
+                // environment with the tap rather than making them find
+                // the setting first.
+                updatePreferences(prev=>applyEnvironment(prev,"practice"));
+                setPracticeMode("drill");
+                if(!activeDrill)startDrill();
+                setView("log");
+              }}>
+              🎯 Start a practice drill
+            </button>
+          )}
+
           <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}
             newlyAvailable={newInsights} onDismissNew={()=>setNewInsights([])}
             hasCoach={insightCoaches.length>0}
@@ -4099,13 +4130,6 @@ export default function BowlingTracker(){
             oilPatterns={pickerPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments} practicePriorAverage={practicePriorAverage}
             scoreOptions={scoreOptions} guests={guests} newGuestName={newGuestName} setNewGuestName={setNewGuestName}
             addGuestBowler={addGuestBowler} removeGuestBowler={removeGuestBowler}
-            goalsPanel={activeBowler&&logGoals.length?(
-              <GoalsPanel
-                goals={logGoals}
-                measurements={logGoalMeasurements}
-                leftHanded={leftHandedForBowler(activeBowler)}
-                onChange={next=>saveGoals(activeBowler,next)}/>
-            ):null}
             gameEquipment={gameEquipment} updateGameEquipment={updateGameEquipment}
             practiceTracking={practiceTracking} setPracticeTracking={setPracticeTracking}
             practiceMode={practiceMode} setPracticeMode={setPracticeMode} activeDrill={activeDrill} setActiveDrill={setActiveDrill} startDrill={startDrill} startAnotherDrill={startAnotherDrill} saveDrill={saveDrill} drillSaved={drillSaved} drills={drills} leftHandedForBowler={leftHandedForBowler}
