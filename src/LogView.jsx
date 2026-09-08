@@ -206,88 +206,6 @@ export default function LogView({
                 thing, and the Log tab is for logging. */}
 
             {/* Session card */}
-            {/* Importing a scorecard has nothing to do with a drill -- a drill
-                isn't a game and produces no scorecard. */}
-            {!editingId&&activeBowler&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
-              <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
-                📷 Import Scorecard
-              </button>
-            )}
-            {/* Enter game scores directly, without shot-by-shot logging.
-                Two cases: a screenshot that only showed game totals, and
-                bowlers who want score tracking without logging 30 shots a
-                night. A score entered here overrides whatever the shots
-                would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
-              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
-              const total=seriesTotal(entered);
-              return(
-                <CollapsibleCard
-                  title="Enter Game Scores"
-                  summary={total!=null?`${total} series`:""}
-                  expanded={expandedSections.manualScores}
-                  onToggle={()=>toggleSection("manualScores")}>
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                    Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
-                  </div>
-                  {[1,2,3].map(g=>{
-                    const isPracticeGames=preferences.environment==="practice";
-                    const arsenal=(arsenals?.[activeBowler]||[]);
-                    const equip=isPracticeGames?getGameEquipment(gameEquipment,activeBowler,effectiveSessionLeague,sessionDate,g):null;
-                    // One real ball means no choice to make -- it's pre-filled.
-                    // Plastic never defaults but is always offered.
-                    const defaultBall=defaultPracticeBall(arsenal,PLASTIC_BALL);
-                    const shownBall=equip?(equip.ball||defaultBall):"";
-                    return(
-                    <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
-                      <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
-                        <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
-                        <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
-                          value={entered[g-1]==null?"":String(entered[g-1])}
-                          onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
-                      </div>
-                      {/* Ball and surface per game, because that's what a
-                          practice is for: which ball, which surface, what
-                          did it average. Only in practice; a league night
-                          entered as scores doesn't record equipment. */}
-                      {isPracticeGames&&arsenal.length>0&&(
-                        <div style={{paddingLeft:"36px"}}>
-                          <div style={{...S.chips,marginBottom:"4px"}}>
-                            {arsenal.map(b=>(
-                              <Chip key={b} label={b} selected={shownBall===b} color={b===PLASTIC_BALL?C.strike:undefined}
-                                onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{ball:shownBall===b?"":b})}/>
-                            ))}
-                          </div>
-                          {shownBall&&shownBall!==PLASTIC_BALL&&(
-                            <div style={S.chips}>
-                              {SURFACES.map(sf=>(
-                                <Chip key={sf} label={sf} selected={equip.surface===sf}
-                                  onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{surface:equip.surface===sf?"":sf})}/>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                  {total!=null&&(
-                    <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
-                      <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
-                        <div style={{...S.statNum,fontSize:"20px",color:C.accent}}>{total}</div>
-                        <div style={S.statLbl}>Series</div>
-                      </div>
-                      <div style={S.statBox}>
-                        <div style={{...S.statNum,fontSize:"20px"}}>
-                          {Math.round(total/entered.filter(v=>v!=null).length)}
-                        </div>
-                        <div style={S.statLbl}>Average</div>
-                      </div>
-                    </div>
-                  )}
-                </CollapsibleCard>
-              );
-            })()}
 
             {/* In a tournament, "Tonight's Session" doesn't fit: game count
                 varies, lane pairs change per game, and there may be several
@@ -449,6 +367,110 @@ export default function LogView({
                 )}
               </CollapsibleCard>
             )}
+
+            {/* Importing a scorecard has nothing to do with a drill -- a drill
+                isn't a game and produces no scorecard. */}
+            {!editingId&&activeBowler&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
+              <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
+                📷 Import Scorecard
+              </button>
+            )}
+
+            {/* Says what's missing rather than showing nothing. The card
+                itself stays gated on a league because a score is keyed by
+                (bowler, league, date, game): one entered with an empty
+                league lands under a key the real league never reads, so
+                it wouldn't sync, wouldn't appear once a league WAS picked,
+                and would still be counted by any average that doesn't
+                filter by league. Silent loss plus a polluted composite --
+                worse than asking for one tap first. */}
+            {!editingId&&activeBowler&&!effectiveSessionLeague
+              &&preferences.environment!=="tournament"
+              &&preferences.trackingMode==="game"
+              &&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
+              <div style={{...S.card,backgroundColor:C.surface}}>
+                <div style={S.label}>Enter Game Scores</div>
+                <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
+                  Pick tonight's league above and this opens up — scores are filed against a league, so there's nowhere to put them yet.
+                </div>
+              </div>
+            )}
+
+            {/* Enter game scores directly, without shot-by-shot logging.
+                Two cases: a screenshot that only showed game totals, and
+                bowlers who want score tracking without logging 30 shots a
+                night. A score entered here overrides whatever the shots
+                would have computed -- see domain/manualScores.js. */}
+            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.environment!=="tournament"&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
+              const entered=[1,2,3].map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
+              const total=seriesTotal(entered);
+              return(
+                <CollapsibleCard
+                  title="Enter Game Scores"
+                  summary={total!=null?`${total} series`:""}
+                  expanded={expandedSections.manualScores}
+                  onToggle={()=>toggleSection("manualScores")}>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                    Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
+                  </div>
+                  {[1,2,3].map(g=>{
+                    const isPracticeGames=preferences.environment==="practice";
+                    const arsenal=(arsenals?.[activeBowler]||[]);
+                    const equip=isPracticeGames?getGameEquipment(gameEquipment,activeBowler,effectiveSessionLeague,sessionDate,g):null;
+                    // One real ball means no choice to make -- it's pre-filled.
+                    // Plastic never defaults but is always offered.
+                    const defaultBall=defaultPracticeBall(arsenal,PLASTIC_BALL);
+                    const shownBall=equip?(equip.ball||defaultBall):"";
+                    return(
+                    <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
+                      <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                        <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
+                        <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
+                          value={entered[g-1]==null?"":String(entered[g-1])}
+                          onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
+                      </div>
+                      {/* Ball and surface per game, because that's what a
+                          practice is for: which ball, which surface, what
+                          did it average. Only in practice; a league night
+                          entered as scores doesn't record equipment. */}
+                      {isPracticeGames&&arsenal.length>0&&(
+                        <div style={{paddingLeft:"36px"}}>
+                          <div style={{...S.chips,marginBottom:"4px"}}>
+                            {arsenal.map(b=>(
+                              <Chip key={b} label={b} selected={shownBall===b} color={b===PLASTIC_BALL?C.strike:undefined}
+                                onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{ball:shownBall===b?"":b})}/>
+                            ))}
+                          </div>
+                          {shownBall&&shownBall!==PLASTIC_BALL&&(
+                            <div style={S.chips}>
+                              {SURFACES.map(sf=>(
+                                <Chip key={sf} label={sf} selected={equip.surface===sf}
+                                  onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{surface:equip.surface===sf?"":sf})}/>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
+                  {total!=null&&(
+                    <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
+                      <div style={{...S.statBox,border:`1px solid ${C.accent}44`}}>
+                        <div style={{...S.statNum,fontSize:"20px",color:C.accent}}>{total}</div>
+                        <div style={S.statLbl}>Series</div>
+                      </div>
+                      <div style={S.statBox}>
+                        <div style={{...S.statNum,fontSize:"20px"}}>
+                          {Math.round(total/entered.filter(v=>v!=null).length)}
+                        </div>
+                        <div style={S.statLbl}>Average</div>
+                      </div>
+                    </div>
+                  )}
+                </CollapsibleCard>
+              );
+            })()}
 
             {/* Casual and practice get their own recap instead of the
                 league summary below: both are scores-only, and the league
