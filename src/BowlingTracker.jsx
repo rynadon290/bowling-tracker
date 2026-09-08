@@ -52,7 +52,7 @@ import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, lea
 import { setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
-import { C, S, Chip, applyTheme } from "./ui.jsx";
+import { C, S, F, Chip, applyTheme } from "./ui.jsx";
 import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName } from "./constants.js";
 import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
@@ -3325,11 +3325,22 @@ export default function BowlingTracker(){
     return [...oilPatterns,...seeds];
   })();
 
-  const navTabs=["log","data","insights",...(coachViewOn?[]:["social"]),...(showCoachingTab?["coaching"]:[])];
+  // Five tabs, one per step of the loop: bowl -> review -> understand ->
+  // improve -> manage. Internal view ids are unchanged -- "log" is still
+  // "log" -- so every existing view==="..." check keeps working; only the
+  // tab that reaches it is new. Social and Coach are reachable from
+  // inside Improve rather than being destinations of their own.
+  const navTabs=[
+    {id:"log",     label:"Bowl",    icon:"🎳"},
+    {id:"history", label:"History", icon:"📖"},
+    {id:"data",    label:"Stats",   icon:"📈"},
+    {id:"insights",label:"Improve", icon:"🎯"},
+    {id:"gear",    label:"Gear",    icon:"🎒"},
+  ];
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and
   // prompted stacking in the first place; four fits comfortably.
-  const stackHeaderIcons=navTabs.length>=5;
+  const stackHeaderIcons=false;
 
   // Everything outstanding, from every source -- coaching invitations,
   // friend and team requests, coach tasks, imported scores, the book
@@ -3370,8 +3381,8 @@ export default function BowlingTracker(){
     // legitimate views, so they must not be treated as "not in the nav"
     // and bounced -- which would have thrown a coach off Settings the
     // moment they flipped coach view.
-    const iconViews=["profile","settings","inbox"];
-    if(!navTabs.includes(view)&&!iconViews.includes(view))setView("log");
+    const iconViews=["profile","settings","inbox","social","coaching","import"];
+    if(!navTabs.some(t=>t.id===view)&&!iconViews.includes(view))setView("log");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[coachViewOn,showCoachingTab]);
 
@@ -3844,21 +3855,6 @@ export default function BowlingTracker(){
             </div>
           )}
         </div>
-        <div style={S.nav}>
-          {navTabs.map(v=>(
-  <button key={v} style={S.navBtn(view===v)} onClick={()=>setView(v)}>
-    {v==="log"?"Log":v==="data"?"Data":v==="insights"?"Insights":v==="social"?"Social":"Coach"}
-    {/* Dot rather than a count: the point is "there's something new
-        here", and a number invites counting rather than looking. */}
-    {v==="insights"&&newInsights.length>0&&view!=="insights"&&(
-      <span style={{display:"inline-block",width:"6px",height:"6px",borderRadius:"50%",backgroundColor:C.spare,marginLeft:"4px",verticalAlign:"top"}}/>
-    )}
-    {v==="coaching"&&coachViewOn&&unreadResponseCount>0&&view!=="coaching"&&(
-      <span style={{display:"inline-block",width:"6px",height:"6px",borderRadius:"50%",backgroundColor:C.spare,marginLeft:"4px",verticalAlign:"top"}}/>
-    )}
-  </button>
-))}
-        </div>
       </div>
 
       {showSyncDetail&&syncBreakdown&&(
@@ -3909,12 +3905,29 @@ export default function BowlingTracker(){
 
       <div style={S.content}>
         
-        {view==="insights"&&(
+        {view==="insights"&&(<>
+          {/* Improve is the whole improvement loop, so the two things
+              that used to be their own tabs live here as entry points:
+              coaching (the person helping you) and social (the people
+              you bowl with). Still their own views underneath, so the
+              screens themselves are untouched. */}
+          <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+            {showCoachingTab&&(
+              <button style={{...S.btn(),flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("coaching")}>
+                🧑‍🏫 Coach{coachViewOn&&unreadResponseCount>0?` · ${unreadResponseCount}`:""}
+              </button>
+            )}
+            {!coachViewOn&&(
+              <button style={{...S.btn(),flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("social")}>
+                👥 Friends &amp; teams
+              </button>
+            )}
+          </div>
           <InsightsView stats={insightStats} onAnalyze={analyzePerformance} bowlerName={statsBowler||activeBowler}
             newlyAvailable={newInsights} onDismissNew={()=>setNewInsights([])}
             hasCoach={insightCoaches.length>0}
             coachName={insightCoaches.map(c=>c.displayName).join(" and ")}/>
-        )}
+        </>)}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* SOCIAL VIEW — Teams + Friends share one nav slot                  */}
@@ -3981,8 +3994,11 @@ export default function BowlingTracker(){
           </>
         )}
 
-        {view==="profile"&&(
+        {(view==="profile"||view==="gear")&&(
           <Profile
+            only={view==="gear"
+              ?["teamsLeagues","arsenal","bags"]
+              :["whoseProfile","identity","aliases","coaching","bookAverage","homeCenters","notes"]}
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
@@ -3995,8 +4011,9 @@ export default function BowlingTracker(){
             bookAverageDue={bookAverageCheck.needed} bookAverageTriggerLeague={bookAverageCheck.league} bookAverageSuggestion={bookAverageSuggestion} acknowledgeBookAverageUpdate={acknowledgeBookAverageUpdate}/>
         )}
 
-        {view==="settings"&&(
+        {(view==="settings"||view==="history")&&(
           <Settings
+            mode={view==="history"?"history":"settings"}
             restartOnboarding={restartOnboarding}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
@@ -4158,6 +4175,30 @@ export default function BowlingTracker(){
           />
         )}
       </div>
+
+      {/* Bottom nav. At the bottom because the top of a phone is out of
+          thumb reach and this app is used standing up holding a ball.
+          One badge per tab, on the tab where the waiting thing lives:
+          "something needs you" and "here's where" become one signal. */}
+      <nav style={{position:"sticky",bottom:0,zIndex:100,display:"flex",backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"6px 2px 8px"}}>
+        {navTabs.map(t=>{
+          const on=view===t.id||(t.id==="insights"&&(view==="coaching"||view==="social"))||(t.id==="log"&&view==="import");
+          const badge=
+            t.id==="history"?(inboxCount||0):
+            t.id==="insights"?((newInsights.length>0&&view!=="insights"?1:0)+(coachViewOn?unreadResponseCount:0)):
+            0;
+          return(
+            <button key={t.id} onClick={()=>setView(t.id)} aria-label={t.label}
+              style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",padding:"5px 0",position:"relative",color:on?C.accent:C.textMuted,fontFamily:F.body,fontSize:"10.5px",fontWeight:on?600:500,WebkitTapHighlightColor:"transparent"}}>
+              <span style={{fontSize:"17px",lineHeight:1}} aria-hidden="true">{t.icon}</span>
+              {t.label}
+              {badge>0&&(
+                <span style={{position:"absolute",top:"2px",right:"calc(50% - 20px)",minWidth:"14px",height:"14px",borderRadius:"7px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"14px",textAlign:"center",padding:"0 3px"}}>{badge}</span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

@@ -34,6 +34,7 @@ function BookAverageUpdatePrompt({ currentAverage, suggestion, onSave, onDismiss
 }
 
 export default function Profile({
+  only = null,
   bowlers, activeBowler, selectBowler,
   profiles, setProfile, teams,
   arsenals, ballLayouts, setBallLayout, removeBall,
@@ -61,6 +62,10 @@ export default function Profile({
     arsenal: false, bags: false, notes: false,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+  // `only` lets the same component serve two tabs: Gear renders just the
+  // equipment and league cards, the profile icon renders the identity
+  // cards. Same code both places, no copy to drift.
+  const show = id => !only || only.includes(id);
 
   if (!bowlers.length) {
     return (
@@ -92,7 +97,7 @@ export default function Profile({
 
   return (
     <div>
-      {bowlers.length > 1 && (
+      {bowlers.length > 1 && show("whoseProfile") && (
         <CollapsibleCard title="Whose Profile" summary={activeBowler}
           expanded={expanded.whoseProfile} onToggle={() => toggle("whoseProfile")}>
           <div style={S.chips}>
@@ -103,6 +108,7 @@ export default function Profile({
         </CollapsibleCard>
       )}
 
+      {show("identity") && (
       <CollapsibleCard title={activeBowler}
         summary={`${profile.leftHanded ? "Left" : "Right"}-handed · ${profile.twoHanded ? "Two-handed" : "One-handed"}`}
         expanded={expanded.identity} onToggle={() => toggle("identity")}>
@@ -128,12 +134,14 @@ export default function Profile({
             onToggle={() => update(setProfileField(profile, "twoHanded", true))} />
         </div>
       </CollapsibleCard>
+      )}
 
       {/* Aliases: how this bowler's name appears on the house scoring
           display, which is often not how it appears in the app. Used
           only to match a scorecard photo back to the right person -- a
           wrong match writes someone else's game into your record, and
           that is far worse than an import that stops to ask. */}
+      {show("aliases") && (
       <CollapsibleCard title="Scorecard Names"
         summary={profile.aliases?.length ? `${profile.aliases.length} alias${profile.aliases.length === 1 ? "" : "es"}` : "None"}
         expanded={expanded.aliases} onToggle={() => toggle("aliases")}>
@@ -160,12 +168,14 @@ export default function Profile({
             disabled={!aliasDraft.trim()} onClick={addAlias}>Add</button>
         </div>
       </CollapsibleCard>
+      )}
 
       {/* Coaching is opt-in and off by default. Someone who doesn't coach
           never sees coaching UI at all, rather than an empty version of
           it. Turning this on only unlocks the coach VIEW -- it doesn't
           connect you to anyone, and a bowler being coached doesn't need
           it, since the Coach tab appears for anyone in a relationship. */}
+      {show("coaching") && (
       <CollapsibleCard title="Coaching" summary={profile.isCoach ? "Coach" : "Not coaching"}
         expanded={expanded.coaching} onToggle={() => toggle("coaching")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
@@ -178,6 +188,7 @@ export default function Profile({
             onToggle={() => update(setProfileField(profile, "isCoach", true))} color={C.spare} />
         </div>
       </CollapsibleCard>
+      )}
 
       {/* Fires when a league this bowler is in has an end date that's
           passed and they haven't been asked about it yet -- see
@@ -212,6 +223,7 @@ export default function Profile({
         </div>
       )}
 
+      {show("bookAverage") && (
       <CollapsibleCard title="Book Average"
         summary={profile.bookAverage ? `${profile.bookAverage}${profile.bookGames ? ` (${profile.bookGames}g)` : ""}` : "Not set"}
         expanded={expanded.bookAverage} onToggle={() => toggle("bookAverage")}>
@@ -229,7 +241,9 @@ export default function Profile({
         <input style={{ ...S.input, marginTop: "6px" }} placeholder="Season (e.g. 2025-26 Winter)"
           value={profile.bookSeason} onChange={e => update(setProfileField(profile, "bookSeason", e.target.value))} />
       </CollapsibleCard>
+      )}
 
+      {show("homeCenters") && (
       <CollapsibleCard title="Home Centers"
         summary={resolvedHomeCenters.length ? `${resolvedHomeCenters.length} set` : "None yet"}
         expanded={expanded.homeCenters} onToggle={() => toggle("homeCenters")}>
@@ -270,7 +284,9 @@ export default function Profile({
           </button>
         )}
       </CollapsibleCard>
+      )}
 
+      {show("teamsLeagues") && (
       <CollapsibleCard title="Teams &amp; Leagues"
         summary={membership.teams.length ? `${membership.teams.length} team${membership.teams.length === 1 ? "" : "s"}` : "Not on a team"}
         expanded={expanded.teamsLeagues} onToggle={() => toggle("teamsLeagues")}>
@@ -288,7 +304,9 @@ export default function Profile({
           ))
         )}
       </CollapsibleCard>
+      )}
 
+      {show("arsenal") && (
       <CollapsibleCard title="Arsenal"
         summary={`${balls.length} ball${balls.length === 1 ? "" : "s"}`}
         expanded={expanded.arsenal} onToggle={() => toggle("arsenal")}>
@@ -336,7 +354,9 @@ export default function Profile({
           catalogEntries={catalogEntries || {}}
           existingBalls={balls} />
       </CollapsibleCard>
+      )}
 
+      {show("bags") && (
       <CollapsibleCard title="Bags"
         summary={`${bowlerBagCount} bag${bowlerBagCount === 1 ? "" : "s"}`}
         expanded={expanded.bags} onToggle={() => toggle("bags")}>
@@ -350,7 +370,9 @@ export default function Profile({
           deleteBag={deleteBag}
           toggleBallBag={toggleBallBag} />
       </CollapsibleCard>
+      )}
 
+      {show("notes") && (
       <CollapsibleCard title="Notes"
         summary={profile.notes ? (profile.notes.length > 28 ? profile.notes.slice(0, 28) + "…" : profile.notes) : ""}
         expanded={expanded.notes} onToggle={() => toggle("notes")}>
@@ -359,6 +381,7 @@ export default function Profile({
           value={profile.notes}
           onChange={e => update(setProfileField(profile, "notes", e.target.value))} />
       </CollapsibleCard>
+      )}
 
       <div style={{ height: "32px" }} />
     </div>

@@ -27,6 +27,7 @@ const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", r
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
+  mode = "both",
   restartOnboarding,
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
@@ -47,7 +48,12 @@ export default function Settings({
   // Settings has two distinct jobs now: configuring the app, and browsing
   // history. History is long reference data, so it lives behind its own
   // section rather than padding out the settings scroll.
-  const [section, setSection] = useState("settings");
+  // mode: "both" is the original screen with a Settings/History switch;
+  // "history" and "settings" render just one half, for the History tab
+  // and the settings icon respectively. Reusing this component for both
+  // destinations means the History tab is the exact code that already
+  // worked, not a copy.
+  const [section, setSection] = useState(mode === "history" ? "history" : "settings");
   const [historyTab, setHistoryTab] = useState("sessions");
   const [shareStatus, setShareStatus] = useState("");
 
@@ -101,12 +107,14 @@ export default function Settings({
       {savedFlash && <div style={{ fontSize: "13px", color: C.strike, textAlign: "center", marginBottom: "10px" }}>✓ Saved</div>}
       {error && <div style={{ fontSize: "13px", color: C.miss, textAlign: "center", marginBottom: "10px" }}>{error}</div>}
 
-      <div style={{ ...S.card, padding: "10px 12px" }}>
-        <div style={S.chips}>
-          <Chip label="Settings" selected={section === "settings"} onToggle={() => setSection("settings")} />
-          <Chip label="History" selected={section === "history"} onToggle={() => setSection("history")} />
+      {mode === "both" && (
+        <div style={{ ...S.card, padding: "10px 12px" }}>
+          <div style={S.chips}>
+            <Chip label="Settings" selected={section === "settings"} onToggle={() => setSection("settings")} />
+            <Chip label="History" selected={section === "history"} onToggle={() => setSection("history")} />
+          </div>
         </div>
-      </div>
+      )}
 
       {section === "history" && (
         <>
