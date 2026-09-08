@@ -589,7 +589,66 @@ export default function BowlingTracker(){
         if(leaguesForShots.online&&leaguesForShots.data){
           leaguesForShots.data.forEach(l=>{leagueNameById[l.id]=practiceLeagueDisplayName(l.name);});
         }
-        const shotsRes=await cloudRead("shots",q=>q.select("*"));
+
+        // Everything else in ONE parallel batch.
+        //
+        // This load was 21 sequential awaits: each read waited for the one
+        // before it, so startup cost 21 round trips -- 2-5 seconds on a
+        // phone before anything appeared, and worse the worse the
+        // connection. The requests are independent; only the league map
+        // above must resolve first, because six of the mappers below need
+        // it to turn a league_id into a name.
+        //
+        // Queries are byte-for-byte the ones that ran sequentially, so no
+        // select is narrowed. Each result keeps its own { online, data }
+        // shape, so every guard below works unchanged and one table
+        // failing still doesn't take the others down.
+        const [
+          shotsRes,
+          sessionsRes,
+          bowlersRes,
+          arsenalsRes,
+          profilesRes,
+          memberRes,
+          drillsRes,
+          hiddenRes,
+          centersRes,
+          patternsRes,
+          goalsRes,
+          tournamentsRes,
+          leagueCentersRes,
+          subsRes,
+          votesRes,
+          groupsRes,
+          bagsRes,
+          manualRes,
+          matchesRes,
+          lanePatternsRes,
+        ] = await Promise.all([
+          cloudRead("shots",q=>q.select("*")),
+          cloudRead("sessions",q=>q.select("*")),
+          cloudRead("bowler_names",q=>q.select("name")),
+          cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values,group_id,coverstock,core_type,weight,rg,diff,int_diff")),
+          cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,aliases,home_centers,notes,book_average,book_games,book_season,book_average_as_of")),
+          cloudRead("ball_bags",q=>q.select("bowler_name,ball,bag_id")),
+          cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,custom_pins,ball,made,missed,notes")),
+          cloudRead("hidden_leagues",q=>q.select("league_id")),
+          cloudRead("bowling_centers",q=>q.select("id,here_id,name,address,city,state,postal_code,country,lat,lng")),
+          cloudRead("oil_patterns",q=>q.select("id,name,series,length_feet,ratio,volume_ml,forward_ml,reverse_ml,verified,source_note,year")),
+          cloudRead("bowler_goals",q=>q.select("bowler_name,goals")),
+          cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,side_pots,match_play,notes")),
+          cloudRead("leagues",q=>q.select("name,center_id,start_date,end_date")),
+          cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at,official,source_note,weight_specs")),
+          cloudRead("ball_confirmations",q=>q.select("submission_id,confirmed_by,vote")),
+          cloudRead("ball_groups",q=>q.select("id,bowler_name,name,sort_order")),
+          cloudRead("bags",q=>q.select("id,bowler_name,name,bag_type,ball_limit,includes_plastic")),
+          cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score,ball,surface")),
+          cloudRead("matches",q=>q.select("*")),
+          cloudRead("lane_patterns",q=>q.select("*")),
+        ]);
+
+
+
         if(shotsRes.online&&shotsRes.data){
           const pending=await getQueuedRecordsForTable("shots");
           const pendingIds=new Set(pending.map(p=>p.id));
@@ -612,8 +671,7 @@ export default function BowlingTracker(){
             }
           }
         }
-        const sessionsRes=await cloudRead("sessions",q=>q.select("*"));
-        if(sessionsRes.online&&sessionsRes.data){
+                if(sessionsRes.online&&sessionsRes.data){
           const pendingSessions=await getQueuedRecordsForTable("sessions");
           const pendingIds=new Set(pendingSessions.map(p=>p.id));
           const cloudSessions=sessionsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>sessionFromSupabaseRow(row,leagueNameById));
@@ -632,8 +690,7 @@ export default function BowlingTracker(){
             }
           }
         }
-        const bowlersRes=await cloudRead("bowler_names",q=>q.select("name"));
-        if(bowlersRes.online&&bowlersRes.data){
+                if(bowlersRes.online&&bowlersRes.data){
           const pendingBowlers=await getQueuedRecordsForTable("bowler_names");
           const names=[...new Set([...bowlersRes.data.map(r=>r.name),...pendingBowlers.map(r=>r.name)])];
           setBowlers(names);
@@ -659,8 +716,7 @@ export default function BowlingTracker(){
           }
         }
 
-        const arsenalsRes=await cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values,group_id,coverstock,core_type,weight,rg,diff,int_diff"));
-        if(arsenalsRes.online&&arsenalsRes.data){
+                if(arsenalsRes.online&&arsenalsRes.data){
           const pendingArsenalRows=await getQueuedRecordsForTable("arsenals");
           const rebuilt={};
           const rebuiltLayouts={};
@@ -693,8 +749,7 @@ export default function BowlingTracker(){
         // mapper: is_coach, and the four book-average columns, all existed in
         // the table and were mapped on the way out, but were never fetched --
         // so they came back undefined on every load and silently reset.
-        const profilesRes=await cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,aliases,home_centers,notes,book_average,book_games,book_season,book_average_as_of"));
-        if(profilesRes.online&&profilesRes.data){
+                if(profilesRes.online&&profilesRes.data){
           const rebuiltProfiles={};
           profilesRes.data.forEach(row=>{
             const p=profileFromRow(row);
@@ -707,8 +762,7 @@ export default function BowlingTracker(){
           if(pr)setProfiles(Object.fromEntries(Object.entries(pr).map(([k,v])=>[k,normalizeProfile(v,k)])));
         }
 
-        const memberRes=await cloudRead("ball_bags",q=>q.select("bowler_name,ball,bag_id"));
-        if(memberRes.online&&memberRes.data){
+                if(memberRes.online&&memberRes.data){
           const rebuiltMembership={};
           memberRes.data.forEach(r=>{rebuiltMembership[membershipKey(r.bowler_name,r.ball,r.bag_id)]=true;});
           setBallBags(rebuiltMembership);
@@ -719,8 +773,7 @@ export default function BowlingTracker(){
         const cachedGuests=await readCached(GUESTS_KEY,"array");
         if(cachedGuests){const g=normalizeGuests(cachedGuests);setGuests(g);guestsRef.current=g;}
 
-        const drillsRes=await cloudRead("drills",q=>q.select("id,bowler_name,date,target,custom_target,custom_pins,ball,made,missed,notes"));
-        if(drillsRes.online&&drillsRes.data){
+                if(drillsRes.online&&drillsRes.data){
           const rebuilt=drillsRes.data.map(drillFromRow).filter(Boolean);
           setDrills(rebuilt);
           try{await window.storage.set(DRILLS_KEY,JSON.stringify(rebuilt));}catch{}
@@ -729,8 +782,7 @@ export default function BowlingTracker(){
           if(dr)setDrills(dr.map(normalizeDrill));
         }
 
-        const hiddenRes=await cloudRead("hidden_leagues",q=>q.select("league_id"));
-        if(hiddenRes.online&&hiddenRes.data){
+                if(hiddenRes.online&&hiddenRes.data){
           const ids=hiddenRes.data.map(r=>r.league_id).filter(Boolean);
           setHiddenLeagues(ids);
           try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(ids));}catch{}
@@ -739,8 +791,7 @@ export default function BowlingTracker(){
           if(hl)setHiddenLeagues(hl.filter(x=>typeof x==="string"));
         }
 
-        const centersRes=await cloudRead("bowling_centers",q=>q.select("id,here_id,name,address,city,state,postal_code,country,lat,lng"));
-        if(centersRes.online&&centersRes.data){
+                if(centersRes.online&&centersRes.data){
           const rebuilt=centersRes.data.map(centerFromRow).filter(Boolean);
           setCenters(rebuilt);
           try{await window.storage.set(CENTERS_KEY,JSON.stringify(rebuilt));}catch{}
@@ -749,8 +800,7 @@ export default function BowlingTracker(){
           if(cs)setCenters(cs.map(normalizeCenter).filter(c=>c.id&&c.name));
         }
 
-        const patternsRes=await cloudRead("oil_patterns",q=>q.select("id,name,series,length_feet,ratio,volume_ml,forward_ml,reverse_ml,verified,source_note,year"));
-        if(patternsRes.online&&patternsRes.data){
+                if(patternsRes.online&&patternsRes.data){
           const rebuilt=patternsRes.data.map(patternFromRow).filter(Boolean);
           setOilPatterns(rebuilt);
           try{await window.storage.set(OIL_PATTERNS_KEY,JSON.stringify(rebuilt));}catch{}
@@ -759,8 +809,7 @@ export default function BowlingTracker(){
           if(op)setOilPatterns(op.map(normalizePattern).filter(Boolean));
         }
 
-        const goalsRes=await cloudRead("bowler_goals",q=>q.select("bowler_name,goals"));
-        if(goalsRes.online&&goalsRes.data){
+                if(goalsRes.online&&goalsRes.data){
           // A goal saved while offline sits in the sync queue, not in the
           // cloud. Taking the cloud rows verbatim would overwrite it with
           // the older server copy and silently revert the change -- same
@@ -786,8 +835,7 @@ export default function BowlingTracker(){
           }catch{}
         }
 
-        const tournamentsRes=await cloudRead("tournaments",q=>q.select("id,bowler_name,name,center,days,buy_in,winnings,side_pots,match_play,notes"));
-        if(tournamentsRes.online&&tournamentsRes.data){
+                if(tournamentsRes.online&&tournamentsRes.data){
           const rebuilt=tournamentsRes.data.map(tournamentFromRow).filter(Boolean);
           setTournaments(rebuilt);
           try{await window.storage.set(TOURNAMENTS_KEY,JSON.stringify(rebuilt));}catch{}
@@ -796,8 +844,7 @@ export default function BowlingTracker(){
           if(ts)setTournaments(ts.map(normalizeTournament).filter(Boolean));
         }
 
-        const leagueCentersRes=await cloudRead("leagues",q=>q.select("name,center_id,start_date,end_date"));
-        if(leagueCentersRes.online&&leagueCentersRes.data){
+                if(leagueCentersRes.online&&leagueCentersRes.data){
           const map={};
           const dateMap={};
           leagueCentersRes.data.forEach(r=>{
@@ -815,9 +862,7 @@ export default function BowlingTracker(){
           if(ld)setLeagueDates(ld);
         }
 
-        const subsRes=await cloudRead("ball_submissions",q=>q.select("id,submitted_by,ball_key,ball_name,brand,coverstock,core_type,weight,rg,diff,int_diff,created_at,official,source_note,weight_specs"));
-        const votesRes=await cloudRead("ball_confirmations",q=>q.select("submission_id,confirmed_by,vote"));
-        if(subsRes.online&&subsRes.data){
+                        if(subsRes.online&&subsRes.data){
           const tally={};
           (votesRes.data||[]).forEach(v=>{
             const t=tally[v.submission_id]=tally[v.submission_id]||{approvals:0,rejections:0,mine:null};
@@ -851,8 +896,7 @@ export default function BowlingTracker(){
           if(ack)setCatalogAck(ack.filter(x=>typeof x==="string"));
         }catch{}
 
-        const groupsRes=await cloudRead("ball_groups",q=>q.select("id,bowler_name,name,sort_order"));
-        if(groupsRes.online&&groupsRes.data){
+                if(groupsRes.online&&groupsRes.data){
           const rebuiltGroups=groupsRes.data.map(groupFromRow).filter(Boolean)
             .sort((a,b)=>a.sortOrder-b.sortOrder);
           setBallGroups(rebuiltGroups);
@@ -862,8 +906,7 @@ export default function BowlingTracker(){
           if(bg2)setBallGroups(bg2.filter(g=>g&&typeof g==="object"&&g.id));
         }
 
-        const bagsRes=await cloudRead("bags",q=>q.select("id,bowler_name,name,bag_type,ball_limit,includes_plastic"));
-        if(bagsRes.online&&bagsRes.data){
+                if(bagsRes.online&&bagsRes.data){
           const rebuiltBags=bagsRes.data.map(bagFromRow).filter(Boolean);
           setBags(rebuiltBags);
           try{await window.storage.set(BAGS_KEY,JSON.stringify(rebuiltBags));}catch{}
@@ -872,8 +915,7 @@ export default function BowlingTracker(){
           if(bg){const v=JSON.parse(bg.value);if(Array.isArray(v))setBags(v.map(b=>normalizeBag(b)));}
         }
 
-        const manualRes=await cloudRead("manual_scores",q=>q.select("bowler_name,league_id,date,game,score,ball,surface"));
-        if(manualRes.online&&manualRes.data){
+                if(manualRes.online&&manualRes.data){
           const rebuilt=manualScoresFromRows(manualRes.data,leagueNameById);
           const equip=gameEquipmentFromRows(manualRes.data,leagueNameById);
           gameEquipmentRef.current=equip;
@@ -907,8 +949,7 @@ export default function BowlingTracker(){
           setSessionStartSeen(seen?.value==="1");
         }catch{setSessionStartSeen(false);}
 
-        const matchesRes=await cloudRead("matches",q=>q.select("*"));
-        if(matchesRes.online&&matchesRes.data){
+                if(matchesRes.online&&matchesRes.data){
           const pendingMatches=await getQueuedRecordsForTable("matches");
           const pendingMatchIds=new Set(pendingMatches.map(p=>p.id));
           const cloudMatches=matchesRes.data.filter(row=>!pendingMatchIds.has(row.id)).map(row=>matchFromSupabaseRow(row,leagueNameById));
@@ -921,8 +962,7 @@ export default function BowlingTracker(){
           if(m){const v=JSON.parse(m.value);if(Array.isArray(v))setMatches(v);}
         }
 
-        const lanePatternsRes=await cloudRead("lane_patterns",q=>q.select("*"));
-        if(lanePatternsRes.online&&lanePatternsRes.data){
+                if(lanePatternsRes.online&&lanePatternsRes.data){
           const pendingPatterns=await getQueuedRecordsForTable("lane_patterns");
           const pendingPatternIds=new Set(pendingPatterns.map(p=>p.id));
           const cloudPatterns=lanePatternsRes.data.filter(row=>!pendingPatternIds.has(row.id)).map(row=>lanePatternFromSupabaseRow(row,leagueNameById));
