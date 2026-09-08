@@ -354,3 +354,59 @@ export function theoreticalFillBallValue(shots,bowler,league,date,game){
   if(thisGameAvg==null)return cumulativeAvg; // shouldn't normally happen once frames 1-9 are logged, but be safe
   return (cumulativeAvg+thisGameAvg)/2;
 }
+
+// ── Best possible score from here ───────────────────────────────────────
+//
+// "If I strike out from this point, what do I finish with?" -- the number
+// a bowler does in their head from about the sixth frame onward, and the
+// reason anyone keeps bowling a game they've already opened in.
+//
+// Distinct from theoreticalScoreForGame, which asks a backward-looking
+// question: what WOULD you have scored had you converted every makeable
+// spare. This one is forward-looking and takes the past as given. Frames
+// already bowled score exactly as bowled; every remaining ball is a
+// strike.
+//
+// Returns null when the game is over or hasn't started -- there's no
+// meaningful ceiling for a game with nothing left to throw.
+export function maxPossibleScore(shots) {
+  const played = (Array.isArray(shots) ? shots : []).filter(s => s && s.frame);
+  if (!played.length) return null;
+
+  // Which frames already have a result.
+  const byFrame = {};
+  for (let f = 1; f <= 9; f++) {
+    byFrame[f] = played.find(s => parseInt(s.frame) === f && !s.ballNum) || null;
+  }
+  const f10 = played.filter(s => parseInt(s.frame) === 10);
+  const f10b1 = f10.find(s => !s.ballNum || s.ballNum === 1) || null;
+  const f10b2 = f10.find(s => s.ballNum === 2) || null;
+  const f10b3 = f10.find(s => s.ballNum === 3) || null;
+
+  // Nothing left to throw: the tenth is complete.
+  const tenthDone =
+    (f10b1 && !isStk(f10b1) && f10b1.spareMade === "No") ||          // open tenth
+    (f10b3 != null) ||                                               // three balls thrown
+    (f10b1 && !isStk(f10b1) && f10b1.spareMade === "Yes" && f10b3);  // spare + fill
+  if (tenthDone) return null;
+
+  // A strike, in the shape the scorer expects.
+  const strike = (frame, ballNum = null) => ({
+    frame: String(frame), ballNum, result: "Strike",
+    otherLeave: [], spareMade: "", pinCount: "",
+  });
+
+  // Keep what was actually bowled; fill everything unbowled with strikes.
+  const filled = [];
+  for (let f = 1; f <= 9; f++) {
+    filled.push(byFrame[f] || strike(f));
+  }
+  filled.push(f10b1 || strike(10, 1));
+  // Ball 2 is only earned when ball 1 struck or spared. If ball 1 was
+  // bowled and did neither, there is no ball 2 to fill -- but that case
+  // is already caught by tenthDone above.
+  filled.push(f10b2 || strike(10, 2));
+  filled.push(f10b3 || strike(10, 3));
+
+  return strictPartial(filled);
+}

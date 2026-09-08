@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots, freshRackShots, theoreticalFillBallValue } from './scoring.js';
+import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots, freshRackShots, theoreticalFillBallValue,
+  maxPossibleScore,
+} from './scoring.js';
 
 describe('tenthFrameStatus', () => {
   it('returns [1] for a brand-new 10th frame with no shots yet', () => {
@@ -464,5 +466,58 @@ describe('theoreticalFillBallValue', () => {
     ];
     const result = theoreticalFillBallValue(shots, 'Ryan', league, '2026-09-03', '1');
     expect(result).toBe(7); // (8 cumulative + 6 this-game) / 2, correctly separated
+  });
+});
+
+// "If I strike out from here, what do I finish with?" -- the number a
+// bowler works out in their head from about the sixth frame on.
+describe('maxPossibleScore', () => {
+  const strike = (f, b = null) => ({ frame: String(f), ballNum: b, result: 'Strike', otherLeave: [], spareMade: '', pinCount: '' });
+  const spare = (f) => ({ frame: String(f), ballNum: null, result: 'Other Leave', otherLeave: ['10'], spareMade: 'Yes', pinCount: '9' });
+  const open = (f, pins) => ({ frame: String(f), ballNum: null, result: 'Other Leave', otherLeave: ['7', '10'], spareMade: 'No', pinCount: String(pins) });
+
+  it('is 300 when nothing has gone wrong yet', () => {
+    expect(maxPossibleScore([strike(1)])).toBe(300);
+    expect(maxPossibleScore([...Array(9)].map((_, i) => strike(i + 1)))).toBe(300);
+  });
+
+  // Hand-computed: 8 + (30 x 8 frames) + 30 = 278.
+  it('drops the ceiling after an open first frame', () => {
+    expect(maxPossibleScore([open(1, 8)])).toBe(278);
+  });
+
+  it('accounts for an open frame stealing bonus from earlier strikes', () => {
+    // Frames 1-3 struck, frame 4 open with 7 -- frame 3 loses bonus.
+    expect(maxPossibleScore([strike(1), strike(2), strike(3), open(4, 7)])).toBe(263);
+  });
+
+  it('handles a spare mid-game', () => {
+    const shots = [strike(1), strike(2), strike(3), strike(4), strike(5), spare(6)];
+    expect(maxPossibleScore(shots)).toBe(279);
+  });
+
+  // No remaining balls means no meaningful ceiling -- showing one would
+  // imply the game could still improve.
+  it('returns null once the game is over', () => {
+    const perfect = [...Array(9)].map((_, i) => strike(i + 1))
+      .concat([strike(10, 1), strike(10, 2), strike(10, 3)]);
+    expect(maxPossibleScore(perfect)).toBeNull();
+  });
+
+  it('returns null with nothing bowled', () => {
+    expect(maxPossibleScore([])).toBeNull();
+    expect(maxPossibleScore(null)).toBeNull();
+  });
+
+  // The ceiling can only fall as a game progresses -- it never rises.
+  it('never increases as more frames are bowled', () => {
+    let prev = 300;
+    const running = [];
+    for (const s of [strike(1), open(2, 8), strike(3), spare(4), strike(5)]) {
+      running.push(s);
+      const max = maxPossibleScore(running);
+      expect(max).toBeLessThanOrEqual(prev);
+      prev = max;
+    }
   });
 });
