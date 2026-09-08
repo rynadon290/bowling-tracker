@@ -9,7 +9,6 @@
 // Secret required: here_api_key  (lowercase -- the Supabase dashboard
 // forces lowercase secret names)
 
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const HERE_API_KEY = Deno.env.get("here_api_key");
@@ -139,7 +138,18 @@ function corsFor(req) {
   };
 }
 
-serve(async (req) => {
+// Deno.serve, not the std/http `serve` import.
+//
+// The import pulled from a pinned deno.land URL, which the runtime has to
+// fetch when the function boots. If that fetch fails -- deno.land being
+// slow, a network hiccup at deploy time, or the pinned version being
+// unavailable -- the function never starts, and the client sees only
+// "Failed to send a request to the Edge Function" with no clue why.
+//
+// Deno.serve is built into the runtime: no import, no fetch, nothing to
+// fail. import-scorecard already used it and has been working, which is
+// what made this the difference worth suspecting.
+Deno.serve(async (req) => {
   const CORS = corsFor(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
