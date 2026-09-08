@@ -46,9 +46,17 @@ export default function StatsView({
   // actual leagues -- so hardcoding "Tuesday Team or Thursday Team" was
   // wrong for anyone whose leagues aren't named that. Build the prompt
   // from the same source the chips use.
+  // The chips said "Tuesday Team" -- built from the LEAGUE name, not the
+  // team's. A bowler whose team is called "Split Happens" saw "Tuesday
+  // Team" everywhere, which is not what they call themselves.
+  const teamNameForLeague = (l) => {
+    const t = (teams || []).find(t => t.league === l && t.name);
+    return t ? t.name : `${String(l).replace(" House Shot", "")} Team`;
+  };
+
   const teamChoiceNames = (leagues || [])
     .filter(l => l !== PRACTICE_SESSION_KEY)
-    .map(l => `"${l.replace(" House Shot", "")} Team"`);
+    .map(l => `"${teamNameForLeague(l)}"`);
   const pickATeam = teamChoiceNames.length === 0
     ? "Pick a league above"
     : teamChoiceNames.length === 1
@@ -85,7 +93,7 @@ bowlers.length>1&&(
                       {leagues.map(l=>{
   const isSelected=statsLeague===l&&!statsBowler;
   return(
-    <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:`${l.replace(" House Shot","")} Team`} selected={isSelected} onToggle={()=>{
+    <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)} selected={isSelected} onToggle={()=>{
       setStatsLeague(isSelected?"":l);
       setStatsBowler("");
       setCompareBowler("");
@@ -116,7 +124,7 @@ bowlers.length>1&&(
                             }} color={C.spare}/>
                           ))}
                           {leagues.filter(l=>l!==statsLeague).map(l=>(
-                            <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:`${l.replace(" House Shot","")} Team`} selected={compareLeague===l} onToggle={()=>{
+                            <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)} selected={compareLeague===l} onToggle={()=>{
                               setCompareLeague(compareLeague===l?"":l);
                               setCompareBowler("");
                             }} color={C.accent}/>
@@ -471,17 +479,24 @@ showTeamCompare&&(()=>{
                 })()
                 );
                 byId["headlineStats"] = (
-<div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-                  <div style={S.statBox}><div style={S.statNum}>{tot}</div><div style={S.statLbl}>Shots</div></div>
-                  <div style={S.statBox}>
-                    <div style={{...S.statNum,color:C.strike}}>{stkR}%</div>
-                    <div style={S.statLbl}>Strike %</div>
-                    {showTeamCompare&&<CompareBadge value={stkR} teamValue={teamStkR} label={compareLabel}/>}
-                  </div>
-                  <div style={S.statBox}>
-                    <div style={{...S.statNum,color:C.spare}}>{spR}%</div>
-                    <div style={S.statLbl}>Spare %</div>
-                    {showTeamCompare&&<CompareBadge value={spR} teamValue={teamSpR} label={compareLabel}/>}
+<div style={S.card}>
+                  {/* Was a bare flex row with no card wrapper and no header,
+                      which is why it read as floating -- every other card
+                      sits in S.card with a label. These three ARE peers, so
+                      they keep the box row; it just belongs to a card now. */}
+                  <div style={S.label}>This season</div>
+                  <div style={{display:"flex",gap:"8px"}}>
+                    <div style={S.statBox}><div style={S.statNum}>{tot}</div><div style={S.statLbl}>Shots</div></div>
+                    <div style={S.statBox}>
+                      <div style={{...S.statNum,color:C.strike}}>{stkR}%</div>
+                      <div style={S.statLbl}>Strike</div>
+                      {showTeamCompare&&<CompareBadge value={stkR} teamValue={teamStkR} label={compareLabel}/>}
+                    </div>
+                    <div style={S.statBox}>
+                      <div style={{...S.statNum,color:C.spare}}>{spR}%</div>
+                      <div style={S.statLbl}>Spare</div>
+                      {showTeamCompare&&<CompareBadge value={spR} teamValue={teamSpR} label={compareLabel}/>}
+                    </div>
                   </div>
                 </div>
                 );
@@ -1103,21 +1118,10 @@ preferences.showMoneyGames&&statsBowler&&(()=>{
                       <StatLead
                         value={`$${total369Money}`} caption="won on 3-6-9" color={C.accent}
                         detail={`${totalWins} win${totalWins===1?"":"s"} and ${totalJackpots} jackpot${totalJackpots===1?"":"s"}.`}/>
-                      {nightResults.map(({session:s,result})=>(
-                        <div key={s.id} style={{borderBottom:`1px solid ${C.border}`,paddingBottom:"8px",marginBottom:"8px"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
-                            <span style={{fontSize:"12px",fontWeight:600}}>{s.league.replace(" House Shot","")}</span>
-                            <span style={{fontSize:"11px",color:C.textMuted}}>{formatDate(s.date)}</span>
-                          </div>
-                          <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
-                            <span style={S.tag(result.qualifies?C.strike:C.textMuted)}>{result.qualifies?"✓ Won":"No win"}</span>
-                            {result.jackpotEligible&&<span style={S.tag(C.spare)}>Jackpot</span>}
-                            {(s.threeSixNineWinnings>0||s.jackpotWinnings>0)&&(
-                              <span style={S.tag(C.accent)}>${(s.threeSixNineWinnings||0)+(s.jackpotWinnings||0)}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                      {/* Night-by-night history removed: this card is about
+                          the season total. The per-night detail is already
+                          on each session in History, and repeating it here
+                          made a summary card scroll for a whole season. */}
                     </div>
                   );
                 })()

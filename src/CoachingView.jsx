@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { C, S, Chip } from "./ui.jsx";
+import { formatDate } from "./constants.js";
 import {
   categorizeCoaching, partitionTasks, taskProgress, sortNotes,
   emptyTask, TASK_METRIC_IDS,
@@ -184,7 +185,7 @@ function NoteThread({ notes, myUserId, otherName, onAdd }) {
             border: `1px solid ${mine ? C.accent + "33" : C.border}`,
           }}>
             <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "2px" }}>
-              {mine ? "You" : otherName}{n.createdAt ? ` · ${n.createdAt.slice(0, 10)}` : ""}
+              {mine ? "You" : otherName}{n.createdAt ? `, ${formatDate(n.createdAt.slice(0, 10))}` : ""}
             </div>
             <div style={{ fontSize: "12px", color: C.text }}>{n.body}</div>
           </div>
@@ -407,7 +408,7 @@ export default function CoachingView({
                         <div style={{ ...S.label, marginBottom: "4px" }}>Recent</div>
                         {snap.recent.map((r, i) => (
                           <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "3px" }}>
-                            <span style={{ color: C.textMuted }}>{r.league ? `${r.league} · ` : ""}{r.date}</span>
+                            <span style={{ color: C.textMuted }}>{r.league ? `${r.league}, ` : ""}{formatDate(r.date)}</span>
                             <span style={{ color: C.text }}>{r.scores.join(" · ")}{r.total != null ? `  (${r.total})` : ""}</span>
                           </div>
                         ))}

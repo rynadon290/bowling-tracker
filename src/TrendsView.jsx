@@ -13,7 +13,7 @@ import { allGamesSeries, allGamesSummary,
 
 export default function TrendsView({
   sessions, shots, bowlers, leagues,
-  statsBowler, setStatsBowler, statsLeague, setStatsLeague,
+  statsBowler, setStatsBowler, statsLeague, setStatsLeague, teams,
   isSplit, isCornerPinLeave, leftHanded = false,
 }) {
   const [metricId, setMetricId] = useState("average");
@@ -27,6 +27,12 @@ export default function TrendsView({
 
   // The league filter still applies in every-game mode, so "all my games
   // in this league" and "all my games" are both reachable.
+  // Real team names, same source as the Stats tab -- a team called
+  // "Split Happens" shouldn't show up as "Tuesday Team".
+  const teamChips = (leagues || [])
+    .filter(l => (teams || []).some(t => t.league === l))
+    .map(l => ({ league: l, label: (teams || []).find(t => t.league === l && t.name)?.name || `${String(l).replace(" House Shot", "")} Team` }));
+
   const gamePoints = allGamesSeries(sessions, statsBowler, statsLeague);
   const gameSummary = allGamesSummary(gamePoints);
   const showEveryGame = everyGame && metricId === "average";
@@ -60,6 +66,19 @@ export default function TrendsView({
             {bowlers.map(b => (
               <Chip key={b} label={b} selected={statsBowler === b}
                 onToggle={() => setStatsBowler(statsBowler === b ? "" : b)} />
+            ))}
+            {/* Team trends work -- an empty bowler already means "everyone"
+                in the domain -- but there was no way to ASK for that except
+                by deselecting, which reads as clearing a filter rather than
+                choosing the team. Selecting it also picks the league, since
+                a team trend blended across two leagues is meaningless. */}
+            {teamChips.map(({ league, label }) => (
+              <Chip key={league} label={label} selected={!statsBowler && statsLeague === league}
+                onToggle={() => {
+                  if (!statsBowler && statsLeague === league) { setStatsLeague(""); return; }
+                  setStatsBowler("");
+                  setStatsLeague(league);
+                }} />
             ))}
           </div>
         </div>

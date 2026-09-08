@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { C, S, F, Chip, PinDeck, CollapsibleCard } from "./ui.jsx";
+import { C, S, F, Chip, PinDeck, CollapsibleCard, StatLead } from "./ui.jsx";
 import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { sessionMoney } from "./domain/money.js";
@@ -907,22 +907,17 @@ export default function LogView({
                       {(()=>{
                         const m=sessionMoney(cs);
                         if(!m)return null;
+                        // Net leads, matching the Money Games card in
+                        // Stats. Won and paid-in are its components, not
+                        // three peer figures -- and net is the only one
+                        // anyone quotes on the drive home.
                         return(
-                          <div style={{display:"flex",gap:"6px",marginBottom:"12px"}}>
-                            <div style={S.statBox}>
-                              <div style={{...S.statNum,fontSize:"18px",color:C.strike}}>${m.gross.toFixed(2)}</div>
-                              <div style={S.statLbl}>Won</div>
-                            </div>
-                            <div style={S.statBox}>
-                              <div style={{...S.statNum,fontSize:"18px",color:C.miss}}>${m.cost.toFixed(2)}</div>
-                              <div style={S.statLbl}>Paid In</div>
-                            </div>
-                            <div style={{...S.statBox,border:`1px solid ${m.net>=0?C.strike:C.miss}44`}}>
-                              <div style={{...S.statNum,fontSize:"18px",color:m.net>=0?C.strike:C.miss}}>
-                                {m.net<0?"−":""}${Math.abs(m.net).toFixed(2)}
-                              </div>
-                              <div style={S.statLbl}>Net</div>
-                            </div>
+                          <div style={{marginBottom:"12px"}}>
+                            <StatLead
+                              value={`${m.net<0?"−":""}$${Math.abs(m.net).toFixed(2)}`}
+                              caption={m.net>=0?"up tonight":"down tonight"}
+                              color={m.net>=0?C.strike:C.miss}
+                              detail={`$${m.gross.toFixed(2)} won against $${m.cost.toFixed(2)} paid in.`}/>
                           </div>
                         );
                       })()}

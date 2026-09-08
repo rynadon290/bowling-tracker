@@ -4320,7 +4320,7 @@ export default function BowlingTracker(){
 
         {view==="data"&&dataTab==="trends"&&(
           <TrendsView
-            sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues}
+            sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues} teams={teams}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
             isSplit={isSplit}
