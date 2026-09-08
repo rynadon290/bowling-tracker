@@ -3997,7 +3997,7 @@ export default function BowlingTracker(){
         {(view==="profile"||view==="locker")&&(
           <Profile
             only={view==="locker"
-              ?["teamsLeagues","arsenal","bags"]
+              ?["arsenal","bags"]
               :["whoseProfile","identity","aliases","coaching","bookAverage","homeCenters","notes"]}
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
@@ -4009,6 +4009,35 @@ export default function BowlingTracker(){
             saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             bookAverageDue={bookAverageCheck.needed} bookAverageTriggerLeague={bookAverageCheck.league} bookAverageSuggestion={bookAverageSuggestion} acknowledgeBookAverageUpdate={acknowledgeBookAverageUpdate}/>
+        )}
+
+        {/* Vault also renders the Leagues editor -- where you bowl belongs
+            with your equipment, not buried in app settings. Same Settings
+            component in a card-filtered mode, so there is still exactly
+            one Leagues editor rather than two that can drift. */}
+        {view==="locker"&&(
+          <Settings
+            mode="leagues"
+            restartOnboarding={restartOnboarding}
+            showBackup={showBackup} setShowBackup={setShowBackup}
+            backupStatus={backupStatus} setBackupStatus={setBackupStatus}
+            importText={importText} setImportText={setImportText}
+            exportData={exportData} importData={importData}
+            confirmClear={confirmClear} setConfirmClear={setConfirmClear}
+            clearAllData={clearAllData} hasData={shots.length>0}
+            sessions={sessions} bowlers={bowlers} leagues={leagues}
+            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            filterBowler={filterBowler} setFilterBowler={setFilterBowler}
+            filterBall={filterBall} setFilterBall={setFilterBall}
+            filterResult={filterResult} setFilterResult={setFilterResult}
+            filtered={filtered} ballUniverse={ballUniverse}
+            startEdit={startEdit} deleteShot={deleteShot}
+            centers={centers} leagueCenters={leagueCenters} setLeagueCenter={setLeagueCenter} searchCenters={searchCenters}
+            leagueDates={leagueDates} setLeagueDates={saveLeagueDates} renameLeague={renameLeague}
+            hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
+            shots={shots}
+            teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
         )}
 
         {(view==="settings"||view==="history")&&(
