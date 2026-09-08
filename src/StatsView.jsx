@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { C, S, Chip, CompareBadge } from "./ui.jsx";
+import { C, S, F, Chip, CompareBadge } from "./ui.jsx";
 import { PRACTICE_SESSION_KEY, formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import {
   bowlerHighGame, bowlerHighSeries, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData,
@@ -581,31 +581,58 @@ showTeamCompare&&(()=>{
                 );
                 byId["tenPinLeaves"] = (
 <div style={S.card}>
-                  <div style={S.label}>Ten Pin Leaves</div>
-                  <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
-                    {!isTeamView&&(
-                      <>
-                        <div style={S.statBox}><div style={{...S.statNum,color:C.miss,fontSize:"20px"}}>{wk}</div><div style={S.statLbl}>Weak 10s</div></div>
-                        <div style={S.statBox}><div style={{...S.statNum,color:C.spare,fontSize:"20px"}}>{rng}</div><div style={S.statLbl}>Ringing 10s</div></div>
-                      </>
-                    )}
-                    <div style={S.statBox}>
-                      <div style={{...S.statNum,color:C.textMuted,fontSize:"20px"}}>{tot>0?Math.round((tenPinLeaveCount/tot)*100):0}%</div>
-                      <div style={S.statLbl}>10-Pin Rate</div>
-                      {showTeamCompare&&<CompareBadge value={tot>0?Math.round((tenPinLeaveCount/tot)*100):0} teamValue={teamTenPinRate} lowerIsBetter label={compareLabel}/>}
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:"8px"}}>
-                    <div style={{...S.statBox,border:`1px solid ${C.strike}44`}}>
-                      <div style={{...S.statNum,color:C.strike,fontSize:"20px"}}>{tenPinAttempts.length?`${tenPinSpareR}%`:"—"}</div>
-                      <div style={S.statLbl}>10-Pin Spare %</div>
-                      {showTeamCompare&&<CompareBadge value={tenPinSpareR} teamValue={teamTenPinSpareR} label={compareLabel}/>}
-                    </div>
-                    <div style={S.statBox}>
-                      <div style={{...S.statNum,color:C.textMuted,fontSize:"20px"}}>{tenPinMade}/{tenPinAttempts.length}</div>
-                      <div style={S.statLbl}>Made / Attempts</div>
-                    </div>
-                  </div>
+                  {/* Redesigned: one lead number (the rate, since
+                      that's the summary stat), the rest as rows with
+                      proportional bars instead of a wall of equal boxes.
+                      Every value that was here is still here -- weak vs
+                      ringing, conversion, attempts, team comparison --
+                      nothing was cut, only reordered by importance. */}
+                  <div style={S.label}>Ten pins</div>
+                  {(()=>{
+                    const rate=tot>0?Math.round((tenPinLeaveCount/tot)*100):0;
+                    const spareRate=tenPinAttempts.length?tenPinSpareR:null;
+                    const wkPct=(wk+rng)>0?Math.round((wk/(wk+rng))*100):0;
+                    return(<>
+                      <div style={{display:"flex",alignItems:"baseline",gap:"10px",marginBottom:"2px"}}>
+                        <div className="num" style={{fontSize:"44px",fontWeight:700,fontFamily:F.num,lineHeight:0.9,color:C.text}}>{rate}%</div>
+                        <span style={{fontSize:"13px",color:C.textMuted}}>of first balls leave a ten</span>
+                      </div>
+                      {showTeamCompare&&<CompareBadge value={rate} teamValue={teamTenPinRate} lowerIsBetter label={compareLabel}/>}
+                      <div style={{fontSize:"12.5px",color:C.textMuted,margin:"6px 0 10px"}}>
+                        {tenPinAttempts.length} attempt{tenPinAttempts.length===1?"":"s"} out of {tot} first balls.
+                      </div>
+                      <div style={{borderTop:`1px solid ${C.border}`,paddingTop:"8px"}}>
+                        {!isTeamView&&(<>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`,fontSize:"13.5px"}}>
+                            <span>Weak 10s</span>
+                            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                              <div style={{height:"5px",width:"64px",background:C.border,borderRadius:"3px",overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${wkPct}%`,background:C.miss,borderRadius:"3px"}}/>
+                              </div>
+                              <b className="num" style={{fontFamily:F.num,fontSize:"16px",color:C.miss}}>{wk}</b>
+                            </div>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`,fontSize:"13.5px"}}>
+                            <span>Ringing 10s</span>
+                            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                              <div style={{height:"5px",width:"64px",background:C.border,borderRadius:"3px",overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${100-wkPct}%`,background:C.spare,borderRadius:"3px"}}/>
+                              </div>
+                              <b className="num" style={{fontFamily:F.num,fontSize:"16px",color:C.spare}}>{rng}</b>
+                            </div>
+                          </div>
+                        </>)}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",fontSize:"13.5px"}}>
+                          <span>Converted</span>
+                          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                            <b className="num" style={{fontFamily:F.num,fontSize:"16px",color:C.strike}}>{tenPinAttempts.length?`${spareRate}%`:"—"}</b>
+                            <span style={{fontSize:"12px",color:C.textMuted}}>({tenPinMade}/{tenPinAttempts.length})</span>
+                          </div>
+                        </div>
+                        {showTeamCompare&&spareRate!=null&&<CompareBadge value={spareRate} teamValue={teamTenPinSpareR} label={compareLabel}/>}
+                      </div>
+                    </>);
+                  })()}
                 </div>
                 );
                 byId["singlePinSpares"] = (
