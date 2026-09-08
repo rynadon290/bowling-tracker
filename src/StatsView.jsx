@@ -33,7 +33,20 @@ export default function StatsView({
   // Fixed cards keep anchored positions: "Viewing" is the selector that
   // controls everything below it, and "Danger Zone" holds destructive
   // actions -- neither should float into the middle of the stats.
-  const renderOrder = ["viewing", ...visibleStatsCardOrder(preferences)];
+  // Head-to-head is pulled directly under the Viewing card whenever a
+  // comparison is active.
+  //
+  // It's the only card that exists BECAUSE you're comparing -- with no
+  // comparison it renders nothing at all. Leaving it in its saved
+  // position meant selecting an opponent put the one card about that
+  // opponent somewhere below fifteen cards about you. The saved order
+  // still governs everything else, and is untouched when no comparison
+  // is running.
+  const baseOrder = ["viewing", ...visibleStatsCardOrder(preferences)];
+  const comparing = !!compareBowler || isTeamView;
+  const renderOrder = comparing
+    ? ["viewing", "headToHead", ...baseOrder.filter(id => id !== "viewing" && id !== "headToHead")]
+    : baseOrder;
 
   return (
           <>
@@ -823,17 +836,26 @@ sessions.length>0&&(()=>{
                     <div style={S.card}>
                       <div style={S.label}>Running Averages</div>
                       {isTeamView&&<div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>Top number is the average bowler's score. "Team" below it is what the whole team scores together that game.</div>}
-                      <div style={{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
-                        {leagueAvgs.map(({league,avg})=>(
-                          <div key={league} style={S.statBox}>
-                            <div style={S.statNum}>{avg}</div>
-                            <div style={S.statLbl}>{league.replace(" House Shot","")}</div>
-                            {isTeamView&&teamGameTotalAvg(sessions,league)!=null&&<div style={{fontSize:"11px",color:C.accent,fontWeight:600,marginTop:"2px"}}>Team: {teamGameTotalAvg(sessions,league)}</div>}
-                            {showTeamCompare&&<CompareBadge value={avg} teamValue={compareBowler?rAvg(sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>}
-                          </div>
+                      {/* Rows, not boxes: this is a variable-length list of
+                          peers -- one average per league -- with no natural
+                          lead figure, and boxes wrapped raggedly once a
+                          bowler had three or more leagues. The composite
+                          gets the accent colour since it's the summary of
+                          the rest. */}
+                      <StatRows>
+                        {leagueAvgs.map(({league,avg},i)=>(
+                          <StatRow key={league}
+                            label={league.replace(" House Shot","")}
+                            value={avg}
+                            sub={isTeamView&&teamGameTotalAvg(sessions,league)!=null?`team ${teamGameTotalAvg(sessions,league)}`:null}
+                            last={i===leagueAvgs.length-1&&!(!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined)}
+                            badge={showTeamCompare?<CompareBadge value={avg} teamValue={compareBowler?rAvg(sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>:null}/>
                         ))}
-                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(<div style={{...S.statBox,border:`1px solid ${C.accent}44`}}><div style={{...S.statNum,color:C.accent}}>{combined}</div><div style={S.statLbl}>Composite</div>{showTeamCompare&&compareBowler&&<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>}</div>)}
-                      </div>
+                        {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(
+                          <StatRow label="Composite" value={combined} color={C.accent} last
+                            badge={showTeamCompare&&compareBowler?<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>:null}/>
+                        )}
+                      </StatRows>
                       {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}
                     </div>
                   );

@@ -64,6 +64,9 @@ export default function Settings({
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);
   const [historyTab, setHistoryTab] = useState("sessions");
+  // Reset wipes theme and card order as well as toggles, so it confirms
+  // rather than firing on a single tap.
+  const [resetArmed, setResetArmed] = useState(false);
   const [shareStatus, setShareStatus] = useState("");
 
   // Every settings card is collapsible, keyed by section id. Environment
@@ -532,15 +535,36 @@ export default function Settings({
       </CollapsibleCard>
       )}
 
+      {/* Named for WHAT it resets, not which environment it resets to.
+          It was "Reset to League Defaults" with "League" as the summary,
+          which read as "reset my league mode" -- but it rebuilds the whole
+          preferences object: theme, every tracked field, money games, and
+          the Stats card order. Someone reaching for it to fix one toggle
+          lost their theme and card layout with no warning. */}
       {showCard("reset") && (
-      <CollapsibleCard title="Reset" summary={ENVIRONMENT_LABELS[preferences.environment] || "Default"}
+      <CollapsibleCard title="Reset settings" summary="Theme, fields, layout"
         expanded={expanded.reset} onToggle={() => toggle("reset")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-          Made a mess of your own toggles or card order? Restore {ENVIRONMENT_LABELS[preferences.environment] || "this environment"}'s defaults — including the Data card layout — without picking through everything by hand.
+          Puts every setting on this screen back to what {ENVIRONMENT_LABELS[preferences.environment] || "this environment"} starts with — your theme, which fields you track, money games, and the Stats card order. Your scores, shots and equipment aren't touched.
         </div>
-        <button style={{ ...S.btn(), width: "100%" }} onClick={() => apply(prev => resetToEnvironmentDefaults(prev))}>
-          Reset to {ENVIRONMENT_LABELS[preferences.environment] || "Default"} Defaults
-        </button>
+        {resetArmed ? (
+          <>
+            <div style={{ fontSize: "12px", color: C.spare, marginBottom: "8px", fontWeight: 600 }}>
+              This will undo your theme and Stats card order too. Sure?
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button style={{ ...S.btn(), flex: 1 }} onClick={() => setResetArmed(false)}>Cancel</button>
+              <button style={{ ...S.btn("warn"), flex: 1 }}
+                onClick={() => { apply(prev => resetToEnvironmentDefaults(prev)); setResetArmed(false); }}>
+                Reset everything
+              </button>
+            </div>
+          </>
+        ) : (
+          <button style={{ ...S.btn(), width: "100%" }} onClick={() => setResetArmed(true)}>
+            Reset all settings
+          </button>
+        )}
       </CollapsibleCard>
       )}
 
