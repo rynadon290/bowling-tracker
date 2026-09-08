@@ -30,7 +30,7 @@ export default function LogView({
   ballLayouts, setBallLayout,
   activeTournament, updateTournament, saveTournament, tournamentSaved,
   manualScores, updateManualScore,
-  showSessionStart, dismissSessionStart, updatePreferences,
+  showSessionStart, dismissSessionStart, updatePreferences, sessionEnvChosen, onSessionEnvChosen,
   goalsPanel, practiceMode, setPracticeMode, gameEquipment, updateGameEquipment, practiceTracking, setPracticeTracking, activeDrill, setActiveDrill, startDrill, startAnotherDrill, saveDrill, drillSaved, drills, leftHandedForBowler,
   ownerName, scoringForOthers, setScoringForOthers, scoreOptions, guests, newGuestName, setNewGuestName, addGuestBowler, removeGuestBowler,
   oilPatterns, submitOilPattern, tournaments, practicePriorAverage,
@@ -53,7 +53,16 @@ export default function LogView({
   // every future session start with four empty boxes.
   const [extraGames,setExtraGames]=useState(0);
 
-  const showGoals=env==="league"||(env==="practice"&&!isDrill);
+  // League needs a league picked before anything else is worth showing.
+  //
+  // Not just tidiness -- it's a data-integrity gate. Shots and scores are
+  // filed against (bowler, league, date), so anything logged before a
+  // league is chosen has nowhere to go: it wouldn't sync, wouldn't appear
+  // once a league WAS picked, and would still skew any average that
+  // doesn't filter by league. Waiting for one tap prevents all of it.
+  const leagueReady=env!=="league"||!!effectiveSessionLeague;
+
+  const showGoals=leagueReady&&(env==="league"||(env==="practice"&&!isDrill));
   // Bug fix: showEquipment checked environment but never trackingMode, so
   // switching League from shot-by-shot to game-scores-only left the Ball/
   // Surface/Line cards showing -- there was nothing gating them on HOW
@@ -63,20 +72,31 @@ export default function LogView({
   // meant the option in Settings did nothing there, which is worse than
   // not offering it. Casual stays excluded: scores-only is the entire
   // point of that mode, so it doesn't get the choice at all.
-  const showEquipment=env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
+  const showEquipment=leagueReady&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
   // Shot Context (game/frame/lane) is meaningless without shots -- a
   // scores-only night has games, not frames. It had no gate at all.
-  const showShotContext=env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
+  const showShotContext=leagueReady&&env!=="casual"&&!isDrill&&preferences.trackingMode==="shot";
 
   return (
     <>
           <>
+            {/* While the guided prompt is up it's the ONLY thing on the
+                tab, vertically centred between header and nav. Showing
+                eleven cards behind a question nobody has answered yet is
+                what made this screen overwhelming. */}
             {!editingId&&showSessionStart&&(
-              <SessionStart
-                preferences={preferences}
-                onApply={updatePreferences}
-                onDismiss={dismissSessionStart}/>
+              <div style={{minHeight:"calc(100vh - 210px)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                <SessionStart
+                  preferences={preferences}
+                  onApply={updatePreferences}
+                  onDismiss={dismissSessionStart}
+                  envChosen={sessionEnvChosen}
+                  onEnvChosen={onSessionEnvChosen}/>
+              </div>
             )}
+
+            {/* Everything below waits for the prompt to be answered. */}
+            {!(!editingId&&showSessionStart)&&(<>
 
             {/* Edit banner */}
             {editingId&&(
@@ -1155,7 +1175,7 @@ export default function LogView({
                 above -- showing both would imply you need to do both.
                 Editing an existing shot always shows the form, since
                 that's how a logged shot gets corrected. */}
-            {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(<>
+            {(editingId||(leagueReady&&preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(<>
             </>)}
 
             {/* Line */}
@@ -1292,6 +1312,7 @@ export default function LogView({
 
             <div style={{height:`${footerHeight}px`}}/>
             </>)}
+            </>)}
           </>
           {/* Sits ABOVE the bottom nav, not under it. The nav is fixed at
               bottom:0 with zIndex 100, so this bar -- also fixed at
@@ -1300,7 +1321,7 @@ export default function LogView({
               shot-by-shot logging from advancing at all.
               64px clears the nav; the safe-area inset clears the iOS
               home indicator underneath it. */}
-          {(editingId||(preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(
+          {(editingId||(leagueReady&&preferences.trackingMode==="shot"&&!(preferences.environment==="practice"&&practiceMode==="drill")))&&(
           <div ref={footerRef} style={{position:"fixed",bottom:"calc(64px + env(safe-area-inset-bottom, 0px))",left:0,right:0,backgroundColor:C.surface,borderTop:`1px solid ${C.border}`,padding:"12px 16px",zIndex:90,maxWidth:"480px",margin:"0 auto"}}>
             <button style={S.btn("primary")} onClick={submitShot} disabled={!form.result||!form.bowler||needsSpareMade}>
               {saved?(editingId?"✓ Shot Updated":"✓ Shot Saved"):(editingId?"Update Shot":"Save Shot")}

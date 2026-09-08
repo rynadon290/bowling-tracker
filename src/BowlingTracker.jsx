@@ -432,6 +432,11 @@ export default function BowlingTracker(){
   // effect has actually read storage, so it can't flash on startup.
   const[sessionStartDismissedDate,setSessionStartDismissedDate]=useState(localDateString());
   const[sessionStartSeen,setSessionStartSeen]=useState(true);
+  // Has the "where" question been answered in THIS prompt? Drives the
+  // staged reveal -- the tracking question only appears afterwards.
+  // Session-local, not persisted: the prompt is per-day, so a fresh
+  // prompt should start fresh.
+  const[sessionEnvChosen,setSessionEnvChosen]=useState(false);
   // Read synchronously on the very first render from a localStorage
   // mirror of the flag.
   //
@@ -4156,6 +4161,7 @@ export default function BowlingTracker(){
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             showSessionStart={showSessionStart} dismissSessionStart={dismissSessionStart}
+            sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={()=>setSessionEnvChosen(true)}
             updatePreferences={updatePreferences}
           />
         )}
