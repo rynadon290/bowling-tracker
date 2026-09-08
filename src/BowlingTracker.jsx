@@ -4120,12 +4120,18 @@ export default function BowlingTracker(){
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
         )}
 
+        {/* Practice and casual: nothing to ask. The container league is
+            fixed and the bowler is whoever is selected in "Keeping score
+            for", so the import opens straight on the screenshot picker
+            instead of asking two questions with one answer each. */}
         {view==="import"&&(
           <ImportScorecard
             bowlers={bowlers} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
             updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}
+            presetLeague={preferences.environment==="practice"||preferences.environment==="casual"?effectiveSessionLeague:null}
+            presetBowler={preferences.environment==="practice"||preferences.environment==="casual"?activeBowler:null}
           />
         )}
 

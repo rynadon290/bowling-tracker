@@ -143,10 +143,18 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
 export default function ImportScorecard({
   bowlers, leagues, teams, profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
+  // Practice and casual have a container league rather than one you pick,
+  // and the bowler is already chosen on the Log tab. Passing those in
+  // lets the import skip straight to what it actually needs -- the
+  // screenshots -- instead of asking questions with one possible answer.
+  presetLeague = null, presetBowler = null,
 }){
   const[step,setStep]=useState("setup"); // setup | processing | review | saving
-  const[contextBowler,setContextBowler]=useState(bowlers[0]||"");
-  const[contextLeague,setContextLeague]=useState(leagues[0]||"");
+  const[contextBowler,setContextBowler]=useState(presetBowler||bowlers[0]||"");
+  const[contextLeague,setContextLeague]=useState(presetLeague||leagues[0]||"");
+  // When both are known there is nothing to ask: show the screenshot
+  // card alone.
+  const contextPreset=!!(presetLeague&&presetBowler);
   const[contextDate,setContextDate]=useState(localDateString());
   const[images,setImages]=useState([]); // [{base64, mimeType, previewUrl}]
   const[error,setError]=useState(null);
@@ -504,6 +512,7 @@ export default function ImportScorecard({
     <div>
       {step==="setup"&&(
         <>
+          {!contextPreset&&(
           <div style={S.card}>
             <div style={S.label}>Whose scorecard is this?</div>
             <div style={S.chips}>
@@ -516,6 +525,20 @@ export default function ImportScorecard({
             <div style={S.label}>Date</div>
             <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
           </div>
+          )}
+
+          {/* Preset: one quiet line confirming what it will be filed
+              against, so it is not a black box, plus the date which does
+              still change. */}
+          {contextPreset&&(
+            <div style={{...S.card,paddingTop:"12px",paddingBottom:"12px"}}>
+              <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"8px"}}>
+                Filing for <strong style={{color:C.text}}>{contextBowler}</strong>
+              </div>
+              <div style={S.label}>Date</div>
+              <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
+            </div>
+          )}
 
           <div style={S.card}>
             <div style={S.label}>Scorecard Screenshot{images.length!==1?"s":""}</div>

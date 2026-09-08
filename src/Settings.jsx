@@ -343,7 +343,7 @@ export default function Settings({
                     or typed wrong at creation -- this is what the
                     book-average update prompt keys off of. */}
                 <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px", marginBottom: "4px" }}>
-                  Season dates
+                  {league === "Practice" || league === "Casual" ? "Date range (optional)" : "Season dates"}
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input type="date" style={{ ...S.input, flex: 1, fontSize: "12px" }}
@@ -390,7 +390,14 @@ export default function Settings({
                   }
                   return (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-                      <span style={{ fontSize: "11px", color: C.textMuted }}>Bowls on {dayName(day)}s</span>
+                      <span style={{ fontSize: "11px", color: C.textMuted }}>
+                        {/* A real league has a fixed night; practice and
+                            casual don't, so "Bowls on Tuesdays" would be
+                            claiming a schedule that doesn't exist. */}
+                        {league === "Practice" || league === "Casual"
+                          ? `Usually ${dayName(day)}s`
+                          : `Bowls on ${dayName(day)}s`}
+                      </span>
                       <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }} onClick={addToCalendar}>
                         Add weekly reminder
                       </button>
