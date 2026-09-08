@@ -3202,6 +3202,15 @@ export default function BowlingTracker(){
     if(startedSessionRef.current===key)return;
     startedSessionRef.current=key;
     const scores=[1,2,3].map(g=>getGameStrict(activeBowler,effectiveSessionLeague,sessionDate,g)).filter(v=>v!=null);
+    // computeSessionStats supplies misses, releases, shotCount, strikes,
+    // spareAttempts and sparesMade. The Summary block calls
+    // cs.misses.filter(...) and cs.releases.filter(...) directly, so a
+    // draft without them threw on render and blanked the screen the
+    // moment a league was selected -- selecting a league is what first
+    // makes this session findable, and therefore what first renders the
+    // Summary.
+    const nightShots=shots.filter(sh=>sh.bowler===activeBowler
+      &&sh.league===effectiveSessionLeague&&sh.date===sessionDate);
     const draft={
       id:crypto.randomUUID(),bowler:activeBowler,league:effectiveSessionLeague,date:sessionDate,
       scores,total:scores.reduce((a,b)=>a+b,0),
@@ -3209,6 +3218,7 @@ export default function BowlingTracker(){
       pokerQuarter:[0,0,0],pokerDollar:[0,0,0],threeSixNineWinnings:0,jackpotWinnings:0,
       highGameWinnings:[0,0,0],pokerQuarterCost:[0,0,0],pokerDollarCost:[0,0,0],
       highGameCost:[0,0,0],threeSixNineCost:0,
+      ...computeSessionStats(nightShots),
     };
     const updated=[...sessions,draft];
     setSessions(updated);

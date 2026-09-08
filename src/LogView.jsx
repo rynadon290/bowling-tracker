@@ -753,8 +753,15 @@ export default function LogView({
               const sr=cs.shotCount?Math.round((cs.strikes/cs.shotCount)*100):0;
               const spr=cs.spareAttempts?Math.round((cs.sparesMade/cs.spareAttempts)*100):0;
               const leagueAs=leagues.map(league=>({league,avg:rAvg(sessions,activeBowler,league)})).filter(x=>x.avg!=null),cA=cAvg(sessions,activeBowler);
-              const mDist=MISSES.map(m=>({m,c:cs.misses.filter(x=>x===m).length})).filter(x=>x.c>0);
-              const gR=cs.releases.filter(r=>r==="Good").length,bR=cs.releases.filter(r=>r==="Bad").length,rT=cs.releases.length;
+              // Defaulted, not assumed. A session saved by an older version
+              // of the app -- or a draft created mid-night -- may not carry
+              // these arrays, and calling .filter() on undefined throws
+              // during render, which blanks the entire screen. A missing
+              // array should cost a chart, not the app.
+              const csMisses=Array.isArray(cs.misses)?cs.misses:[];
+              const csReleases=Array.isArray(cs.releases)?cs.releases:[];
+              const mDist=MISSES.map(m=>({m,c:csMisses.filter(x=>x===m).length})).filter(x=>x.c>0);
+              const gR=csReleases.filter(r=>r==="Good").length,bR=csReleases.filter(r=>r==="Bad").length,rT=csReleases.length;
               return(
                 <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
                   <div style={{...S.label}}>
@@ -960,7 +967,7 @@ export default function LogView({
                       <div style={S.statBox}><div style={{...S.statNum,fontSize:"16px",color:C.strike}}>{Math.round((cs.splitsConverted/cs.splits)*100)}%</div><div style={S.statLbl}>Converted</div></div>
                     </div>
                   )}
-                  {cs.ballsUsed.length>0&&(<div style={{marginBottom:"10px"}}><div style={S.label}>Balls Used</div><div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{cs.ballsUsed.map(b=><span key={b} style={S.tag()}>{b}</span>)}</div></div>)}
+                  {(cs.ballsUsed||[]).length>0&&(<div style={{marginBottom:"10px"}}><div style={S.label}>Balls used</div><div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>{(cs.ballsUsed||[]).map(b=><span key={b} style={S.tag()}>{b}</span>)}</div></div>)}
                   {rT>0&&(
                     <div style={{marginBottom:"10px"}}>
                       <div style={S.label}>Release Quality</div>
