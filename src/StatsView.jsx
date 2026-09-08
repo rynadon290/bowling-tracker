@@ -12,7 +12,6 @@ import { totalMoney } from "./domain/money.js";
 import { visibleStatsCardOrder } from "./domain/preferences.js";
 
 export default function StatsView({
-  goalsPanel,
   centerStats,
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
@@ -38,12 +37,6 @@ export default function StatsView({
 
   return (
           <>
-            {/* Outside the shots.length gate below on purpose. New bowlers
-                default to game-scores-only tracking, so they have sessions
-                and no shots at all -- gating goals on shots would hide the
-                feature entirely from exactly the people most likely to set
-                an average or high-game target. */}
-            {goalsPanel}
             {shots.length===0&&(
               <div style={{textAlign:"center",padding:"40px 16px"}}>
                 <div style={{fontSize:"15px",fontWeight:600,color:C.text,marginBottom:"6px"}}>Nothing to count yet</div>

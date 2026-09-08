@@ -149,15 +149,17 @@ export default function TrendsView({
                 percentage climbing wants to send that to someone. */}
             {points.length > 1 && (
               <div style={{ marginBottom: "12px" }}>
+                {/* trend: true routes this to the graph card. Passing the
+                    points as `scores` made the card sum them into a
+                    meaningless "9825 series" and draw 50 games side by
+                    side at 220px apart -- ~11,000px on a 1080px card,
+                    which is the black bar. */}
                 <ShareButton compact label="Share this trend" summary={{
+                  trend: true,
                   bowler: statsBowler,
-                  scores: showEveryGame ? points.map(p => p.value) : [],
+                  label: metric?.label || "Trend",
+                  points: points.map(p => p.value),
                   league: statsLeague,
-                  environment: "league",
-                  highlights: showEveryGame && gameSummary
-                    ? [`${gameSummary.games} games, averaging ${gameSummary.average}`,
-                       `High ${gameSummary.high}, low ${gameSummary.low}`]
-                    : [`${metric?.label || "Trend"}: ${summary || direction}`],
                 }} />
               </div>
             )}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, F } from "./ui.jsx";
-import { shareText, shareTitle, drawShareCard } from "./domain/shareCard.js";
+import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText } from "./domain/shareCard.js";
 
 // One tap to share a night's scores.
 //
@@ -22,7 +22,10 @@ async function renderCardBlob(summary) {
     canvas.width = 1080; canvas.height = 1080;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    drawShareCard(ctx, { ...summary, colors: C, fonts: F });
+    // A trend is a shape over time, not a scoreline -- it gets the graph
+    // card instead of the score card.
+    if (summary?.trend) drawTrendCard(ctx, { ...summary, colors: C, fonts: F });
+    else drawShareCard(ctx, { ...summary, colors: C, fonts: F });
     return await new Promise(res => canvas.toBlob(res, "image/png"));
   } catch {
     return null;
@@ -34,8 +37,8 @@ export default function ShareButton({ summary, label = "Share", compact = false 
 
   async function share() {
     setState("working");
-    const text = shareText(summary);
-    const title = shareTitle(summary);
+    const text = summary?.trend ? trendShareText(summary) : shareText(summary);
+    const title = summary?.trend ? (summary.label || "Trend") : shareTitle(summary);
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         const blob = await renderCardBlob(summary);

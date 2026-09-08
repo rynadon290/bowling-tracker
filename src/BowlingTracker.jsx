@@ -4310,13 +4310,6 @@ export default function BowlingTracker(){
 
         {view==="data"&&dataTab==="stats"&&(
           <StatsView
-            goalsPanel={goalBowler?(
-              <GoalsPanel
-                goals={activeGoals}
-                measurements={goalMeasurements}
-                leftHanded={viewedLeftHanded}
-                onChange={next=>saveGoals(goalBowler,next)}/>
-            ):null}
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
