@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import { formatDate } from "./constants.js";
 import {
-  categorizeCoaching, partitionTasks, taskProgress, sortNotes,
+  categorizeCoaching, coachRoster, partitionTasks, taskProgress, sortNotes,
   emptyTask, TASK_METRIC_IDS,
 } from "./domain/coaching.js";
 import { goalTypeFor } from "./domain/goals.js";
@@ -206,6 +206,7 @@ function NoteThread({ notes, myUserId, otherName, onAdd }) {
 }
 
 export default function CoachingView({
+  setNextCoachingSession, sessions, leagues,
   myUserId, relationships, profilesById, tasksByRelationship, notesByRelationship,
   coachViewOn, isCoach, onToggleCoachView,
   onSearch, searchResults, searching, onRequest, onRespond, onEnd,
@@ -224,6 +225,20 @@ export default function CoachingView({
   // In coach view you're looking at the people you coach; otherwise at
   // the people who coach you. Same screen, opposite side of the table.
   const list = coachViewOn ? myBowlers : myCoaches;
+
+  // One row per coached bowler: current task, progress, next session.
+  const roster = coachViewOn
+    ? coachRoster({
+        bowlers: myBowlers.map(b => ({
+          name: b.displayName, relationshipId: b.relationshipId,
+          nextSession: b.nextSession, nextSessionNote: b.nextSessionNote,
+        })),
+        tasks: Object.entries(tasksByRelationship || {})
+          .flatMap(([relId, ts]) => (ts || []).map(t => ({ ...t, relationshipId: relId }))),
+        sessions: sessions || [],
+        leagues: leagues || [],
+      })
+    : [];
   const selected = list.find(x => x.relationshipId === selectedId) || list[0] || null;
 
   // Loads on-demand as each bowler is actually viewed, not eagerly for
@@ -249,6 +264,69 @@ export default function CoachingView({
 
   return (
     <>
+      {isCoach && coachViewOn && roster.length > 0 && (
+        <div style={S.card}>
+          <div style={S.label}>Your bowlers</div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+            Everyone at a glance — what they're working on, how far along, and when you next see them.
+          </div>
+          {roster.map(r => (
+            <div key={r.bowler} style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
+                <button onClick={() => setSelectedId(r.relationshipId)}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                           fontSize: "14px", fontWeight: 600, color: C.text, textAlign: "left" }}>
+                  {r.bowler}
+                </button>
+                <span style={{ fontSize: "11px", color: r.nextSession ? C.accent : C.textMuted, flexShrink: 0 }}>
+                  {r.nextSession ? formatDate(r.nextSession) : "no session set"}
+                </span>
+              </div>
+
+              {r.currentTask ? (
+                <div style={{ fontSize: "12.5px", color: C.textMuted, marginTop: "3px" }}>
+                  {r.currentTask.title}
+                  {r.openTaskCount > 1 && ` (+${r.openTaskCount - 1} more)`}
+                </div>
+              ) : (
+                <div style={{ fontSize: "12.5px", color: C.textMuted, marginTop: "3px" }}>Nothing assigned yet.</div>
+              )}
+
+              {/* Progress as a bar: a coach scanning six bowlers reads
+                  bars faster than they read pairs of numbers. */}
+              {r.progress && r.progress.reached != null && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "5px" }}>
+                  <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: "3px",
+                                  width: `${Math.max(0, Math.min(100, Math.round((r.progress.reached / r.progress.target) * 100)))}%`,
+                                  background: r.progress.met ? C.strike : C.spare }} />
+                  </div>
+                  <span style={{ fontSize: "11.5px", color: r.progress.met ? C.strike : C.textMuted, flexShrink: 0 }}>
+                    {r.progress.reached}/{r.progress.target}{r.progress.met ? " ✓" : ""}
+                  </span>
+                </div>
+              )}
+              {r.progress && r.progress.reached == null && (
+                <div style={{ fontSize: "11.5px", color: C.textMuted, marginTop: "5px" }}>
+                  Target {r.progress.target}{r.progress.unit === "percent" ? "%" : ""} — no result logged yet.
+                </div>
+              )}
+
+              {r.nextSessionNote && (
+                <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "4px", fontStyle: "italic" }}>
+                  {r.nextSessionNote}
+                </div>
+              )}
+              {r.nextLeagueNight && (
+                <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>
+                  Bowls {r.nextLeague.replace(" House Shot", "")} on {formatDate(r.nextLeagueNight.toISOString().slice(0, 10))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {isCoach && (
         <div style={S.card}>
           <div style={S.label}>View</div>
@@ -338,6 +416,31 @@ export default function CoachingView({
 
       {selected && (
         <>
+          {/* Scheduling the next session. Coach-only -- a bowler setting
+              their coach's calendar isn't the relationship this models. */}
+          {actingAsCoach && setNextCoachingSession && (
+            <Section title={`Next session with ${selected.displayName}`}>
+              <div style={S.row}>
+                <input style={{ ...S.input, flex: 1 }} type="date"
+                  value={selected.nextSession || ""}
+                  onChange={e => setNextCoachingSession(selected.relationshipId, e.target.value, selected.nextSessionNote || "")} />
+                {selected.nextSession && (
+                  <button style={{ ...S.btn(), flexShrink: 0 }}
+                    onClick={() => setNextCoachingSession(selected.relationshipId, "", "")}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <input style={{ ...S.input, marginTop: "8px" }}
+                placeholder="Where and when, e.g. 6pm lanes 9-10 at Sunset"
+                defaultValue={selected.nextSessionNote || ""}
+                onBlur={e => setNextCoachingSession(selected.relationshipId, selected.nextSession || "", e.target.value)} />
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>
+                Shows on your roster above. Leave it blank if you work session to session.
+              </div>
+            </Section>
+          )}
+
           {actingAsCoach && (
             <Section title={`${selected.displayName}'s Game`}>
               {(() => {

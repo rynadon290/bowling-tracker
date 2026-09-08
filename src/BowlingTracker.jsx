@@ -2139,6 +2139,16 @@ export default function BowlingTracker(){
     await cloudWrite("coaching_relationships",row);
   }
 
+  // Only the coach sets this -- see migration_coaching_next_session.sql.
+  // cloudUpdate rather than cloudWrite so it patches the two columns
+  // instead of upserting a whole row and blanking what it doesn't know.
+  async function setNextCoachingSession(relationshipId,date,note){
+    setCoachingRels(prev=>prev.map(r=>r.id===relationshipId
+      ?{...r,next_session:date||null,next_session_note:note||null}:r));
+    await cloudUpdate("coaching_relationships",{id:relationshipId},
+      {next_session:date||null,next_session_note:note||null});
+  }
+
   async function respondCoaching(relationshipId,status){
     setCoachingRels(prev=>prev.map(r=>r.id===relationshipId?{...r,status}:r));
     await cloudUpdate("coaching_relationships",{id:relationshipId},{status});
@@ -4349,6 +4359,8 @@ export default function BowlingTracker(){
             tasksByRelationship={tasksByRelationship}
             notesByRelationship={notesByRelationship}
             coachViewOn={coachViewOn}
+            setNextCoachingSession={setNextCoachingSession}
+            sessions={sessions} leagues={leagues}
             isCoach={!!myProfile.isCoach}
             onToggleCoachView={v=>updatePreferences(prev=>setCoachView(prev,v))}
             onSearch={searchCoachProfiles}
