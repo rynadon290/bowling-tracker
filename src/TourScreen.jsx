@@ -425,11 +425,14 @@ const SCREENS = {
             showing: real accounts and placeholders side by side, so a
             bowler can see that a teammate without the app isn't a
             blocker. */}
+        {/* Invented names, not real ones. A shipped mock-up shouldn't
+            carry anyone's actual name, and the lineup reads correctly:
+            lead-off first, anchor last. */}
         {[
-          ["1", "Ryan", "you", C.accent],
-          ["2", "Kim Alvarez", "joined", C.strike],
-          ["3", "Thomas Dick", "invited · waiting", C.spare],
-          ["4", "Dave Mitchell", "invited · waiting", C.spare],
+          ["1", "Leadoff Larry", "you", C.accent],
+          ["2", "Brooklyn Barry", "joined", C.strike],
+          ["3", "Tessa Tenpin", "invited · waiting", C.spare],
+          ["4", "Anchor Annie", "invited · waiting", C.spare],
         ].map(([pos, name, state, col]) => (
           <div key={name} style={{
             display: "flex", alignItems: "center", gap: "7px",
