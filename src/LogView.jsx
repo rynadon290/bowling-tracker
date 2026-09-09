@@ -54,6 +54,18 @@ export default function LogView({
   // every future session start with four empty boxes.
   const [extraGames,setExtraGames]=useState(0);
 
+  // Score fields are locked while logging shot by shot.
+  //
+  // With shots being recorded, a score is already derived from them. An
+  // accidental keystroke in a score box would silently override that
+  // derived score -- manual entry takes precedence -- and the bowler
+  // would have no idea their real score had been replaced.
+  //
+  // One lock for all games, not one per game: a bowler switching to
+  // manual entry mid-night is switching for the rest of the night, and
+  // three separate padlocks is three times the friction for no benefit.
+  const [scoresUnlocked,setScoresUnlocked]=useState(false);
+
   // League needs a league picked before anything else is worth showing.
   //
   // Not just tidiness -- it's a data-integrity gate. Shots and scores are
@@ -714,7 +726,19 @@ export default function LogView({
                 bowlers who want score tracking without logging 30 shots a
                 night. A score entered here overrides whatever the shots
                 would have computed -- see domain/manualScores.js. */}
-            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.trackingMode==="game"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
+            {/* Score entry is available in BOTH tracking modes.
+                
+                Shot by shot is a choice made at the start of a night, not
+                a commitment for all three games -- bowlers get tired of
+                logging 30 shots and want to finish on scores without
+                abandoning the shot data they already have. Gating this on
+                trackingMode forced an all-or-nothing switch.
+                
+                In shot mode the fields are LOCKED by default: with shots
+                being logged, a derived score is already showing, and an
+                accidental keystroke silently overriding it would be worse
+                than the inconvenience of one extra tap. */}
+            {!editingId&&activeBowler&&effectiveSessionLeague&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
               // How many game rows to show.
               //
               // Was hardcoded to 3, which is right for a league night and
@@ -749,6 +773,24 @@ export default function LogView({
                       <> Noting a ball for a game attributes that whole game to it, so you can see how each ball held up as the lanes transitioned.</>
                     )}
                   </div>
+                  {/* Only shown in shot mode -- in scores-only mode there is
+                      no derived score to protect, so a lock would be pure
+                      friction. */}
+                  {preferences.trackingMode==="shot"&&(
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                                 padding:"8px 10px",marginBottom:"10px",borderRadius:"8px",
+                                 backgroundColor:C.surface,border:`1px solid ${C.border}`}}>
+                      <span style={{fontSize:"12px",color:C.textMuted,flex:1,lineHeight:1.4}}>
+                        {scoresUnlocked
+                          ?"Typing a score here replaces the one calculated from your shots."
+                          :"Scores are coming from your shots. Unlock to enter them by hand."}
+                      </span>
+                      <button style={{...S.btn(),padding:"6px 12px",fontSize:"12px",flexShrink:0}}
+                        onClick={()=>setScoresUnlocked(v=>!v)}>
+                        {scoresUnlocked?"🔓 Lock":"🔒 Unlock"}
+                      </button>
+                    </div>
+                  )}
                   {gameNums.map(g=>{
                     // Per-game ball is offered EVERYWHERE now, not only in
                     // practice. Lane transition is exactly as real on a
@@ -767,9 +809,16 @@ export default function LogView({
                     <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
                       <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
                         <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{g}</div>
-                        <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
-                          value={entered[g-1]==null?"":String(entered[g-1])}
-                          onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
+                        {(()=>{
+                          const locked=preferences.trackingMode==="shot"&&!scoresUnlocked;
+                          return(
+                            <input style={{...S.input,flex:1,opacity:locked?0.5:1}}
+                              type="number" inputMode="numeric" placeholder="Score"
+                              disabled={locked}
+                              value={entered[g-1]==null?"":String(entered[g-1])}
+                              onChange={e=>updateManualScore(activeBowler,effectiveSessionLeague,sessionDate,g,e.target.value)}/>
+                          );
+                        })()}
                       </div>
                       {/* Ball and surface per game, because that's what a
                           practice is for: which ball, which surface, what
