@@ -639,6 +639,152 @@ export default function ImportScorecard({
           </div>
 
 
+          <div style={S.card}>
+            <div style={S.label}>Scorecard Screenshot{images.length!==1?"s":""}</div>
+            <input type="file" accept="image/*" multiple
+              onChange={e=>e.target.files?.length&&handleFilesSelected(e.target.files)}
+              style={{marginBottom:"12px"}}/>
+            {images.length>0&&(
+              <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"12px"}}>
+                {images.map((img,i)=>(
+                  <div key={i} style={{position:"relative"}}>
+                    <img src={img.previewUrl} alt={`Scorecard ${i+1}`}
+                      style={{width:"72px",height:"72px",objectFit:"cover",borderRadius:"8px",border:`1px solid ${C.border}`}}/>
+                    {/* Picking the wrong photo from a camera roll is easy
+                        and used to mean starting the whole selection over. */}
+                    <button aria-label={`Remove scorecard ${i+1}`}
+                      onClick={()=>removeImage(i)}
+                      style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",
+                        borderRadius:"50%",border:`1px solid ${C.border}`,background:C.surface,
+                        color:C.text,fontSize:"13px",lineHeight:"20px",padding:0,cursor:"pointer"}}>
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {images.length>0&&(
+              <button style={{...S.btn(),width:"100%",marginBottom:"12px",fontSize:"12px",padding:"8px"}}
+                onClick={()=>{images.forEach(i=>{if(i.previewUrl){try{URL.revokeObjectURL(i.previewUrl);}catch{}}});setImages([]);setError(null);}}>
+                Clear all {images.length} image{images.length>1?"s":""}
+              </button>
+            )}
+            {error&&(
+              <div style={{
+                fontSize:"13px",
+                color:errorIsTemporary?C.spare:C.miss,
+                backgroundColor:errorIsTemporary?C.spare+"11":"transparent",
+                border:errorIsTemporary?`1px solid ${C.spare}44`:"none",
+                borderRadius:errorIsTemporary?"8px":0,
+                padding:errorIsTemporary?"10px":0,
+                marginBottom:"12px",
+                lineHeight:1.5,
+              }}>
+                {errorIsTemporary&&<div style={{fontWeight:600,marginBottom:"4px"}}>Nothing's broken — just busy</div>}
+                {error}
+              </div>
+            )}
+            {/* Set the expectation before the wait, not during it. */}
+            {images.length>0&&(()=>{
+              const mb=images.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
+              return(
+                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                  {images.length>1
+                    ? `${images.length} images (${mb.toFixed(1)}MB, full quality) — reading these can take a few minutes.`
+                    : `Reading a scorecard can take a minute or two. (${mb.toFixed(1)}MB, full quality.)`}
+                </div>
+              );
+            })()}
+            <button style={S.btn("primary")} disabled={!contextLeague||!images.length} onClick={handleExtract}>
+              Extract Shots
+            </button>
+          </div>
+        </>
+      )}
+
+      {step==="processing"&&(
+        <div style={{...S.card,textAlign:"center",padding:"32px 16px"}}>
+          <div style={{fontSize:"14px",color:C.text,marginBottom:"8px"}}>Reading the scorecard…</div>
+          {/* Reading pin-deck graphics frame by frame is genuinely slow,
+              and a spinner with no expectation set reads as "stuck". The
+              wording scales with what was actually uploaded, because a
+              single totals-only shot is fast and a six-image team card
+              really is minutes. */}
+          <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
+            {images.length>1
+              ? `Working through ${images.length} images. This can take a few minutes — every frame is read individually.`
+              : "This can take a minute or two — every frame is read individually."}
+          </div>
+          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"10px"}}>
+            Keep this screen open until it finishes.
+          </div>
+        </div>
+      )}
+
+      {step==="columns"&&(
+        <>
+          <div style={S.card}>
+            <div style={S.label}>Who's who</div>
+            <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+              {columns.length} bowler{columns.length===1?"":"s"} read off the card. Confirm each one before anything is saved —
+              a wrong match writes someone else's game into their record.
+            </div>
+            {columns.map((c,i)=>{
+              const detail=detailLevel(c);
+              return(
+                <div key={i} style={{padding:"10px",marginBottom:"8px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${assignments[i]?C.border:C.spare+"66"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"6px"}}>
+                    <div style={{fontSize:"13px",fontWeight:600,color:C.text}}>
+                      {c.scorecardName||`Column ${i+1}`}
+                    </div>
+                    <div style={{fontSize:"10px",color:C.textMuted}}>
+                      {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"shot by shot":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
+                      {c.series!=null&&<> · {c.series} series</>}
+                      {c.mergedFrom>1&&<> · combined from {c.mergedFrom} images</>}
+                    </div>
+                  </div>
+                  {/* The printed total and the games disagreeing means
+                      something was misread -- worth a look, not a silent
+                      pick between them. */}
+                  {c.disagrees&&(
+                    <div style={{fontSize:"10px",color:C.spare,marginBottom:"6px"}}>
+                      Printed series is {c.series} but the games add to {c.computed}. Check the card.
+                    </div>
+                  )}
+                  <select style={{...S.sel,width:"100%",fontSize:"12px"}}
+                    value={assignments[i]||""}
+                    onChange={e=>setAssignments(a=>({...a,[i]:e.target.value}))}>
+                    <option value="">Skip this bowler</option>
+                    {bowlers.map(b=><option key={b} value={b}>{b}</option>)}
+                  </select>
+                  {c.best&&!c.autoMatch&&(
+                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                      {c.ambiguous?"More than one bowler matches this name equally — pick the right one.":`Closest match: ${c.best.bowler}`}
+                    </div>
+                  )}
+                  {c.matchedVia&&c.autoMatch&&c.best?.matchedVia!==c.best?.bowler&&(
+                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
+                      Matched on the alias "{c.best.matchedVia}".
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {orderCheck&&!orderCheck.agrees&&(
+            <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
+              <div style={{...S.label,color:C.spare}}>Roster order</div>
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                The card's order doesn't match your team roster. Names still matched correctly — but if the roster
+                is wrong, position hints will be wrong for every future import.
+              </div>
+              <div style={{fontSize:"11px",color:C.text}}>
+                Card order: {orderCheck.suggestedOrder.join(" → ")}
+              </div>
+            </div>
+          )}
+
           <button style={S.btn("primary")}
             disabled={!Object.values(assignments).some(Boolean)}
             onClick={confirmColumns}>
