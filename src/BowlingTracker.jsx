@@ -4633,7 +4633,7 @@ export default function BowlingTracker(){
             instead of asking two questions with one answer each. */}
         {view==="import"&&(
           <ImportScorecard
-            bowlers={bowlers} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
+            bowlers={bowlers} activeBowler={activeBowler} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
             updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}

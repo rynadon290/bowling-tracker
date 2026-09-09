@@ -141,7 +141,7 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
 }
 
 export default function ImportScorecard({
-  bowlers, leagues, teams, profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
+  bowlers, activeBowler, leagues, teams, profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
   // Practice and casual have a container league rather than one you pick,
   // and the bowler is already chosen on the Log tab. Passing those in
@@ -150,11 +150,27 @@ export default function ImportScorecard({
   presetLeague = null, presetBowler = null,
 }){
   const[step,setStep]=useState("setup"); // setup | processing | review | saving
-  const[contextBowler,setContextBowler]=useState(presetBowler||bowlers[0]||"");
-  const[contextLeague,setContextLeague]=useState(presetLeague||leagues[0]||"");
-  // When both are known there is nothing to ask: show the screenshot
-  // card alone.
-  const contextPreset=!!(presetLeague&&presetBowler);
+  // Which team's scorecard this is. The team, not the league: a league
+  // can hold several teams, and it's the team's roster that the card's
+  // columns get mapped to. The league comes along with it.
+  const teamsForImport=(teams||[]).filter(t=>t.league);
+  const initialTeam=(presetLeague
+    ?teamsForImport.find(t=>t.league===presetLeague)
+    :null)||teamsForImport[0]||null;
+  const[contextTeamId,setContextTeamId]=useState(initialTeam?.id||"");
+  const contextTeam=teamsForImport.find(t=>t.id===contextTeamId)||initialTeam||null;
+  const contextLeague=contextTeam?.league||presetLeague||leagues[0]||"";
+
+  // Whose card this is is NOT asked up front. Every column gets mapped to
+  // a bowler in the review step anyway, so asking first was asking the
+  // same question twice -- and it broke down entirely for multiple
+  // photos, where the answer is "several people".
+  //
+  // "Mine" is therefore derived: the signed-in bowler, used only to
+  // decide which mapped column files to this account rather than being
+  // sent to a teammate.
+  const contextBowler=presetBowler||activeBowler||bowlers[0]||"";
+  const contextPreset=!!presetLeague;
   const[contextDate,setContextDate]=useState(localDateString());
   const[images,setImages]=useState([]); // [{base64, mimeType, previewUrl}]
   const[error,setError]=useState(null);
@@ -173,7 +189,7 @@ export default function ImportScorecard({
   // who wasn't there when it was imported.
   const[teammateScores,setTeammateScores]=useState({}); // columnIndex -> [score strings]
 
-  const teamId=teams.find(t=>t.league===contextLeague&&(t.members||[]).includes(contextBowler))?.id||"";
+  const teamId=contextTeam?.id||"";
 
   // Longest edge, in pixels, that an image is scaled down to before
   // upload.
@@ -290,7 +306,7 @@ export default function ImportScorecard({
     .filter(x=>x.bowler&&x.bowler!==contextBowler);
 
   async function handleExtract(){
-    if(!contextBowler||!contextLeague||!images.length)return;
+    if(!contextLeague||!images.length)return;
     setStep("processing");
     setError(null);
     setErrorIsTemporary(false);
@@ -514,14 +530,33 @@ export default function ImportScorecard({
         <>
           {!contextPreset&&(
           <div style={S.card}>
-            <div style={S.label}>Whose scorecard is this?</div>
-            <div style={S.chips}>
-              {bowlers.map(b=><Chip key={b} label={b} selected={contextBowler===b} onToggle={()=>setContextBowler(b)}/>)}
-            </div>
-            <div style={S.label}>League</div>
-            <div style={S.chips}>
-              {leagues.map(l=><Chip key={l} label={l.replace(" House Shot","")} selected={contextLeague===l} onToggle={()=>setContextLeague(l)}/>)}
-            </div>
+            {/* Team, not league, and no "whose card is this?".
+                
+                Every column on the card gets mapped to a bowler in the
+                review step, so asking up front asked the same question
+                twice -- and with several photos the honest answer is
+                "several people", which a single chip row can't express.
+                
+                The team is what the columns get mapped against, and its
+                league comes with it. */}
+            <div style={S.label}>Which team?</div>
+            {teamsForImport.length===0?(
+              <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
+                No teams yet — add one under a league in Vault, then import.
+              </div>
+            ):(
+              <div style={S.chips}>
+                {teamsForImport.map(t=>(
+                  <Chip key={t.id} label={t.name} selected={contextTeamId===t.id}
+                    onToggle={()=>setContextTeamId(t.id)}/>
+                ))}
+              </div>
+            )}
+            {contextTeam&&(
+              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                {String(contextTeam.league||"").replace(" House Shot","")}
+              </div>
+            )}
             <div style={S.label}>Date</div>
             <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
           </div>
@@ -533,7 +568,7 @@ export default function ImportScorecard({
           {contextPreset&&(
             <div style={{...S.card,paddingTop:"12px",paddingBottom:"12px"}}>
               <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"8px"}}>
-                Filing for <strong style={{color:C.text}}>{contextBowler}</strong>
+                Filing against <strong style={{color:C.text}}>{contextTeam?.name||String(contextLeague).replace(" House Shot","")}</strong> — each column is mapped to a bowler after scanning.
               </div>
               <div style={S.label}>Date</div>
               <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
@@ -579,7 +614,7 @@ export default function ImportScorecard({
                 </div>
               );
             })()}
-            <button style={S.btn("primary")} disabled={!contextBowler||!contextLeague||!images.length} onClick={handleExtract}>
+            <button style={S.btn("primary")} disabled={!contextLeague||!images.length} onClick={handleExtract}>
               Extract Shots
             </button>
           </div>
@@ -682,7 +717,7 @@ export default function ImportScorecard({
       {(step==="review"||step==="saving")&&(
         <>
           <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"12px"}}>
-            {contextBowler} · {contextLeague.replace(" House Shot","")} · {formatDate(contextDate)} — {
+            {contextTeam?.name||contextLeague.replace(" House Shot","")} · {formatDate(contextDate)} — {
               // A totals-only card has no frames to review, so telling the
               // bowler to check frames sends them looking for something
               // that isn't on screen.
