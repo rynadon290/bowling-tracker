@@ -4372,6 +4372,16 @@ export default function BowlingTracker(){
                 <span style={{position:"absolute",top:"-4px",right:"-6px",minWidth:"15px",height:"15px",borderRadius:"8px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"15px",textAlign:"center",padding:"0 3px"}}>{inboxCount}</span>
               </button>
             )}
+            {/* Import lives here rather than on the Log tab. On Log it was
+                gated on the current environment AND on a league already
+                being chosen, so importing a league scorecard meant
+                setting up a league night first, and importing a
+                tournament card while in practice mode wasn't possible at
+                all. From the header it asks what's being imported
+                instead of inheriting whatever mode Log is in. */}
+            <button onClick={()=>setView("import")}
+              style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}}
+              aria-label="Import scorecard">📷</button>
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
@@ -4680,14 +4690,16 @@ export default function BowlingTracker(){
             fixed and the bowler is whoever is selected in "Keeping score
             for", so the import opens straight on the screenshot picker
             instead of asking two questions with one answer each. */}
+        {/* No preset league or bowler: the import asks what kind of card
+            it is and files accordingly, rather than inheriting whichever
+            mode the Log tab was left in. Reaching it from the header
+            means Log may not even be the last screen the bowler was on. */}
         {view==="import"&&(
           <ImportScorecard
-            bowlers={bowlers} activeBowler={activeBowler} profiles={profiles} leagues={leagues} teams={teams} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
+            bowlers={bowlers} activeBowler={activeBowler} profiles={profiles} leagues={leagues} teams={teams} tournaments={tournaments} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
             updateManualScore={updateManualScore}
             setSessionLeague={setSessionLeague} setSessionDate={setSessionDate} selectBowler={selectBowler}
             setView={setView} setSessionSaveMessage={setSessionSaveMessage}
-            presetLeague={preferences.environment==="practice"||preferences.environment==="casual"?effectiveSessionLeague:null}
-            presetBowler={preferences.environment==="practice"||preferences.environment==="casual"?activeBowler:null}
           />
         )}
 

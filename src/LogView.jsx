@@ -429,17 +429,15 @@ export default function LogView({
               </CollapsibleCard>
             )}
 
-            {/* Importing a scorecard has nothing to do with a drill -- a drill
-                isn't a game and produces no scorecard. */}
-            {/* Hidden in league until a league is chosen: an imported
-                scorecard is filed against (bowler, league, date) like any
-                other score, so importing first would have nowhere to put
-                it. leagueReady is true immediately everywhere else. */}
-            {!editingId&&activeBowler&&leagueReady&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(
-              <button style={{...S.btn(),width:"100%",marginBottom:"12px"}} onClick={()=>setView("import")}>
-                📷 Import Scorecard
-              </button>
-            )}
+            {/* Import moved to the header. It was here, gated on the
+                current environment and on a league already being chosen --
+                which meant importing a league card required setting up a
+                league night first, and importing a tournament card while
+                in practice mode was impossible.
+                
+                It's now reachable from anywhere and asks what's being
+                imported, so the import no longer inherits whatever mode
+                the Log tab happens to be in. */}
 
             {/* Says what's missing rather than showing nothing. The card
                 itself stays gated on a league because a score is keyed by

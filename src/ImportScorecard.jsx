@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
-import { formatDate, RESULTS, localDateString } from "./constants.js";
+import { formatDate, RESULTS, localDateString, PRACTICE_SESSION_KEY } from "./constants.js";
 import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
@@ -151,7 +151,7 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
 }
 
 export default function ImportScorecard({
-  bowlers, activeBowler, leagues, teams, profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
+  bowlers, activeBowler, leagues, teams, tournaments = [], profiles, shots, saveShots, updateManualScore, onSubmitTeammateScores,
   setSessionLeague, setSessionDate, selectBowler, setView, setSessionSaveMessage,
   // Practice and casual have a container league rather than one you pick,
   // and the bowler is already chosen on the Log tab. Passing those in
@@ -167,9 +167,26 @@ export default function ImportScorecard({
   const initialTeam=(presetLeague
     ?teamsForImport.find(t=>t.league===presetLeague)
     :null)||teamsForImport[0]||null;
+  // What kind of bowling this scorecard is from.
+  //
+  // Asked outright rather than inherited from whatever mode the Log tab
+  // happened to be in. The import used to live on Log and take its
+  // environment from there, so a tournament card couldn't be imported
+  // while the app was in practice mode, and a league card needed a
+  // league night set up first.
+  const[importKind,setImportKind]=useState(
+    presetLeague===PRACTICE_SESSION_KEY?"practice":"league");
+  const[contextTournamentId,setContextTournamentId]=useState("");
   const[contextTeamId,setContextTeamId]=useState(initialTeam?.id||"");
   const contextTeam=teamsForImport.find(t=>t.id===contextTeamId)||initialTeam||null;
-  const contextLeague=contextTeam?.league||presetLeague||leagues[0]||"";
+  const selectedTournament=(tournaments||[]).find(t=>t.id===contextTournamentId)||null;
+  // Practice and tournament sessions are still filed against a league
+  // name -- that's the key every score hangs off -- but the name comes
+  // from the kind rather than from a team.
+  const contextLeague=
+    importKind==="practice"?(presetLeague||PRACTICE_SESSION_KEY)
+    :importKind==="tournament"?(selectedTournament?.name||"")
+    :(contextTeam?.league||presetLeague||leagues[0]||"");
 
   // Whose card this is is NOT asked up front. Every column gets mapped to
   // a bowler in the review step anyway, so asking first was asking the
@@ -180,7 +197,6 @@ export default function ImportScorecard({
   // decide which mapped column files to this account rather than being
   // sent to a teammate.
   const contextBowler=presetBowler||activeBowler||bowlers[0]||"";
-  const contextPreset=!!presetLeague;
   const[contextDate,setContextDate]=useState(localDateString());
   const[images,setImages]=useState([]); // [{base64, mimeType, previewUrl}]
   const[error,setError]=useState(null);
@@ -556,198 +572,72 @@ export default function ImportScorecard({
     <div>
       {step==="setup"&&(
         <>
-          {!contextPreset&&(
           <div style={S.card}>
-            {/* Team, not league, and no "whose card is this?".
-                
-                Every column on the card gets mapped to a bowler in the
-                review step, so asking up front asked the same question
-                twice -- and with several photos the honest answer is
-                "several people", which a single chip row can't express.
-                
-                The team is what the columns get mapped against, and its
-                league comes with it. */}
-            <div style={S.label}>Which team?</div>
-            {teamsForImport.length===0?(
-              <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
-                No teams yet — add one under a league in Vault, then import.
-              </div>
-            ):(
-              <div style={S.chips}>
-                {teamsForImport.map(t=>(
-                  <Chip key={t.id} label={t.name} selected={contextTeamId===t.id}
-                    onToggle={()=>setContextTeamId(t.id)}/>
-                ))}
-              </div>
+            {/* What kind of bowling, then which one. Asked here rather
+                than inherited from the Log tab's current mode, so any
+                card can be imported from anywhere. */}
+            <div style={S.label}>What are you importing?</div>
+            <div style={S.chips}>
+              <Chip label="Practice" selected={importKind==="practice"} onToggle={()=>setImportKind("practice")}/>
+              <Chip label="League" selected={importKind==="league"} onToggle={()=>setImportKind("league")}/>
+              <Chip label="Tournament" selected={importKind==="tournament"} onToggle={()=>setImportKind("tournament")}/>
+            </div>
+
+            {importKind==="league"&&(
+              <>
+                {/* Team, not league: every column gets mapped to a bowler
+                    in the review step, and the team is the roster it's
+                    mapped against. Its league comes with it. */}
+                <div style={S.label}>Which team?</div>
+                {teamsForImport.length===0?(
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
+                    No teams yet — add one under a league in Vault, then import.
+                  </div>
+                ):(
+                  <div style={S.chips}>
+                    {teamsForImport.map(t=>(
+                      <Chip key={t.id} label={t.name} selected={contextTeamId===t.id}
+                        onToggle={()=>setContextTeamId(t.id)}/>
+                    ))}
+                  </div>
+                )}
+                {contextTeam&&(
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                    {String(contextTeam.league||"").replace(" House Shot","")}
+                  </div>
+                )}
+              </>
             )}
-            {contextTeam&&(
+
+            {importKind==="tournament"&&(
+              <>
+                <div style={S.label}>Which tournament?</div>
+                {(tournaments||[]).length===0?(
+                  <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"10px"}}>
+                    No tournaments yet — start one on the Bowl tab first.
+                  </div>
+                ):(
+                  <div style={S.chips}>
+                    {(tournaments||[]).map(t=>(
+                      <Chip key={t.id} label={t.name} selected={contextTournamentId===t.id}
+                        onToggle={()=>setContextTournamentId(t.id)}/>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {importKind==="practice"&&(
               <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-                {String(contextTeam.league||"").replace(" House Shot","")}
+                Filed as practice — no league or team needed.
               </div>
             )}
+
+            {/* Always visible, whatever the kind. */}
             <div style={S.label}>Date</div>
             <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
           </div>
-          )}
 
-          {/* Preset: one quiet line confirming what it will be filed
-              against, so it is not a black box, plus the date which does
-              still change. */}
-          {contextPreset&&(
-            <div style={{...S.card,paddingTop:"12px",paddingBottom:"12px"}}>
-              <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"8px"}}>
-                Filing against <strong style={{color:C.text}}>{contextTeam?.name||String(contextLeague).replace(" House Shot","")}</strong> — each column is mapped to a bowler after scanning.
-              </div>
-              <div style={S.label}>Date</div>
-              <input style={S.input} type="date" value={contextDate} onChange={e=>setContextDate(e.target.value)}/>
-            </div>
-          )}
-
-          <div style={S.card}>
-            <div style={S.label}>Scorecard Screenshot{images.length!==1?"s":""}</div>
-            <input type="file" accept="image/*" multiple
-              onChange={e=>e.target.files?.length&&handleFilesSelected(e.target.files)}
-              style={{marginBottom:"12px"}}/>
-            {images.length>0&&(
-              <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"12px"}}>
-                {images.map((img,i)=>(
-                  <div key={i} style={{position:"relative"}}>
-                    <img src={img.previewUrl} alt={`Scorecard ${i+1}`}
-                      style={{width:"72px",height:"72px",objectFit:"cover",borderRadius:"8px",border:`1px solid ${C.border}`}}/>
-                    {/* Picking the wrong photo from a camera roll is easy
-                        and used to mean starting the whole selection over. */}
-                    <button aria-label={`Remove scorecard ${i+1}`}
-                      onClick={()=>removeImage(i)}
-                      style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",
-                        borderRadius:"50%",border:`1px solid ${C.border}`,background:C.surface,
-                        color:C.text,fontSize:"13px",lineHeight:"20px",padding:0,cursor:"pointer"}}>
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {images.length>0&&(
-              <button style={{...S.btn(),width:"100%",marginBottom:"12px",fontSize:"12px",padding:"8px"}}
-                onClick={()=>{images.forEach(i=>{if(i.previewUrl){try{URL.revokeObjectURL(i.previewUrl);}catch{}}});setImages([]);setError(null);}}>
-                Clear all {images.length} image{images.length>1?"s":""}
-              </button>
-            )}
-            {error&&(
-              <div style={{
-                fontSize:"13px",
-                color:errorIsTemporary?C.spare:C.miss,
-                backgroundColor:errorIsTemporary?C.spare+"11":"transparent",
-                border:errorIsTemporary?`1px solid ${C.spare}44`:"none",
-                borderRadius:errorIsTemporary?"8px":0,
-                padding:errorIsTemporary?"10px":0,
-                marginBottom:"12px",
-                lineHeight:1.5,
-              }}>
-                {errorIsTemporary&&<div style={{fontWeight:600,marginBottom:"4px"}}>Nothing's broken — just busy</div>}
-                {error}
-              </div>
-            )}
-            {/* Set the expectation before the wait, not during it. */}
-            {images.length>0&&(()=>{
-              const mb=images.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
-              return(
-                <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                  {images.length>1
-                    ? `${images.length} images (${mb.toFixed(1)}MB, full quality) — reading these can take a few minutes.`
-                    : `Reading a scorecard can take a minute or two. (${mb.toFixed(1)}MB, full quality.)`}
-                </div>
-              );
-            })()}
-            <button style={S.btn("primary")} disabled={!contextLeague||!images.length} onClick={handleExtract}>
-              Extract Shots
-            </button>
-          </div>
-        </>
-      )}
-
-      {step==="processing"&&(
-        <div style={{...S.card,textAlign:"center",padding:"32px 16px"}}>
-          <div style={{fontSize:"14px",color:C.text,marginBottom:"8px"}}>Reading the scorecard…</div>
-          {/* Reading pin-deck graphics frame by frame is genuinely slow,
-              and a spinner with no expectation set reads as "stuck". The
-              wording scales with what was actually uploaded, because a
-              single totals-only shot is fast and a six-image team card
-              really is minutes. */}
-          <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
-            {images.length>1
-              ? `Working through ${images.length} images. This can take a few minutes — every frame is read individually.`
-              : "This can take a minute or two — every frame is read individually."}
-          </div>
-          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"10px"}}>
-            Keep this screen open until it finishes.
-          </div>
-        </div>
-      )}
-
-      {step==="columns"&&(
-        <>
-          <div style={S.card}>
-            <div style={S.label}>Who's who</div>
-            <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-              {columns.length} bowler{columns.length===1?"":"s"} read off the card. Confirm each one before anything is saved —
-              a wrong match writes someone else's game into their record.
-            </div>
-            {columns.map((c,i)=>{
-              const detail=detailLevel(c);
-              return(
-                <div key={i} style={{padding:"10px",marginBottom:"8px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${assignments[i]?C.border:C.spare+"66"}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"6px"}}>
-                    <div style={{fontSize:"13px",fontWeight:600,color:C.text}}>
-                      {c.scorecardName||`Column ${i+1}`}
-                    </div>
-                    <div style={{fontSize:"10px",color:C.textMuted}}>
-                      {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"shot by shot":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
-                      {c.series!=null&&<> · {c.series} series</>}
-                      {c.mergedFrom>1&&<> · combined from {c.mergedFrom} images</>}
-                    </div>
-                  </div>
-                  {/* The printed total and the games disagreeing means
-                      something was misread -- worth a look, not a silent
-                      pick between them. */}
-                  {c.disagrees&&(
-                    <div style={{fontSize:"10px",color:C.spare,marginBottom:"6px"}}>
-                      Printed series is {c.series} but the games add to {c.computed}. Check the card.
-                    </div>
-                  )}
-                  <select style={{...S.sel,width:"100%",fontSize:"12px"}}
-                    value={assignments[i]||""}
-                    onChange={e=>setAssignments(a=>({...a,[i]:e.target.value}))}>
-                    <option value="">Skip this bowler</option>
-                    {bowlers.map(b=><option key={b} value={b}>{b}</option>)}
-                  </select>
-                  {c.best&&!c.autoMatch&&(
-                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
-                      {c.ambiguous?"More than one bowler matches this name equally — pick the right one.":`Closest match: ${c.best.bowler}`}
-                    </div>
-                  )}
-                  {c.matchedVia&&c.autoMatch&&c.best?.matchedVia!==c.best?.bowler&&(
-                    <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
-                      Matched on the alias "{c.best.matchedVia}".
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {orderCheck&&!orderCheck.agrees&&(
-            <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
-              <div style={{...S.label,color:C.spare}}>Roster order</div>
-              <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                The card's order doesn't match your team roster. Names still matched correctly — but if the roster
-                is wrong, position hints will be wrong for every future import.
-              </div>
-              <div style={{fontSize:"11px",color:C.text}}>
-                Card order: {orderCheck.suggestedOrder.join(" → ")}
-              </div>
-            </div>
-          )}
 
           <button style={S.btn("primary")}
             disabled={!Object.values(assignments).some(Boolean)}
