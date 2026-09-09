@@ -201,41 +201,27 @@ export default function ImportScorecard({
 
   const teamId=contextTeam?.id||"";
 
-  // Longest edge, in pixels, that an image is scaled down to before
-  // upload.
+  // Images are sent as-is. Nothing is resized or re-encoded.
   //
-  // A modern phone camera produces 4-12MB per photo, and base64 inflates
-  // that by a third. Six of those is a request body far past what the
-  // function will accept -- which arrives as a bare transport failure
-  // after a long wait, with nothing to say it was a size problem.
+  // They used to be scaled to a 1600px long edge and re-encoded as JPEG
+  // at 0.82. The reasoning was that a scorecard frame is only a few
+  // pixels wide so sharpness matters more than pixel count -- which is
+  // exactly backwards. Small digits and pin-deck graphics are the FIRST
+  // thing lost to downscaling, and JPEG artifacts land hardest on the
+  // fine lines OCR depends on. A phone screenshot arrives already sharp
+  // and already compressed; running it through a second lossy pass threw
+  // away the detail that made it readable, and three screenshots
+  // reducing to 0.3MB total is the visible symptom of that.
   //
-  // 1600px is comfortably enough to read pin-deck graphics (a scorecard
-  // frame is a handful of pixels wide at phone resolution, and the
-  // limiting factor is the photo's sharpness, not its pixel count) while
-  // cutting a typical upload by an order of magnitude.
-  const MAX_IMAGE_EDGE = 1600;
-  const JPEG_QUALITY = 0.82;
+  // The size ceiling below still exists, because an oversized body is a
+  // real transport failure -- but it now reports the problem instead of
+  // silently degrading every image to avoid it.
+  const MAX_TOTAL_MB = 18;
 
   async function downscale(file){
-    // No canvas (older browser, or a test environment) -- fall back to
-    // sending the original rather than failing the import outright.
-    if(typeof document==="undefined"||!document.createElement("canvas").getContext){
-      return readRaw(file);
-    }
-    try{
-      const bitmap=await createImageBitmap(file);
-      const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));
-      if(scale>=1)return readRaw(file);
-      const canvas=document.createElement("canvas");
-      canvas.width=Math.round(bitmap.width*scale);
-      canvas.height=Math.round(bitmap.height*scale);
-      canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
-      const dataUrl=canvas.toDataURL("image/jpeg",JPEG_QUALITY);
-      bitmap.close?.();
-      return{base64:dataUrl.split(",")[1],mimeType:"image/jpeg",previewUrl:dataUrl};
-    }catch{
-      return readRaw(file);
-    }
+    // Kept as the single entry point so callers don't change, but it no
+    // longer scales anything -- it just reads the file.
+    return readRaw(file);
   }
 
   function readRaw(file){
@@ -271,8 +257,8 @@ export default function ImportScorecard({
       const totalMb=withData.reduce((n,i)=>n+i.base64.length,0)/1024/1024*0.75;
       // Still too big even after scaling -- say so now rather than after
       // a two-minute wait that ends in a transport error.
-      if(totalMb>15){
-        setError(`These images come to about ${totalMb.toFixed(0)}MB even after resizing, which is too much to send at once. Try fewer images.`);
+      if(totalMb>MAX_TOTAL_MB){
+        setError(`These images come to about ${totalMb.toFixed(0)}MB, which is too much to send at once. Remove one and try again — images are sent at full quality, so fewer is better than smaller.`);
         setImages([]);
         return;
       }
@@ -668,8 +654,8 @@ export default function ImportScorecard({
               return(
                 <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
                   {images.length>1
-                    ? `${images.length} images (${mb.toFixed(1)}MB after resizing) — reading these can take a few minutes.`
-                    : `Reading a scorecard can take a minute or two. (${mb.toFixed(1)}MB after resizing.)`}
+                    ? `${images.length} images (${mb.toFixed(1)}MB, full quality) — reading these can take a few minutes.`
+                    : `Reading a scorecard can take a minute or two. (${mb.toFixed(1)}MB, full quality.)`}
                 </div>
               );
             })()}
