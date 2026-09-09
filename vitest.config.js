@@ -16,7 +16,13 @@ export default defineConfig({
     //
     // jsdom gives real DOM nodes and real event dispatch, so a test can
     // click the chip and assert what happened.
-    environment: 'jsdom',
+    // node by default, jsdom only where it's needed.
+    //
+    // Only three files touch a DOM (appRender, interactions, Scoresheet)
+    // and they opt in with a `@vitest-environment jsdom` comment. The
+    // other 37 are pure domain logic -- booting jsdom for them cost real
+    // time on every CI run and every local run, for nothing.
+    environment: 'node',
     globals: true,
     setupFiles: ['./src/test-setup.js'],
     include: ['src/**/*.test.js', 'src/**/*.test.jsx'],
