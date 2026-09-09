@@ -8,9 +8,22 @@ describe('tourSteps', () => {
   const league = { trackingMode: 'shot', showMoneyGames: true };
   const casual = { trackingMode: 'game', showMoneyGames: false };
 
+  // Every tab a step names must be a REAL nav id.
+  //
+  // The Stats step said "stats"; the nav's internal id is "data". An
+  // unknown view hits BowlingTracker's guard and bounces to Bowl, so the
+  // tour jumped to the Bowl tab while its text described Stats. Nothing
+  // errored -- it just quietly went to the wrong place.
+  it('only names tabs that actually exist in the nav', () => {
+    const NAV_IDS = ['log', 'history', 'data', 'insights', 'locker'];
+    for (const step of tourSteps({ trackingMode: 'shot', showMoneyGames: true })) {
+      if (step.tab) expect(NAV_IDS).toContain(step.tab);
+    }
+  });
+
   it('covers every tab', () => {
     const tabs = tourSteps(league).map(s => s.tab).filter(Boolean);
-    for (const tab of ['log', 'history', 'stats', 'insights', 'locker']) {
+    for (const tab of ['log', 'history', 'data', 'insights', 'locker']) {
       expect(tabs).toContain(tab);
     }
   });

@@ -14,7 +14,18 @@ const ALL_STEPS = [
     id: "bowl",
     tab: "log",
     title: "Bowl",
-    body: "Where you log. Pick your league, then record each shot — or just type game scores if you'd rather.",
+    body: "Where you log. Pick your league and date at the top, then record what happened.",
+  },
+  {
+    id: "tracking",
+    tab: "log",
+    title: "Two ways to track",
+    // The choice that shapes everything downstream, so it's worth its
+    // own step rather than a clause in the Bowl one. A bowler who
+    // doesn't understand this picks shot-by-shot, finds it slow, and
+    // concludes the app is heavy going -- when scores-only was there
+    // the whole time.
+    body: "Shot by shot records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only takes three numbers a night. You can switch any time, and even start a night one way and finish the other.",
   },
   {
     id: "scoresheet",
@@ -39,7 +50,12 @@ const ALL_STEPS = [
   },
   {
     id: "stats",
-    tab: "stats",
+    // "data", not "stats". The nav's internal id for the Stats tab is
+    // "data" -- sending "stats" hit the unknown-view guard in
+    // BowlingTracker, which bounces anything unrecognised back to the
+    // Bowl tab. The tour therefore jumped to Bowl while claiming to show
+    // Stats.
+    tab: "data",
     title: "Stats",
     body: "Averages, spare conversion, which ball is working. Compare yourself to a teammate, a friend or your team.",
   },
