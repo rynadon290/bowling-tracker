@@ -758,7 +758,7 @@ fivePinAttempts.length>0&&(
                   {!isTeamView&&splitBreakdownList.length>0&&(
                     <>
                       <div style={S.divider}/>
-                      <div style={{...S.label,marginBottom:"8px"}}>By Leave</div>
+                      <div style={{...S.label,marginBottom:"8px"}}>Conversion by split</div>
                       <div style={{height:`${Math.min(splitBreakdownList.length,8)*28+16}px`,marginBottom:"10px"}}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={[...splitBreakdownList.slice(0,8)].reverse()} layout="vertical" margin={{top:0,right:16,left:0,bottom:0}}>
@@ -772,10 +772,18 @@ fivePinAttempts.length>0&&(
                       </div>
                       {splitBreakdownList.map(g=>(
                         <div key={g.key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-                          <span style={{fontSize:"13px",fontWeight:600}}>{g.key}</span>
+                          <div>
+                            <span style={{fontSize:"13px",fontWeight:600}}>{g.key}</span>
+                            {/* A named split shows its pins underneath, so
+                                "Baby split" isn't ambiguous -- the 3-10 and
+                                the 2-7 are both baby splits and a bowler
+                                may only struggle with one of them. */}
+                            {g.pins&&g.pins!==g.key&&(
+                              <span style={{fontSize:"11px",color:C.textMuted,marginLeft:"6px"}}>{g.pins}</span>
+                            )}
+                          </div>
                           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                            <span style={{fontSize:"11px",color:C.textMuted}}>{g.count}×</span>
-                            <span style={S.tag(g.converted>0?C.strike:C.miss)}>{g.rate}% conv.</span>
+                            <span style={S.tag(g.converted>0?C.strike:C.miss)}>{g.converted}/{g.count} · {g.rate}%</span>
                           </div>
                         </div>
                       ))}

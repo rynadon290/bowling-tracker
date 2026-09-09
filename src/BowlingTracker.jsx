@@ -14,7 +14,7 @@ import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { classifySyncError, cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
-import { isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
+import { splitConversionByType, isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import { maxPossibleScore,
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
   nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots,
@@ -3645,6 +3645,27 @@ export default function BowlingTracker(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[displayName,bowlers.length]);
 
+  // A new SESSION starts with no ball chosen. A new GAME does not.
+  //
+  // The ball carries forward shot to shot and game to game -- you don't
+  // re-pick it every frame, and switching balls between games is a
+  // deliberate act, not a default. But a new night is a genuine fresh
+  // start: the lanes, the pattern and the ball you want to open with
+  // all change, and inheriting last Tuesday's choice would quietly
+  // attribute tonight's first shots to a ball you may not have thrown.
+  //
+  // Keyed on bowler + league + date, which is what a session IS.
+  const sessionKey=`${activeBowler}|${effectiveSessionLeague}|${sessionDate}`;
+  const lastSessionKeyRef=useRef(sessionKey);
+  useEffect(()=>{
+    if(lastSessionKeyRef.current===sessionKey)return;
+    lastSessionKeyRef.current=sessionKey;
+    // Only clear when not mid-edit -- an edit holds the shot's own ball,
+    // and wiping it would change a saved shot's equipment silently.
+    if(!editingId)setForm(f=>({...f,ball:"",surface:""}));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[sessionKey]);
+
   // Persist tonight's context so a refresh doesn't lose the session.
   //
   // localStorage rather than window.storage: this has to be readable
@@ -4295,18 +4316,11 @@ export default function BowlingTracker(){
 
   // Split breakdown by specific pin combination (e.g. "5-7", "2-4-5"), not
   // just the aggregate split rate — shows which leaves actually recur.
-  function splitBreakdown(dataset){
-    const groups={};
-    dataset.filter(isSplit).forEach(s=>{
-      const key=(Array.isArray(s.otherLeave)?s.otherLeave:[]).filter(p=>p!=="9 Pin No-Tap").map(Number).sort((a,b)=>a-b).join("-");
-      if(!groups[key])groups[key]={key,count:0,converted:0};
-      groups[key].count++;
-      if(s.spareMade==="Yes")groups[key].converted++;
-    });
-    return Object.values(groups).map(g=>({...g,rate:g.count?Math.round(g.converted/g.count*100):0}))
-      .sort((a,b)=>b.count-a.count);
-  }
-  const splitBreakdownList=splitBreakdown(statsShots);
+  // Per-split-type conversion, from the domain so it's tested and so the
+  // 4-7-10 and the 3-10 stop being one number. Mapped to the shape the
+  // Splits card already renders.
+  const splitBreakdownList=splitConversionByType(statsShots)
+    .map(e=>({key:e.name,pins:e.key,count:e.left,converted:e.made,rate:e.rate??0}));
 
   // Breakdown of every recurring NON-split leave (e.g. "2-4-5"), single or
   // multi-pin — how often it happens and how often it's converted. Weak 10 /

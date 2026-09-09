@@ -716,6 +716,29 @@ export default function LogView({
                 }}/>
             )}
 
+            {/* Ball, between the scoresheet and the result.
+            
+                A dropdown rather than the chip row further down: it's
+                the one thing a bowler changes DURING a game, so it
+                belongs beside the frames rather than below the release
+                and line fields. The choice carries forward shot to shot
+                and game to game, and resets only for a new session. */}
+            {showShotContext&&logBalls.length>0&&(
+              <div style={{...S.card,padding:"10px 12px",marginBottom:"8px",
+                display:"flex",alignItems:"center",gap:"10px"}}>
+                <div style={{...S.label,marginBottom:0,flexShrink:0}}>Ball</div>
+                <select style={{...S.sel,padding:"8px 10px",fontSize:"14px"}}
+                  value={form.ball||""}
+                  onChange={e=>editingId?toggle("ball",e.target.value):handleBallChange(e.target.value)}>
+                  <option value="">— pick a ball —</option>
+                  {logBalls.map(b=>{
+                    const layout=formatLayout(ballLayouts?.[`${form.bowler}|${b}`]);
+                    return <option key={b} value={b}>{layout?`${b} · ${layout}`:b}</option>;
+                  })}
+                </select>
+              </div>
+            )}
+
             {showShotContext&&(
             <div style={S.card}>
               {/* The ceiling on the game in progress: strike out from here
@@ -930,12 +953,12 @@ export default function LogView({
                                  backgroundColor:C.surface,border:`1px solid ${C.border}`}}>
                       <span style={{fontSize:"12px",color:C.textMuted,flex:1,lineHeight:1.4}}>
                         {scoresUnlocked
-                          ?"Typing a score here replaces the one calculated from your shots."
-                          :"Scores are coming from your shots. Unlock to enter them by hand."}
+                          ?"Game scores now come from what you type here, not from your shots."
+                          :"Tired of logging every shot? Switch to entering game scores instead."}
                       </span>
                       <button style={{...S.btn(),padding:"6px 12px",fontSize:"12px",flexShrink:0}}
                         onClick={()=>setScoresUnlocked(v=>!v)}>
-                        {scoresUnlocked?"🔓 Lock":"🔒 Unlock"}
+                        {scoresUnlocked?"Back to shots":"Switch to game scores"}
                       </button>
                     </div>
                   )}
