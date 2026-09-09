@@ -7,6 +7,10 @@ import {
   coachViewActive,
   defaultStatsCardOrder,
   ENVIRONMENTS,
+  MONEY_GAMES,
+  visibleMoneyGames,
+  isMoneyGameShown,
+  setMoneyGameHidden,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -274,5 +278,30 @@ describe('switching environments', () => {
     };
     expect(applyEnvironment(custom, 'practice').statsCardOrder[0]).toBe('money');
     expect(applyEnvironment(custom, 'casual').statsCardOrder[0]).toBe('money');
+  });
+});
+
+// A house that runs a quarter game and nothing else was still shown four
+// rows of buy-in boxes every week, three of them noise.
+describe('per-pot money game visibility', () => {
+  it('shows every pot by default', () => {
+    expect(visibleMoneyGames({})).toEqual(MONEY_GAMES);
+  });
+
+  it('hides and unhides individually', () => {
+    let p = setMoneyGameHidden({}, 'threeSixNine', true);
+    expect(isMoneyGameShown(p, 'threeSixNine')).toBe(false);
+    expect(isMoneyGameShown(p, 'pokerQuarter')).toBe(true);
+    p = setMoneyGameHidden(p, 'threeSixNine', false);
+    expect(isMoneyGameShown(p, 'threeSixNine')).toBe(true);
+  });
+
+  it('ignores an unknown pot rather than storing junk', () => {
+    expect(setMoneyGameHidden({}, 'notAPot', true)).toEqual({});
+  });
+
+  it('survives malformed stored data', () => {
+    expect(visibleMoneyGames({ hiddenMoneyGames: 'nope' })).toEqual(MONEY_GAMES);
+    expect(visibleMoneyGames({ hiddenMoneyGames: ['bogus'] })).toEqual(MONEY_GAMES);
   });
 });

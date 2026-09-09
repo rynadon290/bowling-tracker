@@ -161,3 +161,34 @@ describe('costArraysFor', () => {
     expect(sessionMoney(session).net).toBeCloseTo(-3.75, 2);
   });
 });
+
+// Saving a buy-in rate used to mean paying it every week forever: the
+// app assumed the bowler was in every pot every night, so a week they
+// sat one out silently charged them for it and net winnings drifted
+// from reality with nothing on screen to explain why.
+describe('costArraysFor participation', () => {
+  const rates = { pokerQuarter: 0.25, pokerDollar: 1, highGame: 2, threeSixNine: 5 };
+
+  // Null means "all of them", which is what keeps every existing caller
+  // and every already-saved session behaving exactly as before.
+  it('charges every pot when participation is not specified', () => {
+    const c = costArraysFor(rates, 3);
+    expect(c.pokerDollarCost).toEqual([1, 1, 1]);
+    expect(c.threeSixNineCost).toBe(5);
+  });
+
+  it('charges nothing for a pot the bowler sat out', () => {
+    const c = costArraysFor(rates, 3, {
+      pokerQuarter: true, pokerDollar: false, highGame: true, threeSixNine: false,
+    });
+    expect(c.pokerQuarterCost).toEqual([0.25, 0.25, 0.25]);
+    expect(c.pokerDollarCost).toEqual([0, 0, 0]);
+    expect(c.threeSixNineCost).toBe(0);
+  });
+
+  it('still respects games bowled for pots they are in', () => {
+    const c = costArraysFor(rates, 1, { pokerQuarter: true, pokerDollar: true, highGame: false, threeSixNine: true });
+    expect(c.pokerQuarterCost).toEqual([0.25, 0, 0]);
+    expect(c.highGameCost).toEqual([0, 0, 0]);
+  });
+});

@@ -416,3 +416,42 @@ export function setTrackingMode(prefs, mode) {
 export function setTheme(prefs, themeId) {
   return { ...prefs, theme: normalizeThemeId(themeId) };
 }
+
+// ── Which money games this league actually runs ─────────────────────────
+//
+// showMoneyGames is all-or-nothing, which meant a house that runs a
+// quarter game and nothing else still saw boxes for the dollar game,
+// high game and 3-6-9 every week -- four rows of which three are noise.
+//
+// Hidden here means "this pot doesn't exist for me", which is different
+// from "I didn't play it tonight" (see participation below).
+export const MONEY_GAMES = ["pokerQuarter", "pokerDollar", "highGame", "threeSixNine"];
+
+export const MONEY_GAME_LABELS = {
+  pokerQuarter: "Quarter game",
+  pokerDollar: "Dollar game",
+  highGame: "High game",
+  threeSixNine: "3-6-9",
+};
+
+export function hiddenMoneyGames(prefs) {
+  const raw = prefs?.hiddenMoneyGames;
+  return Array.isArray(raw) ? raw.filter(g => MONEY_GAMES.includes(g)) : [];
+}
+
+export function isMoneyGameShown(prefs, game) {
+  return !hiddenMoneyGames(prefs).includes(game);
+}
+
+export function setMoneyGameHidden(prefs, game, hidden) {
+  if (!MONEY_GAMES.includes(game)) return prefs;
+  const current = hiddenMoneyGames(prefs);
+  const next = hidden
+    ? (current.includes(game) ? current : [...current, game])
+    : current.filter(g => g !== game);
+  return { ...prefs, hiddenMoneyGames: next };
+}
+
+export function visibleMoneyGames(prefs) {
+  return MONEY_GAMES.filter(g => isMoneyGameShown(prefs, g));
+}

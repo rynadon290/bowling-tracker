@@ -122,13 +122,25 @@ export function buyInsForLeague(buyIns, league) {
 // Only charges games that were actually bowled -- `gamesBowled` is the
 // count of non-null scores. Charging a buy-in for a game that doesn't
 // exist would quietly overstate what the night cost.
-export function costArraysFor(rates, gamesBowled) {
+export function costArraysFor(rates, gamesBowled, playing = null) {
   const n = Math.max(0, Math.min(3, gamesBowled || 0));
-  const per = v => [0, 1, 2].map(i => (i < n ? (Number(v) || 0) : 0));
+
+  // `playing` is which pots the bowler actually entered TONIGHT.
+  //
+  // Without it, saving a buy-in rate meant charging it every week
+  // forever -- the app assumed you were in every pot every night, so a
+  // week you sat out the dollar game silently cost you $3 you never
+  // paid, and net winnings drifted from reality with nothing to show why.
+  //
+  // Null means "all of them", which keeps every existing caller and
+  // every already-saved session behaving exactly as before.
+  const isIn = key => (playing == null ? true : !!playing[key]);
+  const per = (v, key) => [0, 1, 2].map(i => (i < n && isIn(key) ? (Number(v) || 0) : 0));
+
   return {
-    pokerQuarterCost: per(rates.pokerQuarter),
-    pokerDollarCost: per(rates.pokerDollar),
-    highGameCost: per(rates.highGame),
-    threeSixNineCost: Number(rates.threeSixNine) || 0,
+    pokerQuarterCost: per(rates.pokerQuarter, "pokerQuarter"),
+    pokerDollarCost: per(rates.pokerDollar, "pokerDollar"),
+    highGameCost: per(rates.highGame, "highGame"),
+    threeSixNineCost: isIn("threeSixNine") ? (Number(rates.threeSixNine) || 0) : 0,
   };
 }
