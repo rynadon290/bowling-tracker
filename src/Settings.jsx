@@ -37,7 +37,7 @@ export default function Settings({
   startEdit, deleteShot,
   centers, leagueCenters, setLeagueCenter, searchCenters,
   leagueDates, setLeagueDates, renameLeague,
-  hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam,
+  hiddenLeagues, leagueIds, toggleLeagueHidden, teams, activeBowler, leaveTeam, onCreateTeam,
   shots, leftHandedForBowler,
 }) {
   const { preferences, updatePreferences, displayName } = useAuth();
@@ -67,6 +67,8 @@ export default function Settings({
   // Reset wipes theme and card order as well as toggles, so it confirms
   // rather than firing on a single tap.
   const [resetArmed, setResetArmed] = useState(false);
+  // Keyed by league so two leagues' in-progress team names can't collide.
+  const [teamDrafts, setTeamDrafts] = useState({});
   const [shareStatus, setShareStatus] = useState("");
 
   // Every settings card is collapsible, keyed by section id. Environment
@@ -407,19 +409,60 @@ export default function Settings({
                   );
                 })()}
 
-                {/* Leaving a team is different -- other people see it. This
-                    is scoped to the SIGNED-IN user, not the active bowler,
-                    since the active bowler may be a proxy-logged teammate
-                    whose membership isn't yours to change. */}
-                {teamsInLeague(league, teams || [], displayName).map(team => (
-                  <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
-                    <span style={{ fontSize: "11px", color: C.textMuted }}>On {team.name}</span>
-                    <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }}
-                      onClick={() => leaveTeam(team, league)}>
-                      Leave team
+                {/* Every team in this league, not just the ones you're on.
+                    Adding a team used to mean scrolling to a separate Teams
+                    card that had its own duplicate "Add League" form -- so
+                    you'd add a league here, then add it again down there
+                    before a team could attach to it.
+                    
+                    Deliberately shows team NAMES only, no rosters: this is
+                    the league's shape at a glance. Managing who's on a
+                    team stays in the Teams card below, where the roster
+                    editing already lives. */}
+                {(() => {
+                  const all = (teams || []).filter(t => t.league === league);
+                  const mine = new Set(teamsInLeague(league, teams || [], displayName).map(t => t.id));
+                  if (!all.length) return null;
+                  return (
+                    <div style={{ marginTop: "8px" }}>
+                      <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "4px" }}>
+                        {all.length} team{all.length === 1 ? "" : "s"} in this league
+                      </div>
+                      {all.map(team => (
+                        <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                          <span style={{ fontSize: "12px", color: mine.has(team.id) ? C.text : C.textMuted }}>
+                            {team.name}{mine.has(team.id) ? " · yours" : ""}
+                          </span>
+                          {/* Leaving is scoped to the SIGNED-IN user, not the
+                              active bowler -- the active bowler may be a
+                              proxy-logged teammate whose membership isn't
+                              yours to change. */}
+                          {mine.has(team.id) && (
+                            <button style={{ ...S.btn(), padding: "3px 8px", fontSize: "10px" }}
+                              onClick={() => leaveTeam(team, league)}>
+                              Leave team
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {onCreateTeam && league !== "Practice" && league !== "Casual" && (
+                  <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                    <input style={{ ...S.input, flex: 1, fontSize: "12px", padding: "8px 10px" }}
+                      placeholder="Add a team to this league"
+                      value={teamDrafts[league] || ""}
+                      onChange={e => setTeamDrafts(d => ({ ...d, [league]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === "Enter") { onCreateTeam(league, (teamDrafts[league] || "").trim()); setTeamDrafts(d => ({ ...d, [league]: "" })); } }} />
+                    <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+                      disabled={!(teamDrafts[league] || "").trim()}
+                      onClick={() => { onCreateTeam(league, (teamDrafts[league] || "").trim()); setTeamDrafts(d => ({ ...d, [league]: "" })); }}>
+                      Add
                     </button>
                   </div>
-                ))}
+                )}
               </div>
             );
           })}

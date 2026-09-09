@@ -16,6 +16,7 @@ export default function StatsView({
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
+  compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, compareSessions,
   statsLeague, setStatsLeague,
   compareLeague, setCompareLeague, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
@@ -124,21 +125,55 @@ bowlers.length>1&&(
                       <>
                         <div style={S.divider}/>
                         <div style={S.label}>Compare To</div>
-                        <div style={S.chips}>
-                          <Chip label="None" selected={!compareBowler&&!compareLeague} onToggle={()=>{setCompareBowler("");setCompareLeague("");}}/>
-                          {bowlers.filter(b=>b!==statsBowler).map(b=>(
-                            <Chip key={b} label={b} selected={compareBowler===b} onToggle={()=>{
-                              setCompareBowler(compareBowler===b?"":b);
+                        {/* A dropdown rather than a chip row: a chip row grows
+                            by one every time a friend is added, and mixed
+                            individual/team chips in one row didn't make the
+                            two kinds of comparison read as different things.
+                            Grouped options do both -- fixed height, and the
+                            grouping itself explains what each option means. */}
+                        <select style={S.sel} value={
+                            compareFriendId?`friend:${compareFriendId}`
+                            :compareLeague?`team:${compareLeague}`
+                            :""
+                          }
+                          onChange={e=>{
+                            const v=e.target.value;
+                            if(!v){setCompareBowler("");setCompareFriendId("");setCompareLeague("");return;}
+                            const[kind,id]=v.split(/:(.*)/s);
+                            if(kind==="friend"){
+                              const f=friends.find(x=>x.userId===id);
+                              setCompareBowler(f?.displayName||"");
+                              setCompareFriendId(id);
                               setCompareLeague("");
-                            }} color={C.spare}/>
-                          ))}
-                          {leagues.filter(l=>l!==statsLeague).map(l=>(
-                            <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)} selected={compareLeague===l} onToggle={()=>{
-                              setCompareLeague(compareLeague===l?"":l);
+                              // Fetch on selection, not on every render -- a
+                              // friend's cloud data has no reason to load
+                              // until someone actually wants to compare
+                              // against them.
+                              onLoadFriendData?.(id);
+                            } else if(kind==="team"){
+                              setCompareLeague(id);
                               setCompareBowler("");
-                            }} color={C.accent}/>
-                          ))}
-                        </div>
+                              setCompareFriendId("");
+                            }
+                          }}>
+                          <option value="">None</option>
+                          {friends.length>0&&(
+                            <optgroup label="Friends">
+                              {friends.map(f=>(
+                                <option key={f.userId} value={`friend:${f.userId}`}>{f.displayName}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {leagues.filter(l=>l!==statsLeague).length>0&&(
+                            <optgroup label="Teams">
+                              {leagues.filter(l=>l!==statsLeague).map(l=>(
+                                <option key={l} value={`team:${l}`}>
+                                  {l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
                       </>
                     )}
                   </div>
@@ -887,11 +922,11 @@ sessions.length>0&&(()=>{
                             value={avg}
                             sub={isTeamView&&teamGameTotalAvg(sessions,league)!=null?`team ${teamGameTotalAvg(sessions,league)}`:null}
                             last={i===leagueAvgs.length-1&&!(!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined)}
-                            badge={showTeamCompare?<CompareBadge value={avg} teamValue={compareBowler?rAvg(sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>:null}/>
+                            badge={showTeamCompare?<CompareBadge value={avg} teamValue={compareBowler?rAvg(compareSessions??sessions,compareBowler,league):(isTeamView?teamGameTotalAvg(sessions,league):rAvg(sessions,"",league))} label={compareLabel}/>:null}/>
                         ))}
                         {!statsLeague&&(!statsBowler||bowlerLeagueCount>1)&&combined&&(
                           <StatRow label="Composite" value={combined} color={C.accent} last
-                            badge={showTeamCompare&&compareBowler?<CompareBadge value={combined} teamValue={cAvg(sessions,compareBowler)} label={compareLabel}/>:null}/>
+                            badge={showTeamCompare&&compareBowler?<CompareBadge value={combined} teamValue={cAvg(compareSessions??sessions,compareBowler)} label={compareLabel}/>:null}/>
                         )}
                       </StatRows>
                       {!statsLeague&&showTeamCompare&&!compareBowler&&<div style={{fontSize:"11px",color:C.textMuted,marginTop:"4px"}}>Combined spans all leagues, so there's no single team to compare it against — pick a specific bowler under "Compare To", or select a specific league above.</div>}

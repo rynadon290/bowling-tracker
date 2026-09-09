@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudUpdate, cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
 
@@ -168,7 +167,6 @@ const S = new Proxy({}, {
 export default function TeamManagement({
   leagues = [],
   onTeamsChange,
-  onLeagueAdd,
 }) {
   const{user,displayName,updateDisplayName}=useAuth();
   // Maps league name -> its Supabase row id, built from its own small fetch
@@ -183,14 +181,11 @@ export default function TeamManagement({
   const[newTeamName, setNewTeamName] = useState("");
   const[editingTeamId, setEditingTeamId] = useState(null);
   const[editingName, setEditingName] = useState("");
-  const[newLeagueName, setNewLeagueName] = useState("");
   // Asked at creation because there's no other reliable way to know when a
   // season ends -- leagues in this app have no automatic boundary, so this
   // is what makes the book-average update prompt possible at all. Optional:
   // an ongoing house shot with no fixed end just leaves these blank, and
   // the prompt never fires for it.
-  const[newLeagueStart, setNewLeagueStart] = useState("");
-  const[newLeagueEnd, setNewLeagueEnd] = useState("");
   // Per-team "add a teammate" search state: {[teamId]: {term, results, searching}}
   const[searchState, setSearchState] = useState({});
   const searchTimers = useRef({});
@@ -210,7 +205,6 @@ export default function TeamManagement({
   // spot that isn't theirs.
   const[myPendingInvites, setMyPendingInvites] = useState([]);
   // QR code for the sign-in URL, generated once on mount
-  const[qrDataUrl, setQrDataUrl] = useState("");
 
   async function loadAll() {
     setLoading(true);
@@ -319,19 +313,6 @@ export default function TeamManagement({
     onTeamsChange?.(simplified);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams]);
-
-  // A QR code for the app's own sign-in URL — a convenient way to hand
-  // someone the link, nothing more. It cannot log anyone in as anyone else;
-  // each person still has to enter their own email and get their own magic
-  // link. The actual "this person is pre-assigned to this roster slot"
-  // linking happens via email-matched pending invites, independent of how
-  // someone arrived at the sign-in screen.
-  useEffect(() => {
-    const url = window.location.origin + window.location.pathname;
-    QRCode.toDataURL(url, { width: 220, margin: 1 })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(""));
-  }, []);
 
   const leagueList = (leagues || []).length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
   const leagueTeams = teams.filter(team => team.league === selectedLeague);
@@ -548,17 +529,6 @@ export default function TeamManagement({
     cloudWrite("team_members", { team_id: teamId, user_id: movedTeam.members[newIndex].userId, lineup_position: movedTeam.members[newIndex].lineupPosition });
   }
 
-  function createLeague() {
-    const name = newLeagueName.trim();
-    if (!name) return;
-    if (leagueList.some(league => league.toLowerCase() === name.toLowerCase())) { alert("A league with that name already exists."); return; }
-    onLeagueAdd?.(name, newLeagueStart, newLeagueEnd);
-    setSelectedLeague(name);
-    setNewLeagueName("");
-    setNewLeagueStart("");
-    setNewLeagueEnd("");
-  }
-
   return (
     <div>
       {loading && (
@@ -606,18 +576,6 @@ export default function TeamManagement({
       </div>
 
       <div style={S.card}>
-        <div style={S.label}>Share Sign-In Link</div>
-        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
-          A quick way to hand someone the app link — scanning this just opens the sign-in screen. It doesn't log anyone in as anyone; each person still enters their own email.
-        </div>
-        {qrDataUrl && (
-          <div style={{textAlign:"center"}}>
-            <img src={qrDataUrl} alt="QR code to sign-in page" style={{borderRadius:"8px",background:"#fff",padding:"8px"}}/>
-          </div>
-        )}
-      </div>
-
-      <div style={S.card}>
         <div style={S.label}>League</div>
         <select value={selectedLeague} onChange={e=>setSelectedLeague(e.target.value)} style={{...S.input,appearance:"auto"}}>
           {leagueList.map(league=><option key={league} value={league}>{league}</option>)}
@@ -632,23 +590,11 @@ export default function TeamManagement({
             Rename this league, set its center or season dates in Settings › Leagues.
           </div>
         )}
-        <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
-          <div style={S.label}>Add League</div>
-          <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
-            <input value={newLeagueName} onChange={e=>setNewLeagueName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")createLeague();}} placeholder="League name" style={{...S.input,flex:1}}/>
-            <button style={S.primary} onClick={createLeague}>Add</button>
-          </div>
-          {/* Season dates -- optional, but this is the only chance to set
-              them without a separate edit flow, and they're what makes the
-              book-average update prompt possible at all. */}
-          <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
-            Season dates (optional) — lets the app prompt you to update your book average once the season wraps
-          </div>
-          <div style={{display:"flex",gap:"8px"}}>
-            <input type="date" value={newLeagueStart} onChange={e=>setNewLeagueStart(e.target.value)} style={{...S.input,flex:1}}/>
-            <input type="date" value={newLeagueEnd} onChange={e=>setNewLeagueEnd(e.target.value)} style={{...S.input,flex:1}}/>
-          </div>
-        </div>
+        {/* Adding a league used to live here too, duplicating the Leagues
+            editor at the top of Vault. Two places to create the same thing
+            meant adding a league, scrolling down, and adding it again
+            before a team could attach to it. Teams are now created from
+            the Leagues card directly, where the league already is. */}
       </div>
 
       <div style={S.card}>

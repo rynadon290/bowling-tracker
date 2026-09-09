@@ -63,6 +63,7 @@ import { validTeamId,
 // then it's cached for the session.
 const TeamManagement = lazy(() => import("./TeamManagement.jsx"));
 const Friends = lazy(() => import("./Friends.jsx"));
+import { categorizeFriendships } from "./Friends.jsx";
 const StatsView = lazy(() => import("./StatsView.jsx"));
 const ImportScorecard = lazy(() => import("./ImportScorecard.jsx"));
 const Settings = lazy(() => import("./Settings.jsx"));
@@ -382,6 +383,92 @@ export default function BowlingTracker(){
   // to pull everyone's history before the coach has picked someone to look
   // at.
   const[coachBowlerSessions,setCoachBowlerSessions]=useState({});
+
+  // Accepted friends, and their sessions/shots fetched on demand -- the
+  // same shape as coachBowlerSessions above, and for the same reason: a
+  // friend's games live in the cloud under THEIR user_id, not in this
+  // account's own shots array, so comparing against one means a separate
+  // fetch keyed by id rather than a name filter on local data.
+  //
+  // This is what gives "friend" an actual job distinct from "teammate":
+  // RLS already grants teammates and friends identical read access to
+  // sessions/shots (are_friends(user_id) and is_team_member(team_id) are
+  // parallel policies), but Compare To only ever offered bowlers already
+  // present in this device's local roster. A friend who isn't on your
+  // team has no reason to be in that list -- until now, adding them as a
+  // friend bought nothing Compare To could use.
+  const[friends,setFriends]=useState([]); // [{userId, displayName}]
+  const[friendSessions,setFriendSessions]=useState({});
+  const[friendShots,setFriendShots]=useState({});
+
+  // Create a team from the Leagues card in Vault, so a league and its
+  // teams are set up in one place.
+  //
+  // Mirrors TeamManagement's createTeam deliberately, including the stale
+  // league-id fallback: leagueIdsRef can be out of date if the league was
+  // created moments ago, and writing a team with a null league_id makes a
+  // team that can never sync and that teammates will never see.
+  async function createTeamForLeague(leagueName,name){
+    const clean=(name||"").trim();
+    if(!clean||!leagueName)return;
+    const existing=(teams||[]).filter(t=>t.league===leagueName);
+    if(existing.some(t=>t.name.toLowerCase()===clean.toLowerCase())){
+      window.alert("A team with that name already exists in this league.");
+      return;
+    }
+    const id=crypto.randomUUID();
+    let leagueId=leagueIdsRef.current[leagueName];
+    if(!leagueId){
+      const{data,online}=await cloudRead("leagues",q=>q.select("id").eq("name",leagueName).limit(1));
+      if(online&&data&&data[0]){
+        leagueId=data[0].id;
+        leagueIdsRef.current[leagueName]=leagueId;
+      }
+    }
+    persistTeams([...(teams||[]),{id,name:clean,league:leagueName,members:[],pendingInvites:[]}]);
+    if(!leagueId){
+      window.alert(`Couldn't find "${leagueName}" in the cloud — this team was created on this device only and won't be visible to teammates. Try again once you're back online.`);
+      return;
+    }
+    const result=await cloudWrite("teams",{id,name:clean,league_id:leagueId,created_by:user?.id||null});
+    if(!result.synced){
+      window.alert(`"${clean}" was created locally but couldn't reach the cloud yet (${result.reason||"unknown reason"}). It'll keep retrying in the background.`);
+    }
+  }
+
+  async function loadFriends(){
+    const{data,online}=await cloudRead("friendships",q=>q.select("id,requester_id,addressee_id,status"));
+    if(!online||!data)return;
+    const myId=user?.id;
+    const relevant=data.filter(f=>f.requester_id===myId||f.addressee_id===myId);
+    const otherIds=[...new Set(relevant.map(f=>f.requester_id===myId?f.addressee_id:f.requester_id))];
+    let profilesById={};
+    if(otherIds.length){
+      const profRes=await cloudRead("profiles",q=>q.select("id,display_name").in("id",otherIds));
+      if(profRes.online&&profRes.data)profRes.data.forEach(p=>{profilesById[p.id]=p.display_name;});
+    }
+    const{accepted}=categorizeFriendships(relevant,myId,profilesById);
+    setFriends(accepted);
+  }
+
+  // Mirrors loadCoachBowlerSessions below almost exactly -- same fetch
+  // shape, same reason (another user's cloud data by id), same
+  // leagueIdsRef caveat about league name resolution for a different
+  // account's rows.
+  async function loadFriendData(friendUserId){
+    if(!friendUserId||friendSessions[friendUserId])return;
+    const nameById={};
+    Object.entries(leagueIdsRef.current||{}).forEach(([name,id])=>{nameById[id]=name;});
+
+    const res=await cloudRead("sessions",q=>q.select("*").eq("user_id",friendUserId));
+    if(res.online&&res.data){
+      setFriendSessions(prev=>({...prev,[friendUserId]:res.data.map(row=>sessionFromSupabaseRow(row,nameById))}));
+    }
+    const shotRes=await cloudRead("shots",q=>q.select("*").eq("user_id",friendUserId));
+    if(shotRes.online&&Array.isArray(shotRes.data)){
+      setFriendShots(prev=>({...prev,[friendUserId]:shotRes.data.map(row=>shotFromSupabaseRow(row,nameById))}));
+    }
+  }
   const[coachBowlerShots,setCoachBowlerShots]=useState({});
   const[coachSearchResults,setCoachSearchResults]=useState([]);
   const[coachSearching,setCoachSearching]=useState(false);
@@ -526,6 +613,12 @@ export default function BowlingTracker(){
   // thing you have to navigate away from.
   const[statsBowler,setStatsBowler]=useState(displayName||"");
   const[compareBowler,setCompareBowler]=useState("");
+  // Set alongside compareBowler when the comparison target is a FRIEND
+  // rather than someone in the local roster -- lets the merged-shots
+  // effect below know which friend's cloud data to fold in, without
+  // requiring every existing s.bowler===compareBowler filter throughout
+  // this file to be rewritten to understand two different kinds of id.
+  const[compareFriendId,setCompareFriendId]=useState("");
   const[statsLeague,setStatsLeague]=useState("");
   const[compareLeague,setCompareLeague]=useState("");
   const[sessionLeague,setSessionLeague]=useState(savedContext?.league||"");
@@ -628,6 +721,7 @@ export default function BowlingTracker(){
     loadImportedScores();
     loadFriendRequests();
     loadTeamInvites();
+    loadFriends();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id]);
 
@@ -4044,11 +4138,26 @@ export default function BowlingTracker(){
   // on it here could silently compare against a skewed subset of shots
   // that share a league but disagree on team_id for reasons that have
   // nothing to do with which team they actually belong to.
-  const compareShots=compareBowler
-  ?shots.filter(s=>s.bowler===compareBowler)
-  :compareLeague
-    ?shots.filter(s=>s.league===compareLeague)
-    :shots; // unused when showTeamCompare is false
+  // Same reasoning as compareShots above, for the two comparison-average
+  // lookups in StatsView that filter SESSIONS by compareBowler
+  // (rAvg/cAvg against a per-league or combined average). Kept as its own
+  // array rather than merged into the primary `sessions`, for the same
+  // reason: no path by which a friend's nights become part of this
+  // account's own season record.
+  const compareSessions=compareFriendId?(friendSessions[compareFriendId]||[]):sessions;
+
+  // A friend's shots live in the cloud under THEIR user_id, fetched
+  // separately into friendShots -- never merged into this account's own
+  // `shots` array, so there is no path by which a friend's data can leak
+  // into this account's own primary stats. Only compareShots, which
+  // feeds the comparison-only team* metrics below, ever reads it.
+  const compareShots=compareFriendId
+  ?(friendShots[compareFriendId]||[])
+  :compareBowler
+    ?shots.filter(s=>s.bowler===compareBowler)
+    :compareLeague
+      ?shots.filter(s=>s.league===compareLeague)
+      :shots; // unused when showTeamCompare is false
   const teamTot=compareShots.length;
   const teamStkR=teamTot?Math.round((compareShots.filter(s=>s.result==="Strike").length/teamTot)*100):0;
   const teamSpAtt=compareShots.filter(s=>s.result!=="Strike"&&s.spareMade!==""&&!isSplit(s));
@@ -4406,6 +4515,7 @@ export default function BowlingTracker(){
         {view==="locker"&&(
           <Settings
             mode="leagues"
+            onCreateTeam={createTeamForLeague}
             restartOnboarding={restartOnboarding}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
@@ -4600,6 +4710,8 @@ export default function BowlingTracker(){
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
+            compareFriendId={compareFriendId} setCompareFriendId={setCompareFriendId}
+            friends={friends} onLoadFriendData={loadFriendData} compareSessions={compareSessions}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
             compareLeague={compareLeague} setCompareLeague={setCompareLeague}
             matches={matches}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
+import QRCode from "qrcode";
 
 // Pure functions, extracted so they're testable without rendering the
 // component — same pattern as TeamManagement.jsx's roster functions.
@@ -20,41 +21,6 @@ export function categorizeFriendships(friendships, myUserId, profilesById) {
       else if (f.status === "pending" && f.requester_id === myUserId) outgoing.push(entry);
     });
   return { accepted, incoming, outgoing };
-}
-
-// Ranks by per-person average, for everyone in `nameById` (self + accepted
-// friends) who has at least one completed game. Averages across individual
-// GAMES, not across per-session averages — averaging averages of unequal
-// group sizes (some nights have 3 games, some have fewer) silently
-// mis-weights every night equally regardless of how many games it actually
-// contained, which both skews the average and makes "session count" read
-// as something other than what a bowler means by "games bowled."
-//
-// Critically, this also only counts a session toward someone's total if
-// bowler_name matches their own display name — NOT just because the
-// session's user_id matches their account. This app is built entirely
-// around proxy logging (one signed-in account can log a session for a
-// teammate, a sub, anyone), so a session's user_id alone says nothing
-// about whose game it actually was. Grouping by user_id alone silently
-// folds anyone else's proxy-logged nights into this account's own total.
-export function computeLeaderboard(sessions, nameById) {
-  const normalize = s => (s || "").trim().toLowerCase();
-  const byUser = {};
-  sessions.forEach(s => {
-    const ownerName = nameById[s.user_id];
-    if (!ownerName || normalize(s.bowler_name) !== normalize(ownerName)) return;
-    const games = Array.isArray(s.scores) ? s.scores.filter(x => x != null) : [];
-    if (!games.length) return;
-    (byUser[s.user_id] = byUser[s.user_id] || []).push(...games);
-  });
-  return Object.entries(byUser)
-    .map(([userId, games]) => ({
-      userId,
-      displayName: nameById[userId],
-      gameCount: games.length,
-      overallAverage: Math.round(games.reduce((a, b) => a + b, 0) / games.length),
-    }))
-    .sort((a, b) => b.overallAverage - a.overallAverage);
 }
 
 // Shares the live palette from ui.jsx instead of carrying a private copy
@@ -92,17 +58,17 @@ export default function Friends({ onRequestsChanged } = {}) {
   const[outgoing,setOutgoing]=useState([]);
   const[loading,setLoading]=useState(true);
 
+  const[qrDataUrl,setQrDataUrl]=useState("");
   const[searchTerm,setSearchTerm]=useState("");
   const[searchResults,setSearchResults]=useState([]);
   const[searching,setSearching]=useState(false);
   const searchTimer=useRef(null);
 
-  const[leaderboard,setLeaderboard]=useState([]);
-  const[leaderboardLoading,setLeaderboardLoading]=useState(false);
   // True if this account has real session rows under its user_id, but none
   // of them matched its own display_name -- meaning the account's own
-  // games are silently missing from the leaderboard below because
-  // display_name doesn't match the bowler_name sessions are logged under
+  // games are silently invisible under this account -- their bowler_name
+  // doesn't match display_name -- which matters for Compare To in Stats,
+  // not just any one screen
   // (most commonly: display_name was never set).
   const[nameMismatchWarning,setNameMismatchWarning]=useState(false);
 
@@ -132,27 +98,36 @@ export default function Friends({ onRequestsChanged } = {}) {
 
   useEffect(()=>{ loadFriendships(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },[]);
 
-  async function loadLeaderboard() {
+  // The leaderboard this fed is gone -- both the global and the
+  // friends-only version were dropped in favor of Compare To, which
+  // scopes a comparison to one bowler or team the user chose rather than
+  // publishing everyone's average to everyone else. This check survives
+  // because it catches something real and unrelated to any leaderboard:
+  // an account whose sessions are silently invisible to itself.
+  async function checkNameMismatch() {
     if (!user?.id) return;
-    setLeaderboardLoading(true);
-    const friendIds=friends.map(f=>f.userId);
-    const allIds=[user.id,...friendIds];
-    const nameById={[user.id]:displayName||"You"};
-    friends.forEach(f=>{nameById[f.userId]=f.displayName;});
-
-    const{data,online}=await cloudRead("sessions",q=>q.select("user_id,bowler_name,scores").in("user_id",allIds));
-    if (online && data) {
-      setLeaderboard(computeLeaderboard(data,nameById));
-      const normalize=s=>(s||"").trim().toLowerCase();
-      const myOwnName=nameById[user.id];
-      const mySessions=data.filter(s=>s.user_id===user.id);
-      const myMatchedSessions=mySessions.filter(s=>normalize(s.bowler_name)===normalize(myOwnName));
-      setNameMismatchWarning(mySessions.length>0 && myMatchedSessions.length===0);
-    }
-    setLeaderboardLoading(false);
+    const{data,online}=await cloudRead("sessions",q=>q.select("bowler_name").eq("user_id",user.id));
+    if (!online || !data) return;
+    const normalize=s=>(s||"").trim().toLowerCase();
+    const myOwnName=displayName||"";
+    const myMatchedSessions=data.filter(s=>normalize(s.bowler_name)===normalize(myOwnName));
+    setNameMismatchWarning(data.length>0 && myMatchedSessions.length===0);
   }
 
-  useEffect(()=>{ loadLeaderboard(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },[friends]);
+  useEffect(()=>{ checkNameMismatch(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },[]);
+
+  // A QR code for the app's own sign-in URL -- a convenient way to hand
+  // someone the link, nothing more. It cannot log anyone in as anyone
+  // else; each person still enters their own email and gets their own
+  // magic link.
+  //
+  // Lives here rather than in Teams because what it actually does is
+  // invite someone to the APP. That's the same job as "Add a Friend"
+  // directly above it, and nothing to do with managing a roster.
+  useEffect(()=>{
+    const url=window.location.origin+window.location.pathname;
+    QRCode.toDataURL(url,{width:220,margin:1}).then(setQrDataUrl).catch(()=>setQrDataUrl(""));
+  },[]);
 
   function handleSearchChange(term) {
     setSearchTerm(term);
@@ -235,6 +210,18 @@ export default function Friends({ onRequestsChanged } = {}) {
         )}
       </div>
 
+      <div style={S.card}>
+        <div style={S.label}>Share Sign-In Link</div>
+        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+          A quick way to hand someone the app link — scanning this just opens the sign-in screen. It doesn't log anyone in as anyone; each person still enters their own email.
+        </div>
+        {qrDataUrl && (
+          <div style={{textAlign:"center"}}>
+            <img src={qrDataUrl} alt="QR code to sign-in page" style={{borderRadius:"8px",background:"#fff",padding:"8px"}}/>
+          </div>
+        )}
+      </div>
+
       {incoming.length>0 && (
         <div style={S.card}>
           <div style={S.label}>Requests</div>
@@ -277,30 +264,15 @@ export default function Friends({ onRequestsChanged } = {}) {
 
       {nameMismatchWarning && (
         <div style={{...S.card,border:`1px solid ${C.spare}44`}}>
-          <div style={{color:C.spare,fontSize:"13px",fontWeight:600,marginBottom:"4px"}}>⚠️ Your games aren't showing on the leaderboard</div>
+          <div style={{color:C.spare,fontSize:"13px",fontWeight:600,marginBottom:"4px"}}>⚠️ Your games aren't attributed to your account</div>
           <div style={{color:C.textMuted,fontSize:"12px"}}>Your account's display name doesn't match the bowler name your sessions are logged under. Set your name in Teams to fix this.</div>
         </div>
       )}
 
-      <div style={S.card}>
-        <div style={S.label}>Leaderboard</div>
-        {leaderboardLoading && <div style={{color:C.textMuted,fontSize:"12px",padding:"6px 0"}}>Loading…</div>}
-        {!leaderboardLoading && leaderboard.length===0 && (
-          <div style={{color:C.textMuted,fontSize:"12px",padding:"6px 0"}}>No sessions logged yet among you and your friends.</div>
-        )}
-        {!leaderboardLoading && leaderboard.map((row,i)=>(
-          <div key={row.userId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderTop:i>0?`1px solid ${C.border}`:"none"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-              <div style={{width:"20px",color:C.textMuted,fontWeight:700}}>{i+1}.</div>
-              <span style={{color:row.userId===user?.id?C.accent:C.text,fontWeight:row.userId===user?.id?700:400}}>{row.displayName}</span>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{color:C.text,fontWeight:700}}>{row.overallAverage}</div>
-              <div style={{color:C.textMuted,fontSize:"10px"}}>{row.gameCount} {row.gameCount===1?"game":"games"}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* The leaderboard that used to render here is gone. Comparing to a
+          friend or a team is now done from Stats > Compare To, which
+          shows a comparison the user actually chose to see rather than
+          publishing every friend's average on this screen by default. */}
     </div>
   );
 }
