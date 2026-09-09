@@ -3,17 +3,18 @@ import { C, S } from "./ui.jsx";
 import { tourSteps, stepAt, isLastStep, tourLength } from "./domain/tour.js";
 import TourScreen from "./TourScreen.jsx";
 
-// A short walkthrough after setup.
+// A full-screen walkthrough that takes over the app.
 //
-// Setup asks the two things the app can't work without. It can't explain
-// what five tabs are for, so a new bowler landed on a full app and had
-// to find out by poking at it.
+// It used to be a card pinned to the bottom over the live app, which had
+// two problems: there wasn't room to show anything useful, and the live
+// app behind it was a bowler's EMPTY app -- no scores, no frames, no
+// teams -- so the step describing a scoresheet sat above a screen that
+// didn't have one.
 //
-// Deliberately a card at the bottom rather than a spotlight over each
-// element: highlighting a nav item means measuring its position, which
-// breaks on every layout change and on any screen where the element
-// isn't visible yet. A card that names the tab and switches to it is
-// simpler and doesn't lie when the layout moves.
+// Taking over means each step can show a full, populated screen with the
+// relevant part lit up. That's the only way to teach how to enter a
+// spare: you have to see the pins-standing chips and the Spare Made
+// buttons, and a new bowler has no data that would produce them.
 export default function Tour({ preferences = {}, onNavigate, onFinish }) {
   const [index, setIndex] = useState(0);
   const steps = tourSteps(preferences);
@@ -21,59 +22,62 @@ export default function Tour({ preferences = {}, onNavigate, onFinish }) {
   const total = tourLength(preferences);
 
   if (!step) return null;
-
   const last = isLastStep(preferences, index);
 
   function go(next) {
     const clamped = Math.max(0, Math.min(total - 1, next));
     setIndex(clamped);
+    // Still switch the app behind the tour, so finishing leaves the
+    // bowler on the tab the last step described.
     const s = steps[clamped];
-    // Switch to the tab being described, so the bowler is looking at the
-    // thing while reading about it.
     if (s?.tab && onNavigate) onNavigate(s.tab);
   }
 
   return (
     <div style={{
-      position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 300,
-      padding: "12px", paddingBottom: "calc(12px + env(safe-area-inset-bottom))",
-      background: C.bg, borderTop: `1px solid ${C.border}`,
-      boxShadow: "0 -8px 24px rgba(0,0,0,0.35)",
+      position: "fixed", inset: 0, zIndex: 400,
+      background: C.bg,
+      display: "flex", flexDirection: "column",
+      paddingTop: "env(safe-area-inset-top)",
+      paddingBottom: "env(safe-area-inset-bottom)",
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-        <div style={{ fontSize: "15px", fontWeight: 700, color: C.text }}>{step.title}</div>
-        <div style={{ fontSize: "11px", color: C.textMuted }}>{index + 1} of {total}</div>
+      {/* Progress: dots rather than "3 of 12", which reads as a chore. */}
+      <div style={{ display: "flex", gap: "4px", justifyContent: "center", padding: "14px 16px 8px" }}>
+        {steps.map((s, i) => (
+          <div key={s.id} style={{
+            height: "4px", borderRadius: "2px", flex: i === index ? "0 0 22px" : "0 0 7px",
+            background: i === index ? C.accent : i < index ? C.accent + "55" : C.border,
+            transition: "flex-basis 0.2s",
+          }} />
+        ))}
       </div>
 
-      {/* Drawn mock-up with the relevant area lit, beside the text.
-      
-          Spotlighting the LIVE app would mean measuring an element's
-          position at runtime -- which breaks on any layout change and
-          fails outright when the thing being described isn't on screen,
-          like pointing at a Vault card from the Bowl tab. A drawing
-          always shows the right thing, and can show a full scoresheet
-          mid-game that a new bowler has no data to produce. */}
-      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "12px" }}>
-        <div style={{ flexShrink: 0 }}>
-          <TourScreen stepId={step.id} />
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 8px" }}>
+        <div style={{ fontSize: "20px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
+          {step.title}
         </div>
-        <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.5 }}>
+        <div style={{ fontSize: "14px", color: C.textMuted, lineHeight: 1.55, marginBottom: "16px" }}>
           {step.body}
         </div>
+
+        <TourScreen stepId={step.id} />
       </div>
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        {/* Skip is always available and always visible. A tour someone
-            can't leave is worse than no tour. */}
-        <button style={{ ...S.btn(), padding: "10px 14px", fontSize: "13px" }} onClick={onFinish}>
+      <div style={{
+        display: "flex", gap: "8px", alignItems: "center",
+        padding: "12px 16px", borderTop: `1px solid ${C.border}`, background: C.surface,
+      }}>
+        {/* Skip is always reachable. A tour you can't leave is worse than
+            no tour at all. */}
+        <button style={{ ...S.btn(), padding: "12px 14px", fontSize: "13px" }} onClick={onFinish}>
           Skip
         </button>
         {index > 0 && (
-          <button style={{ ...S.btn(), padding: "10px 14px", fontSize: "13px" }} onClick={() => go(index - 1)}>
+          <button style={{ ...S.btn(), padding: "12px 14px", fontSize: "13px" }} onClick={() => go(index - 1)}>
             Back
           </button>
         )}
-        <button style={{ ...S.btn("primary"), flex: 1, padding: "10px 14px", fontSize: "13px" }}
+        <button style={{ ...S.btn("primary"), flex: 1, padding: "12px 14px", fontSize: "14px" }}
           onClick={() => (last ? onFinish?.() : go(index + 1))}>
           {last ? "Start bowling" : "Next"}
         </button>
