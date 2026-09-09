@@ -224,3 +224,28 @@ export function needingReentry(records) {
     .map(normalizeImportRecord)
     .filter(r => r && r.status === "rejected");
 }
+
+// A game score that a game of bowling can actually produce.
+//
+// The teammate review screen used to accept any positive number, so a
+// garbled OCR read -- 1.95e+127 was a real one -- displayed as a valid
+// series, passed review, and was then silently nulled by cleanScores on
+// the receiving end. The teammate got a blank score and no explanation,
+// and the uploader had no idea anything was wrong.
+//
+// 300 is the hard ceiling: no game can exceed it. Empty is allowed --
+// "this bowler didn't bowl game 3" is a real answer, distinct from a
+// misread.
+export function isValidGameScore(v) {
+  if (v === "" || v === null || v === undefined) return true;
+  const n = Number(v);
+  return Number.isFinite(n) && Number.isInteger(n) && n >= 0 && n <= 300;
+}
+
+// Which entries in a teammate's score row are unusable, so the UI can
+// point at them instead of letting them through.
+export function invalidScoreIndexes(scores) {
+  return (Array.isArray(scores) ? scores : [])
+    .map((v, i) => (isValidGameScore(v) ? -1 : i))
+    .filter(i => i >= 0);
+}

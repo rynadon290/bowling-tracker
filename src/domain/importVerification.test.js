@@ -3,6 +3,8 @@ import {
   emptyImportRecord, normalizeImportRecord, effectiveScores, isConfirmed,
   approve, reject, canCorrect, correctAsTeammate, laterSessionEnded,
   describeStatus, pendingFor, needingReentry,
+  isValidGameScore,
+  invalidScoreIndexes,
 } from './importVerification.js';
 
 const base = { ...emptyImportRecord('Kim', 'Ryan'), id: 'i1', league: 'Tue', date: '2026-06-02', importedScores: [180, 190, 175] };
@@ -134,5 +136,46 @@ describe('imported frame data', () => {
   it('ignores a non-array, so bad cloud data cannot crash the inbox', () => {
     const r = normalizeImportRecord({ ...withFrames, importedShots: 'nope' });
     expect(r.importedShots).toEqual([]);
+  });
+});
+
+// A garbled OCR read -- 1.95e+127 was a real one off a real card --
+// displayed as a valid series, passed review, and was then silently
+// nulled by cleanScores on arrival. The teammate got a blank score and
+// nobody knew why.
+describe('isValidGameScore', () => {
+  it('rejects a value no game of bowling can produce', () => {
+    expect(isValidGameScore('1.95e+127')).toBe(false);
+    expect(isValidGameScore(301)).toBe(false);
+    expect(isValidGameScore(-5)).toBe(false);
+  });
+
+  it('rejects a non-integer, since games are scored in whole pins', () => {
+    expect(isValidGameScore(12.5)).toBe(false);
+  });
+
+  it('accepts every real score including the extremes', () => {
+    expect(isValidGameScore(0)).toBe(true);
+    expect(isValidGameScore(300)).toBe(true);
+    expect(isValidGameScore('200')).toBe(true);
+  });
+
+  // "They didn't bowl game 3" is a real answer, distinct from a misread.
+  it('accepts empty', () => {
+    expect(isValidGameScore("")).toBe(true);
+    expect(isValidGameScore(null)).toBe(true);
+    expect(isValidGameScore(undefined)).toBe(true);
+  });
+});
+
+describe('invalidScoreIndexes', () => {
+  it('points at exactly the boxes that need fixing', () => {
+    expect(invalidScoreIndexes([200, '1.95e+127', 180])).toEqual([1]);
+    expect(invalidScoreIndexes([200, 180, 210])).toEqual([]);
+    expect(invalidScoreIndexes([999, 180, 400])).toEqual([0, 2]);
+  });
+
+  it('treats a blank game as fine, not as an error to fix', () => {
+    expect(invalidScoreIndexes([200, '', 180])).toEqual([]);
   });
 });
