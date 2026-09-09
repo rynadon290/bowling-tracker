@@ -2,7 +2,7 @@ import { useState } from "react";
 import { C, S, F, Chip, PinDeck, CollapsibleCard, StatLead } from "./ui.jsx";
 import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
-import { sessionMoney } from "./domain/money.js";
+import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
@@ -26,6 +26,7 @@ export default function LogView({
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
+  leagueBuyIns, onSaveLeagueBuyIns,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, maxScoreThisGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
@@ -1079,34 +1080,57 @@ export default function LogView({
                         );
                       })()}
 
-                      <div style={{marginBottom:"12px"}}>
-                        <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Buy-ins ($)</div>
-                        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"6px"}}>
-                          What it cost to enter — so the totals below show what you actually cleared.
-                        </div>
-                        {[0,1,2].map(gameIdx=>{
-                          if(cs.scores[gameIdx]==null)return null;
-                          const qc=(cs.pokerQuarterCost||[0,0,0])[gameIdx]??0;
-                          const dc=(cs.pokerDollarCost||[0,0,0])[gameIdx]??0;
-                          const hc=(cs.highGameCost||[0,0,0])[gameIdx]??0;
-                          return(
-                            <div key={gameIdx} style={{display:"flex",gap:"6px",alignItems:"center",marginBottom:"6px"}}>
-                              <div style={{fontSize:"12px",color:C.textMuted,width:"28px"}}>G{gameIdx+1}</div>
-                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="0.25" placeholder="Qtr"
-                                value={qc||""} onChange={e=>setSessionMoneyArray(cs.id,"pokerQuarterCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
-                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="1" placeholder="Dollar"
-                                value={dc||""} onChange={e=>setSessionMoneyArray(cs.id,"pokerDollarCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
-                              <input style={{...S.input,flex:1,fontSize:"12px",padding:"6px 8px"}} type="number" step="1" placeholder="High"
-                                value={hc||""} onChange={e=>setSessionMoneyArray(cs.id,"highGameCost",gameIdx,e.target.value===""?0:parseFloat(e.target.value))}/>
+                      {/* Buy-ins are per LEAGUE, not per game and not per
+                          week: the quarter game costs a quarter every game
+                          all season. This used to be nine boxes re-typed
+                          every week, which is repetition whose most likely
+                          outcome is getting one of them wrong.
+                          
+                          Editing here updates the rate for this league and
+                          applies it to tonight. Past nights keep whatever
+                          they actually cost. */}
+                      {(()=>{
+                        const rates=buyInsForLeague(leagueBuyIns,cs.league);
+                        const games=(cs.scores||[]).filter(v=>v!=null).length;
+                        const setRate=(key,val)=>{
+                          const next={...rates,[key]:val===""?0:parseFloat(val)||0};
+                          onSaveLeagueBuyIns?.(cs.league,next);
+                          const arrays=costArraysFor(next,games);
+                          Object.entries(arrays).forEach(([field,value])=>{
+                            if(Array.isArray(value)){
+                              value.forEach((v,i)=>setSessionMoneyArray(cs.id,field,i,v));
+                            } else {
+                              setSessionMoneyValue(cs.id,field,value);
+                            }
+                          });
+                        };
+                        const row=(label,key,step)=>(
+                          <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                            <div style={{fontSize:"12px",color:C.textMuted,flex:1}}>{label}</div>
+                            <input style={{...S.input,width:"90px",fontSize:"13px",padding:"6px 10px",textAlign:"right"}}
+                              type="number" step={step} placeholder="$"
+                              value={rates[key]===0?"":rates[key]}
+                              onChange={e=>setRate(key,e.target.value)}/>
+                          </div>
+                        );
+                        return(
+                          <div style={{marginBottom:"12px"}}>
+                            <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Buy-ins ($ per game)</div>
+                            <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
+                              Saved for {String(cs.league||"this league").replace(" House Shot","")} — you won't need to enter these again.
                             </div>
-                          );
-                        })}
-                        <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-                          <div style={{fontSize:"12px",color:C.textMuted,width:"56px"}}>3-6-9</div>
-                          <input style={{...S.input,flex:1,fontSize:"13px",padding:"6px 10px"}} type="number" step="1" placeholder="Buy-in $"
-                            value={cs.threeSixNineCost||""} onChange={e=>setSessionMoneyValue(cs.id,"threeSixNineCost",e.target.value===""?0:parseFloat(e.target.value))}/>
-                        </div>
-                      </div>
+                            {row("Quarter game","pokerQuarter","0.25")}
+                            {row("Dollar game","pokerDollar","1")}
+                            {row("High game","highGame","1")}
+                            {row("3-6-9 (whole night)","threeSixNine","1")}
+                            <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
+                              {games} game{games===1?"":"s"} tonight · costs ${(
+                                (rates.pokerQuarter+rates.pokerDollar+rates.highGame)*games+rates.threeSixNine
+                              ).toFixed(2)} in
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {(()=>{
                         const m=sessionMoney(cs);

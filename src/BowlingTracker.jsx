@@ -18,6 +18,7 @@ import { maxPossibleScore,
   freshRackShots, theoreticalFillBallValue,
 } from "./domain/scoring.js";
 import { emptyShot, computeSessionStats, findExistingShotSlot } from "./domain/sessions.js";
+import { buyInsForLeague, costArraysFor } from "./domain/money.js";
 import { normalizeLayout } from "./domain/layouts.js";
 import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHandedness, suggestBookAverage } from "./domain/profiles.js";
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
@@ -117,6 +118,10 @@ const CATALOG_ACK_KEY = "bowling-catalog-ack-v1";
 const CENTERS_KEY = "bowling-centers-v1";
 const OIL_PATTERNS_KEY = "bowling-oil-patterns-v1";
 const LEAGUE_CENTERS_KEY = "bowling-league-centers-v1";
+// Buy-in rates per league. A league's buy-ins don't change game to game
+// or week to week, so they're entered once and reused -- see
+// domain/money.js.
+const LEAGUE_BUY_INS_KEY = "bowling-league-buy-ins-v1";
 const LEAGUE_DATES_KEY = "bowling-league-dates-v1";
 const HIDDEN_LEAGUES_KEY = "bowling-hidden-leagues-v1";
 const DRILLS_KEY = "bowling-drills-v1";
@@ -440,6 +445,26 @@ export default function BowlingTracker(){
     }
   }
 
+  // Buy-ins load from local storage on mount. Deliberately device-local
+  // rather than synced: they're a convenience default for filling in
+  // costs, not a fact about the league that other people need.
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const raw=await window.storage.get(LEAGUE_BUY_INS_KEY);
+        if(raw)setLeagueBuyIns(JSON.parse(raw.value));
+      }catch{}
+    })();
+  },[]);
+
+  function saveLeagueBuyIns(league,rates){
+    setLeagueBuyIns(prev=>{
+      const next={...prev,[league]:rates};
+      try{window.storage.set(LEAGUE_BUY_INS_KEY,JSON.stringify(next));}catch{}
+      return next;
+    });
+  }
+
   async function loadFriends(){
     const{data,online}=await cloudRead("friendships",q=>q.select("id,requester_id,addressee_id,status"));
     if(!online||!data)return;
@@ -478,6 +503,8 @@ export default function BowlingTracker(){
   const[coachSearching,setCoachSearching]=useState(false);
   const coachSearchTimer=useRef(null);
   const[leagueCenters,setLeagueCenters]=useState({});
+  // {leagueName: {pokerQuarter, pokerDollar, highGame, threeSixNine}}
+  const[leagueBuyIns,setLeagueBuyIns]=useState({});
   // Season boundaries per league, keyed by name: {name: {startDate, endDate}}.
   // Shared across everyone in the league (like center), unlike per-bowler
   // book-average tracking which lives on the profile.
@@ -3344,8 +3371,12 @@ export default function BowlingTracker(){
       scores,total:scores.reduce((a,b)=>a+b,0),
       average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0,
       pokerQuarter:[0,0,0],pokerDollar:[0,0,0],threeSixNineWinnings:0,jackpotWinnings:0,
-      highGameWinnings:[0,0,0],pokerQuarterCost:[0,0,0],pokerDollarCost:[0,0,0],
-      highGameCost:[0,0,0],threeSixNineCost:0,
+      highGameWinnings:[0,0,0],
+      // Costs pre-filled from this league's saved buy-ins, so they never
+      // have to be typed again. Still stored per game on the session, so
+      // a one-off week -- skipped the dollar game in game 3 -- stays
+      // representable and past nights keep whatever they actually cost.
+      ...costArraysFor(buyInsForLeague(leagueBuyIns,effectiveSessionLeague),scores.length),
       ...computeSessionStats(nightShots),
     };
     const updated=[...sessions,draft];
@@ -4625,6 +4656,7 @@ export default function BowlingTracker(){
             getLanePattern={getLanePattern} getMatch={getMatch} handleBallChange={handleBallChange} handleLeaveToggle={handleLeaveToggle} handleLineChange={handleLineChange}
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
+            leagueBuyIns={leagueBuyIns} onSaveLeagueBuyIns={saveLeagueBuyIns}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} maxScoreThisGame={maxScoreThisGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
             preferences={logPreferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
