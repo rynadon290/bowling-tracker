@@ -4,6 +4,7 @@ import { formatDate, RESULTS, localDateString } from "./constants.js";
 import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
+import { isValidGameScore, invalidScoreIndexes } from "./domain/importVerification.js";
 import { supabase } from "./supabaseClient.js";
 
 // A short, human-readable summary of a single shot, for the collapsed row
@@ -107,10 +108,19 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
           </div>
           <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
             <div style={{fontSize:"12px",color:C.textMuted,width:"52px"}}>Score</div>
-            <input style={{...S.input,flex:1}} type="number" inputMode="numeric" placeholder="Score"
+            <input style={{...S.input,flex:1,
+              ...(isValidGameScore(game.totalScore)?{}:{borderColor:C.miss,color:C.miss})}}
+              type="number" inputMode="numeric" placeholder="Score"
               value={game.totalScore==null?"":String(game.totalScore)}
               onChange={e=>onUpdateScore(e.target.value===""?null:parseInt(e.target.value))}/>
           </div>
+          {/* Same bound as the teammate rows: a garbled read is flagged
+              where it can be fixed, not carried silently into history. */}
+          {!isValidGameScore(game.totalScore)&&(
+            <div style={{fontSize:"10px",color:C.miss,marginTop:"4px"}}>
+              That isn't a possible game score — type the real one.
+            </div>
+          )}
         </>
       )}
       {game.warnings.length>0&&(
@@ -240,6 +250,19 @@ export default function ImportScorecard({
     });
   }
 
+  function removeImage(idx){
+    setImages(prev=>{
+      const img=prev[idx];
+      // createObjectURL holds the blob alive until it's revoked. Dropping
+      // the reference alone would leak a full-size photo per mistake.
+      if(img?.previewUrl){try{URL.revokeObjectURL(img.previewUrl);}catch{}}
+      return prev.filter((_,i)=>i!==idx);
+    });
+    // A size error was about the set as a whole, so it stops applying the
+    // moment the set changes.
+    setError(null);
+  }
+
   async function handleFilesSelected(fileList){
     const files=Array.from(fileList).slice(0,6);
     try{
@@ -304,6 +327,12 @@ export default function ImportScorecard({
   const teammateEntries=columns
     .map((c,i)=>({column:c,index:i,bowler:assignments[i]}))
     .filter(x=>x.bowler&&x.bowler!==contextBowler);
+
+  // Any teammate score that a game of bowling can't produce. Sending one
+  // means the receiving end nulls it and the teammate gets a blank, so
+  // this blocks the save rather than only colouring the box.
+  const hasInvalidTeammateScores=teammateEntries
+    .some(({index})=>invalidScoreIndexes(teammateScores[index]||[]).length>0);
 
   async function handleExtract(){
     if(!contextLeague||!images.length)return;
@@ -596,10 +625,27 @@ export default function ImportScorecard({
             {images.length>0&&(
               <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"12px"}}>
                 {images.map((img,i)=>(
-                  <img key={i} src={img.previewUrl} alt={`Scorecard ${i+1}`}
-                    style={{width:"72px",height:"72px",objectFit:"cover",borderRadius:"8px",border:`1px solid ${C.border}`}}/>
+                  <div key={i} style={{position:"relative"}}>
+                    <img src={img.previewUrl} alt={`Scorecard ${i+1}`}
+                      style={{width:"72px",height:"72px",objectFit:"cover",borderRadius:"8px",border:`1px solid ${C.border}`}}/>
+                    {/* Picking the wrong photo from a camera roll is easy
+                        and used to mean starting the whole selection over. */}
+                    <button aria-label={`Remove scorecard ${i+1}`}
+                      onClick={()=>removeImage(i)}
+                      style={{position:"absolute",top:"-6px",right:"-6px",width:"22px",height:"22px",
+                        borderRadius:"50%",border:`1px solid ${C.border}`,background:C.surface,
+                        color:C.text,fontSize:"13px",lineHeight:"20px",padding:0,cursor:"pointer"}}>
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
+            )}
+            {images.length>0&&(
+              <button style={{...S.btn(),width:"100%",marginBottom:"12px",fontSize:"12px",padding:"8px"}}
+                onClick={()=>{images.forEach(i=>{if(i.previewUrl){try{URL.revokeObjectURL(i.previewUrl);}catch{}}});setImages([]);setError(null);}}>
+                Clear all {images.length} image{images.length>1?"s":""}
+              </button>
             )}
             {error&&(
               <div style={{
@@ -769,18 +815,36 @@ export default function ImportScorecard({
                     <div style={{fontSize:"10px",color:C.textMuted}}>read as "{column.scorecardName||"unnamed"}"</div>
                   </div>
                   <div style={{display:"flex",gap:"6px"}}>
-                    {(teammateScores[index]||[]).map((v,gi)=>(
-                      <input key={gi} style={{...S.input,flex:1,textAlign:"center",fontSize:"14px"}}
-                        type="number" inputMode="numeric" placeholder={`G${gi+1}`}
-                        value={v}
-                        onChange={e=>setTeammateScores(prev=>({
-                          ...prev,
-                          [index]:(prev[index]||[]).map((x,j)=>j===gi?e.target.value:x),
-                        }))}/>
-                    ))}
+                    {(teammateScores[index]||[]).map((v,gi)=>{
+                      // A misread is flagged at the box it came from.
+                      // Without an upper bound a garbled OCR value like
+                      // 1.95e+127 passed review as a valid series, then
+                      // got silently nulled on the receiving end -- so
+                      // the teammate got a blank and nobody knew why.
+                      const bad=!isValidGameScore(v);
+                      return(
+                        <input key={gi} style={{...S.input,flex:1,textAlign:"center",fontSize:"14px",
+                          ...(bad?{borderColor:C.miss,color:C.miss}:{})}}
+                          type="number" inputMode="numeric" placeholder={`G${gi+1}`}
+                          value={v}
+                          onChange={e=>setTeammateScores(prev=>({
+                            ...prev,
+                            [index]:(prev[index]||[]).map((x,j)=>j===gi?e.target.value:x),
+                          }))}/>
+                      );
+                    })}
                   </div>
                   {(()=>{
-                    const nums=(teammateScores[index]||[]).map(Number).filter(n=>Number.isFinite(n)&&n>0);
+                    const raw=teammateScores[index]||[];
+                    const badIdx=invalidScoreIndexes(raw);
+                    if(badIdx.length){
+                      return(
+                        <div style={{fontSize:"10px",color:C.miss,marginTop:"4px"}}>
+                          Game{badIdx.length>1?"s":""} {badIdx.map(i=>i+1).join(", ")} couldn't be read — type the real score, or clear the box if they didn't bowl it.
+                        </div>
+                      );
+                    }
+                    const nums=raw.map(Number).filter(n=>Number.isFinite(n)&&n>0);
                     return nums.length?(
                       <div style={{fontSize:"10px",color:C.textMuted,marginTop:"4px"}}>
                         Series {nums.reduce((a,b)=>a+b,0)}
@@ -794,8 +858,14 @@ export default function ImportScorecard({
             </div>
           )}
 
-          <button style={S.btn("primary")} disabled={step==="saving"} onClick={handleSave}>
-            {step==="saving"?"Saving…":teammateEntries.length?`Save & Send To ${teammateEntries.length} Teammate${teammateEntries.length>1?"s":""}`:"Looks Good — Save"}
+          {/* Blocked while any teammate score is unreadable. Flagging it
+              without blocking would just be decoration: the value passes
+              review, then cleanScores nulls it on arrival and the
+              teammate gets a blank with no explanation. */}
+          <button style={S.btn("primary")}
+            disabled={step==="saving"||hasInvalidTeammateScores}
+            onClick={handleSave}>
+            {step==="saving"?"Saving…":hasInvalidTeammateScores?"Fix the flagged scores first":teammateEntries.length?`Save & Send To ${teammateEntries.length} Teammate${teammateEntries.length>1?"s":""}`:"Looks Good — Save"}
           </button>
           <button style={{...S.btn(),marginTop:"8px"}} onClick={()=>setStep("setup")}>Start Over</button>
         </>
