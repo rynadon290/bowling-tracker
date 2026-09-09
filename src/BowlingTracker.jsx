@@ -756,6 +756,19 @@ export default function BowlingTracker(){
   // team is one tap away and still fully available; it just isn't the
   // thing you have to navigate away from.
   const[statsBowler,setStatsBowler]=useState(displayName||"");
+  // displayName arrives asynchronously, so the initial value above is ""
+  // on first paint -- which shows the unfiltered view: every shot in the
+  // local array, including teammates proxy-logged and every column off an
+  // imported scorecard, blended into one average. Settle on the account
+  // once it's known, unless the bowler has already picked someone.
+  const statsBowlerTouched=useRef(false);
+  const chooseStatsBowler=v=>{statsBowlerTouched.current=true;setStatsBowler(v);};
+  const chooseStatsLeague=v=>{statsBowlerTouched.current=true;setStatsLeague(v);};
+  useEffect(()=>{
+    if(statsBowlerTouched.current)return;
+    if(displayName&&!statsBowler&&!statsLeague)setStatsBowler(displayName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[displayName]);
   const[compareBowler,setCompareBowler]=useState("");
   // Set alongside compareBowler when the comparison target is a FRIEND
   // rather than someone in the local roster -- lets the merged-shots
@@ -4845,8 +4858,8 @@ export default function BowlingTracker(){
             confirmClear={confirmClear} setConfirmClear={setConfirmClear}
             clearAllData={clearAllData} hasData={shots.length>0}
             sessions={sessions} bowlers={bowlers} leagues={leagues}
-            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
-            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            statsBowler={statsBowler} setStatsBowler={chooseStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={chooseStatsLeague}
             filterBowler={filterBowler} setFilterBowler={setFilterBowler}
             filterBall={filterBall} setFilterBall={setFilterBall}
             filterResult={filterResult} setFilterResult={setFilterResult}
@@ -4899,8 +4912,8 @@ export default function BowlingTracker(){
             confirmClear={confirmClear} setConfirmClear={setConfirmClear}
             clearAllData={clearAllData} hasData={shots.length>0}
             sessions={sessions} bowlers={bowlers} leagues={leagues}
-            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
-            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            statsBowler={statsBowler} setStatsBowler={chooseStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={chooseStatsLeague}
             filterBowler={filterBowler} setFilterBowler={setFilterBowler}
             filterBall={filterBall} setFilterBall={setFilterBall}
             filterResult={filterResult} setFilterResult={setFilterResult}
@@ -5036,8 +5049,8 @@ export default function BowlingTracker(){
           <TrendsView
             sessions={sessions} shots={shots} bowlers={bowlers} leagues={leagues} teams={teams}
             arsenals={arsenals} gameEquipment={gameEquipment}
-            statsBowler={statsBowler} setStatsBowler={setStatsBowler}
-            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            statsBowler={statsBowler} setStatsBowler={chooseStatsBowler}
+            statsLeague={statsLeague} setStatsLeague={chooseStatsLeague}
             friends={friends} displayName={displayName}
             isSplit={isSplit}
             isCornerPinLeave={shot=>isCornerPinLeave(shot,trendsLeftHanded)}
@@ -5048,10 +5061,10 @@ export default function BowlingTracker(){
           <StatsView
             centerStats={centerStats}
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
-            statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
+            statsBowler={statsBowler} setStatsBowler={chooseStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
             compareFriendId={compareFriendId} setCompareFriendId={setCompareFriendId}
             friends={friends} onLoadFriendData={loadFriendData} compareSessions={compareSessions} displayName={displayName}
-            statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            statsLeague={statsLeague} setStatsLeague={chooseStatsLeague}
             compareLeague={compareLeague} setCompareLeague={setCompareLeague}
             matches={matches}
             FRAME_POSITION_RELIABILITY_THRESHOLD={FRAME_POSITION_RELIABILITY_THRESHOLD} SHOT_SAMPLE_THRESHOLD={SHOT_SAMPLE_THRESHOLD} allFirstBalls={allFirstBalls} bStats={bStats} bowlerLeagueCount={bowlerLeagueCount}

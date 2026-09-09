@@ -111,9 +111,11 @@ export default function TrendsView({
                 setStatsBowler(""); setStatsLeague(id);
               }
             }}>
-            <option value="">Everyone on this device</option>
+            {/* No unfiltered option -- see StatsView for why. It blended
+                every bowler in the local array into one line, which is
+                nobody's trend. */}
             {displayName && (
-              <option value={`bowler:${displayName}`}>{displayName}</option>
+              <option value={`bowler:${displayName}`}>{displayName} (you)</option>
             )}
             {friends.length > 0 && (
               <optgroup label="Friends">

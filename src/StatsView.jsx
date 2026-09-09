@@ -119,10 +119,24 @@ bowlers.length>1&&(
                         if(kind==="bowler"){setStatsBowler(id);setStatsLeague("");}
                         else{setStatsLeague(id);setStatsBowler("");}
                       }}>
-                      <option value="">Everyone on this device</option>
-                      {/* You first -- it's your own stats screen. */}
+                      {/* No unfiltered option.
+                      
+                          With nothing selected, the stats were every shot
+                          in the LOCAL array -- yours, teammates you
+                          proxy-logged, every column off an imported
+                          scorecard, guests. For a solo bowler that's
+                          just their own numbers; for a captain who logs
+                          the team on one phone it's five bowlers blended
+                          into one meaningless average.
+                          
+                          It also isn't "all my friends" -- a friend's
+                          data is fetched separately and deliberately
+                          never merged into this account's own stats.
+                          
+                          So there's nothing this option correctly
+                          describes. You are the default instead. */}
                       {displayName&&(
-                        <option value={`bowler:${displayName}`}>{displayName}</option>
+                        <option value={`bowler:${displayName}`}>{displayName} (you)</option>
                       )}
                       {friends.length>0&&(
                         <optgroup label="Friends">
