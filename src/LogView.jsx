@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { C, S, F, Chip, PinDeck, CollapsibleCard, StatLead } from "./ui.jsx";
-import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
+import { PLASTIC_BALL, formatDate, localDateString, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js";
 import { visibleMoneyGames } from "./domain/preferences.js";
+import { nextLeagueDate, prebowlConflict } from "./domain/sessions.js";
+import { inferLeagueDay } from "./domain/reminders.js";
 import Scoresheet from "./Scoresheet.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
@@ -303,6 +305,53 @@ export default function LogView({
                   <input style={S.input} type="date" value={sessionDate}
                     onChange={e=>{setSessionDate(e.target.value);set("date",e.target.value);setShowSummary(false);}}/>
                 </div>
+
+                {/* Prebowling: games thrown early that count for a future
+                    week -- often on the same night as the current week's
+                    session, before or after it.
+                    
+                    Filed under the date they COUNT FOR, not the date
+                    thrown. That's correct for standings, and it's what
+                    keeps them from colliding: sessions are keyed on
+                    (bowler, league, date), so a prebowl filed under today
+                    would share a key with tonight's real session and one
+                    would silently overwrite the other. */}
+                {preferences.environment==="league"&&sessionLeague&&(()=>{
+                  const bowledOn=localDateString();
+                  const isPrebowl=sessionDate>bowledOn;
+                  const conflict=isPrebowl
+                    ?prebowlConflict(sessions,activeBowler,effectiveSessionLeague,sessionDate,bowledOn)
+                    :"";
+                  const leagueDay=inferLeagueDay(
+                    (sessions||[]).filter(s=>s.bowler===activeBowler),effectiveSessionLeague);
+                  return(
+                    <div style={{marginBottom:"10px"}}>
+                      <button
+                        onClick={()=>{
+                          if(isPrebowl){
+                            setSessionDate(bowledOn);set("date",bowledOn);
+                          }else{
+                            const next=nextLeagueDate(bowledOn,leagueDay)
+                              ||nextLeagueDate(bowledOn,new Date(`${bowledOn}T00:00:00`).getDay());
+                            setSessionDate(next);set("date",next);
+                          }
+                          setShowSummary(false);
+                        }}
+                        style={{width:"100%",textAlign:"left",cursor:"pointer",
+                          padding:"8px 10px",borderRadius:"8px",fontSize:"12px",
+                          border:`1px solid ${isPrebowl?C.accent:C.border}`,
+                          background:isPrebowl?C.accent+"11":"transparent",
+                          color:isPrebowl?C.text:C.textMuted}}>
+                        {isPrebowl?"✓ Prebowling":"Prebowling for a future week?"}
+                      </button>
+                      {isPrebowl&&(
+                        <div style={{fontSize:"11px",color:conflict?C.miss:C.textMuted,marginTop:"4px",lineHeight:1.4}}>
+                          {conflict||`Counts for ${formatDate(sessionDate)}. Bowled today — change the date above if that's the wrong week.`}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Opponent & handicap — moved here from Stats, since this is
                     known before bowling starts and belongs with the rest of
