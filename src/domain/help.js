@@ -123,8 +123,9 @@ export const HELP = [
     id: "teams",
     view: "locker",
     title: "Add a team and its roster",
-    keywords: ["team", "roster", "lineup", "teammate", "invite"],
-    body: "Teams live under their league in the Vault — add a league, then add its team right underneath. Open the team to set the lineup order and invite teammates by email. Someone who hasn't signed up yet can be added as a placeholder and linked later.",
+    keywords: ["team", "roster", "lineup", "teammate", "invite", "placeholder",
+               "not signed up", "hasn't joined", "email required", "bowling order", "add a teammate"],
+    body: "Teams live under their league in the Vault — add a league, then add your team right underneath. Open the team to set the bowling order and add each teammate by name and email. The email is required: it's what connects them to their spot when they sign up. Teammates who haven't joined yet still work — you can log their scores straight away, and everything you've recorded is waiting for them when they accept the invite.",
   },
   {
     id: "arsenal",

@@ -96,7 +96,13 @@ const ALL_STEPS = [
     id: "vault",
     tab: "locker",
     title: "Vault",
-    body: "Your leagues, teams and ball arsenal live here. Add a league, then add its team right underneath.",
+    body: "Your leagues, teams and ball arsenal live here. Add a league, then add your team right underneath.",
+  },
+  {
+    id: "roster",
+    tab: "locker",
+    title: "Adding your teammates",
+    body: "Build your roster in bowling order. Add each teammate with their name and email — that works whether or not they've signed up yet. You can start logging their scores immediately, no account needed. When they do sign up with that email, the invite is waiting for them, and accepting it connects them to everything you've already recorded.",
   },
   {
     id: "money",
