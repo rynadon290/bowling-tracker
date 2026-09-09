@@ -4418,9 +4418,18 @@ export default function BowlingTracker(){
                 tournament card while in practice mode wasn't possible at
                 all. From the header it asks what's being imported
                 instead of inheriting whatever mode Log is in. */}
+            {/* Labelled, not just an icon. A bare camera reads as "take a
+                photo" -- several bowlers looked for import on the Bowl
+                tab and gave up. There's room in the header for the words. */}
             <button onClick={()=>setView("import")}
-              style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}}
-              aria-label="Import scorecard">📷</button>
+              style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",
+                fontSize:"12px",fontWeight:600,color:C.text,
+                padding:"5px 9px",borderRadius:"7px",lineHeight:1,
+                display:"flex",alignItems:"center",gap:"4px",whiteSpace:"nowrap"}}
+              aria-label="Import scorecard">
+              <span style={{fontSize:"13px"}}>📷</span>
+              <span>Import</span>
+            </button>
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
