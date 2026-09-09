@@ -14,6 +14,7 @@ import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { classifySyncError, cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
+import { normalizeSignupCode, isValidSignupCode } from "./domain/signupCodes.js";
 import { splitConversionByType, isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import { maxPossibleScore,
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -2561,6 +2562,25 @@ export default function BowlingTracker(){
     setShowOnboarding(true);
   }
 
+  // Claiming a signup code. Returns an error string, or "" on success.
+  //
+  // The RPC is security definer: the claimer isn't on the team yet and
+  // can't see the invite row, so the database does the checking. It
+  // writes only the caller's own user id, so a code can't be used to add
+  // anyone else.
+  async function claimSignupCode(raw){
+    const code=normalizeSignupCode(raw);
+    if(!isValidSignupCode(code))return "That doesn't look like a team code.";
+    try{
+      const{error}=await supabase.rpc("claim_signup_code",{code});
+      if(error)return error.message||"That code is not valid.";
+      // Teams refresh on the next startup fetch; nothing to call here.
+      return "";
+    }catch{
+      return "Couldn't check that code — you may be offline. You can enter it later in Settings.";
+    }
+  }
+
   function finishOnboarding(){
     // Commit what onboarding collected. The name creates the bowler --
     // everything downstream keys off bowler name, so this has to happen
@@ -3973,8 +3993,15 @@ export default function BowlingTracker(){
   // friend and team requests, coach tasks, imported scores, the book
   // average prompt. Previously each lived only on its own tab, so
   // "is anything waiting for me" meant checking five places.
-  const inboxItems=buildInbox({
-    bowler:activeBowler,
+  // The header icon and count use the ACCOUNT's inbox, not the active
+  // bowler's.
+  //
+  // Who's Bowling changes activeBowler when logging for a teammate, and
+  // scoping the count to it meant the inbox icon appeared and vanished
+  // depending on whose scores you were entering -- items addressed to
+  // you were invisible while you had a teammate selected.
+  const myInboxItems=buildInbox({
+    bowler:displayName||activeBowler,
     userId:user?.id,
     importedScores,
     sessions,
@@ -3985,13 +4012,14 @@ export default function BowlingTracker(){
     friendRequests:incomingFriendRequests,
     teamInvites:myTeamInvites,
     bookAverageDue:bookAverageCheck,
-    catalogRejections:rejectedBallsFor(arsenals[activeBowler]||[],catalogEntries,catalogAck),
+    catalogRejections:rejectedBallsFor(arsenals[displayName||activeBowler]||[],catalogEntries,catalogAck),
     coachViewOn,
   });
+
   // The icon is conditional: a permanent icon for a usually-empty inbox
   // is clutter, and one that only appears when something is waiting needs
   // no label.
-  const inboxCount=countInbox(inboxItems);
+  const inboxCount=countInbox(myInboxItems);
 
   // Whether the bowler being VIEWED has an accepted coach -- Insights adds
   // a line telling them to check with that coach before acting on it.
@@ -4483,6 +4511,7 @@ export default function BowlingTracker(){
         onApply={updatePreferences}
         onFinish={finishOnboarding}
         profile={onboardingProfile}
+        onClaimCode={claimSignupCode}
         onProfileChange={setOnboardingProfile}
         centers={centers}
         searchCenters={searchCenters}
@@ -4742,7 +4771,7 @@ export default function BowlingTracker(){
             {/* Links out to whichever screen already owns each workflow.
                 The inbox notifies; it doesn't re-implement accepting a
                 coaching invitation in a second place. */}
-            <InboxList items={inboxItems} onOpen={item=>{
+            <InboxList items={myInboxItems} onOpen={item=>{
               // A task set BY a coach is homework for the bowler, so open
               // the Coach tab on the bowling side rather than dropping
               // them into coach view looking at their own bowlers.

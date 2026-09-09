@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider.jsx";
 import { cloudUpdate, cloudRead, cloudWrite, cloudDelete } from "./syncQueue.js";
+import { generateSignupCode } from "./domain/signupCodes.js";
 
 // Pure roster-management functions, extracted so they're testable without
 // rendering the component. Each takes the current `teams` array plus
@@ -46,7 +47,7 @@ export function moveTeamMember(teams, teamId, index, direction) {
 // email is optional — a blank one creates a name-only "placeholder" roster
 // slot rather than an error. Duplicate-checking only applies when an email
 // is actually given, since multiple email-less placeholders are allowed.
-export function createTeamInvite(teams, teamId, id, name, email) {
+export function createTeamInvite(teams, teamId, id, name, email, useCode = false) {
   const cleanName = (name || "").trim();
   const cleanEmail = (email || "").trim().toLowerCase();
   if (!cleanName) return { teams, invite: null, error: "invalid" };
@@ -60,18 +61,30 @@ export function createTeamInvite(teams, teamId, id, name, email) {
   // knowledge, and team membership grants read access to sessions and
   // shots. Requiring the email removes the need for that path entirely:
   // the person signs up, sees the invite, and accepts it themselves.
-  if (!cleanEmail) return { teams, invite: null, error: "no-email" };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+  // Email OR a signup code. Not neither.
+  //
+  // Both give the teammate a way to claim the spot THEMSELVES. What was
+  // banned is a placeholder with no route at all, because the only way
+  // to resolve one of those was a captain searching every account on the
+  // app and linking one -- which let a captain add anyone, without
+  // consent, and team membership grants read access to sessions and
+  // shots.
+  if (!cleanEmail && !useCode) return { teams, invite: null, error: "no-contact" };
+  if (cleanEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
     return { teams, invite: null, error: "bad-email" };
   }
 
   const team = teams.find(t => t.id === teamId);
   if (!team) return { teams, invite: null, error: "no-team" };
-  if (team.pendingInvites.some(inv => inv.email && inv.email.toLowerCase() === cleanEmail)) {
+  if (cleanEmail && team.pendingInvites.some(inv => inv.email && inv.email.toLowerCase() === cleanEmail)) {
     return { teams, invite: null, error: "duplicate" };
   }
   const lineupPosition = team.members.length + team.pendingInvites.length;
-  const invite = { id, name: cleanName, email: cleanEmail, lineupPosition, leftHanded: false, isSub: false };
+  const invite = {
+    id, name: cleanName, email: cleanEmail || null, lineupPosition,
+    leftHanded: false, isSub: false,
+    signupCode: useCode ? generateSignupCode() : null,
+  };
   const newTeams = teams.map(t => t.id === teamId ? { ...t, pendingInvites: [...t.pendingInvites, invite] } : t);
   return { teams: newTeams, invite, error: null };
 }
@@ -402,13 +415,13 @@ export default function TeamManagement({
   function createInvite(teamId) {
     const form = inviteForm[teamId] || {};
     const id = crypto.randomUUID();
-    const { teams: newTeams, invite, error } = createTeamInvite(teams, teamId, id, form.name, form.email);
+    const { teams: newTeams, invite, error } = createTeamInvite(teams, teamId, id, form.name, form.email, !!form.useCode);
     if (error === "duplicate") {
       alert("There's already a pending invite for that email on this team.");
       return;
     }
-    if (error === "no-email") {
-      alert("An email is needed. It's how they're connected to this spot when they sign up — without it there's no way to link them.");
+    if (error === "no-contact") {
+      alert("Add an email, or tick \u201cI don\u2019t have their email\u201d to get a code you can text them. Either way they need a way to claim this spot themselves.");
       return;
     }
     if (error === "bad-email") {
@@ -421,6 +434,13 @@ export default function TeamManagement({
     cloudWrite("pending_invites", {
       id, team_id: teamId, invited_name: invite.name, invited_email: invite.email,
       lineup_position: invite.lineupPosition, created_by: user?.id || null,
+      signup_code: invite.signupCode,
+      // A month is long enough to catch someone who signs up next
+      // Tuesday, short enough that an abandoned code doesn't sit live
+      // forever.
+      code_expires_at: invite.signupCode
+        ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+        : null,
     });
   }
 
@@ -584,7 +604,27 @@ export default function TeamManagement({
               <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
                 <div style={{width:"24px"}}></div>
                 <div style={{flex:1}}>
-                  <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
+                  <div>
+                    <div style={{color:C.textMuted,fontStyle:"italic"}}>{invite.name}</div>
+                    {/* The code, big enough to read off a phone and copy
+                        into a text. Shown until it's claimed. */}
+                    {invite.signupCode&&(
+                      <div style={{marginTop:"3px",display:"flex",alignItems:"center",gap:"6px"}}>
+                        <span style={{
+                          fontFamily:"monospace",fontSize:"13px",fontWeight:700,
+                          letterSpacing:"1px",color:C.accent,
+                        }}>{invite.signupCode}</span>
+                        <button
+                          onClick={()=>{
+                            const msg=`Join our team on My Bowling Vault — sign up and enter code ${invite.signupCode}`;
+                            try{navigator.clipboard?.writeText(msg);}catch{}
+                          }}
+                          style={{...S.btn(),padding:"3px 8px",fontSize:"10px"}}>
+                          Copy
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div style={{color:C.textMuted,fontSize:"10px"}}>
                     {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
                   </div>
@@ -650,13 +690,34 @@ export default function TeamManagement({
                   placeholder="Their name"
                   style={S.input}
                 />
-                <input
-                  value={inviteForm[team.id]?.email || ""}
-                  onChange={e=>setInviteForm(prev=>({...prev,[team.id]:{...prev[team.id],email:e.target.value}}))}
-                  placeholder="Their email (optional)"
-                  type="email"
-                  style={S.input}
-                />
+                {!inviteForm[team.id]?.useCode && (
+                  <input
+                    value={inviteForm[team.id]?.email || ""}
+                    onChange={e=>setInviteForm(prev=>({...prev,[team.id]:{...prev[team.id],email:e.target.value}}))}
+                    placeholder="Their email"
+                    type="email"
+                    style={S.input}
+                  />
+                )}
+
+                {/* The way out for a captain standing at the lanes with
+                    four teammates and two email addresses. A code they
+                    can text works the same way an email invite does: the
+                    teammate claims the spot themselves. */}
+                <button
+                  onClick={()=>setInviteForm(prev=>({...prev,[team.id]:{
+                    ...prev[team.id],useCode:!prev[team.id]?.useCode,email:"",
+                  }}))}
+                  style={{
+                    textAlign:"left",padding:"8px 10px",borderRadius:"8px",cursor:"pointer",
+                    fontSize:"12px",
+                    border:`1px solid ${inviteForm[team.id]?.useCode?C.accent:C.border}`,
+                    background:inviteForm[team.id]?.useCode?C.accent+"11":"transparent",
+                    color:inviteForm[team.id]?.useCode?C.text:C.textMuted,
+                  }}>
+                  {inviteForm[team.id]?.useCode?"✓ ":""}I don't have their email — give me a code to text them
+                </button>
+
                 <button style={S.primary} onClick={()=>createInvite(team.id)}>Add to Roster</button>
               </div>
             </div>

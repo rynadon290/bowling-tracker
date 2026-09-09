@@ -97,10 +97,10 @@ describe('createTeamInvite', () => {
   // "Link Account" search necessary, and that search let a captain add
   // any account on the app to their roster without consent. Email is now
   // required, so a placeholder always has a way to resolve itself.
-  it('rejects a name-only placeholder — there would be no way to link them', () => {
+  it('rejects a placeholder with neither an email nor a code', () => {
     const teams = [team()];
     const result = createTeamInvite(teams, 'team-1', 'id', 'Aaron', '');
-    expect(result.error).toBe('no-email');
+    expect(result.error).toBe('no-contact');
     expect(result.invite).toBeNull();
   });
 
@@ -232,17 +232,17 @@ describe('resolvePlaceholder', () => {
 // let a captain add ANY user to their roster without that person
 // knowing, and team membership grants read access to their sessions and
 // shots.
-describe('createTeamInvite requires an email', () => {
+describe('createTeamInvite requires a way to reach them', () => {
   const teams = [{ id: 't1', name: 'Split Happens', league: 'Tuesday', members: [], pendingInvites: [] }];
 
-  it('rejects a placeholder with no email', () => {
+  it('rejects a placeholder with no email and no code', () => {
     const r = createTeamInvite(teams, 't1', 'i1', 'Dave', '');
-    expect(r.error).toBe('no-email');
+    expect(r.error).toBe('no-contact');
     expect(r.invite).toBeNull();
   });
 
   it('rejects whitespace as an email', () => {
-    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', '   ').error).toBe('no-email');
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', '   ').error).toBe('no-contact');
   });
 
   it('rejects something that is not an email', () => {
@@ -267,5 +267,53 @@ describe('createTeamInvite requires an email', () => {
 
   it('still requires a name', () => {
     expect(createTeamInvite(teams, 't1', 'i1', '', 'dave@example.com').error).toBe('invalid');
+  });
+});
+
+// Email OR a code -- not neither. Both give the teammate a way to claim
+// the spot themselves; a placeholder with no route at all is what forced
+// the captain-side manual link that let anyone be added without consent.
+describe('createTeamInvite with a signup code', () => {
+  const teams = [{ id: 't1', name: 'Split Happens', league: 'Tuesday', members: [], pendingInvites: [] }];
+
+  it('rejects a placeholder with neither email nor code', () => {
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', '').error).toBe('no-contact');
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', '', false).error).toBe('no-contact');
+  });
+
+  it('accepts a code instead of an email', () => {
+    const r = createTeamInvite(teams, 't1', 'i1', 'Dave', '', true);
+    expect(r.error).toBeNull();
+    expect(r.invite.email).toBeNull();
+    expect(r.invite.signupCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  });
+
+  it('still accepts an email, with no code attached', () => {
+    const r = createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave@example.com');
+    expect(r.error).toBeNull();
+    expect(r.invite.signupCode).toBeNull();
+  });
+
+  it('gives each teammate a different code', () => {
+    const a = createTeamInvite(teams, 't1', 'i1', 'Dave', '', true);
+    const b = createTeamInvite(a.teams, 't1', 'i2', 'Kim', '', true);
+    expect(a.invite.signupCode).not.toBe(b.invite.signupCode);
+  });
+
+  // Two code placeholders have no email to collide on.
+  it('does not treat two code placeholders as duplicates', () => {
+    const a = createTeamInvite(teams, 't1', 'i1', 'Dave', '', true);
+    const b = createTeamInvite(a.teams, 't1', 'i2', 'Kim', '', true);
+    expect(b.error).toBeNull();
+    expect(b.teams[0].pendingInvites).toHaveLength(2);
+  });
+
+  it('still rejects a duplicate email', () => {
+    const a = createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave@example.com');
+    expect(createTeamInvite(a.teams, 't1', 'i2', 'D2', 'dave@example.com').error).toBe('duplicate');
+  });
+
+  it('still requires a name', () => {
+    expect(createTeamInvite(teams, 't1', 'i1', '', '', true).error).toBe('invalid');
   });
 });

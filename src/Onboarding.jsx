@@ -45,12 +45,15 @@ const ENVIRONMENT_DESCRIPTIONS = {
 //
 // Ball arsenal is still NOT asked -- it genuinely is recoverable later
 // and it's the one that turns setup into data entry.
-export default function Onboarding({ preferences, onApply, onFinish, profile, onProfileChange, centers = [], searchCenters, ensureCenter }) {
+export default function Onboarding({ preferences, onApply, onFinish, profile, onProfileChange, centers = [], searchCenters, ensureCenter, onClaimCode }) {
   // Two steps rather than one long scroll: on a phone, four environment
   // chips plus their descriptions plus two tracking chips plus theirs is
   // more than a screenful, and a "Start" button below the fold reads as a
   // dead end.
   const [step, setStep] = useState(1);
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [signupCode, setSignupCode] = useState("");
+  const [codeError, setCodeError] = useState("");
   const [centerQuery, setCenterQuery] = useState("");
   const [centerResults, setCenterResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -277,6 +280,46 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
               })}
             </div>
 
+            {/* Signup code, for someone whose captain didn't have their
+                email. Optional and easy to skip -- most people arrive
+                without one, and a required field here would be a wall in
+                front of the app for everybody. */}
+            {preferences.environment !== "casual" && (
+              <div style={{ marginBottom: "16px" }}>
+                {!showCodeEntry ? (
+                  <button
+                    onClick={() => setShowCodeEntry(true)}
+                    style={{
+                      background: "none", border: "none", padding: 0, cursor: "pointer",
+                      fontSize: "13px", color: C.accent, textDecoration: "underline",
+                    }}>
+                    Got a team code from your captain?
+                  </button>
+                ) : (
+                  <div style={{
+                    padding: "12px 14px", borderRadius: "10px",
+                    border: `1px solid ${C.border}`, backgroundColor: C.card,
+                  }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: C.text, marginBottom: "6px" }}>
+                      Team code
+                    </div>
+                    <input
+                      value={signupCode}
+                      onChange={e => { setSignupCode(e.target.value); setCodeError(""); }}
+                      placeholder="ABCD-EFGH"
+                      autoCapitalize="characters"
+                      style={{ ...S.input, fontFamily: "monospace", letterSpacing: "1px" }} />
+                    {codeError && (
+                      <div style={{ fontSize: "11px", color: C.miss, marginTop: "5px" }}>{codeError}</div>
+                    )}
+                    <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>
+                      Puts you straight onto your team, with anything they've already logged for you.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {preferences.environment !== "casual" && (
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -300,7 +343,20 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
               </div>
             )}
 
-            <button style={S.btn("primary")} onClick={onFinish}>Start Bowling</button>
+            <button style={S.btn("primary")}
+              onClick={async () => {
+                // Claim the code before finishing, so the roster spot is
+                // theirs by the time the app opens. A bad code stops the
+                // finish rather than silently dropping them somewhere
+                // they didn't expect.
+                if (signupCode.trim() && onClaimCode) {
+                  const err = await onClaimCode(signupCode);
+                  if (err) { setCodeError(err); return; }
+                }
+                onFinish?.();
+              }}>
+              Start Bowling
+            </button>
             <button
               style={{ ...S.btn(), width: "100%", marginTop: "8px" }}
               onClick={() => setStep(2)}>
