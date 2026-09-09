@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { computeSessionStats, findExistingShotSlot } from './sessions.js';
+import { computeSessionStats, findExistingShotSlot,
+  nextLeagueDate,
+  prebowlConflict,
+} from './sessions.js';
 
 describe('computeSessionStats', () => {
   // A realistic mixed night: 2 strikes, a converted Weak 10, a converted
@@ -93,3 +96,73 @@ describe('findExistingShotSlot', () => {
   });
 });
 
+
+// Prebowling: a bowler who can't make next week bowls those games early,
+// commonly on the same night as the current week's session.
+//
+// Sessions and shots are keyed on (bowler, league, date), so a prebowl
+// filed under TODAY shares a key with tonight's real session and one
+// silently overwrites the other. Filing it under the date it counts for
+// is both correct for standings and collision-free.
+describe('nextLeagueDate', () => {
+  const dayOf = d => new Date(`${d}T00:00:00`).getDay();
+
+  it('lands on the requested weekday', () => {
+    expect(dayOf(nextLeagueDate('2026-09-09', 2))).toBe(2);
+    expect(dayOf(nextLeagueDate('2026-09-09', 4))).toBe(4);
+  });
+
+  // The case that caused the bug: prebowling ON league night must give
+  // NEXT week, never today, or it overwrites tonight's session.
+  it('never returns the day it was bowled on', () => {
+    for (const d of ['2026-09-15', '2026-09-16', '2026-09-17']) {
+      for (let wd = 0; wd < 7; wd++) {
+        expect(nextLeagueDate(d, wd)).not.toBe(d);
+      }
+    }
+  });
+
+  it('always returns a future date', () => {
+    for (let wd = 0; wd < 7; wd++) {
+      expect(nextLeagueDate('2026-09-15', wd) > '2026-09-15').toBe(true);
+    }
+  });
+
+  it('returns empty for a missing weekday rather than guessing', () => {
+    expect(nextLeagueDate('2026-09-15', null)).toBe('');
+    expect(nextLeagueDate('2026-09-15', undefined)).toBe('');
+  });
+});
+
+describe('prebowlConflict', () => {
+  const sessions = [{ bowler: 'Ryan', league: 'Tuesday House Shot', date: '2026-09-22' }];
+  const check = (countsFor, bowledOn = '2026-09-15') =>
+    prebowlConflict(sessions, 'Ryan', 'Tuesday House Shot', countsFor, bowledOn);
+
+  it('accepts a clean future date', () => {
+    expect(check('2026-09-29')).toBe('');
+  });
+
+  it('rejects today, which is the collision it exists to prevent', () => {
+    expect(check('2026-09-15')).toMatch(/today/i);
+  });
+
+  it('rejects a past date', () => {
+    expect(check('2026-09-08')).toMatch(/passed/i);
+  });
+
+  // Prebowling twice for the same week would overwrite the first.
+  it('rejects a date that already has a session', () => {
+    expect(check('2026-09-22')).toMatch(/overwrite/i);
+  });
+
+  it('rejects a missing date', () => {
+    expect(check('')).toMatch(/pick the date/i);
+  });
+
+  // Another bowler's session on that date is not a conflict.
+  it('is scoped to this bowler and league', () => {
+    expect(prebowlConflict(sessions, 'Kim', 'Tuesday House Shot', '2026-09-22', '2026-09-15')).toBe('');
+    expect(prebowlConflict(sessions, 'Ryan', 'Thursday House Shot', '2026-09-22', '2026-09-15')).toBe('');
+  });
+});

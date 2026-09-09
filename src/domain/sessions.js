@@ -37,3 +37,54 @@ export function findExistingShotSlot(shots,candidate){
     (s.ballNum||null)===(candidate.ballNum||null)
   );
 }
+
+// ── Prebowling ──────────────────────────────────────────────────────────
+//
+// A bowler who can't make next week's league bowls those games early --
+// commonly on the same night as the current week's session, before or
+// after it.
+//
+// The games count for the FUTURE week. Filing them under the date they
+// count for is both correct for standings and the thing that keeps them
+// from colliding: sessions and shots are keyed on
+// (bowler, league, date), so a prebowl filed under today would share a
+// key with tonight's real session and one would overwrite the other.
+
+// The next occurrence of a weekday strictly AFTER the given date.
+//
+// Strictly after, deliberately: prebowling on league night is the common
+// case, and returning today would file the prebowl on top of the session
+// being bowled tonight -- the exact collision this exists to prevent.
+export function nextLeagueDate(fromDate, weekday) {
+  if (weekday === null || weekday === undefined) return "";
+  const base = new Date(`${fromDate}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return "";
+  let delta = (weekday - base.getDay() + 7) % 7;
+  if (delta === 0) delta = 7;
+  base.setDate(base.getDate() + delta);
+  return base.toISOString().slice(0, 10);
+}
+
+// Would filing a session on this date overwrite one that already exists?
+//
+// Same key as findExistingShotSlot uses, so this answers the question the
+// storage layer will actually ask.
+export function sessionExistsFor(sessions, bowler, league, date) {
+  return (sessions || []).some(s =>
+    s.bowler === bowler && s.league === league && s.date === date);
+}
+
+// A prebowl is valid when it lands on a date that isn't already taken.
+export function prebowlConflict(sessions, bowler, league, countsForDate, bowledOnDate) {
+  if (!countsForDate) return "Pick the date these games count for.";
+  if (countsForDate === bowledOnDate) {
+    return "That's today — prebowled games count for a future date.";
+  }
+  if (countsForDate < bowledOnDate) {
+    return "That date has passed. Prebowled games count for an upcoming session.";
+  }
+  if (sessionExistsFor(sessions, bowler, league, countsForDate)) {
+    return "You already have a session on that date. Saving would overwrite it.";
+  }
+  return "";
+}
