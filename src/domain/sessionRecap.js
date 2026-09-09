@@ -94,7 +94,7 @@ export function awards(lines) {
         ? `Tied at ${first.total} — nobody's settling this tonight.`
         : margin <= 10
           ? `${first.total}, by just ${margin}. That was close.`
-          : `${first.total}, winning by ${margin}.`,
+          : `${first.total}, won by ${margin}.`,
     });
   }
 
