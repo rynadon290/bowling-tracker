@@ -12,7 +12,7 @@ import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/r
 import { localDateString } from "./constants.js";
 import { MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
-  resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
+  resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
 
@@ -257,7 +257,7 @@ export default function Settings({
           looks at everything else through. Swatches rather than names
           alone: nobody can picture "Urethane" from the word. */}
       {showCard("look") && (
-      <CollapsibleCard title="Look" summary={THEMES[preferences.theme]?.label || THEMES.lane.label}
+      <CollapsibleCard title="App appearance" summary={THEMES[preferences.theme]?.label || THEMES.lane.label}
         expanded={expanded.look} onToggle={() => toggle("look")}>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
           Each one takes its colour from a different part of the house. Dark ones for a dim centre, light ones for a bright room or daytime.
@@ -496,10 +496,6 @@ export default function Settings({
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
           Poker, 3-6-9, and High Game Pot tracking cards on the Log and Data tabs.
         </div>
-        <div style={S.chips}>
-          <Chip label="Shown" selected={preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, true))} color={C.strike} />
-          <Chip label="Hidden" selected={!preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, false))} color={C.miss} />
-        </div>
 
         {/* Which pots this house actually runs. Hiding one here means it
             doesn't exist for this bowler at all -- different from not
@@ -508,9 +504,13 @@ export default function Settings({
             
             A house that runs a quarter game and nothing else was still
             shown four rows every week, three of them noise. */}
-        {preferences.showMoneyGames && (
+        {/* The per-pot switches ARE the control now. A master
+            shown/hidden toggle above them was redundant -- hiding all
+            four is the same thing, and having both meant a pot could be
+            "shown" while the whole card was hidden. */}
+        {true && (
           <>
-            <div style={{ ...S.label, marginTop: "14px" }}>Which pots does your house run?</div>
+            <div style={{ ...S.label, marginTop: "4px" }}>Which pots does your house run?</div>
             {MONEY_GAMES.map(g => {
               const shown = isMoneyGameShown(preferences, g);
               return (

@@ -458,9 +458,9 @@ export default function BowlingTracker(){
   // batch -- so the first pass sees an empty roster and auto-friends
   // nobody. Keyed on the teammate ids rather than the array so it doesn't
   // re-run on every unrelated team edit.
-  const teammateKey=(teams||[])
-    .flatMap(t=>(t.members||[]).map(m=>(typeof m==="string"?m:m?.userId)))
-    .filter(Boolean).sort().join(",");
+  // Keyed on team IDS, not members: members are empty at startup, so a
+  // member-based key never changed and this never re-ran.
+  const teammateKey=(teams||[]).map(t=>t.id).filter(Boolean).sort().join(",");
   useEffect(()=>{
     if(!user?.id||!teammateKey)return;
     loadFriends();
@@ -506,12 +506,22 @@ export default function BowlingTracker(){
     const already=new Set(existing.map(f=>
       f.requester_id===myId?f.addressee_id:f.requester_id));
 
+    // Read team_members directly rather than from `teams`.
+    //
+    // The startup teams fetch is NAMES ONLY -- members stay [] until the
+    // Teams screen is opened. This function walked that empty array and
+    // created nothing, which is why teammates never became friends and
+    // why the Stats and Trends pickers had nobody to list.
+    const myTeamIds=(teams||[]).map(t=>t.id).filter(Boolean);
+    if(!myTeamIds.length)return existing;
+    const memRes=await cloudRead("team_members",q=>
+      q.select("team_id,user_id").in("team_id",myTeamIds));
+    if(!memRes.online||!Array.isArray(memRes.data))return existing;
+
     const teammateIds=new Set();
-    for(const t of (teams||[])){
-      for(const mem of (t.members||[])){
-        const id=typeof mem==="string"?null:mem?.userId;
-        if(id&&id!==myId&&!already.has(id))teammateIds.add(id);
-      }
+    for(const row of memRes.data){
+      const id=row.user_id;
+      if(id&&id!==myId&&!already.has(id))teammateIds.add(id);
     }
     if(!teammateIds.size)return existing;
 
@@ -2502,6 +2512,21 @@ export default function BowlingTracker(){
     const note={id:crypto.randomUUID(),relationshipId,authorId:user?.id||"",body:clean,createdAt:new Date().toISOString()};
     setNotesByRelationship(prev=>({...prev,[relationshipId]:[...(prev[relationshipId]||[]),note]}));
     await cloudWrite("coaching_notes",{id:note.id,...noteToRow(note,relationshipId,user?.id||null),created_at:note.createdAt});
+  }
+
+  // A coach setting one of their bowler's goals, from the roster.
+  //
+  // Writes the BOWLER's goal, not a separate coach-only copy: the point
+  // is that both people watch the same number between sessions, and two
+  // parallel goal lists would drift the moment either edited theirs.
+  // Passing a null target removes it.
+  function setBowlerGoal(bowlerName,typeId,target){
+    if(!bowlerName||!typeId)return;
+    const current=goalsByBowler[bowlerName]||[];
+    const next=target==null
+      ? current.filter(g=>g.typeId!==typeId)
+      : [...current.filter(g=>g.typeId!==typeId),{typeId,target:Number(target)}];
+    saveGoals(bowlerName,next);
   }
 
   function saveGoals(bowler,next){
@@ -4943,7 +4968,7 @@ export default function BowlingTracker(){
             tasksByRelationship={tasksByRelationship}
             notesByRelationship={notesByRelationship}
             coachViewOn={coachViewOn}
-            setNextCoachingSession={setNextCoachingSession}
+            setNextCoachingSession={setNextCoachingSession} onSetBowlerGoal={setBowlerGoal}
             sessions={sessions} leagues={leagues}
             isCoach={!!myProfile.isCoach}
             onToggleCoachView={v=>updatePreferences(prev=>setCoachView(prev,v))}

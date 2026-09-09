@@ -3,7 +3,7 @@ import { C, S, F, Chip, PinDeck, CollapsibleCard, StatLead } from "./ui.jsx";
 import { PLASTIC_BALL, formatDate, localDateString, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js";
-import { visibleMoneyGames } from "./domain/preferences.js";
+import { anyMoneyGameShown, visibleMoneyGames } from "./domain/preferences.js";
 import { nextLeagueDate, prebowlConflict } from "./domain/sessions.js";
 import { needsLeagueSetup } from "./domain/tour.js";
 import { inferLeagueDay } from "./domain/reminders.js";
@@ -654,7 +654,7 @@ export default function LogView({
               {/* Lane display */}
               {!editingId&&startingLane&&(
                 <div style={{textAlign:"center",padding:"10px",backgroundColor:C.surface,borderRadius:"8px",border:`1px solid ${C.border}`}}>
-                  <span style={{fontSize:"12px",color:C.textMuted}}>Lane </span>
+                  <span style={{fontSize:"12px",color:C.textMuted,marginRight:"8px"}}>Lane</span>
                   <span style={{fontSize:"22px",fontWeight:700,color:C.accent}}>{currentLane||"—"}</span>
                 </div>
               )}
@@ -691,6 +691,8 @@ export default function LogView({
                 })}
                 currentFrame={form.frame}
                 currentBall={form.ballNum}
+                bowlerName={form.bowler||activeBowler}
+                maxScore={maxScoreThisGame}
                 onSelectFrame={(frame,shot)=>{
                   const goTo=()=>setForm(f=>({...f,frame:String(frame),
                     ballNum:Number(frame)===10?1:null}));
@@ -750,14 +752,10 @@ export default function LogView({
                   time a bowler is actually throwing, which is exactly when
                   this number matters. It was also gated on sessionLeague,
                   so practice never saw it at all. */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}}>
-                <div style={{...S.label,marginBottom:0}}>Result</div>
-                {maxScoreThisGame!=null&&(
-                  <span style={{fontSize:"11.5px",color:C.accent}}>
-                    {maxScoreThisGame} max
-                  </span>
-                )}
-              </div>
+              {/* Max score moved to the scoresheet -- it's a fact about
+                  the GAME, so it belongs under the frames rather than
+                  above the buttons for a single shot. */}
+              <div style={{...S.label,marginBottom:"8px"}}>Result</div>
               <div style={S.chips}>
                 {resultsForHandedness(activeBowlerLeftHanded).map(label=>{
                   // `label` is what the bowler sees (e.g. "Weak 7" for a
@@ -1184,7 +1182,7 @@ export default function LogView({
                     );
                   })()}
 
-                  {preferences.showMoneyGames&&(
+                  {anyMoneyGameShown(preferences)&&(
                     <>
                       <div style={{marginBottom:"12px"}}>
                         <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Poker Winnings ($)</div>

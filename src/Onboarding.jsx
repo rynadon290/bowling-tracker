@@ -276,6 +276,30 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                 );
               })}
             </div>
+
+            {preferences.environment !== "casual" && (
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                gap: "10px", padding: "12px 14px", marginBottom: "16px",
+                borderRadius: "10px", border: `1px solid ${C.border}`, backgroundColor: C.card,
+              }}>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: C.text }}>
+                    Do you coach other bowlers?
+                  </div>
+                  <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "2px" }}>
+                    Turns on the roster for tracking who you coach.
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                  <Chip label="No" selected={!profile?.isCoach}
+                    onToggle={() => onProfileChange?.({ ...profile, isCoach: false })} />
+                  <Chip label="Yes" selected={!!profile?.isCoach} color={C.strike}
+                    onToggle={() => onProfileChange?.({ ...profile, isCoach: true })} />
+                </div>
+              </div>
+            )}
+
             <button style={S.btn("primary")} onClick={onFinish}>Start Bowling</button>
             <button
               style={{ ...S.btn(), width: "100%", marginTop: "8px" }}

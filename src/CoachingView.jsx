@@ -5,7 +5,7 @@ import {
   categorizeCoaching, coachRoster, partitionTasks, taskProgress, sortNotes,
   emptyTask, TASK_METRIC_IDS,
 } from "./domain/coaching.js";
-import { goalTypeFor } from "./domain/goals.js";
+import { GOAL_TYPES, goalTypeFor } from "./domain/goals.js";
 
 function Section({ title, children, subtitle }) {
   return (
@@ -206,7 +206,7 @@ function NoteThread({ notes, myUserId, otherName, onAdd }) {
 }
 
 export default function CoachingView({
-  setNextCoachingSession, sessions, leagues,
+  setNextCoachingSession, onSetBowlerGoal, sessions, leagues,
   myUserId, relationships, profilesById, tasksByRelationship, notesByRelationship,
   coachViewOn, isCoach, onToggleCoachView,
   onSearch, searchResults, searching, onRequest, onRespond, onEnd,
@@ -215,6 +215,7 @@ export default function CoachingView({
   onSelectBowler, bowlerSnapshots = {}, bowlerBreakdowns = {},
   unreadResponses = {}, onMarkResponsesSeen,
 }) {
+  const [goalDraft, setGoalDraft] = useState({ typeId: "", target: "" });
   const [selectedId, setSelectedId] = useState("");
   const [addingTask, setAddingTask] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -416,6 +417,54 @@ export default function CoachingView({
 
       {selected && (
         <>
+          {/* Setting a goal for this bowler, from the roster.
+          
+              A coach could already assign a task, but not a goal -- and a
+              goal is the thing with a number that tracks itself between
+              sessions. Saved as the BOWLER's goal, not a separate
+              coach-only copy, so you're both looking at one number. */}
+          {actingAsCoach && onSetBowlerGoal && (
+            <Section title={`Goal for ${selected.displayName}`}>
+              {(selected.goals || []).length > 0 && (
+                <div style={{ marginBottom: "10px" }}>
+                  {(selected.goals || []).map(g => (
+                    <div key={g.typeId} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      fontSize: "12px", padding: "4px 0",
+                    }}>
+                      <span style={{ color: C.text }}>{g.label}: {g.target}</span>
+                      <button style={{ ...S.btn(), padding: "4px 9px", fontSize: "11px" }}
+                        onClick={() => onSetBowlerGoal(selected.displayName, g.typeId, null)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={S.row}>
+                <select style={S.sel} value={goalDraft.typeId}
+                  onChange={e => setGoalDraft(d => ({ ...d, typeId: e.target.value }))}>
+                  <option value="">Pick something to work on</option>
+                  {GOAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+                <input style={{ ...S.input, width: "80px", flexShrink: 0 }} type="number"
+                  placeholder="Target" value={goalDraft.target}
+                  onChange={e => setGoalDraft(d => ({ ...d, target: e.target.value }))} />
+              </div>
+              <button style={{ ...S.btn("primary"), marginTop: "8px" }}
+                disabled={!goalDraft.typeId || !goalDraft.target}
+                onClick={() => {
+                  onSetBowlerGoal(selected.displayName, goalDraft.typeId, Number(goalDraft.target));
+                  setGoalDraft({ typeId: "", target: "" });
+                }}>
+                Set this goal
+              </button>
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "6px" }}>
+                They'll see it on their Improve tab in bowling terms, and it tracks itself as they bowl.
+              </div>
+            </Section>
+          )}
+
           {/* Scheduling the next session. Coach-only -- a bowler setting
               their coach's calendar isn't the relationship this models. */}
           {actingAsCoach && setNextCoachingSession && (

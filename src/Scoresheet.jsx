@@ -15,6 +15,8 @@ export default function Scoresheet({
   currentFrame = null,   // string|number — the frame being logged now
   currentBall = null,    // 1|2|3 within the tenth
   onSelectFrame,         // (frame, shot) => void
+  bowlerName = "",       // whose card this is
+  maxScore = null,       // ceiling if they strike out from here
 }) {
   const rows = frameScoresheet(shots);
 
@@ -87,12 +89,28 @@ export default function Scoresheet({
         })}
       </div>
 
-      {currentFrame && (
-        <div style={{ fontSize: "10px", color: C.textMuted, marginTop: "6px", textAlign: "center" }}>
-          Tap any frame to edit it
+      {/* Whose card this is, and what the game can still reach.
+      
+          The name matters when logging for a teammate: the frames look
+          identical whoever they belong to, and entering someone else's
+          shots under your own name is the most common first-session
+          mistake. The max is a fact about the game, so it belongs here
+          rather than above the result buttons. */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        marginTop: "6px", fontSize: "10px", color: C.textMuted,
+      }}>
+        <span style={{ fontWeight: 600, color: bowlerName ? C.text : C.textMuted }}>
+          {bowlerName || ""}
+        </span>
+        <span>
+          {currentFrame ? "Tap any frame to edit" : ""}
           {currentBall && Number(currentFrame) === 10 ? ` · ball ${currentBall}` : ""}
-        </div>
-      )}
+        </span>
+        <span style={{ color: C.accent, fontWeight: 600 }}>
+          {maxScore != null ? `${maxScore} max` : ""}
+        </span>
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
 import { totalMoney } from "./domain/money.js";
-import { visibleStatsCardOrder } from "./domain/preferences.js";
+import { anyMoneyGameShown, visibleStatsCardOrder } from "./domain/preferences.js";
 
 export default function StatsView({
   centerStats,
@@ -1142,7 +1142,7 @@ sessions.length>0&&(gameAvg(sessions,statsBowler,0,statsLeague)||gameAvg(session
                 )
                 );
                 byId["money"] = (
-preferences.showMoneyGames&&(()=>{
+anyMoneyGameShown(preferences)&&(()=>{
                   const relevantSessions=sessions.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
                   if(!relevantSessions.length)return null;
                   const m=totalMoney(relevantSessions);
@@ -1187,7 +1187,7 @@ preferences.showMoneyGames&&(()=>{
                 })()
                 );
                 byId["threeSixNine"] = (
-preferences.showMoneyGames&&statsBowler&&(()=>{
+anyMoneyGameShown(preferences)&&statsBowler&&(()=>{
                   // Every night this bowler has a logged session for,
                   // newest first. threeSixNineResults is a single,
                   // whole-session determination now (all 9 specific
