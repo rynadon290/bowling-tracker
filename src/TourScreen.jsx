@@ -125,6 +125,40 @@ function Frames({ highlight }) {
   );
 }
 
+// The pin rack, laid out like ui.jsx's PinDeck: 7-8-9-10 across the
+// back, then 4-5-6, then 2-3, then the headpin. A row of number chips
+// wouldn't teach anything -- the whole point is that it looks like a
+// rack, so a bowler taps the pins they can actually see standing.
+function PinRack({ standing = [] }) {
+  const rows = [
+    [["7", 14], ["8", 38], ["9", 62], ["10", 86]],
+    [["4", 26], ["5", 50], ["6", 74]],
+    [["2", 38], ["3", 62]],
+    [["1", 50]],
+  ];
+  const size = 22, gap = 25;
+  return (
+    <div style={{ position: "relative", height: `${gap * 3 + size + 6}px`, margin: "4px 0" }}>
+      {rows.map((row, r) => row.map(([n, x]) => {
+        const on = standing.includes(n);
+        return (
+          <div key={n} style={{
+            position: "absolute", left: `${x}%`, top: `${r * gap + 3}px`,
+            transform: "translateX(-50%)", width: `${size}px`, height: `${size}px`,
+            borderRadius: "50%", boxSizing: "border-box",
+            border: `2px solid ${on ? C.spare : C.border}`,
+            background: on ? C.spare + "33" : C.surface,
+            color: on ? C.spare : C.textMuted,
+            fontSize: "9px", fontWeight: 700, fontFamily: F.body,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>{n}</div>
+        );
+      }))}
+      <div style={{ ...muted, position: "absolute", right: 0, bottom: 0 }}>← still standing</div>
+    </div>
+  );
+}
+
 // The Result card, in the state each scoring lesson needs.
 function ResultCard({ stage }) {
   const strike = stage === "strike";
@@ -146,11 +180,7 @@ function ResultCard({ stage }) {
       {leave && (
         <>
           <div style={{ ...label, marginTop: "10px" }}>Pins standing</div>
-          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-            <span style={chip(true, C.spare)}>3</span>
-            <span style={chip(true, C.spare)}>10</span>
-            <span style={muted}>← what's left</span>
-          </div>
+          <PinRack standing={["3", "10"]} />
 
           <div style={{ ...label, marginTop: "10px" }}>Spare made?</div>
           <div style={{ display: "flex", gap: "6px" }}>
@@ -192,12 +222,12 @@ const SCREENS = {
         <Spot style={{ marginBottom: "8px" }}>
           <div style={{ ...S.input, padding: "8px 9px", borderColor: C.accent }}>
             <div style={{ fontSize: "11px", fontWeight: 700, color: C.accent }}>Shot by shot</div>
-            <div style={muted}>Every ball · powers spare stats</div>
+            <div style={muted}>Every ball · pins, ball, release</div>
           </div>
         </Spot>
         <div style={{ ...S.input, padding: "8px 9px" }}>
           <div style={{ fontSize: "11px", fontWeight: 600, color: C.textMuted }}>Scores only</div>
-          <div style={muted}>Three numbers a night</div>
+          <div style={muted}>213 · 196 · 203</div>
         </div>
       </div>
       <div style={muted}>Switch any time — even mid-game.</div>
@@ -246,14 +276,25 @@ const SCREENS = {
       <ResultCard stage="miss" />
       <div style={card}>
         <div style={label}>Total pins this frame</div>
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          <Spot>
+        <Spot>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "4px" }}>
             <div style={{
-              ...S.input, width: "54px", padding: "6px", textAlign: "center",
-              fontSize: "16px", fontWeight: 700, borderColor: C.accent,
+              ...S.btn("sm"), padding: "4px 12px", fontSize: "15px",
+              borderRadius: "8px", lineHeight: 1,
+            }}>−</div>
+            <div style={{
+              flex: 1, textAlign: "center", fontSize: "22px",
+              fontWeight: 700, color: C.spare, fontFamily: F.num,
             }}>9</div>
-          </Spot>
-          <span style={muted}>both balls added together</span>
+            <div style={{
+              ...S.btn("sm"), padding: "4px 12px", fontSize: "15px",
+              borderRadius: "8px", lineHeight: 1,
+            }}>+</div>
+          </div>
+        </Spot>
+        <div style={{ display: "flex", justifyContent: "space-around", marginTop: "4px" }}>
+          <span style={muted}>First ball: <b style={{ color: C.text }}>8</b></span>
+          <span style={muted}>Second ball: <b style={{ color: C.text }}>1</b></span>
         </div>
       </div>
       <Note>Left a 3-10 and knocked one down? That's 9.</Note>
