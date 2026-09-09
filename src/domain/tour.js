@@ -25,13 +25,13 @@ const ALL_STEPS = [
     // doesn't understand this picks shot-by-shot, finds it slow, and
     // concludes the app is heavy going -- when scores-only was there
     // the whole time.
-    body: "Shot by shot records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only takes three numbers a night. You can switch any time, and even start a night one way and finish the other.",
+    body: "Shot by shot records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only just takes your final score for each game: 213, 196, 203. You can switch any time, and even start a night one way and finish the other.",
   },
   {
     id: "scoresheet",
     tab: "log",
     title: "Your ten frames",
-    body: "The scoresheet fills in as you bowl. Tap any frame to fix it — you don't have to go hunting through a list.",
+    body: "The ten frames sit between the frame picker and the result buttons, filling in as you bowl. Tap any frame to go back and change it.",
     // Only meaningful when shots are being logged; a scores-only bowler
     // never sees a scoresheet, so promising one would be a lie.
     when: ({ trackingMode }) => trackingMode === "shot",
@@ -53,14 +53,14 @@ const ALL_STEPS = [
     id: "score-spare",
     tab: "log",
     title: "Recording a spare",
-    body: "Tap Other Leave, then tap the pins still standing after your first ball. Answer Spare Made? — Yes. The app works out your first ball from the pins you left, so there's nothing else to count.",
+    body: "Tap Other Leave, then tap the pins still standing on the rack. Answer Spare Made? — Yes. The app works out your first ball from the pins you left, so there's nothing else to count.",
     when: ({ trackingMode }) => trackingMode === "shot",
   },
   {
     id: "score-miss",
     tab: "log",
     title: "Recording an open frame",
-    body: "Same start: Other Leave, then the pins standing. Answer Spare Made? — No. Now set Total Pins This Frame — both balls added together. Leave a 3-10 and knock one down, that's 9.",
+    body: "Same start: Other Leave, then the pins on the rack. Answer Spare Made? — No. Then use − and + to set the total pins for the frame — both balls added together. Leave a 3-10 and knock one down, that's 9.",
     when: ({ trackingMode }) => trackingMode === "shot",
   },
   {
