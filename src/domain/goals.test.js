@@ -3,6 +3,7 @@ import {
   goalType, goalTypeFor, minSampleFor, normalizeGoal, normalizeGoals,
   setGoal, removeGoal, goalProgress, allGoalProgress, goalsToRow, goalsFromRow,
   measurementsFor,
+  goalInBowlingTerms,
 } from './goals.js';
 import { isSplit, isSinglePinLeave, isCornerPinLeave } from './splits.js';
 import { SAMPLE_THRESHOLDS } from './insightGating.js';
@@ -315,5 +316,59 @@ describe('goal measurement scope', () => {
   it('still scopes correctly when a real league IS asked for', () => {
     const m = measurementsFor({ shots, sessions: [], bowler: 'Ryan', league: 'Tuesday House Shot', ...preds });
     expect(m.strikeRate.current).toBe(80);
+  });
+});
+
+// "84% -> 90%" means little to most bowlers. "Make 9 of your next 10 ten
+// pins" is something to aim at on the lane. Each goal type gets its own
+// phrasing, because a percentage, a score and a series are different
+// kinds of thing.
+describe('goalInBowlingTerms', () => {
+  const p = (typeId, current, target, extra = {}) =>
+    ({ typeId, current, target, sample: 50, gated: false, noData: false, met: false, ...extra });
+
+  it('phrases a percentage goal as N of your next M', () => {
+    expect(goalInBowlingTerms(p('tenPinSpareRate', 84, 90)))
+      .toBe('Make 9 of your next 10 ten pins — 1 more than you are now.');
+  });
+
+  it('uses the right verb per goal', () => {
+    expect(goalInBowlingTerms(p('strikeRate', 52, 60))).toMatch(/^Strike /);
+    expect(goalInBowlingTerms(p('spareRate', 70, 80))).toMatch(/^Make /);
+    expect(goalInBowlingTerms(p('cleanFrameRate', 70, 80))).toMatch(/^Keep .* clean/);
+  });
+
+  // The rate GOING FORWARD, not the cumulative rate lifted over history.
+  // Lifting a season's 84% to 90% with fifty logged needs near-perfection
+  // for weeks -- true and useless as motivation.
+  it('does not demand every one of the next N', () => {
+    const s = goalInBowlingTerms(p('tenPinSpareRate', 84, 90, { sample: 500 }));
+    expect(s).not.toMatch(/every/i);
+    expect(s).toMatch(/9 of your next 10/);
+  });
+
+  // 88% and 90% both round to 9 of 10; the window must widen until the
+  // gap is a whole make.
+  it('widens the window when the gap is under one at ten', () => {
+    const s = goalInBowlingTerms(p('spareRate', 88, 90));
+    expect(s).toMatch(/of your next (20|25|50|100)/);
+    expect(s).toMatch(/1 more/);
+  });
+
+  it('phrases score goals in pins', () => {
+    expect(goalInBowlingTerms(p('average', 196.4, 200))).toBe('4 pins a game to go.');
+    expect(goalInBowlingTerms(p('highGame', 258, 279))).toBe('Beat your best by 21 pins.');
+    expect(goalInBowlingTerms(p('highSeries', 640, 700))).toBe('Beat your best series by 60 pins.');
+  });
+
+  it('singular pin when the gap is one', () => {
+    expect(goalInBowlingTerms(p('average', 199, 200))).toBe('1 pin a game to go.');
+  });
+
+  it('says nothing when there is nothing useful to say', () => {
+    expect(goalInBowlingTerms(p('average', 200, 200, { met: true }))).toBe('');
+    expect(goalInBowlingTerms(p('strikeRate', null, 60, { gated: true }))).toBe('');
+    expect(goalInBowlingTerms(p('strikeRate', null, 60, { noData: true }))).toBe('');
+    expect(goalInBowlingTerms(null)).toBe('');
   });
 });

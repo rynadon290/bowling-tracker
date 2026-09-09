@@ -53,12 +53,15 @@ export const THEMES = {
     },
   },
 
-  // Oil pattern. The greens and teals of a lane-machine readout, cooler
-  // than Lane but still warm-black underneath.
+  // Rock'n'bowl. The greens and teals of a blacklit house on a Friday
+  // night, cooler than Lane but still warm-black underneath.
+  //
+  // Keeps the id "pattern" -- it's stored in every existing preferences
+  // row, and renaming it would reset everyone's theme to the default.
   pattern: {
     id: "pattern",
-    label: "Pattern",
-    hint: "Oil-machine green on warm black",
+    label: "Glow",
+    hint: "Rock'n'bowl green on warm black",
     colors: {
       bg: "#0F1412", surface: "#161D19", card: "#1E2822",
       accent: "#4FC9A4", accentDim: "#153A2E",
@@ -164,7 +167,7 @@ Object.assign(THEMES, {
 export const THEME_IDS = Object.keys(THEMES);
 export const DARK_THEME_IDS = THEME_IDS.filter(id => !THEMES[id].light);
 export const LIGHT_THEME_IDS = THEME_IDS.filter(id => THEMES[id].light);
-export const DEFAULT_THEME = "lane";
+export const DEFAULT_THEME = "pattern";
 
 export function themeFor(id) {
   return THEMES[id] || THEMES[DEFAULT_THEME];

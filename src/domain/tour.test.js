@@ -3,6 +3,7 @@ import {
   tourSteps, tourLength, stepAt, isLastStep,
   tourToOffer, markTourSeen, hasSeenTour, needsLeagueSetup,
   availableTours, COACH_STEPS,
+  recordStepsSeen,
 } from './tour.js';
 
 const league = { environment: 'league', trackingMode: 'shot', showMoneyGames: true };
@@ -202,5 +203,65 @@ describe('availableTours', () => {
       expect(t.label).toBeTruthy();
       expect(t.blurb).toBeTruthy();
     }
+  });
+});
+
+// A league bowler who did the casual tour first shouldn't sit through
+// "this is the History tab" again -- the overlap between tracks is large.
+describe('skipping steps already seen', () => {
+  const casual = { environment: 'casual', trackingMode: 'game' };
+  const league = { environment: 'league', trackingMode: 'shot', showMoneyGames: true };
+
+  it('drops steps shown in an earlier tour', () => {
+    const seen = recordStepsSeen([], tourSteps(casual));
+    const next = tourSteps(league, { skipSeen: seen }).map(s => s.id);
+    expect(next).not.toContain('history');
+    expect(next).not.toContain('stats');
+    expect(next).toContain('roster');
+    expect(next).toContain('score-spare');
+  });
+
+  it('never returns an empty tour', () => {
+    const seen = recordStepsSeen([], tourSteps(league));
+    expect(tourSteps(league, { skipSeen: seen }).length).toBeGreaterThan(0);
+  });
+
+  it('records without duplicating', () => {
+    const once = recordStepsSeen([], tourSteps(casual));
+    expect(recordStepsSeen(once, tourSteps(casual))).toHaveLength(once.length);
+  });
+});
+
+// A casual night has no printed scorecard, and the import flow asks
+// "which team?" which a casual bowler doesn't have.
+describe('import step scoping', () => {
+  it('is hidden from the casual tour', () => {
+    expect(tourSteps({ environment: 'casual', trackingMode: 'game' }).map(s => s.id))
+      .not.toContain('import');
+  });
+
+  it('is shown to everyone else', () => {
+    for (const env of ['practice', 'league', 'tournament']) {
+      expect(tourSteps({ environment: env, trackingMode: 'shot' }).map(s => s.id))
+        .toContain('import');
+    }
+  });
+});
+
+// The coach tour is about coaching, not a relabelled bowler tour.
+describe('coach tour content', () => {
+  it('covers the coaching workflow', () => {
+    const ids = COACH_STEPS.map(s => s.id);
+    for (const id of ['coach-roster', 'coach-tasks', 'coach-goals', 'coach-session']) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it('shares no steps with any bowler tour', () => {
+    const bowlerIds = new Set(
+      ['casual', 'practice', 'league', 'tournament']
+        .flatMap(e => tourSteps({ environment: e, trackingMode: 'shot', showMoneyGames: true }).map(s => s.id))
+    );
+    for (const s of COACH_STEPS) expect(bowlerIds.has(s.id)).toBe(false);
   });
 });

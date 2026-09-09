@@ -248,6 +248,10 @@ export function defaultPreferences(environment = "league") {
     trackingMode: ENVIRONMENT_DEFAULT_TRACKING[safeEnvironment] ?? "game",
     trackedFields: { ...preset.trackedFields },
     showMoneyGames: preset.showMoneyGames,
+    // Every pot shown by default. Present here as well as in
+    // normalizePreferences, or a normalize round-trip adds a field the
+    // defaults lack and the two objects stop matching.
+    hiddenMoneyGames: [],
     statsCardOrder: defaultStatsCardOrder(safeEnvironment),
     hiddenStatsCards: [...(HIDDEN_BY_ENVIRONMENT[safeEnvironment] || [])],
     // Colour theme. Independent of environment: switching to practice
@@ -277,6 +281,11 @@ export function reconcileCardOrder(storedOrder) {
 // later-added toggle, or malformed) into a complete, safe preferences
 // object -- so a partially-saved or out-of-date record never causes a
 // missing-field crash in the UI.
+// Declared above normalizePreferences, which filters against it. `const`
+// isn't hoisted, so leaving it further down worked only by accident of
+// call timing.
+export const MONEY_GAMES = ["pokerQuarter", "pokerDollar", "highGame", "threeSixNine"];
+
 export function normalizePreferences(raw) {
   const base = defaultPreferences(raw?.environment);
   if (!raw || typeof raw !== "object") return base;
@@ -285,6 +294,15 @@ export function normalizePreferences(raw) {
     trackingMode: TRACKING_MODES.includes(raw.trackingMode) ? raw.trackingMode : base.trackingMode,
     trackedFields: { ...base.trackedFields, ...(raw.trackedFields || {}) },
     showMoneyGames: typeof raw.showMoneyGames === "boolean" ? raw.showMoneyGames : base.showMoneyGames,
+    // Which individual pots are hidden.
+    //
+    // normalizePreferences rebuilds the object field by field, so a field
+    // missing HERE is silently dropped on every save -- which is exactly
+    // what happened: hiding one pot appeared to work, then reverted the
+    // moment anything else was saved.
+    hiddenMoneyGames: Array.isArray(raw.hiddenMoneyGames)
+      ? raw.hiddenMoneyGames.filter(g => MONEY_GAMES.includes(g))
+      : [],
     statsCardOrder: reconcileCardOrder(raw.statsCardOrder),
     hiddenStatsCards: Array.isArray(raw.hiddenStatsCards)
       ? raw.hiddenStatsCards.filter(id => MOVABLE_STATS_CARD_IDS.includes(id))
@@ -425,7 +443,6 @@ export function setTheme(prefs, themeId) {
 //
 // Hidden here means "this pot doesn't exist for me", which is different
 // from "I didn't play it tonight" (see participation below).
-export const MONEY_GAMES = ["pokerQuarter", "pokerDollar", "highGame", "threeSixNine"];
 
 export const MONEY_GAME_LABELS = {
   pokerQuarter: "Quarter game",
@@ -453,5 +470,19 @@ export function setMoneyGameHidden(prefs, game, hidden) {
 }
 
 export function visibleMoneyGames(prefs) {
+  // showMoneyGames still gates the whole section for environments that
+  // never have pots (practice, casual). Within an environment that does,
+  // the per-pot switches decide.
+  if (prefs && prefs.showMoneyGames === false) return [];
   return MONEY_GAMES.filter(g => isMoneyGameShown(prefs, g));
+}
+
+// Are any money games shown at all?
+//
+// showMoneyGames used to be a separate master switch, which could
+// disagree with the per-pot list -- a pot marked shown while the whole
+// card was hidden. The pots are now the single source of truth: the card
+// appears when at least one pot is on.
+export function anyMoneyGameShown(prefs) {
+  return visibleMoneyGames(prefs).length > 0;
 }

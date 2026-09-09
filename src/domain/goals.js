@@ -329,3 +329,83 @@ export function measurementsFor({
     cleanFrameRate: { current: pct(cleanFrames, frameShots.length), sample: frameShots.length },
   };
 }
+
+// ── Progress in bowling terms ───────────────────────────────────────────
+//
+// "84% → 90%" means nothing to most bowlers. "Make 3 more of your next
+// 20 ten pins" does. Each goal type gets its own phrasing, because a
+// percentage goal, a score goal and a series goal are different kinds of
+// thing and one template reads wrong for at least two of them.
+//
+// Returns a short sentence, or "" when there's nothing useful to say
+// (gated, no data, or already met).
+
+const NOUN_FOR = {
+  strikeRate:         { plural: "first balls",          verb: "strike" },
+  spareRate:          { plural: "spare attempts",       verb: "make" },
+  singlePinSpareRate: { plural: "single-pin spares",    verb: "make" },
+  tenPinSpareRate:    { plural: "ten pins",             verb: "make" },
+  cleanFrameRate:     { plural: "frames",               verb: "keep clean" },
+};
+
+// For a percentage goal: the target as "N of your next M", and how many
+// more than you're currently making that is.
+//
+// This is the RATE GOING FORWARD, not the cumulative rate lifted over
+// history. Lifting a season's cumulative 84% to 90% with fifty attempts
+// already logged needs near-perfection for weeks -- mathematically true
+// and useless as motivation. "9 of your next 10" is what a bowler
+// actually aims at on the lane.
+//
+// The window is the smallest round number where the target is a whole
+// count: 90% -> 9 of 10; 85% -> 17 of 20; 92% -> 23 of 25.
+function targetWindow(currentPct, targetPct) {
+  // Keep widening until the gap is at least one whole make. An 88% bowler
+  // aiming for 90% is "9 of 10" at both rates once rounded, which would
+  // wrongly read as already there -- at 50 it's 44 vs 45, a real gap.
+  for (const w of [10, 20, 25, 50, 100]) {
+    const need = (targetPct / 100) * w;
+    if (Math.abs(need - Math.round(need)) > 1e-9) continue;
+    const now = Math.round((currentPct / 100) * w);
+    const more = Math.round(need) - now;
+    if (more >= 1) return { need: Math.round(need), of: w, now, more };
+  }
+  const need = Math.round(targetPct);
+  return { need, of: 100, now: Math.round(currentPct), more: need - Math.round(currentPct) };
+}
+
+export function goalInBowlingTerms(progress) {
+  if (!progress || progress.gated || progress.noData || progress.met) return "";
+  const { typeId, current, target, sample } = progress;
+  if (current == null || target == null) return "";
+
+  // Score-shaped goals: the gap is just pins.
+  if (typeId === "average") {
+    const gap = Math.ceil(target - current);
+    if (gap <= 0) return "";
+    return `${gap} pin${gap === 1 ? "" : "s"} a game to go.`;
+  }
+  if (typeId === "highGame") {
+    const gap = Math.ceil(target - current);
+    if (gap <= 0) return "";
+    return `Beat your best by ${gap} pin${gap === 1 ? "" : "s"}.`;
+  }
+  if (typeId === "highSeries") {
+    const gap = Math.ceil(target - current);
+    if (gap <= 0) return "";
+    return `Beat your best series by ${gap} pin${gap === 1 ? "" : "s"}.`;
+  }
+
+  // Percentage goals: the target as N of your next M.
+  const noun = NOUN_FOR[typeId];
+  if (!noun) return "";
+  const w = targetWindow(current, target);
+  if (w.more <= 0) return "";
+  const verb = noun.verb;
+  // "Make 9 of your next 10 ten pins -- 1 more than you are now."
+  // "Keep 8 of your next 10 frames clean -- 2 more than you are now."
+  const head = verb === "keep clean"
+    ? `Keep ${w.need} of your next ${w.of} ${noun.plural} clean`
+    : `${verb[0].toUpperCase()}${verb.slice(1)} ${w.need} of your next ${w.of} ${noun.plural}`;
+  return `${head} — ${w.more} more than you are now.`;
+}

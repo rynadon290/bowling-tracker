@@ -11,6 +11,8 @@ import {
   visibleMoneyGames,
   isMoneyGameShown,
   setMoneyGameHidden,
+  anyMoneyGameShown,
+  hiddenMoneyGames,
 } from './preferences.js';
 
 describe('defaultPreferences', () => {
@@ -303,5 +305,37 @@ describe('per-pot money game visibility', () => {
   it('survives malformed stored data', () => {
     expect(visibleMoneyGames({ hiddenMoneyGames: 'nope' })).toEqual(MONEY_GAMES);
     expect(visibleMoneyGames({ hiddenMoneyGames: ['bogus'] })).toEqual(MONEY_GAMES);
+  });
+});
+
+// Hiding one pot appeared to work and then reverted, because
+// normalizePreferences rebuilds the object field by field and this one
+// was missing -- so every subsequent save dropped it.
+describe('hiddenMoneyGames survives a save', () => {
+  it('is kept by normalizePreferences', () => {
+    let p = normalizePreferences({});
+    p = setMoneyGameHidden(p, 'highGame', true);
+    p = normalizePreferences(p);
+    expect(hiddenMoneyGames(p)).toContain('highGame');
+  });
+
+  it('hides one pot without hiding the others', () => {
+    let p = setMoneyGameHidden(normalizePreferences({}), 'highGame', true);
+    p = normalizePreferences(p);
+    expect(visibleMoneyGames(p)).toEqual(['pokerQuarter', 'pokerDollar', 'threeSixNine']);
+  });
+
+  it('filters unknown pots out of stored data', () => {
+    const p = normalizePreferences({ hiddenMoneyGames: ['highGame', 'bogus'] });
+    expect(hiddenMoneyGames(p)).toEqual(['highGame']);
+  });
+
+  // The money card shows when any pot is on -- one source of truth
+  // rather than a master switch that could disagree with the pots.
+  it('reports whether any pot is shown', () => {
+    expect(anyMoneyGameShown(normalizePreferences({}))).toBe(true);
+    let all = normalizePreferences({});
+    for (const g of MONEY_GAMES) all = setMoneyGameHidden(all, g, true);
+    expect(anyMoneyGameShown(all)).toBe(false);
   });
 });

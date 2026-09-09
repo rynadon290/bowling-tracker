@@ -67,6 +67,9 @@ const ALL_STEPS = [
     id: "import",
     tab: null,
     title: "Import a scorecard",
+    // A casual night has no printed scorecard to photograph, and the
+    // import flow asks "which team?" which a casual bowler doesn't have.
+    envs: ["practice", "league", "tournament"],
     body: "Snap the monitor at the end of the night and the 📷 button at the top reads it — yours and your teammates'.",
   },
   {
@@ -90,7 +93,7 @@ const ALL_STEPS = [
     id: "insights",
     tab: "insights",
     title: "What's costing you pins",
-    body: "The app reads your last few nights and tells you what it sees — the spare you keep missing, the ball that stopped carrying, whether your third game falls off. It updates on its own as you bowl; you don't have to ask for it.",
+    body: "The app reads your nights and tells you what it sees — the spare you keep missing, the ball that stopped carrying, whether your third game falls off. It needs a few nights of data first, and it gets sharper the more you log: three nights gives you a hint, a month gives you something worth acting on.",
   },
   {
     id: "improve",
@@ -143,20 +146,38 @@ export const COACH_STEPS = [
   {
     id: "coach-roster",
     tab: "coaching",
-    title: "Your bowlers",
-    body: "Everyone you coach on one screen: what each is working on, how far along they are, and when you next see them. Tap a name to open their game.",
+    title: "Everyone you coach, one screen",
+    body: "Your bowlers in a single list: what each is working on right now, how far along they are, when you next see them, and which league night they bowl. No hunting through five separate profiles before a session.",
+  },
+  {
+    id: "coach-open",
+    tab: "coaching",
+    title: "Opening a bowler's game",
+    body: "Tap a name to see their real numbers — spare conversion by split type, which ball is carrying, how their third game compares to their first. This is their logged data, not a summary they typed for you.",
   },
   {
     id: "coach-tasks",
     tab: "coaching",
-    title: "Setting a task",
-    body: "Give a bowler something specific with a target and a date — 'ten pin conversion to 90% by the 15th'. It shows on their Improve tab, and progress updates as they bowl.",
+    title: "Assigning something to work on",
+    body: "Give a bowler one specific thing with a number and a date: 'ten pin conversion to 90% by the 15th'. It appears on their Improve tab in bowling terms — 'make 9 of your next 10 ten pins' — and the progress bar moves on its own as they bowl.",
+  },
+  {
+    id: "coach-goals",
+    tab: "coaching",
+    title: "Setting their goals",
+    body: "Set a goal for a bowler straight from their row. It shows up as their goal, tracked the same way as one they set themselves, so you're both looking at the same number between sessions.",
   },
   {
     id: "coach-session",
     tab: "coaching",
-    title: "Your next session",
-    body: "Set when you next see each bowler. That's separate from their league night on purpose — you might coach on a practice lane on a different day entirely.",
+    title: "Scheduling the next session",
+    body: "Set when you next see each bowler, with a note about what you'll cover. Deliberately separate from their league night — you'll often coach on a practice lane on a different day, and guessing that wrong is worse than leaving it blank.",
+  },
+  {
+    id: "coach-between",
+    tab: "coaching",
+    title: "What happens between sessions",
+    body: "Their nights keep logging whether you're there or not. Come back a week later and the roster already shows what changed — no 'so how did it go?' to start every session.",
   },
 ];
 
@@ -171,14 +192,39 @@ export const COACH_STEPS = [
 // Someone bowling casually with friends doesn't need a league roster
 // explained, and showing it would make the app look like more work than
 // it is -- which is the moment a casual bowler decides it isn't for them.
-export function tourSteps(preferences = {}, { track = "main" } = {}) {
-  if (track === "coach") return COACH_STEPS;
+export function tourSteps(preferences = {}, { track = "main", skipSeen = [] } = {}) {
+  const base = track === "coach"
+    ? COACH_STEPS
+    : (() => {
+        const env = preferences?.environment || "league";
+        return ALL_STEPS.filter(s => {
+          if (s.envs && !s.envs.includes(env)) return false;
+          return !s.when || s.when(preferences);
+        });
+      })();
 
-  const env = preferences?.environment || "league";
-  return ALL_STEPS.filter(s => {
-    if (s.envs && !s.envs.includes(env)) return false;
-    return !s.when || s.when(preferences);
-  });
+  // Steps already seen in an earlier tour are dropped.
+  //
+  // A league bowler who did the casual tour first shouldn't sit through
+  // "this is the History tab" again -- the overlap between tracks is
+  // large, and repeating it teaches nothing and reads as padding.
+  if (!skipSeen?.length) return base;
+  const seen = new Set(skipSeen);
+  const trimmed = base.filter(s => !seen.has(s.id));
+  // Never return nothing: a tour that's entirely overlap should still
+  // show its first step rather than flashing open and closed.
+  return trimmed.length ? trimmed : base.slice(0, 1);
+}
+
+// Which step ids a bowler has already been shown.
+export function stepsSeenFrom(seenSteps) {
+  return Array.isArray(seenSteps) ? seenSteps : [];
+}
+
+export function recordStepsSeen(seenSteps, steps) {
+  const set = new Set(stepsSeenFrom(seenSteps));
+  for (const s of steps || []) set.add(s.id);
+  return [...set];
 }
 
 export function tourLength(preferences, opts) {
