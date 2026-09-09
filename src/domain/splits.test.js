@@ -3,6 +3,8 @@ import { isSplit, isTenPinLeave, isSinglePinLeave, isWashout, isMakeableSpare,
   mirrorPin,
   mirrorLeave,
   cornerPinLabel,
+  splitConversionByType,
+  splitName,
 } from './splits.js';
 
 function leave(pins) {
@@ -215,5 +217,58 @@ describe('isSplit argument shape', () => {
   it('counts correctly when filtering shots directly', () => {
     const shots = [realSplit, realSplit, { result: 'Strike', otherLeave: [] }];
     expect(shots.filter(isSplit)).toHaveLength(2);
+  });
+});
+
+// An overall split conversion rate hides what a bowler needs to know:
+// the 4-7-10 and the 3-10 are not the same problem. Someone converting
+// every baby split and no big ones reads the same as the reverse.
+describe('splitConversionByType', () => {
+  const mk = (leave, made) => ({ result: 'Other Leave', otherLeave: leave, spareMade: made });
+
+  it('separates split types', () => {
+    const r = splitConversionByType([mk(['3', '10'], 'Yes'), mk(['7', '10'], 'No')]);
+    expect(r.map(x => x.key).sort()).toEqual(['3-10', '7-10']);
+  });
+
+  it('computes conversion per type', () => {
+    const r = splitConversionByType([mk(['3', '10'], 'Yes'), mk(['3', '10'], 'Yes'), mk(['3', '10'], 'No')]);
+    expect(r[0]).toMatchObject({ key: '3-10', left: 3, made: 2, rate: 67 });
+  });
+
+  // Leaves are stored as strings; a naive sort puts "10" before "3".
+  it('merges the same split regardless of pin order', () => {
+    const r = splitConversionByType([mk(['3', '10'], 'Yes'), mk(['10', '3'], 'No')]);
+    expect(r).toHaveLength(1);
+    expect(r[0].left).toBe(2);
+  });
+
+  it('names the well-known splits', () => {
+    expect(splitName('3-10')).toBe('Baby split');
+    expect(splitName('4-6-7-10')).toBe('Big four');
+    expect(splitName('7-10')).toBe('7-10');
+    expect(splitName('2-4-10')).toBe('2-4-10');
+  });
+
+  it('falls back to the pins for an unnamed split', () => {
+    expect(splitName('5-7-10')).toBe('5-7-10');
+  });
+
+  it('ignores leaves that are not splits', () => {
+    const r = splitConversionByType([mk(['10'], 'Yes'), mk(['2', '4', '5'], 'No')]);
+    expect(r).toHaveLength(0);
+  });
+
+  it('orders by how often each is left', () => {
+    const r = splitConversionByType([
+      mk(['7', '10'], 'No'),
+      mk(['3', '10'], 'Yes'), mk(['3', '10'], 'No'), mk(['3', '10'], 'Yes'),
+    ]);
+    expect(r[0].key).toBe('3-10');
+  });
+
+  it('handles nothing', () => {
+    expect(splitConversionByType([])).toEqual([]);
+    expect(splitConversionByType(null)).toEqual([]);
   });
 });

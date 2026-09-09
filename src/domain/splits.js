@@ -176,3 +176,65 @@ export function isMakeableSpare(shot,leftHanded){
   if(isWashout(shot,leftHanded))return false;
   return true;
 }
+
+// ── Split conversion by type ────────────────────────────────────────────
+//
+// An overall split conversion rate hides the thing a bowler actually
+// needs to know. The 4-7-10 and the 3-10 are not the same problem: one
+// is close to unmakeable and the other is a routine spare for a good
+// bowler. Lumping them into one percentage means someone converting
+// every baby split and no big ones reads the same as someone doing the
+// reverse.
+
+// The pins standing, as a stable sorted key like "3-10". Leaves are
+// stored as strings, so sort numerically rather than lexically -- "10"
+// would otherwise sort before "3".
+export function splitKey(shot){
+  const pins=(shot?.otherLeave||[]).map(p=>parseInt(p,10)).filter(n=>!Number.isNaN(n));
+  return pins.sort((a,b)=>a-b).join("-");
+}
+
+// The well-known splits get a name; anything else shows as its pins.
+const SPLIT_NAMES={
+  "7-10":"7-10",
+  "4-6":"4-6",
+  "4-6-7-10":"Big four",
+  "4-6-7-9-10":"Greek church",
+  "4-6-7-8-10":"Greek church",
+  "3-10":"Baby split",
+  "2-7":"Baby split",
+  "5-7":"5-7",
+  "5-10":"5-10",
+  "8-10":"8-10",
+  "7-9":"7-9",
+  "6-7-10":"6-7-10",
+  "4-7-10":"4-7-10",
+  "2-4-10":"2-4-10",
+  "3-6-7":"3-6-7",
+  "4-9":"Bucket split",
+  "6-8":"Bucket split",
+};
+
+export function splitName(key){
+  return SPLIT_NAMES[key]||key;
+}
+
+// Per-split-type conversion, ordered by how often each is left.
+//
+// Returns [{key, name, left, made, rate}] where rate is 0-100 or null
+// when a split has never been attempted. Only true splits count --
+// isSplit already applies the headpin-down and gap rules.
+export function splitConversionByType(shots){
+  const byKey={};
+  for(const s of (shots||[])){
+    if(!isSplit(s))continue;
+    const key=splitKey(s);
+    if(!key)continue;
+    const e=byKey[key]||(byKey[key]={key,name:splitName(key),left:0,made:0});
+    e.left+=1;
+    if(s.spareMade==="Yes")e.made+=1;
+  }
+  return Object.values(byKey)
+    .map(e=>({...e,rate:e.left?Math.round((e.made/e.left)*100):null}))
+    .sort((a,b)=>b.left-a.left||a.key.localeCompare(b.key));
+}
