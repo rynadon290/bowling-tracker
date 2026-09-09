@@ -15,14 +15,24 @@ import TourScreen from "./TourScreen.jsx";
 // relevant part lit up. That's the only way to teach how to enter a
 // spare: you have to see the pins-standing chips and the Spare Made
 // buttons, and a new bowler has no data that would produce them.
-export default function Tour({ preferences = {}, onNavigate, onFinish }) {
+// `track` picks which walkthrough: "casual" | "practice" | "league" |
+// "tournament" | "coach". It overrides the environment in preferences so
+// a league bowler can replay the tournament tour from Settings before
+// their first one, without switching modes to do it.
+export default function Tour({ preferences = {}, track, onNavigate, onFinish }) {
   const [index, setIndex] = useState(0);
-  const steps = tourSteps(preferences);
-  const step = stepAt(preferences, index);
-  const total = tourLength(preferences);
+  const opts = track === "coach"
+    ? { track: "coach" }
+    : undefined;
+  const prefs = track && track !== "coach"
+    ? { ...preferences, environment: track }
+    : preferences;
+  const steps = tourSteps(prefs, opts);
+  const step = stepAt(prefs, index, opts);
+  const total = tourLength(prefs, opts);
 
   if (!step) return null;
-  const last = isLastStep(preferences, index);
+  const last = isLastStep(prefs, index, opts);
 
   function go(next) {
     const clamped = Math.max(0, Math.min(total - 1, next));
