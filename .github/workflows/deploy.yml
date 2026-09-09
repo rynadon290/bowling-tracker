@@ -1,7 +1,15 @@
 name: Deploy Bowling Tracker to GitHub Pages
 
+# One workflow for main. tests.yml used to run in parallel with this on
+# every push, so a single commit paid for THREE npm installs, TWO full
+# test runs and TWO builds -- roughly half the work duplicated.
+#
+# Pull requests still get tested (see the pr job below); they just don't
+# build or deploy, because there's nothing to deploy from a PR.
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -15,48 +23,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  # Test and build in ONE job.
+  #
+  # They were separate jobs, and separate jobs don't share a filesystem --
+  # so the build job had to check out and `npm ci` all over again. Same
+  # runner means one install serves both, and dist/ is already there when
+  # the artifact is uploaded.
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v5
+
       - name: Setup Node
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: 'npm'
+
       - name: Install dependencies
-        run: npm ci --no-audit
+        run: npm ci --no-audit --prefer-offline
+
       - name: Run tests
         run: npm test
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci --no-audit
+      - name: Data-flow audit
+        run: node audit_dataflow.mjs
+
+      - name: Schema audit
+        run: node audit_live_schema.mjs
+
       - name: Build
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # Pages steps are skipped on pull requests: a PR has nowhere to
+      # deploy to, and running them would fail on permissions.
       - name: Setup Pages
-        uses: actions/configure-pages@v6
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -64,4 +81,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
