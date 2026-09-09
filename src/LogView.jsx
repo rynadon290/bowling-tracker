@@ -3,6 +3,8 @@ import { C, S, F, Chip, PinDeck, CollapsibleCard, StatLead } from "./ui.jsx";
 import { PLASTIC_BALL, formatDate, RESULTS, SURFACES, RELEASES, MISSES, BALL_CHANGE_REASONS, resultsForHandedness, storedResultFor, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
 import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js";
+import { visibleMoneyGames } from "./domain/preferences.js";
+import Scoresheet from "./Scoresheet.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
@@ -14,7 +16,7 @@ import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
 export default function LogView({
-  shots, sessions, bowlers, footerHeight, footerRef, teams, leagues,
+  shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,
   sessionLeague, setSessionLeague, effectiveSessionLeague, sessionDate, setSessionDate,
@@ -585,6 +587,28 @@ export default function LogView({
             </div>
             )}
 
+            {/* The ten frames, between the frame picker above and the
+                result being entered below -- which is where a bowler
+                looks to check what they just did. Rebuilt from `shots`
+                every render, so a mark appears as soon as a shot saves. */}
+            {showShotContext&&(
+              <Scoresheet
+                shots={(shots||[]).filter(sh=>
+                  sh.bowler===activeBowler
+                  &&sh.league===effectiveSessionLeague
+                  &&sh.date===sessionDate
+                  &&String(sh.game)===String(form.game))}
+                currentFrame={form.frame}
+                currentBall={form.ballNum}
+                onSelectFrame={(frame,shot)=>{
+                  // A bowled frame opens for editing; an empty one just
+                  // moves the logger there, so tapping ahead to fix a
+                  // frame you skipped works without a separate control.
+                  if(shot&&startEdit)startEdit(shot);
+                  else setForm(f=>({...f,frame:String(frame),ballNum:Number(frame)===10?1:null}));
+                }}/>
+            )}
+
             {showShotContext&&(
             <div style={S.card}>
               {/* The ceiling on the game in progress: strike out from here
@@ -1090,10 +1114,27 @@ export default function LogView({
                       {(()=>{
                         const rates=buyInsForLeague(leagueBuyIns,cs.league);
                         const games=(cs.scores||[]).filter(v=>v!=null).length;
-                        const setRate=(key,val)=>{
-                          const next={...rates,[key]:val===""?0:parseFloat(val)||0};
-                          onSaveLeagueBuyIns?.(cs.league,next);
-                          const arrays=costArraysFor(next,games);
+                        const pots=visibleMoneyGames(preferences);
+
+                        // Whether the bowler is IN each pot tonight,
+                        // derived from what the session already records
+                        // rather than stored twice: a non-zero cost means
+                        // they entered it.
+                        //
+                        // Saving a buy-in rate used to mean paying it
+                        // every week forever -- the app assumed you were
+                        // in every pot every night, so a week you sat one
+                        // out silently charged you for it and net
+                        // winnings drifted from reality with nothing on
+                        // screen to explain why.
+                        const costField={pokerQuarter:"pokerQuarterCost",pokerDollar:"pokerDollarCost",
+                                         highGame:"highGameCost",threeSixNine:"threeSixNineCost"};
+                        const isIn=key=>key==="threeSixNine"
+                          ?Number(cs.threeSixNineCost||0)>0
+                          :((cs[costField[key]]||[]).some(v=>Number(v)>0));
+
+                        const applyCosts=(nextRates,playing)=>{
+                          const arrays=costArraysFor(nextRates,games,playing);
                           Object.entries(arrays).forEach(([field,value])=>{
                             if(Array.isArray(value)){
                               value.forEach((v,i)=>setSessionMoneyArray(cs.id,field,i,v));
@@ -1102,29 +1143,56 @@ export default function LogView({
                             }
                           });
                         };
-                        const row=(label,key,step)=>(
-                          <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
-                            <div style={{fontSize:"12px",color:C.textMuted,flex:1}}>{label}</div>
-                            <input style={{...S.input,width:"90px",fontSize:"13px",padding:"6px 10px",textAlign:"right"}}
-                              type="number" step={step} placeholder="$"
-                              value={rates[key]===0?"":rates[key]}
-                              onChange={e=>setRate(key,e.target.value)}/>
-                          </div>
-                        );
+                        const playingNow=()=>Object.fromEntries(pots.map(k=>[k,isIn(k)]));
+
+                        const setRate=(key,val)=>{
+                          const next={...rates,[key]:val===""?0:parseFloat(val)||0};
+                          onSaveLeagueBuyIns?.(cs.league,next);
+                          // Entering a rate means you're in that pot --
+                          // otherwise typing a number would do nothing
+                          // visible, which reads as broken.
+                          applyCosts(next,{...playingNow(),[key]:true});
+                        };
+                        const togglePot=key=>applyCosts(rates,{...playingNow(),[key]:!isIn(key)});
+
+                        const label={pokerQuarter:"Quarter game",pokerDollar:"Dollar game",
+                                     highGame:"High game",threeSixNine:"3-6-9 (whole night)"};
+                        const step={pokerQuarter:"0.25",pokerDollar:"1",highGame:"1",threeSixNine:"1"};
+
+                        const owed=pots.reduce((sum,k)=>{
+                          if(!isIn(k))return sum;
+                          return sum+(k==="threeSixNine"?rates[k]:rates[k]*games);
+                        },0);
+
+                        if(!pots.length)return null;
                         return(
                           <div style={{marginBottom:"12px"}}>
-                            <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Buy-ins ($ per game)</div>
+                            <div style={{fontSize:"12px",color:C.textMuted,marginBottom:"6px"}}>Money games tonight</div>
                             <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                              Saved for {String(cs.league||"this league").replace(" House Shot","")} — you won't need to enter these again.
+                              Tap the ones you're in. Buy-ins are saved for {String(cs.league||"this league").replace(" House Shot","")} — you won't need to enter them again.
                             </div>
-                            {row("Quarter game","pokerQuarter","0.25")}
-                            {row("Dollar game","pokerDollar","1")}
-                            {row("High game","highGame","1")}
-                            {row("3-6-9 (whole night)","threeSixNine","1")}
+                            {pots.map(key=>{
+                              const inIt=isIn(key);
+                              return(
+                                <div key={key} style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
+                                  <button onClick={()=>togglePot(key)}
+                                    aria-label={`${label[key]}: ${inIt?"playing":"not playing"}`}
+                                    style={{flex:1,textAlign:"left",cursor:"pointer",padding:"6px 8px",borderRadius:"8px",
+                                      border:`1px solid ${inIt?C.strike+"66":C.border}`,
+                                      background:inIt?C.strike+"11":"transparent",
+                                      color:inIt?C.text:C.textMuted,fontSize:"12px"}}>
+                                    {inIt?"✓ ":""}{label[key]}
+                                  </button>
+                                  <input style={{...S.input,width:"90px",fontSize:"13px",padding:"6px 10px",textAlign:"right",
+                                    opacity:inIt?1:0.45}}
+                                    type="number" step={step[key]} placeholder="$"
+                                    value={rates[key]===0?"":rates[key]}
+                                    onChange={e=>setRate(key,e.target.value)}/>
+                                </div>
+                              );
+                            })}
                             <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
-                              {games} game{games===1?"":"s"} tonight · costs ${(
-                                (rates.pokerQuarter+rates.pokerDollar+rates.highGame)*games+rates.threeSixNine
-                              ).toFixed(2)} in
+                              {games} game{games===1?"":"s"} tonight · ${owed.toFixed(2)} paid in
                             </div>
                           </div>
                         );

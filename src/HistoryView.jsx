@@ -30,7 +30,6 @@ export default function HistoryView({
             team is what a shot is actually associated with. */}
         {(teams||[]).length>0&&(
           <>
-            <div style={{...S.label,marginTop:"4px"}}>Team</div>
             <div style={S.chips}>
               {(teams||[]).map(t=>(
                 <Chip key={t.id} label={t.name}

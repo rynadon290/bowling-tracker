@@ -9,11 +9,16 @@ const PAGE_SIZE = 15;
 // bound, and it was pushing the actual analysis off the bottom of a phone
 // screen. Looking up "what did I shoot three weeks ago" is a deliberate
 // act, not something you want between you and your averages.
-export default function SessionHistory({ sessions, bowlers, leagues, teams = [], statsBowler, setStatsBowler, statsLeague, setStatsLeague }) {
+export default function SessionHistory({ sessions, bowlers, leagues, teams = [], displayName = "", statsBowler, setStatsBowler, statsLeague, setStatsLeague }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const filtered = sessions
-    .filter(s => (!statsBowler || s.bowler === statsBowler) && (!statsLeague || s.league === statsLeague));
+  // Your own sessions only. The sessions array also holds nights logged
+  // on behalf of teammates, which aren't yours to browse or act on from
+  // your own history screen -- hiding the bowler filter without scoping
+  // the data would have left theirs mixed into the list.
+  const mine = sessions.filter(s => !displayName || s.bowler === displayName);
+  const filtered = mine
+    .filter(s => (!statsLeague || s.league === statsLeague));
   const ordered = [...filtered].reverse();
   const visible = ordered.slice(0, visibleCount);
 
@@ -41,26 +46,18 @@ export default function SessionHistory({ sessions, bowlers, leagues, teams = [],
           label, so nothing said they were different dimensions -- a row
           of names above a row of teams reads as one long list of things
           to pick between, not two independent choices. */}
-      {(bowlers.length > 1 || teamOptions.length > 1) && (
+      {teamOptions.length > 1 && (
         <div style={S.card}>
-          {bowlers.length > 1 && (
-            <>
-              <div style={S.label}>Bowler</div>
-              <div style={{ ...S.chips, marginBottom: teamOptions.length > 1 ? "12px" : 0 }}>
-                <Chip label="All bowlers" selected={!statsBowler} onToggle={() => updateFilter(setStatsBowler, "")} />
-                {bowlers.map(b => (
-                  <Chip key={b} label={b} selected={statsBowler === b} onToggle={() => updateFilter(setStatsBowler, b)} />
-                ))}
-              </div>
-            </>
-          )}
+          {/* No bowler filter: this is your own session history. The local
+              roster also holds teammates you log for, and their nights
+              aren't yours to browse from here. */}
           {/* Team rather than league: a league can hold several teams,
               and the team is the group a session actually belongs to.
               statsLeague still carries the value, since that's the key
               sessions are filed under -- the team just supplies it. */}
           {teamOptions.length > 1 && (
             <>
-              <div style={S.label}>Team</div>
+              <div style={S.label}>Filter</div>
               <div style={S.chips}>
                 <Chip label="All teams" selected={!statsLeague} onToggle={() => updateFilter(setStatsLeague, "")} />
                 {teamOptions.map(t => (

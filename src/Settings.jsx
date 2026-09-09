@@ -141,7 +141,7 @@ export default function Settings({
           </div>
           {historyTab === "sessions" && (
             <SessionHistory
-              sessions={sessions || []} bowlers={bowlers || []} leagues={leagues || []} teams={teams || []}
+              sessions={sessions || []} bowlers={bowlers || []} leagues={leagues || []} teams={teams || []} displayName={displayName}
               statsBowler={statsBowler} setStatsBowler={setStatsBowler}
               statsLeague={statsLeague} setStatsLeague={setStatsLeague} />
           )}

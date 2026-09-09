@@ -4596,7 +4596,7 @@ export default function BowlingTracker(){
           <Profile
             only={view==="locker"
               ?["arsenal","bags"]
-              :["whoseProfile","identity","aliases","coaching","bookAverage","homeCenters","notes"]}
+              :["identity","aliases","coaching","bookAverage","homeCenters","notes"]}
             bowlers={bowlers} activeBowler={activeBowler} selectBowler={selectBowler}
             profiles={profiles} setProfile={setProfile} teams={teams}
             arsenals={arsenals} ballLayouts={ballLayouts} setBallLayout={setBallLayout} removeBall={removeBall}
@@ -4722,7 +4722,7 @@ export default function BowlingTracker(){
 
         {view==="log"&&(
           <LogView
-            shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={activeLeagues}
+            shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={activeLeagues} startEdit={startEdit}
             activeBowler={activeBowler} newBowlerName={newBowlerName} setNewBowlerName={setNewBowlerName} arsenals={arsenals} newBallName={newBallName} setNewBallName={setNewBallName}
             form={form} setForm={setForm} editingId={editingId} saved={saved} sessionSaved={sessionSaved} sessionSaveMessage={sessionSaveMessage}
             sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} effectiveSessionLeague={effectiveSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}
