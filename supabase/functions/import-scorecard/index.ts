@@ -249,8 +249,11 @@ Deno.serve(async (req) => {
     // the client and POSTing a 200MB body straight at this function, which
     // would then forward it to Gemini and bill for it.
     //
-    // 8MB per image and 20MB total: comfortably above a downscaled
-    // 1600px photo, far below anything worth paying to process.
+    // 8MB per image and 20MB total. The client no longer downscales --
+    // resizing was destroying the small digits and pin-deck graphics the
+    // model has to read -- so these now sit above a full-resolution phone
+    // screenshot or photo, and still far below anything worth paying to
+    // process. The client stops at 18MB total, just under this.
     const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
     const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
     const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
