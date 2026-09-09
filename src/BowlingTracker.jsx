@@ -4,6 +4,7 @@ import LogView from "./LogView.jsx";
 import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
+import Tour from "./Tour.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
 import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
@@ -140,6 +141,10 @@ const SESSION_START_SEEN_KEY = "bowling-session-start-seen-v1";
 // Whether the full-screen first-launch flow has been completed. Separate
 // from the daily prompt's keys: this one is once-ever.
 const ONBOARDED_KEY = "bowling-onboarded-v1";
+// The walkthrough after setup. Separate from ONBOARDED_KEY so an
+// existing bowler who already finished setup doesn't get a tour they
+// never asked for on the next update.
+const TOURED_KEY = "bowling-toured-v1";
 const GOALS_KEY = "bowling-goals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
@@ -588,6 +593,16 @@ export default function BowlingTracker(){
     try{return window.localStorage.getItem(ONBOARDED_KEY)==="1";}
     catch{return false;}
   });
+  // Shown once, after setup. Read synchronously like the flag above --
+  // an async read would flash the tour at someone who'd already done it.
+  const[toured,setToured]=useState(()=>{
+    try{return window.localStorage.getItem(TOURED_KEY)==="1";}
+    catch{return true;} // storage unavailable: don't nag
+  });
+  function finishTour(){
+    setToured(true);
+    try{window.localStorage.setItem(TOURED_KEY,"1");}catch{}
+  }
   // Latched at mount, deliberately NOT recomputed as data arrives.
   //
   // The gate used to also consult sessions/shots to spot an existing
@@ -2415,6 +2430,12 @@ export default function BowlingTracker(){
     cloudWrite("bowler_goals",goalsToRow(normalized,bowler,user?.id||null),{onConflict:"created_by,bowler_name"});
   }
 
+  function replayTour(){
+    setToured(false);
+    try{window.localStorage.removeItem(TOURED_KEY);}catch{}
+    setView("log");
+  }
+
   function restartOnboarding(){
     // Seed from the existing profile. Without this an established bowler
     // reruns setup to a blank name field, and finishing would either
@@ -2431,6 +2452,12 @@ export default function BowlingTracker(){
   }
 
   function finishOnboarding(){
+    // A bowler who just completed setup gets the walkthrough. Set here
+    // rather than defaulting to "not toured" so an existing bowler --
+    // who never runs finishOnboarding again -- is never shown it.
+    setToured(false);
+    try{window.localStorage.removeItem(TOURED_KEY);}catch{}
+
     // Commit what onboarding collected. The name creates the bowler --
     // everything downstream keys off bowler name, so this has to happen
     // before anything else can be logged.
@@ -4400,6 +4427,16 @@ export default function BowlingTracker(){
         </div>
       </div>
 
+      {/* The walkthrough, over the top of the real app rather than
+          instead of it -- a new bowler reads each step while looking at
+          the tab it describes. */}
+      {!toured&&onboarded&&(
+        <Tour
+          preferences={preferences}
+          onNavigate={setView}
+          onFinish={finishTour}/>
+      )}
+
       {showSyncDetail&&syncBreakdown&&(()=>{
         // Plain language first, technical detail on request.
         //
@@ -4627,7 +4664,7 @@ export default function BowlingTracker(){
           <Settings
             mode="leagues"
             onCreateTeam={createTeamForLeague}
-            restartOnboarding={restartOnboarding}
+            restartOnboarding={restartOnboarding} replayTour={replayTour}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
             importText={importText} setImportText={setImportText}
@@ -4681,7 +4718,7 @@ export default function BowlingTracker(){
         {(view==="settings"||view==="history")&&(
           <Settings
             mode={view==="history"?"history":"settings"}
-            restartOnboarding={restartOnboarding}
+            restartOnboarding={restartOnboarding} replayTour={replayTour}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
             importText={importText} setImportText={setImportText}

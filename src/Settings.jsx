@@ -26,7 +26,7 @@ const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, 
 
 export default function Settings({
   mode = "both",
-  restartOnboarding,
+  restartOnboarding, replayTour,
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
   confirmClear, setConfirmClear, clearAllData, hasData,
@@ -610,6 +610,24 @@ export default function Settings({
           preferences object: theme, every tracked field, money games, and
           the Stats card order. Someone reaching for it to fix one toggle
           lost their theme and card layout with no warning. */}
+      {/* Replay the walkthrough. Separate from Reset settings: someone
+          who wants a reminder of what a tab does shouldn't have to
+          consider wiping their theme and layout to get it. */}
+      {showCard("reset") && replayTour && (
+        <div style={{ ...S.card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>Show me around again</div>
+            <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>
+              A quick walkthrough of what each tab does.
+            </div>
+          </div>
+          <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px", flexShrink: 0 }}
+            onClick={replayTour}>
+            Replay
+          </button>
+        </div>
+      )}
+
       {showCard("reset") && (
       <CollapsibleCard title="Reset settings" summary="Theme, fields, layout"
         expanded={expanded.reset} onToggle={() => toggle("reset")}>
