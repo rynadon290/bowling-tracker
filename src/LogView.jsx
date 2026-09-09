@@ -593,11 +593,25 @@ export default function LogView({
                 every render, so a mark appears as soon as a shot saves. */}
             {showShotContext&&(
               <Scoresheet
-                shots={(shots||[]).filter(sh=>
-                  sh.bowler===activeBowler
-                  &&sh.league===effectiveSessionLeague
-                  &&sh.date===sessionDate
-                  &&String(sh.game)===String(form.game))}
+                shots={(shots||[]).filter(sh=>{
+                  // Matched loosely on purpose.
+                  //
+                  // A shot is saved by spreading ...form, and a blank
+                  // form starts with bowler:"" and league:"" -- so a shot
+                  // logged before those fields are populated is stored
+                  // with empty strings. Comparing them strictly against
+                  // activeBowler / effectiveSessionLeague matched nothing,
+                  // which is why frames stayed blank and no frame ever
+                  // had a shot to open for editing.
+                  //
+                  // An empty field on either side means "unset", not
+                  // "different", so it doesn't exclude the shot.
+                  const same=(a,b)=>!a||!b||a===b;
+                  return same(sh.bowler,form.bowler||activeBowler)
+                    &&same(sh.league,form.league||effectiveSessionLeague)
+                    &&same(sh.date,form.date||sessionDate)
+                    &&String(sh.game)===String(form.game);
+                })}
                 currentFrame={form.frame}
                 currentBall={form.ballNum}
                 onSelectFrame={(frame,shot)=>{
