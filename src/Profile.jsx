@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "./AuthProvider.jsx";
 import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
 import { PLASTIC_BALL } from "./constants.js";
 import ArsenalList from "./ArsenalList.jsx";
@@ -67,6 +68,17 @@ export default function Profile({
   // cards. Same code both places, no copy to drift.
   const show = id => !only || only.includes(id);
 
+  const { displayName, updateDisplayName } = useAuth();
+  const [editingMyName, setEditingMyName] = useState(false);
+  const [myNameInput, setMyNameInput] = useState("");
+  async function saveMyName() {
+    const name = myNameInput.trim();
+    if (!name) return;
+    setEditingMyName(false);
+    const { error } = await updateDisplayName(name);
+    if (error) window.alert(error.message);
+  }
+
   if (!bowlers.length) {
     return (
       <div style={S.card}>
@@ -106,6 +118,34 @@ export default function Profile({
             ))}
           </div>
         </CollapsibleCard>
+      )}
+
+      {/* Your ACCOUNT name -- what other people see when they search for
+          you or view a roster. Distinct from the bowler profiles below,
+          which are per-bowler and can include proxy-logged teammates.
+          
+          Lived in Teams until now, which made it feel like roster
+          configuration rather than "this is who I am in the app". */}
+      {show("identity") && (
+      <div style={S.card}>
+        <div style={S.label}>Your Name</div>
+        {!editingMyName ? (
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:C.text,fontSize:"15px",fontWeight:600}}>{displayName || "(not set)"}</span>
+            <button style={S.btn()} onClick={()=>{setMyNameInput(displayName||"");setEditingMyName(true);}}>Edit</button>
+          </div>
+        ) : (
+          <div style={{display:"flex",gap:"8px"}}>
+            <input value={myNameInput} onChange={e=>setMyNameInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")saveMyName();}} autoFocus style={{...S.input,flex:1}}/>
+            <button style={S.btn("primary")} onClick={saveMyName}>Save</button>
+            <button style={S.btn()} onClick={()=>setEditingMyName(false)}>Cancel</button>
+          </div>
+        )}
+        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
+          This is what teammates see when they search for you or view the roster — it defaults to your email prefix until you set it.
+        </div>
+      </div>
       )}
 
       {show("identity") && (

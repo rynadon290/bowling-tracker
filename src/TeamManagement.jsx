@@ -166,7 +166,7 @@ const S = new Proxy({}, {
 
 export default function TeamManagement({
   leagues = [],
-  onTeamsChange,
+  onTeamsChange, focusTeamId,
 }) {
   const{user,displayName,updateDisplayName}=useAuth();
   // Maps league name -> its Supabase row id, built from its own small fetch
@@ -177,9 +177,16 @@ export default function TeamManagement({
   const leagueIdsRef = useRef({});
   const[teams, setTeams] = useState([]);
   const[loading, setLoading] = useState(true);
-  const[selectedLeague, setSelectedLeague] = useState((leagues || [])[0] || "Tuesday House Shot");
-  const[newTeamName, setNewTeamName] = useState("");
   const[editingTeamId, setEditingTeamId] = useState(null);
+
+  // The team just created from the Leagues card above. Scrolled to on
+  // arrival so adding players continues straight on from adding the team,
+  // rather than leaving the bowler to find it further down the page.
+  const focusedTeamRef = useRef(null);
+  useEffect(() => {
+    if (!focusTeamId || !focusedTeamRef.current) return;
+    focusedTeamRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusTeamId, teams.length]);
   const[editingName, setEditingName] = useState("");
   // Asked at creation because there's no other reliable way to know when a
   // season ends -- leagues in this app have no automatic boundary, so this
@@ -203,7 +210,6 @@ export default function TeamManagement({
   // only returns rows actually meant for this signed-in user, so there's
   // no free-text search surface that could leak or let someone claim a
   // spot that isn't theirs.
-  const[myPendingInvites, setMyPendingInvites] = useState([]);
   // QR code for the sign-in URL, generated once on mount
 
   async function loadAll() {
@@ -260,29 +266,9 @@ export default function TeamManagement({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadMyPendingInvites() {
-    if (!user?.email) { setMyPendingInvites([]); return; }
-    const { data, online } = await cloudRead("pending_invites", q =>
-      q.select("id,team_id,invited_name,lineup_position").is("accepted_at", null).eq("invited_email", user.email)
-    );
-    if (!online || !data || !data.length) { setMyPendingInvites([]); return; }
 
-    const teamIds = [...new Set(data.map(inv => inv.team_id))];
-    const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id").in("id", teamIds));
-    const teamById = Object.fromEntries((teamsRes.data || []).map(t => [t.id, t]));
-    const leagueIds = [...new Set(Object.values(teamById).map(t => t.league_id).filter(Boolean))];
-    const leaguesRes = leagueIds.length ? await cloudRead("leagues", q => q.select("id,name").in("id", leagueIds)) : { data: [] };
-    const leagueNameById = Object.fromEntries((leaguesRes.data || []).map(l => [l.id, l.name]));
-
-    setMyPendingInvites(data.map(inv => ({
-      id: inv.id, teamId: inv.team_id, name: inv.invited_name, lineupPosition: inv.lineup_position,
-      teamName: teamById[inv.team_id]?.name || "Unknown team",
-      leagueName: leagueNameById[teamById[inv.team_id]?.league_id] || "",
-    })));
-  }
 
   useEffect(() => {
-    loadMyPendingInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email]);
 
@@ -315,39 +301,8 @@ export default function TeamManagement({
   }, [teams]);
 
   const leagueList = (leagues || []).length ? leagues : ["Tuesday House Shot", "Thursday House Shot"];
-  const leagueTeams = teams.filter(team => team.league === selectedLeague);
 
-  async function createTeam() {
-    const name = newTeamName.trim();
-    if (!name) return;
-    const duplicate = leagueTeams.some(team => team.name.toLowerCase() === name.toLowerCase());
-    if (duplicate) { alert("A team with that name already exists in this league."); return; }
 
-    const id = crypto.randomUUID();
-    let leagueId = leagueIdsRef.current[selectedLeague];
-    if (!leagueId) {
-      // Cached ref might be stale (e.g. this league was created/renamed
-      // after this screen last loaded) — try a fresh lookup rather than
-      // silently creating a team that can never actually sync to the cloud.
-      const { data, online } = await cloudRead("leagues", q => q.select("id").eq("name", selectedLeague).limit(1));
-      if (online && data && data[0]) {
-        leagueId = data[0].id;
-        leagueIdsRef.current[selectedLeague] = leagueId;
-      }
-    }
-
-    setTeams(prev => [...prev, newTeamObject(id, name, selectedLeague)]);
-    setNewTeamName("");
-
-    if (!leagueId) {
-      alert(`Couldn't find "${selectedLeague}" — this team was created on this device only and won't be visible to teammates or survive leaving this screen. Try again once you're back online, or check the league exists.`);
-      return;
-    }
-    const result = await cloudWrite("teams", { id, name, league_id: leagueId, created_by: user?.id || null });
-    if (!result.synced) {
-      alert(`"${name}" was created locally but couldn't reach the cloud yet (${result.reason || "unknown reason"}). It'll keep retrying in the background — if this keeps happening, check your connection.`);
-    }
-  }
 
   function startRename(team) {
     setEditingTeamId(team.id);
@@ -357,7 +312,10 @@ export default function TeamManagement({
   function saveRename(teamId) {
     const name = editingName.trim();
     if (!name) return;
-    const duplicate = leagueTeams.some(team => team.id !== teamId && team.name.toLowerCase() === name.toLowerCase());
+    const renaming = teams.find(t => t.id === teamId);
+    const duplicate = teams.some(team => team.id !== teamId
+      && team.league === renaming?.league
+      && team.name.toLowerCase() === name.toLowerCase());
     if (duplicate) { alert("A team with that name already exists in this league."); return; }
 
     setTeams(prev => prev.map(team => team.id === teamId ? { ...team, name } : team));
@@ -502,14 +460,7 @@ export default function TeamManagement({
     cloudUpdate("pending_invites", { id: inviteId }, { accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
   }
 
-  async function claimPlaceholder(invite) {
-    if (!user?.id) return;
-    setMyPendingInvites(prev => prev.filter(r => r.id !== invite.id));
-    await cloudWrite("team_members", { team_id: invite.teamId, user_id: user.id, lineup_position: invite.lineupPosition ?? 0 });
-    const acceptedAt = new Date().toISOString();
-    await cloudUpdate("pending_invites", { id: invite.id }, { accepted_at: acceptedAt, accepted_user_id: user.id });
-    await loadAll(); // refresh so the newly-real membership shows up if this is your own team too
-  }
+
 
   async function saveMyName() {
     const name = myNameInput.trim();
@@ -537,88 +488,26 @@ export default function TeamManagement({
         </div>
       )}
 
-      <div style={S.card}>
-        <div style={S.label}>Your Name</div>
-        {!editingMyName ? (
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:C.text,fontSize:"15px",fontWeight:600}}>{displayName || "(not set)"}</span>
-            <button style={S.button} onClick={()=>{setMyNameInput(displayName||"");setEditingMyName(true);}}>Edit</button>
-          </div>
-        ) : (
-          <div style={{display:"flex",gap:"8px"}}>
-            <input value={myNameInput} onChange={e=>setMyNameInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveMyName();}} autoFocus style={{...S.input,flex:1}}/>
-            <button style={S.primary} onClick={saveMyName}>Save</button>
-            <button style={S.button} onClick={()=>setEditingMyName(false)}>Cancel</button>
-          </div>
-        )}
-        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
-          This is what teammates see when they search for you or view the roster — it defaults to your email prefix until you set it.
-        </div>
-      </div>
-
-      <div style={S.card}>
-        <div style={S.label}>Is a Teammate Already Tracking Your Scores?</div>
-        <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-          If someone added you to a roster before you signed up, any spot waiting for your email shows up here automatically.
-        </div>
-        {myPendingInvites.length===0 && (
-          <div style={{fontSize:"12px",color:C.textMuted}}>Nothing waiting for you right now.</div>
-        )}
-        {myPendingInvites.map(r=>(
-          <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
-            <div>
-              <div style={{color:C.text}}>{r.name}</div>
-              <div style={{color:C.textMuted,fontSize:"10px"}}>{r.teamName}{r.leagueName?` · ${r.leagueName}`:""}</div>
-            </div>
-            <button style={S.primary} onClick={()=>claimPlaceholder(r)}>This is me</button>
-          </div>
-        ))}
-      </div>
-
-      <div style={S.card}>
-        <div style={S.label}>League</div>
-        <select value={selectedLeague} onChange={e=>setSelectedLeague(e.target.value)} style={{...S.input,appearance:"auto"}}>
-          {leagueList.map(league=><option key={league} value={league}>{league}</option>)}
-        </select>
-        {/* Renaming a league lives in Settings > Leagues, alongside its
-            center, season dates and hide toggle. It used to be here too,
-            calling the same handler -- two places that rewrite every shot
-            and session to a new name is two places to keep correct, and
-            the duplicate was pure risk for no capability. */}
-        {selectedLeague&&(
-          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
-            Rename this league, set its center or season dates in Settings › Leagues.
-          </div>
-        )}
-        {/* Adding a league used to live here too, duplicating the Leagues
-            editor at the top of Vault. Two places to create the same thing
-            meant adding a league, scrolling down, and adding it again
-            before a team could attach to it. Teams are now created from
-            the Leagues card directly, where the league already is. */}
-      </div>
-
-      <div style={S.card}>
-        <div style={S.label}>Create Team</div>
-        <div style={{display:"flex",gap:"8px"}}>
-          <input
-            value={newTeamName}
-            onChange={e=>setNewTeamName(e.target.value)}
-            onKeyDown={e=>{if(e.key==="Enter")createTeam();}}
-            placeholder="Team name"
-            style={{...S.input,flex:1}}
-          />
-          <button style={S.primary} onClick={createTeam}>Add</button>
-        </div>
-      </div>
-
-      {!loading && leagueTeams.length===0 && (
+      {!loading && teams.length===0 && (
         <div style={S.card}>
-          <div style={{color:C.textMuted,textAlign:"center",padding:"12px 0"}}>No teams have been created for this league yet.</div>
+          <div style={{color:C.textMuted,textAlign:"center",padding:"12px 0"}}>
+            No teams yet — add one under a league in the Leagues card above.
+          </div>
         </div>
       )}
 
-      {leagueTeams.map(team => (
-        <div key={team.id} style={S.card}>
+      {/* Every team, not just one league's. The league dropdown that used
+          to scope this list is gone: picking a league now happens in the
+          Leagues card above, where teams are created, so a second picker
+          here was a way to end up looking at a different league than the
+          one you just added a team to. */}
+      {teams.map(team => (
+        <div key={team.id} ref={team.id===focusTeamId?focusedTeamRef:null} style={{
+          ...S.card,
+          // A brief outline on the team you just made, so it's obvious
+          // which one the page jumped to.
+          ...(team.id===focusTeamId?{border:`1px solid ${C.accent}66`}:{}),
+        }}>
           {editingTeamId===team.id ? (
             <div>
               <div style={S.label}>Team Name</div>
@@ -633,6 +522,7 @@ export default function TeamManagement({
               <div>
                 <div style={{fontSize:"18px",fontWeight:700,color:C.text}}>{team.name}</div>
                 <div style={{fontSize:"11px",color:C.textMuted,marginTop:"3px"}}>
+                  {team.league?`${String(team.league).replace(" House Shot","")} · `:""}
                   {team.members.length} {team.members.length===1?"bowler":"bowlers"}
                 </div>
               </div>

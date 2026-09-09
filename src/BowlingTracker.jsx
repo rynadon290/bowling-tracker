@@ -397,6 +397,9 @@ export default function BowlingTracker(){
   // present in this device's local roster. A friend who isn't on your
   // team has no reason to be in that list -- until now, adding them as a
   // friend bought nothing Compare To could use.
+  // The team just created from the Leagues card, so the Teams section
+  // below can scroll straight to its roster.
+  const[focusTeamId,setFocusTeamId]=useState("");
   const[friends,setFriends]=useState([]); // [{userId, displayName}]
   const[friendSessions,setFriendSessions]=useState({});
   const[friendShots,setFriendShots]=useState({});
@@ -426,6 +429,7 @@ export default function BowlingTracker(){
       }
     }
     persistTeams([...(teams||[]),{id,name:clean,league:leagueName,members:[],pendingInvites:[]}]);
+    setFocusTeamId(id);
     if(!leagueId){
       window.alert(`Couldn't find "${leagueName}" in the cloud — this team was created on this device only and won't be visible to teammates. Try again once you're back online.`);
       return;
@@ -4264,7 +4268,7 @@ export default function BowlingTracker(){
               : <div style={S.title}>{navTabs.find(t=>t.id===view)?.label
                   ||(view==="settings"?"Settings":view==="profile"?"Profile"
                     :view==="inbox"?"Inbox":view==="coaching"?"Coach"
-                    :view==="social"?"Friends & teams":view==="import"?"Import scorecard":"")}</div>}
+                    :view==="social"?"Friends":view==="import"?"Import scorecard":"")}</div>}
           </div>
 
           <div style={{display:"flex",gap:"12px",flexShrink:0,alignItems:"center"}}>
@@ -4552,7 +4556,7 @@ export default function BowlingTracker(){
           <TeamManagement
             leagues={leagues}
             onTeamsChange={persistTeams}
-            onLeagueAdd={addLeague}
+            focusTeamId={focusTeamId}
           />
         )}
 
