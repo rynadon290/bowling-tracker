@@ -148,67 +148,7 @@ export default function LogView({
                 local-only guests. Tournaments don't get this card at all --
                 a tournament bowler is always logging their own results, so
                 a card that could only ever say "it's you" adds nothing. */}
-            {!editingId&&preferences.environment!=="tournament"&&(
-              <div style={S.card}>
-                <div style={S.label}>Keeping Score For</div>
 
-                <>
-                    <div style={{...S.chips,gap:"4px"}}>
-                      <Chip label={`${ownerName||"Me"} (me)`} selected={activeBowler===ownerName}
-                        onToggle={()=>selectBowler(ownerName)} color={C.accent} dense/>
-                      {scoringForOthers&&scoreOptions.filter(n=>n!==ownerName).map(b=>(
-                        <Chip key={b} label={b} selected={activeBowler===b}
-                          onToggle={()=>selectBowler(b)} color={C.accent} dense/>
-                      ))}
-                    </div>
-
-                    <div style={{...S.chips,marginTop:"4px"}}>
-                      <Chip label={scoringForOthers?"✓ Also scoring for others":"Also scoring for others"}
-                        dense selected={scoringForOthers}
-                        onToggle={()=>{
-                          const next=!scoringForOthers;
-                          setScoringForOthers(next);
-                          // Turning it off must not leave the form pointed
-                          // at someone who's no longer selectable.
-                          if(!next&&activeBowler!==ownerName)selectBowler(ownerName);
-                        }}/>
-                    </div>
-
-                    {scoringForOthers&&(
-                      <>
-                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
-                          {scorekeepingHelp(preferences.environment)}
-                        </div>
-
-                        {otherBowlerSource(preferences.environment)==="freetext"&&(
-                          <>
-                            <div style={{...S.row,marginTop:"8px"}}>
-                              <input style={{...S.input,flex:1}} placeholder="Add someone bowling with you"
-                                value={newGuestName} onChange={e=>setNewGuestName(e.target.value)}
-                                onKeyDown={e=>{if(e.key==="Enter")addGuestBowler();}}/>
-                              <button style={S.btn("sm")} onClick={addGuestBowler}>+</button>
-                            </div>
-                            {(guests||[]).length>0&&(
-                              <div style={{...S.chips,marginTop:"6px"}}>
-                                {guests.map(g=>(
-                                  <Chip key={g} label={`${g}  ×`} dense selected color={C.textMuted}
-                                    onToggle={()=>removeGuestBowler(g)}/>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {otherBowlerSource(preferences.environment)==="roster"&&scoreOptions.length<=1&&(
-                          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
-                            No teammates on this league's roster yet — add them on the Social tab.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-              </div>
-            )}
 
             {/* In Practice, a night can be games OR a drill. A drill is a
                 focused repetition scored as a rate -- it's kept out of the
@@ -716,6 +656,72 @@ export default function LogView({
 
                   goTo();
                 }}/>
+            )}
+
+            {!editingId&&preferences.environment!=="tournament"&&(
+              <div style={{...S.card,padding:"10px 12px"}}>
+                {/* Below Shot Context and kept short: this is a setting
+                    you touch once a night, not something to scroll past
+                    before every shot. The name also shows on the
+                    scoresheet, so this card doesn't have to shout. */}
+                <div style={{...S.label,marginBottom:"6px"}}>Keeping score for</div>
+
+                <>
+                    <div style={{...S.chips,gap:"4px",marginBottom:0}}>
+                      <Chip label={`${ownerName||"Me"} (me)`} selected={activeBowler===ownerName}
+                        onToggle={()=>selectBowler(ownerName)} color={C.accent} dense/>
+                      {scoringForOthers&&scoreOptions.filter(n=>n!==ownerName).map(b=>(
+                        <Chip key={b} label={b} selected={activeBowler===b}
+                          onToggle={()=>selectBowler(b)} color={C.accent} dense/>
+                      ))}
+                    </div>
+
+                    <div style={{...S.chips,marginTop:"6px",marginBottom:0}}>
+                      <Chip label={scoringForOthers?"✓ Also scoring for others":"Also scoring for others"}
+                        dense selected={scoringForOthers}
+                        onToggle={()=>{
+                          const next=!scoringForOthers;
+                          setScoringForOthers(next);
+                          // Turning it off must not leave the form pointed
+                          // at someone who's no longer selectable.
+                          if(!next&&activeBowler!==ownerName)selectBowler(ownerName);
+                        }}/>
+                    </div>
+
+                    {scoringForOthers&&(
+                      <>
+                        <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
+                          {scorekeepingHelp(preferences.environment)}
+                        </div>
+
+                        {otherBowlerSource(preferences.environment)==="freetext"&&(
+                          <>
+                            <div style={{...S.row,marginTop:"8px"}}>
+                              <input style={{...S.input,flex:1}} placeholder="Add someone bowling with you"
+                                value={newGuestName} onChange={e=>setNewGuestName(e.target.value)}
+                                onKeyDown={e=>{if(e.key==="Enter")addGuestBowler();}}/>
+                              <button style={S.btn("sm")} onClick={addGuestBowler}>+</button>
+                            </div>
+                            {(guests||[]).length>0&&(
+                              <div style={{...S.chips,marginTop:"6px"}}>
+                                {guests.map(g=>(
+                                  <Chip key={g} label={`${g}  ×`} dense selected color={C.textMuted}
+                                    onToggle={()=>removeGuestBowler(g)}/>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {otherBowlerSource(preferences.environment)==="roster"&&scoreOptions.length<=1&&(
+                          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px"}}>
+                            No teammates on this league's roster yet — add them on the Social tab.
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+              </div>
             )}
 
             {/* Ball, between the scoresheet and the result.

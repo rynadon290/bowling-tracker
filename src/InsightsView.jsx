@@ -147,6 +147,22 @@ export default function InsightsView({ stats, onAnalyze, bowlerName, newlyAvaila
 
   return (
     <div>
+      {/* Insights sharpen with data, and saying so matters.
+      
+          Crossing the 10-game gate isn't "now it's right" -- it's the
+          first point where anything can be said honestly. A bowler
+          reading a thin early insight and concluding the feature is
+          weak is worse than one who knows it's still filling in.
+          
+          Shown only while the sample is small: past a season's worth it
+          would be noise. */}
+      {gameCount < 40 && (
+        <div style={{ fontSize: "11.5px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.45 }}>
+          Based on {gameCount} games so far. These get sharper the more you log —
+          a few nights gives a hint, a season gives you something to act on.
+        </div>
+      )}
+
       {/* Announced once, when a threshold is actually crossed -- so a
           bowler who found nothing here last month knows to come back,
           rather than having to keep checking. */}
