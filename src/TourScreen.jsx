@@ -415,6 +415,48 @@ const SCREENS = {
     </Phone>
   ),
 
+  roster: () => (
+    <Phone title="Vault">
+      <div style={card}>
+        <div style={label}>Split Happens</div>
+        <div style={{ ...muted, marginBottom: "8px" }}>Tuesday · roster in bowling order</div>
+
+        {/* A mixed roster is the normal case, and the thing worth
+            showing: real accounts and placeholders side by side, so a
+            bowler can see that a teammate without the app isn't a
+            blocker. */}
+        {[
+          ["1", "Ryan", "you", C.accent],
+          ["2", "Kim Alvarez", "joined", C.strike],
+          ["3", "Thomas Dick", "invited · waiting", C.spare],
+          ["4", "Dave Mitchell", "invited · waiting", C.spare],
+        ].map(([pos, name, state, col]) => (
+          <div key={name} style={{
+            display: "flex", alignItems: "center", gap: "7px",
+            padding: "5px 0", borderTop: `1px solid ${C.border}`,
+          }}>
+            <span style={{ ...muted, width: "10px" }}>{pos}</span>
+            <span style={{ fontSize: "11px", color: C.text, flex: 1 }}>{name}</span>
+            <span style={{ fontSize: "9px", color: col, fontWeight: 600 }}>{state}</span>
+          </div>
+        ))}
+
+        <Spot style={{ marginTop: "8px" }}>
+          <div>
+            <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted }}>
+              Name
+            </div>
+            <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted, marginTop: "4px" }}>
+              Email
+            </div>
+          </div>
+        </Spot>
+      </div>
+      <Note>Log their scores today — they connect when they sign up</Note>
+      <Nav active={4} />
+    </Phone>
+  ),
+
   money: () => (
     <Phone title="Bowl">
       <div style={card}>
