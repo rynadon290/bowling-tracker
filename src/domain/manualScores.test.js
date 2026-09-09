@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   getGameEquipment, setGameEquipment, defaultPracticeBall,
+  setManualScore,
+  resolveGameScore,
 } from './manualScores.js';
 
 // A games-only practice still has a ball and a surface -- that's what
@@ -35,5 +37,39 @@ describe('default practice ball', () => {
   it('never defaults to plastic, and asks when there is a real choice', () => {
     expect(defaultPracticeBall(['Plastic'])).toBe('');
     expect(defaultPracticeBall(['Bionic', 'Phaze II'])).toBe('');
+  });
+});
+
+// Importing frame data over an existing game score.
+//
+// Manual scores win over shot-derived ones everywhere in the app, which
+// is right -- a typed score is a deliberate override. But it means that
+// importing frames for a game that already has a manual score would
+// store the frames and then keep displaying the old number, with the two
+// silently disagreeing.
+//
+// ImportScorecard clears the manual score for any game that arrives WITH
+// frames, which is what makes the import actually take effect. This pins
+// that behaviour, since the bug it prevents is invisible.
+describe('shot data imported over an existing game score', () => {
+  const who = ['Ryan', 'Tuesday House Shot', '2026-09-03', 1];
+
+  it('shows the manual score while one is set', () => {
+    const ms = setManualScore({}, ...who, '185');
+    expect(resolveGameScore(ms, ...who, 212)).toBe(185);
+  });
+
+  it('falls back to the shot-derived score once the manual one is cleared', () => {
+    let ms = setManualScore({}, ...who, '185');
+    ms = setManualScore(ms, ...who, '');
+    expect(resolveGameScore(ms, ...who, 212)).toBe(212);
+  });
+
+  // The reverse is intentional: a scores-only import for a game that
+  // already has frames sets a manual score, and that override wins.
+  // ImportScorecard warns before doing it.
+  it('lets a deliberate manual score override existing frames', () => {
+    const ms = setManualScore({}, ...who, '190');
+    expect(resolveGameScore(ms, ...who, 212)).toBe(190);
   });
 });
