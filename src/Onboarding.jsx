@@ -149,9 +149,14 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
             {homeCenterIds.length > 0 && (
               <div style={{ ...S.chips, marginBottom: "8px" }}>
                 {homeCenterIds.map(id => {
-                  const known = homeCenters.find(c => c.id === id);
+                  // Defensive: a non-string id here means something upstream
+                  // stored an object, and rendering an object as a React
+                  // child throws and blanks the whole screen. A malformed
+                  // entry should cost one chip, not the app.
+                  const key = typeof id === "string" ? id : (id?.id || String(id?.name || ""));
+                  const known = homeCenters.find(c => c.id === key);
                   return (
-                    <Chip key={id} label={known?.name || id} selected
+                    <Chip key={key} label={known?.name || key} selected
                       onToggle={() => setField("homeCenters", homeCenterIds.filter(x => x !== id))} />
                   );
                 })}
@@ -169,9 +174,18 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                 style={{ display: "block", width: "100%", textAlign: "left", cursor: "pointer", padding: "8px 10px",
                   marginBottom: "6px", borderRadius: "8px", backgroundColor: C.surface, border: `1px solid ${C.border}` }}
                 onClick={async () => {
-                  // ensureCenter registers the center and returns its id,
-                  // which is what the profile actually stores.
-                  const id = ensureCenter ? await ensureCenter(r) : (r.id || r.name);
+                  // ensureCenter returns the CENTER OBJECT, not an id --
+                  // the previous comment claimed otherwise and the id was
+                  // stored as an object. homeCenters holds id strings, so
+                  // the chip below rendered an object as a React child and
+                  // blanked the screen.
+                  //
+                  // Only surfaced once bowling_centers was empty: with a
+                  // populated table ensureCenter returned an existing
+                  // record and the same bug was invisible, because that
+                  // object still had a usable .name.
+                  const created = ensureCenter ? await ensureCenter(r) : null;
+                  const id = created?.id || r.id || r.name;
                   if (id && !homeCenterIds.includes(id)) {
                     setField("homeCenters", [...homeCenterIds, id]);
                   }
