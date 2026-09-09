@@ -2084,6 +2084,8 @@ export default function BowlingTracker(){
       date:r.date,
       importedScores:r.imported_scores,
       correctedScores:r.corrected_scores,
+      importedShots:r.imported_shots,
+      correctedShots:r.corrected_shots,
       status:r.status,
       respondedAt:r.responded_at,
       correctedBy:r.corrected_by,
@@ -2118,6 +2120,8 @@ export default function BowlingTracker(){
         league_id:leagueIdsRef.current[e.league]||null,
         date:e.date,
         imported_scores:e.importedScores,
+        // The frames from the photo, proposed rather than applied.
+        imported_shots:e.importedShots?.length?e.importedShots:null,
         status:"pending",
       });
     }
@@ -2130,6 +2134,7 @@ export default function BowlingTracker(){
       league:e.league,
       date:e.date,
       importedScores:e.importedScores,
+      importedShots:e.importedShots||[],
       status:"pending",
     })).filter(Boolean)]);
     for(const row of rows)await cloudWrite("imported_scores",row);
@@ -2140,6 +2145,7 @@ export default function BowlingTracker(){
     cloudUpdate("imported_scores",{id:next.id},{
       status:next.status,
       corrected_scores:next.correctedScores,
+      corrected_shots:next.correctedShots||null,
       responded_at:next.respondedAt||null,
       corrected_by:next.correctedBy?(teams.flatMap(t=>t.members||[]).find(m=>teamMemberName(m)===next.correctedBy)?.userId||user?.id||null):null,
       note:next.note||null,
@@ -2159,7 +2165,50 @@ export default function BowlingTracker(){
     return canCorrectImportRecord(record,activeBowler,{sessions,verifiedTeammates});
   }
 
-  function approveImportedScores(record){replaceImportRecord(approveImport(record));}
+  // Approving accepts the scores AND, when the photo had frames, writes
+  // them into this bowler's shot history.
+  //
+  // Marked with imported_from so an imported frame is never silently
+  // indistinguishable from one the bowler logged themselves: the data is
+  // usable in stats, but its provenance travels with it.
+  //
+  // Only the bowler's OWN approval does this. Nothing is written until
+  // they say the numbers are right, which is the whole point of the
+  // pending state.
+  async function approveImportedScores(record){
+    const approved=approveImport(record);
+    replaceImportRecord(approved);
+
+    const frames=record.correctedShots?.length?record.correctedShots:record.importedShots;
+    if(!Array.isArray(frames)||!frames.length)return;
+    if(record.bowler!==activeBowler)return;
+
+    // Don't duplicate: if this bowler already has shots for this
+    // league/date/game, the import has already been applied (or they
+    // logged it themselves) and re-adding would double every frame.
+    const already=new Set(shots
+      .filter(sh=>sh.bowler===record.bowler&&sh.league===record.league&&sh.date===record.date)
+      .map(sh=>String(sh.game)));
+
+    const newShots=[];
+    for(const g of frames){
+      if(already.has(String(g.gameNumber)))continue;
+      for(const sh of (g.shots||[])){
+        newShots.push({
+          ...sh,
+          id:crypto.randomUUID(),
+          bowler:record.bowler,
+          league:record.league,
+          date:record.date,
+          game:String(g.gameNumber),
+          ball:sh.ball||g.ballUsed||"",
+          importedFrom:record.id,
+        });
+      }
+    }
+    if(!newShots.length)return;
+    await saveShots([...shots,...newShots]);
+  }
   function rejectImportedScores(record,corrected){replaceImportRecord(rejectImport(record,corrected,{by:record.bowler}));}
   function correctTeammateScores(record,corrected){
     // Which teammates have already confirmed their own scores for this

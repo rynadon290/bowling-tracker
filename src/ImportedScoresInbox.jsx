@@ -42,6 +42,17 @@ function PendingCard({ record, onApprove, onReject }) {
 
       <ScoreRow label="Scores read" scores={scores} />
 
+      {/* Frames come with the photo when the scorecard showed them, but
+          nothing is written to this bowler's shot history until they
+          confirm -- and once written, each shot is marked as imported so
+          it's never mistaken for one they logged themselves. */}
+      {(record.importedShots || []).length > 0 && (
+        <div style={{ fontSize: "11px", color: C.accent, marginTop: "8px" }}>
+          Frame-by-frame data included for {record.importedShots.length}{" "}
+          {record.importedShots.length === 1 ? "game" : "games"} — confirming adds it to your shot history.
+        </div>
+      )}
+
       {!correcting && (
         <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
           <button style={{ ...S.btn("primary"), flex: 1, padding: "8px", fontSize: "12px" }}

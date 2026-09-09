@@ -486,7 +486,7 @@ export default function ImportScorecard({
       .map((c,i)=>({column:c,index:i,bowler:assignments[i]}))
       .filter(x=>x.bowler&&x.bowler!==contextBowler);
     if(teammateColumns.length&&onSubmitTeammateScores){
-      await onSubmitTeammateScores(teammateColumns.map(({index,bowler})=>({
+      await onSubmitTeammateScores(teammateColumns.map(({column,index,bowler})=>({
         bowler,
         league:contextLeague,
         date:contextDate,
@@ -497,6 +497,19 @@ export default function ImportScorecard({
           const n=Number(v);
           return v===""||!Number.isFinite(n)?null:Math.round(n);
         }),
+        // Frame data rides along as a PROPOSAL. The photo contained every
+        // bowler's frames all along -- convertColumn builds them for any
+        // bowler -- and they used to be discarded here, so a teammate
+        // could never get shot-level stats from an import even though the
+        // data existed when it was scanned.
+        //
+        // Nothing is written to their history until they approve it, and
+        // an approved shot is marked as imported rather than self-logged.
+        // A card showing only totals sends no frames, which is a normal
+        // case rather than a failure.
+        importedShots:convertColumn(column,bowler)
+          .filter(g=>!g.scoreOnly&&g.shots.length)
+          .map(g=>({gameNumber:g.gameNumber,ballUsed:g.ballUsed,shots:g.shots})),
       })));
     }
 
