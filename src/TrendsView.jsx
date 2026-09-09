@@ -29,11 +29,6 @@ export default function TrendsView({
     });
     return [...seen].sort();
   })();
-  // Only balls this bowler has actually thrown in this league -- listing
-  // the whole arsenal would offer filters that produce an empty graph.
-  const ballsUsed = [...new Set((shots || [])
-    .filter(s => s && s.ball && (!statsBowler || s.bowler === statsBowler) && (!statsLeague || s.league === statsLeague))
-    .map(s => s.ball))].sort();
   // "Every game" plots one point per game instead of one per night.
   // Nightly averages hide the spread: 190/190/190 and 140/240/190 are the
   // same point. Off by default because the averaged view is the better
@@ -121,23 +116,6 @@ export default function TrendsView({
               onToggle={() => setMetricId(m.id)} />
           ))}
         </div>
-        {/* Ball filter, shot metrics only.
-            "Is my strike rate improving" is a fair question; "is THIS ball
-            still right as the lanes wear in" is the one a bowler with an
-            arsenal actually asks. Hidden for score metrics because a game
-            score isn't attributable to one ball. */}
-        {metric && metric.source !== "scores" && ballsUsed.length > 1 && (
-          <>
-            <div style={{ ...S.label, marginTop: "12px" }}>Ball</div>
-            <div style={S.chips}>
-              <Chip label="All balls" selected={!ballFilter} onToggle={() => setBallFilter("")} />
-              {ballsUsed.map(b => (
-                <Chip key={b} label={b} selected={ballFilter === b}
-                  onToggle={() => setBallFilter(ballFilter === b ? "" : b)} />
-              ))}
-            </div>
-          </>
-        )}
         {/* Ball filter. Works on SCORE metrics too: a scores-only game can
             still name its ball, and a ball that averages 210 in game one
             and 190 in game three is exactly what a bowler wants to see. */}

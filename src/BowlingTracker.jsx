@@ -4871,7 +4871,7 @@ export default function BowlingTracker(){
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
             compareFriendId={compareFriendId} setCompareFriendId={setCompareFriendId}
-            friends={friends} onLoadFriendData={loadFriendData} compareSessions={compareSessions}
+            friends={friends} onLoadFriendData={loadFriendData} compareSessions={compareSessions} displayName={displayName}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
             compareLeague={compareLeague} setCompareLeague={setCompareLeague}
             matches={matches}

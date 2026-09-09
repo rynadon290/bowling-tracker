@@ -16,7 +16,7 @@ export default function StatsView({
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
-  compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, compareSessions,
+  compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, compareSessions, displayName="",
   statsLeague, setStatsLeague,
   compareLeague, setCompareLeague, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
@@ -99,28 +99,48 @@ export default function StatsView({
 bowlers.length>1&&(
                   <div style={S.card}>
                     <div style={S.label}>Viewing</div>
-                    <div style={S.chips}>
-                      {leagues.map(l=>{
-  const isSelected=statsLeague===l&&!statsBowler;
-  return(
-    <Chip key={l} label={l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)} selected={isSelected} onToggle={()=>{
-      setStatsLeague(isSelected?"":l);
-      setStatsBowler("");
-      setCompareBowler("");
-      setCompareLeague("");
-    }}/>
-  );
-})}
-                      {bowlers.map(b=>(
-                        <Chip key={b} label={b} selected={statsBowler===b} onToggle={()=>{
-                          const next=statsBowler===b?"":b;
-                          setStatsBowler(next);
-                          setStatsLeague("");
-                          setCompareBowler("");
-                          setCompareLeague("");
-                        }}/>
-                      ))}
-                    </div>
+                    {/* A grouped dropdown, not a chip row of every name.
+                    
+                        `bowlers` is the local roster -- it holds guests and
+                        anyone ever logged for, so the chips listed people
+                        who aren't yours to look at and grew with every
+                        guest. This offers you, your friends, and your
+                        teams, which is the set that means something. */}
+                    <select style={S.sel} value={
+                        statsBowler?`bowler:${statsBowler}`
+                        :statsLeague?`team:${statsLeague}`
+                        :""
+                      }
+                      onChange={e=>{
+                        const v=e.target.value;
+                        setCompareBowler("");setCompareLeague("");setCompareFriendId?.("");
+                        if(!v){setStatsBowler("");setStatsLeague("");return;}
+                        const[kind,id]=v.split(/:(.*)/s);
+                        if(kind==="bowler"){setStatsBowler(id);setStatsLeague("");}
+                        else{setStatsLeague(id);setStatsBowler("");}
+                      }}>
+                      <option value="">Everything</option>
+                      {/* You first -- it's your own stats screen. */}
+                      {displayName&&(
+                        <option value={`bowler:${displayName}`}>{displayName}</option>
+                      )}
+                      {friends.length>0&&(
+                        <optgroup label="Friends">
+                          {friends.map(f=>(
+                            <option key={f.userId} value={`bowler:${f.displayName}`}>{f.displayName}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {leagues.length>0&&(
+                        <optgroup label="Teams">
+                          {leagues.map(l=>(
+                            <option key={l} value={`team:${l}`}>
+                              {l===PRACTICE_SESSION_KEY?l:teamNameForLeague(l)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
                     {(statsBowler||statsLeague)&&(
                       <>
                         <div style={S.divider}/>
@@ -133,6 +153,7 @@ bowlers.length>1&&(
                             grouping itself explains what each option means. */}
                         <select style={S.sel} value={
                             compareFriendId?`friend:${compareFriendId}`
+                            :compareBowler?`bowler:${compareBowler}`
                             :compareLeague?`team:${compareLeague}`
                             :""
                           }
@@ -140,7 +161,14 @@ bowlers.length>1&&(
                             const v=e.target.value;
                             if(!v){setCompareBowler("");setCompareFriendId("");setCompareLeague("");return;}
                             const[kind,id]=v.split(/:(.*)/s);
-                            if(kind==="friend"){
+                            if(kind==="bowler"){
+                              // A local bowler: their shots are already in
+                              // this device's array, so no fetch and no
+                              // friend id -- compareShots filters by name.
+                              setCompareBowler(id);
+                              setCompareFriendId("");
+                              setCompareLeague("");
+                            } else if(kind==="friend"){
                               const f=friends.find(x=>x.userId===id);
                               setCompareBowler(f?.displayName||"");
                               setCompareFriendId(id);
@@ -157,6 +185,19 @@ bowlers.length>1&&(
                             }
                           }}>
                           <option value="">None</option>
+                          {/* Bowlers in the local roster -- teammates you
+                              log for, guests, anyone with shots on this
+                              device. Dropped by mistake when this became a
+                              dropdown, which left the list empty for
+                              anyone with no friends added yet even though
+                              they had a full team to compare against. */}
+                          {bowlers.filter(b=>b!==statsBowler).length>0&&(
+                            <optgroup label="Bowlers">
+                              {bowlers.filter(b=>b!==statsBowler).map(b=>(
+                                <option key={b} value={`bowler:${b}`}>{b}</option>
+                              ))}
+                            </optgroup>
+                          )}
                           {friends.length>0&&(
                             <optgroup label="Friends">
                               {friends.map(f=>(
