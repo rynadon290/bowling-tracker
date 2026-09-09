@@ -84,3 +84,51 @@ export function sessionHighGame(session) {
   const scores = (session?.scores || []).filter(s => typeof s === 'number');
   return scores.length ? Math.max(...scores) : null;
 }
+
+// ── Per-league buy-in rates ──────────────────────────────────────────────
+//
+// A league's buy-ins don't change from game to game or week to week: the
+// quarter game costs a quarter every game, all season. Entering the same
+// three numbers into nine boxes every week was pure repetition, and the
+// most likely outcome of repetition is that one week they're wrong.
+//
+// Stored per league and applied to each game automatically. The SESSION
+// still records per-game cost arrays -- that's what sessionMoney reads,
+// and it's what makes a one-off week (skipped the dollar game in game 3)
+// representable at all. This just fills them in.
+
+// What a typical house charges. Defaults, not constants -- a house that
+// runs a 50c game can change them, and changing them must not rewrite
+// what past nights actually cost.
+export const DEFAULT_BUY_INS = {
+  pokerQuarter: 0.25,
+  pokerDollar: 1,
+  highGame: 0,
+  threeSixNine: 0,
+};
+
+export function buyInsForLeague(buyIns, league) {
+  const saved = (buyIns || {})[league] || {};
+  return {
+    pokerQuarter: saved.pokerQuarter ?? DEFAULT_BUY_INS.pokerQuarter,
+    pokerDollar: saved.pokerDollar ?? DEFAULT_BUY_INS.pokerDollar,
+    highGame: saved.highGame ?? DEFAULT_BUY_INS.highGame,
+    threeSixNine: saved.threeSixNine ?? DEFAULT_BUY_INS.threeSixNine,
+  };
+}
+
+// Cost arrays for a session, from the league's rates.
+//
+// Only charges games that were actually bowled -- `gamesBowled` is the
+// count of non-null scores. Charging a buy-in for a game that doesn't
+// exist would quietly overstate what the night cost.
+export function costArraysFor(rates, gamesBowled) {
+  const n = Math.max(0, Math.min(3, gamesBowled || 0));
+  const per = v => [0, 1, 2].map(i => (i < n ? (Number(v) || 0) : 0));
+  return {
+    pokerQuarterCost: per(rates.pokerQuarter),
+    pokerDollarCost: per(rates.pokerDollar),
+    highGameCost: per(rates.highGame),
+    threeSixNineCost: Number(rates.threeSixNine) || 0,
+  };
+}
