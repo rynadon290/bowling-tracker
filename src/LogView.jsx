@@ -615,11 +615,27 @@ export default function LogView({
                 currentFrame={form.frame}
                 currentBall={form.ballNum}
                 onSelectFrame={(frame,shot)=>{
-                  // A bowled frame opens for editing; an empty one just
-                  // moves the logger there, so tapping ahead to fix a
-                  // frame you skipped works without a separate control.
-                  if(shot&&startEdit)startEdit(shot);
-                  else setForm(f=>({...f,frame:String(frame),ballNum:Number(frame)===10?1:null}));
+                  const goTo=()=>setForm(f=>({...f,frame:String(frame),
+                    ballNum:Number(frame)===10?1:null}));
+
+                  // A bowled frame opens for editing.
+                  if(shot&&startEdit){startEdit(shot);return;}
+
+                  // An EMPTY frame while editing means "never mind" --
+                  // tapping away from an edit is the natural way to
+                  // abandon it, and leaving Update/Cancel as the only
+                  // exits made the scoresheet feel stuck.
+                  if(editingId){cancelEdit?.();goTo();return;}
+
+                  // An empty frame with a finished shot in hand saves it
+                  // first, so tapping the next frame is a second path to
+                  // Save Shot rather than silently discarding what was
+                  // entered. Same condition the Save button uses -- if it
+                  // wouldn't save on tap, it doesn't save here either.
+                  const canSave=form.result&&form.bowler&&!needsSpareMade;
+                  if(canSave&&submitShot){submitShot();return;}
+
+                  goTo();
                 }}/>
             )}
 
