@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { C, S } from "./ui.jsx";
 import { tourSteps, stepAt, isLastStep, tourLength } from "./domain/tour.js";
+import TourScreen from "./TourScreen.jsx";
 
 // A short walkthrough after setup.
 //
@@ -39,13 +40,26 @@ export default function Tour({ preferences = {}, onNavigate, onFinish }) {
       background: C.bg, borderTop: `1px solid ${C.border}`,
       boxShadow: "0 -8px 24px rgba(0,0,0,0.35)",
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
         <div style={{ fontSize: "15px", fontWeight: 700, color: C.text }}>{step.title}</div>
         <div style={{ fontSize: "11px", color: C.textMuted }}>{index + 1} of {total}</div>
       </div>
 
-      <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.5, marginBottom: "12px" }}>
-        {step.body}
+      {/* Drawn mock-up with the relevant area lit, beside the text.
+      
+          Spotlighting the LIVE app would mean measuring an element's
+          position at runtime -- which breaks on any layout change and
+          fails outright when the thing being described isn't on screen,
+          like pointing at a Vault card from the Bowl tab. A drawing
+          always shows the right thing, and can show a full scoresheet
+          mid-game that a new bowler has no data to produce. */}
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "12px" }}>
+        <div style={{ flexShrink: 0 }}>
+          <TourScreen stepId={step.id} />
+        </div>
+        <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.5 }}>
+          {step.body}
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>

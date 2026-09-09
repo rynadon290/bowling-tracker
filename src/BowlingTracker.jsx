@@ -5,6 +5,7 @@ import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import Tour from "./Tour.jsx";
+import HelpView from "./HelpView.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
 import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
@@ -3936,7 +3937,7 @@ export default function BowlingTracker(){
     // legitimate views, so they must not be treated as "not in the nav"
     // and bounced -- which would have thrown a coach off Settings the
     // moment they flipped coach view.
-    const iconViews=["profile","settings","inbox","social","coaching","import"];
+    const iconViews=["profile","settings","inbox","social","coaching","import","help"];
     if(!navTabs.some(t=>t.id===view)&&!iconViews.includes(view))setView("log");
   },[view,coachViewOn,showCoachingTab]);
 
@@ -4451,7 +4452,7 @@ export default function BowlingTracker(){
               : <div style={S.title}>{navTabs.find(t=>t.id===view)?.label
                   ||(view==="settings"?"Settings":view==="profile"?"Profile"
                     :view==="inbox"?"Inbox":view==="coaching"?"Coach"
-                    :view==="social"?"Friends":view==="import"?"Import scorecard":"")}</div>}
+                    :view==="help"?"Help":view==="social"?"Friends":view==="import"?"Import scorecard":"")}</div>}
           </div>
 
           <div style={{display:"flex",gap:"12px",flexShrink:0,alignItems:"center"}}>
@@ -4475,6 +4476,11 @@ export default function BowlingTracker(){
                 <span style={{position:"absolute",top:"-4px",right:"-6px",minWidth:"15px",height:"15px",borderRadius:"8px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"15px",textAlign:"center",padding:"0 3px"}}>{inboxCount}</span>
               </button>
             )}
+            {/* Search the documentation, and jump to what it describes. */}
+            <button onClick={()=>setView("help")}
+              style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}}
+              aria-label="Search help">🔍</button>
+
             {/* Import lives here rather than on the Log tab. On Log it was
                 gated on the current environment AND on a league already
                 being chosen, so importing a league scorecard meant
@@ -4821,6 +4827,13 @@ export default function BowlingTracker(){
             it is and files accordingly, rather than inheriting whichever
             mode the Log tab was left in. Reaching it from the header
             means Log may not even be the last screen the bowler was on. */}
+        {view==="help"&&(
+          <HelpView
+            onNavigate={setView}
+            onClose={()=>setView("log")}
+            onReplayTour={replayTour}/>
+        )}
+
         {view==="import"&&(
           <ImportScorecard
             bowlers={bowlers} activeBowler={activeBowler} profiles={profiles} leagues={leagues} teams={teams} tournaments={tournaments} shots={shots} saveShots={saveShots} onSubmitTeammateScores={submitTeammateScores}
