@@ -10,7 +10,7 @@ function strikeDescriptionLabel(stored,leftHanded){
 }
 
 export default function HistoryView({
-  bowlers, leagues,
+  bowlers, leagues, teams = [],
   filterBowler, setFilterBowler,
   filterBall, setFilterBall,
   filterResult, setFilterResult,
@@ -21,19 +21,24 @@ export default function HistoryView({
     <>
       <div style={S.card}>
         <div style={S.label}>Filter</div>
-        {bowlers.length>1&&(
-          <div style={S.chips}>
-            {bowlers.map(b=>(
-              <Chip key={b} label={b} selected={filterBowler===b} onToggle={()=>setFilterBowler(filterBowler===b?"":b)}/>
-            ))}
-          </div>
+        {/* Shots history shows only your own shots, so there's no bowler
+            filter here -- the local array also holds proxy-logged
+            teammates and imported scorecards, and every row has a delete
+            button. Deleting a teammate's frames from your history screen
+            isn't yours to do. */}
+        {/* Team, not league: a league can hold several teams, and the
+            team is what a shot is actually associated with. */}
+        {(teams||[]).length>0&&(
+          <>
+            <div style={{...S.label,marginTop:"4px"}}>Team</div>
+            <div style={S.chips}>
+              {(teams||[]).map(t=>(
+                <Chip key={t.id} label={t.name}
+                  selected={filterBall==="__"+t.id} onToggle={()=>setFilterBall(filterBall==="__"+t.id?"":"__"+t.id)}/>
+              ))}
+            </div>
+          </>
         )}
-        <div style={S.chips}>
-          {leagues.map(l=>(
-            <Chip key={l} label={l.replace(" House Shot","")}
-              selected={filterBall==="__"+l} onToggle={()=>setFilterBall(filterBall==="__"+l?"":"__"+l)}/>
-          ))}
-        </div>
         <div style={S.row}>
           <select style={S.sel} value={filterBall.startsWith("__")?"":filterBall} onChange={e=>setFilterBall(e.target.value)}>
             <option value="">All Balls</option>

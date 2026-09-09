@@ -9,7 +9,7 @@ const PAGE_SIZE = 15;
 // bound, and it was pushing the actual analysis off the bottom of a phone
 // screen. Looking up "what did I shoot three weeks ago" is a deliberate
 // act, not something you want between you and your averages.
-export default function SessionHistory({ sessions, bowlers, leagues, statsBowler, setStatsBowler, statsLeague, setStatsLeague }) {
+export default function SessionHistory({ sessions, bowlers, leagues, teams = [], statsBowler, setStatsBowler, statsLeague, setStatsLeague }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filtered = sessions
@@ -25,26 +25,50 @@ export default function SessionHistory({ sessions, bowlers, leagues, statsBowler
     setter(value);
   }
 
+  // One option per league the bowler has sessions in, labelled with the
+  // team's name when a team exists for it. Falls back to the league name
+  // so a league without a team is still filterable rather than vanishing.
+  const teamOptions = (leagues || []).map(l => {
+    const team = (teams || []).find(t => t.league === l);
+    return { league: l, name: team?.name || String(l).replace(" House Shot", "") };
+  });
+
   return (
     <div>
-      {(bowlers.length > 1 || leagues.length > 1) && (
+      {/* Two separate filters, each with its own heading.
+      
+          They used to be two chip rows stacked under a single "Filter"
+          label, so nothing said they were different dimensions -- a row
+          of names above a row of teams reads as one long list of things
+          to pick between, not two independent choices. */}
+      {(bowlers.length > 1 || teamOptions.length > 1) && (
         <div style={S.card}>
-          <div style={S.label}>Filter</div>
           {bowlers.length > 1 && (
-            <div style={{ ...S.chips, marginBottom: leagues.length > 1 ? "8px" : 0 }}>
-              <Chip label="All bowlers" selected={!statsBowler} onToggle={() => updateFilter(setStatsBowler, "")} />
-              {bowlers.map(b => (
-                <Chip key={b} label={b} selected={statsBowler === b} onToggle={() => updateFilter(setStatsBowler, b)} />
-              ))}
-            </div>
+            <>
+              <div style={S.label}>Bowler</div>
+              <div style={{ ...S.chips, marginBottom: teamOptions.length > 1 ? "12px" : 0 }}>
+                <Chip label="All bowlers" selected={!statsBowler} onToggle={() => updateFilter(setStatsBowler, "")} />
+                {bowlers.map(b => (
+                  <Chip key={b} label={b} selected={statsBowler === b} onToggle={() => updateFilter(setStatsBowler, b)} />
+                ))}
+              </div>
+            </>
           )}
-          {leagues.length > 1 && (
-            <div style={S.chips}>
-              <Chip label="All leagues" selected={!statsLeague} onToggle={() => updateFilter(setStatsLeague, "")} />
-              {leagues.map(l => (
-                <Chip key={l} label={l.replace(" House Shot", "")} selected={statsLeague === l} onToggle={() => updateFilter(setStatsLeague, l)} />
-              ))}
-            </div>
+          {/* Team rather than league: a league can hold several teams,
+              and the team is the group a session actually belongs to.
+              statsLeague still carries the value, since that's the key
+              sessions are filed under -- the team just supplies it. */}
+          {teamOptions.length > 1 && (
+            <>
+              <div style={S.label}>Team</div>
+              <div style={S.chips}>
+                <Chip label="All teams" selected={!statsLeague} onToggle={() => updateFilter(setStatsLeague, "")} />
+                {teamOptions.map(t => (
+                  <Chip key={t.league} label={t.name} selected={statsLeague === t.league}
+                    onToggle={() => updateFilter(setStatsLeague, t.league)} />
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}

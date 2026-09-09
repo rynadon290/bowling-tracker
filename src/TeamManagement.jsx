@@ -182,10 +182,22 @@ export default function TeamManagement({
   // The team just created from the Leagues card above. Scrolled to on
   // arrival so adding players continues straight on from adding the team,
   // rather than leaving the bowler to find it further down the page.
+  // Which team's cards are showing. Every team used to render its own
+  // full stack -- name, roster, invite form, "not signed up yet" form --
+  // so three teams meant scrolling past three of everything to reach the
+  // one you wanted.
+  const [shownTeamId, setShownTeamId] = useState("");
+  const shownTeam = teams.find(t => t.id === shownTeamId) || teams[0] || null;
+
   const focusedTeamRef = useRef(null);
   useEffect(() => {
-    if (!focusTeamId || !focusedTeamRef.current) return;
-    focusedTeamRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!focusTeamId) return;
+    // Select it as well as scrolling: with one team shown at a time, a
+    // newly created team that isn't selected would scroll to nothing.
+    setShownTeamId(focusTeamId);
+    if (focusedTeamRef.current) {
+      focusedTeamRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }, [focusTeamId, teams.length]);
   const[editingName, setEditingName] = useState("");
   // Asked at creation because there's no other reliable way to know when a
@@ -501,7 +513,23 @@ export default function TeamManagement({
           Leagues card above, where teams are created, so a second picker
           here was a way to end up looking at a different league than the
           one you just added a team to. */}
-      {teams.map(team => (
+      {/* One team at a time, chosen from a dropdown. */}
+      {teams.length > 1 && (
+        <div style={S.card}>
+          <div style={S.label}>Team</div>
+          <select style={{ ...S.input, appearance: "auto" }}
+            value={shownTeam?.id || ""}
+            onChange={e => setShownTeamId(e.target.value)}>
+            {teams.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}{t.league ? ` — ${String(t.league).replace(" House Shot", "")}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {[shownTeam].filter(Boolean).map(team => (
         <div key={team.id} ref={team.id===focusTeamId?focusedTeamRef:null} style={{
           ...S.card,
           // A brief outline on the team you just made, so it's obvious

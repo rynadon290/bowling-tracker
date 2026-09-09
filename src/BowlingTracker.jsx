@@ -3920,9 +3920,21 @@ export default function BowlingTracker(){
   // ── Stats ─────────────────────────────────────────────────────────────────
   // statsBowler === "" means Team/combined (everyone's shots together)
   const statsShots=shots.filter(s=>(statsBowler?s.bowler===statsBowler:true)&&(statsLeague?s.league===statsLeague:true));
-  const filtered=shots.filter(s=>{
+  // History > Shots shows only THIS bowler's own shots.
+  //
+  // It used to list everything in the local array, which includes shots
+  // proxy-logged for teammates and shots that arrived from an imported
+  // scorecard. Every row has a delete button, so a bowler could delete a
+  // teammate's frames from their own history screen -- and a teammate
+  // doing the same on their device could delete these.
+  //
+  // Scoped to displayName (the signed-in account) rather than
+  // activeBowler: activeBowler changes when logging for someone else,
+  // and "whose history am I looking at" should not follow that.
+  const myShots=shots.filter(s=>!displayName||s.bowler===displayName);
+  const filtered=myShots.filter(s=>{
     if(filterBowler&&s.bowler!==filterBowler)return false;
-    if(filterBall.startsWith("__")){if(s.league!==filterBall.slice(2))return false;}
+    if(filterBall.startsWith("__")){if(s.teamId!==filterBall.slice(2))return false;}
     else if(filterBall&&s.ball!==filterBall)return false;
     if(filterResult&&s.result!==filterResult)return false;
     return true;
@@ -4490,7 +4502,12 @@ export default function BowlingTracker(){
               the approach mid-frame -- and Improve is where the whole
               loop lives: see what's costing you, set a target, drill it,
               check the trend. */}
-          {activeBowler&&logGoals.length>0&&(
+          {/* Shown even with no goals set. Gating on logGoals.length>0
+              meant the panel only appeared once a goal existed -- and the
+              only way to create one is the "+ Add a goal" button inside
+              the panel, so a bowler with no goals had no route to a first
+              one. GoalsPanel handles the empty case itself. */}
+          {activeBowler&&(
             <GoalsPanel
               goals={logGoals}
               measurements={logGoalMeasurements}

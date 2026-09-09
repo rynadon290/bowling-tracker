@@ -9,7 +9,7 @@ import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
-import { setTheme,
+import { MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
   resetToEnvironmentDefaults, setTrackedField, setShowMoneyGames,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
@@ -141,7 +141,7 @@ export default function Settings({
           </div>
           {historyTab === "sessions" && (
             <SessionHistory
-              sessions={sessions || []} bowlers={bowlers || []} leagues={leagues || []}
+              sessions={sessions || []} bowlers={bowlers || []} leagues={leagues || []} teams={teams || []}
               statsBowler={statsBowler} setStatsBowler={setStatsBowler}
               statsLeague={statsLeague} setStatsLeague={setStatsLeague} />
           )}
@@ -240,7 +240,7 @@ export default function Settings({
           })()}
           {historyTab === "shots" && (
             <HistoryView
-              bowlers={bowlers || []} leagues={leagues || []}
+              bowlers={bowlers || []} leagues={leagues || []} teams={teams || []}
               filterBowler={filterBowler} setFilterBowler={setFilterBowler}
               filterBall={filterBall} setFilterBall={setFilterBall}
               filterResult={filterResult} setFilterResult={setFilterResult}
@@ -499,6 +499,32 @@ export default function Settings({
           <Chip label="Shown" selected={preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, true))} color={C.strike} />
           <Chip label="Hidden" selected={!preferences.showMoneyGames} onToggle={() => apply(prev => setShowMoneyGames(prev, false))} color={C.miss} />
         </div>
+
+        {/* Which pots this house actually runs. Hiding one here means it
+            doesn't exist for this bowler at all -- different from not
+            entering it on a given night, which is a per-session toggle on
+            the Bowl tab.
+            
+            A house that runs a quarter game and nothing else was still
+            shown four rows every week, three of them noise. */}
+        {preferences.showMoneyGames && (
+          <>
+            <div style={{ ...S.label, marginTop: "14px" }}>Which pots does your house run?</div>
+            {MONEY_GAMES.map(g => {
+              const shown = isMoneyGameShown(preferences, g);
+              return (
+                <div key={g} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}>
+                  <span style={{ fontSize: "13px", color: shown ? C.text : C.textMuted }}>
+                    {MONEY_GAME_LABELS[g]}
+                  </span>
+                  <Chip label={shown ? "Shown" : "Hidden"} dense selected={shown}
+                    onToggle={() => apply(prev => setMoneyGameHidden(prev, g, shown))}
+                    color={shown ? C.strike : C.miss} />
+                </div>
+              );
+            })}
+          </>
+        )}
       </CollapsibleCard>
       )}
 
