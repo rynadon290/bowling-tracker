@@ -92,21 +92,22 @@ describe('createTeamInvite', () => {
     expect(createTeamInvite(teams, 'team-1', 'id', '', 'a@example.com').error).toBe('invalid');
   });
 
-  it('a blank email is valid — creates a name-only placeholder, not an error', () => {
+  // These two tests used to assert the opposite -- that a name-only
+  // placeholder was valid. That was the behaviour that made the
+  // "Link Account" search necessary, and that search let a captain add
+  // any account on the app to their roster without consent. Email is now
+  // required, so a placeholder always has a way to resolve itself.
+  it('rejects a name-only placeholder — there would be no way to link them', () => {
     const teams = [team()];
     const result = createTeamInvite(teams, 'team-1', 'id', 'Aaron', '');
-    expect(result.error).toBeNull();
-    expect(result.invite.email).toBeNull();
-    expect(result.invite.name).toBe('Aaron');
+    expect(result.error).toBe('no-email');
+    expect(result.invite).toBeNull();
   });
 
-  it('multiple email-less placeholders on the same team do not collide as duplicates', () => {
-    let teams = [team()];
-    const first = createTeamInvite(teams, 'team-1', 'id-1', 'Aaron', '');
-    teams = first.teams;
-    const second = createTeamInvite(teams, 'team-1', 'id-2', 'Rob', '');
-    expect(second.error).toBeNull();
-    expect(second.teams[0].pendingInvites).toHaveLength(2);
+  it('does not add an email-less placeholder to the roster', () => {
+    const teams = [team()];
+    const result = createTeamInvite(teams, 'team-1', 'id', 'Aaron', '');
+    expect(result.teams[0].pendingInvites).toHaveLength(0);
   });
 
   it('rejects a duplicate email, case-insensitively', () => {
@@ -220,5 +221,51 @@ describe('resolvePlaceholder', () => {
     })];
     const result = resolvePlaceholder(teams, 'team-1', 'inv-1', { id: 'u2', display_name: 'Aaron' });
     expect(result[0].members[1].lineupPosition).toBe(1);
+  });
+});
+
+// Email is required on a placeholder.
+//
+// It's the only link between the placeholder and the account the person
+// eventually creates. Without one, the only way to connect them was a
+// captain searching every profile on the app and pressing Link -- which
+// let a captain add ANY user to their roster without that person
+// knowing, and team membership grants read access to their sessions and
+// shots.
+describe('createTeamInvite requires an email', () => {
+  const teams = [{ id: 't1', name: 'Split Happens', league: 'Tuesday', members: [], pendingInvites: [] }];
+
+  it('rejects a placeholder with no email', () => {
+    const r = createTeamInvite(teams, 't1', 'i1', 'Dave', '');
+    expect(r.error).toBe('no-email');
+    expect(r.invite).toBeNull();
+  });
+
+  it('rejects whitespace as an email', () => {
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', '   ').error).toBe('no-email');
+  });
+
+  it('rejects something that is not an email', () => {
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave').error).toBe('bad-email');
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave@').error).toBe('bad-email');
+    expect(createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave@nowhere').error).toBe('bad-email');
+  });
+
+  it('accepts a real email and stores it lowercased', () => {
+    const r = createTeamInvite(teams, 't1', 'i1', 'Dave', '  Dave@Example.COM ');
+    expect(r.error).toBeNull();
+    expect(r.invite.email).toBe('dave@example.com');
+  });
+
+  // The email is what matches a signup, so two placeholders sharing one
+  // would both claim the same person.
+  it('still rejects a duplicate email on the same team', () => {
+    const first = createTeamInvite(teams, 't1', 'i1', 'Dave', 'dave@example.com');
+    const second = createTeamInvite(first.teams, 't1', 'i2', 'Dave again', 'dave@example.com');
+    expect(second.error).toBe('duplicate');
+  });
+
+  it('still requires a name', () => {
+    expect(createTeamInvite(teams, 't1', 'i1', '', 'dave@example.com').error).toBe('invalid');
   });
 });

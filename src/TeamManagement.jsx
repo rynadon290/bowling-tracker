@@ -50,13 +50,28 @@ export function createTeamInvite(teams, teamId, id, name, email) {
   const cleanName = (name || "").trim();
   const cleanEmail = (email || "").trim().toLowerCase();
   if (!cleanName) return { teams, invite: null, error: "invalid" };
+
+  // Email is REQUIRED.
+  //
+  // It's the only link between a placeholder and the account that person
+  // eventually creates. Without one, the only way to connect them was a
+  // captain searching every account on the app and pressing Link -- which
+  // let a captain add ANY user to their roster without that person's
+  // knowledge, and team membership grants read access to sessions and
+  // shots. Requiring the email removes the need for that path entirely:
+  // the person signs up, sees the invite, and accepts it themselves.
+  if (!cleanEmail) return { teams, invite: null, error: "no-email" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+    return { teams, invite: null, error: "bad-email" };
+  }
+
   const team = teams.find(t => t.id === teamId);
   if (!team) return { teams, invite: null, error: "no-team" };
-  if (cleanEmail && team.pendingInvites.some(inv => inv.email && inv.email.toLowerCase() === cleanEmail)) {
+  if (team.pendingInvites.some(inv => inv.email && inv.email.toLowerCase() === cleanEmail)) {
     return { teams, invite: null, error: "duplicate" };
   }
   const lineupPosition = team.members.length + team.pendingInvites.length;
-  const invite = { id, name: cleanName, email: cleanEmail || null, lineupPosition, leftHanded: false, isSub: false };
+  const invite = { id, name: cleanName, email: cleanEmail, lineupPosition, leftHanded: false, isSub: false };
   const newTeams = teams.map(t => t.id === teamId ? { ...t, pendingInvites: [...t.pendingInvites, invite] } : t);
   return { teams: newTeams, invite, error: null };
 }
@@ -215,8 +230,6 @@ export default function TeamManagement({
   const[inviteForm, setInviteForm] = useState({});
   // Per-placeholder "link to an account" search, keyed by invite id:
   // {[inviteId]: {term, results, searching}}
-  const[linkSearchState, setLinkSearchState] = useState({});
-  const linkSearchTimers = useRef({});
   // Self-claim: invites addressed to this account's own verified email,
   // loaded automatically rather than searched by typed name -- RLS now
   // only returns rows actually meant for this signed-in user, so there's
@@ -394,6 +407,14 @@ export default function TeamManagement({
       alert("There's already a pending invite for that email on this team.");
       return;
     }
+    if (error === "no-email") {
+      alert("An email is needed. It's how they're connected to this spot when they sign up — without it there's no way to link them.");
+      return;
+    }
+    if (error === "bad-email") {
+      alert("That doesn't look like an email address.");
+      return;
+    }
     if (error || !invite) return;
     setTeams(newTeams);
     setInviteForm(prev => ({ ...prev, [teamId]: { name: "", email: "" } }));
@@ -448,29 +469,9 @@ export default function TeamManagement({
 
   // Manual link: a team member picks any real, already-signed-up account
   // for one of their own placeholders.
-  function handleLinkSearchChange(inviteId, term) {
-    setLinkSearchState(prev => ({ ...prev, [inviteId]: { term, results: prev[inviteId]?.results || [], searching: !!term.trim() } }));
-    clearTimeout(linkSearchTimers.current[inviteId]);
-    if (!term.trim()) {
-      setLinkSearchState(prev => ({ ...prev, [inviteId]: { term: "", results: [], searching: false } }));
-      return;
-    }
-    linkSearchTimers.current[inviteId] = setTimeout(async () => {
-      const { data, online } = await cloudRead("profiles", q =>
-        q.select("id,display_name").ilike("display_name", `%${term.trim()}%`).limit(8)
-      );
-      setLinkSearchState(prev => ({ ...prev, [inviteId]: { term, results: online && data ? data : [], searching: false } }));
-    }, 300);
-  }
 
-  function linkPlaceholderToAccount(teamId, inviteId, profile) {
-    const invite = teams.find(t => t.id === teamId)?.pendingInvites.find(i => i.id === inviteId);
-    const lineupPosition = invite?.lineupPosition ?? 0;
-    setTeams(prev => resolvePlaceholder(prev, teamId, inviteId, profile));
-    setLinkSearchState(prev => ({ ...prev, [inviteId]: { term: "", results: [], searching: false } }));
-    cloudWrite("team_members", { team_id: teamId, user_id: profile.id, lineup_position: lineupPosition });
-    cloudUpdate("pending_invites", { id: inviteId }, { accepted_at: new Date().toISOString(), accepted_user_id: profile.id });
-  }
+
+
 
 
 
@@ -592,38 +593,8 @@ export default function TeamManagement({
                   onClick={()=>setInviteHandedness(team.id,invite.id,!invite.leftHanded)}>{invite.leftHanded?"L":"R"}</button>
                 <button style={{...S.button,color:invite.isSub?C.accent:undefined}} title="Sub — tap to toggle"
                   onClick={()=>setInviteIsSub(team.id,invite.id,!invite.isSub)}>{invite.isSub?"Sub ✓":"Sub"}</button>
-                <button style={S.button} onClick={()=>setLinkSearchState(prev=>prev[invite.id]!==undefined
-                  ?{...prev,[invite.id]:undefined}
-                  :{...prev,[invite.id]:{term:"",results:[],searching:false}}
-                )}>{linkSearchState[invite.id]!==undefined?"Cancel":"Link Account"}</button>
                 <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
               </div>
-              {linkSearchState[invite.id]!==undefined && (
-                <div style={{marginTop:"8px",marginLeft:"32px"}}>
-                  <input
-                    value={linkSearchState[invite.id]?.term||""}
-                    onChange={e=>handleLinkSearchChange(invite.id,e.target.value)}
-                    placeholder="Search for their real account…"
-                    style={S.input}
-                  />
-                  {linkSearchState[invite.id]?.searching && (
-                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>Searching…</div>
-                  )}
-                  {!linkSearchState[invite.id]?.searching && (linkSearchState[invite.id]?.results?.length>0) && (
-                    <div style={{marginTop:"6px"}}>
-                      {linkSearchState[invite.id].results.map(p=>(
-                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
-                          <span style={{color:C.text}}>{p.display_name}</span>
-                          <button style={S.button} onClick={()=>linkPlaceholderToAccount(team.id,invite.id,p)}>Link</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {!linkSearchState[invite.id]?.searching && linkSearchState[invite.id]?.term && linkSearchState[invite.id]?.results?.length===0 && (
-                    <div style={{fontSize:"12px",color:C.textMuted,marginTop:"6px"}}>No one found with that name.</div>
-                  )}
-                </div>
-              )}
             </div>
           ))}
 
@@ -658,6 +629,16 @@ export default function TeamManagement({
             )}
 
             <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${C.border}`}}>
+              {/* Email is required here.
+              
+                  It's the only link between this placeholder and the
+                  account the person eventually makes: they sign up, see
+                  the invite, and accept it. There used to be a "Link
+                  Account" button that searched every profile on the app
+                  and joined one to this spot -- which let a captain add
+                  anyone at all to their roster without that person
+                  knowing, and team membership grants read access to
+                  their sessions and shots. */}
               <div style={S.label}>Or Add Someone Not Signed Up Yet</div>
               <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
                 Reserves their spot on the roster now — you can start logging their scores under their name right away via Who's Bowling, no account needed yet. Email is optional: with one, they're linked automatically the moment they sign in with that exact address. Without one, you'll need to link them manually once they join.
