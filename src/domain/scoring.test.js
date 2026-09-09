@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { nextState, tenthFrameStatus, strictPartial, frameQualityScore, makeTheoreticalShots, freshRackShots, theoreticalFillBallValue,
   maxPossibleScore,
+  frameScoresheet,
 } from './scoring.js';
 
 describe('tenthFrameStatus', () => {
@@ -519,5 +520,63 @@ describe('maxPossibleScore', () => {
       expect(max).toBeLessThanOrEqual(prev);
       prev = max;
     }
+  });
+});
+
+// Editing a shot meant History > Shots > scroll to find it. A scoresheet
+// is how a bowler already pictures the game, and tapping the frame you
+// want is more direct than hunting a list.
+describe('frameScoresheet', () => {
+  const strike = (f, b = null) => ({ frame: String(f), ballNum: b, result: 'Strike', otherLeave: [], spareMade: '', pinCount: '' });
+  const spare = (f) => ({ frame: String(f), ballNum: null, result: 'Other Leave', otherLeave: ['10'], spareMade: 'Yes', pinCount: '9' });
+  const open = (f, tot) => ({ frame: String(f), ballNum: null, result: 'Other Leave', otherLeave: ['7', '10'], spareMade: 'No', pinCount: String(tot) });
+
+  it('scores a perfect game 30, 60, 90 ... 300', () => {
+    const perfect = [...Array(9)].map((_, i) => strike(i + 1))
+      .concat([strike(10, 1), strike(10, 2), strike(10, 3)]);
+    expect(frameScoresheet(perfect).map(r => r.running))
+      .toEqual([30, 60, 90, 120, 150, 180, 210, 240, 270, 300]);
+  });
+
+  // Hand-computed: X, X, 9/, 8- -> 29, 49, 67, 75.
+  it('fills in an early strike once its bonus balls are thrown', () => {
+    const sheet = frameScoresheet([strike(1), strike(2), spare(3), open(4, 8)]);
+    expect(sheet[0].running).toBe(29);
+    expect(sheet[1].running).toBe(49);
+    expect(sheet[2].running).toBe(67);
+    expect(sheet[3].running).toBe(75);
+  });
+
+  // The bug this replaced: scoring a prefix can't see bonus balls that
+  // come after the frame, so frame 1 stayed blank until frame 3 existed.
+  it('scores frame 1 as soon as frames 2 and 3 exist', () => {
+    expect(frameScoresheet([strike(1)])[0].running).toBeNull();
+    expect(frameScoresheet([strike(1), strike(2), strike(3)])[0].running).toBe(30);
+  });
+
+  it('leaves unresolved frames null rather than guessing', () => {
+    const sheet = frameScoresheet([strike(1), strike(2)]);
+    expect(sheet[0].running).toBeNull();  // needs a third ball
+    expect(sheet[4].running).toBeNull();  // not bowled
+  });
+
+  it('renders the marks a bowler expects', () => {
+    const sheet = frameScoresheet([strike(1), spare(2), open(3, 8)]);
+    expect(sheet[0].marks).toEqual(['X']);
+    expect(sheet[1].marks).toEqual(['9', '/']);
+    expect(sheet[2].marks).toEqual(['8', '-']);
+  });
+
+  // The scoresheet must never disagree with the score shown elsewhere.
+  it('agrees with strictPartial on the final total', () => {
+    const game = [strike(1), strike(2), spare(3), open(4, 8), strike(5)];
+    const sheet = frameScoresheet(game);
+    const lastKnown = [...sheet].reverse().find(r => r.running != null);
+    expect(lastKnown.running).toBe(strictPartial(game));
+  });
+
+  it('exposes the shot for each frame so a tap can open it', () => {
+    const s1 = strike(1);
+    expect(frameScoresheet([s1])[0].shot).toBe(s1);
   });
 });

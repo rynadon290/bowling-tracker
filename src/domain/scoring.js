@@ -410,3 +410,149 @@ export function maxPossibleScore(shots) {
 
   return strictPartial(filled);
 }
+
+// ── Scoresheet: one row per frame, the way a bowler reads a game ─────────
+//
+// Editing a shot meant History > Shots > scroll to find it > edit. That's
+// a database view of something every bowler already pictures as a
+// scoresheet: ten frames left to right, marks in the corners, a running
+// total underneath. Tapping the frame you want is how it should work.
+//
+// Returns one entry per frame:
+//   frame      1-10
+//   marks      what shows in the frame's boxes, e.g. ["X"], ["7","/"], ["9","-"]
+//   running    cumulative score THROUGH this frame, or null if not yet
+//              determinable (a strike whose bonus balls aren't thrown yet)
+//   shot       the shot record for this frame, so a tap can open it
+//   tenth      the three tenth-frame balls, when frame === 10
+//
+// `running` being null is meaningful, not an error: frame 7's score
+// genuinely isn't known until frames 8 and 9 are bowled. Showing a
+// provisional number there would be lying.
+export function frameScoresheet(shots) {
+  const played = (Array.isArray(shots) ? shots : []).filter(s => s && s.frame);
+
+  const byFrame = {};
+  for (let f = 1; f <= 9; f++) {
+    byFrame[f] = played.find(s => parseInt(s.frame) === f && !s.ballNum) || null;
+  }
+  const f10 = played.filter(s => parseInt(s.frame) === 10);
+  const f10b1 = f10.find(s => !s.ballNum || s.ballNum === 1) || null;
+  const f10b2 = f10.find(s => s.ballNum === 2) || null;
+  const f10b3 = f10.find(s => s.ballNum === 3) || null;
+
+  // What goes in the frame's little boxes.
+  function marksFor(s) {
+    if (!s) return [];
+    if (isStk(s)) return ["X"];
+    const fb = firstBallOf(s);
+    if (s.spareMade === "Yes") return [fb === 0 ? "-" : String(fb), "/"];
+    const total = (s.pinCount !== "" && s.pinCount != null) ? parseInt(s.pinCount) : null;
+    if (fb === null) return [];
+    const second = total === null ? null : Math.max(0, total - fb);
+    return [
+      fb === 0 ? "-" : String(fb),
+      second === null ? "" : (second === 0 ? "-" : String(second)),
+    ];
+  }
+
+  // Running totals come from scoring progressively longer prefixes of the
+  // game and reading the total each time. Reusing strictPartial rather
+  // than reimplementing the bonus rules means the scoresheet can never
+  // disagree with the score shown everywhere else -- which would be worse
+  // than showing nothing.
+  const full = [];
+  for (let i = 1; i <= 9; i++) if (byFrame[i]) full.push(byFrame[i]);
+  if (f10b1) full.push(f10b1);
+  if (f10b2) full.push(f10b2);
+  if (f10b3) full.push(f10b3);
+
+  // Running totals, scored frame by frame with the whole game available
+  // for bonus lookup.
+  //
+  // A prefix-based approach can't see the bonus balls that come AFTER a
+  // frame, so frame 1's strike scored null until frame 3 existed --
+  // exactly backwards from a real scoresheet, where frame 1 fills in the
+  // moment frames 2 and 3 are thrown.
+  //
+  // Once a frame can't be scored (its bonus balls aren't thrown yet),
+  // every later frame is null too: a running total with a gap in the
+  // middle would be nonsense.
+  const cumulative = {};
+  {
+    let total = 0, stuck = false;
+
+    // The first ball of frame f, wherever it lives.
+    const firstOf = f => {
+      if (f <= 9) return byFrame[f] ? firstBallOf(byFrame[f]) : null;
+      return f10b1 ? firstBallOf(f10b1) : null;
+    };
+    // The second ball delivered in frame f (not the frame total).
+    const secondOf = f => {
+      if (f <= 9) {
+        const sh = byFrame[f];
+        if (!sh || isStk(sh)) return null;
+        return secondBallOf(sh);
+      }
+      if (!f10b2) return null;
+      return isStk(f10b2) ? 10 : firstBallOf(f10b2);
+    };
+
+    for (let f = 1; f <= 10; f++) {
+      if (stuck) { cumulative[f] = null; continue; }
+
+      if (f === 10) {
+        cumulative[10] = f10b1 ? strictPartial(full) : null;
+        if (cumulative[10] === null) stuck = true;
+        continue;
+      }
+
+      const sh = byFrame[f];
+      if (!sh) { cumulative[f] = null; stuck = true; continue; }
+
+      let value = null;
+      if (isStk(sh)) {
+        // Two balls after the strike, which may span the next two frames.
+        const b1 = firstOf(f + 1);
+        const b2 = (f + 1 <= 9 && byFrame[f + 1] && isStk(byFrame[f + 1]))
+          ? firstOf(f + 2)
+          : secondOf(f + 1);
+        value = (b1 === null || b2 === null) ? null : 10 + b1 + b2;
+      } else if (sh.spareMade === "Yes") {
+        const b1 = firstOf(f + 1);
+        value = b1 === null ? null : 10 + b1;
+      } else {
+        const pc = (sh.pinCount !== "" && sh.pinCount != null) ? parseInt(sh.pinCount) : null;
+        value = pc === null ? null : pc;
+      }
+
+      if (value === null) { cumulative[f] = null; stuck = true; continue; }
+      total += value;
+      cumulative[f] = total;
+    }
+  }
+
+  const rows = [];
+  for (let f = 1; f <= 10; f++) {
+    const throughHere = cumulative[f];
+
+    if (f === 10) {
+      rows.push({
+        frame: 10,
+        marks: [f10b1, f10b2, f10b3].filter(Boolean).map(b => (isStk(b) ? "X" : marksFor(b)[0] || "")),
+        running: throughHere,
+        shot: f10b1,
+        tenth: { ball1: f10b1, ball2: f10b2, ball3: f10b3 },
+      });
+    } else {
+      rows.push({
+        frame: f,
+        marks: marksFor(byFrame[f]),
+        running: throughHere,
+        shot: byFrame[f],
+        tenth: null,
+      });
+    }
+  }
+  return rows;
+}
