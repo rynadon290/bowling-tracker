@@ -36,6 +36,33 @@ const ALL_STEPS = [
     // never sees a scoresheet, so promising one would be a lie.
     when: ({ trackingMode }) => trackingMode === "shot",
   },
+  // ── How to actually record a shot ──────────────────────────────────
+  //
+  // Three worked examples rather than one abstract explanation. The
+  // result buttons are only the first step for anything that isn't a
+  // strike, and a bowler who doesn't know that gets stuck on their first
+  // open frame -- which is the point most people would give up.
+  {
+    id: "score-strike",
+    tab: "log",
+    title: "Recording a strike",
+    body: "Tap Strike. That's the whole frame — the app scores it and moves you to the next one.",
+    when: ({ trackingMode }) => trackingMode === "shot",
+  },
+  {
+    id: "score-spare",
+    tab: "log",
+    title: "Recording a spare",
+    body: "Tap Other Leave, then tap the pins still standing after your first ball. Answer Spare Made? — Yes. The app works out your first ball from the pins you left, so there's nothing else to count.",
+    when: ({ trackingMode }) => trackingMode === "shot",
+  },
+  {
+    id: "score-miss",
+    tab: "log",
+    title: "Recording an open frame",
+    body: "Same start: Other Leave, then the pins standing. Answer Spare Made? — No. Now set Total Pins This Frame — both balls added together. Leave a 3-10 and knock one down, that's 9.",
+    when: ({ trackingMode }) => trackingMode === "shot",
+  },
   {
     id: "import",
     tab: null,
