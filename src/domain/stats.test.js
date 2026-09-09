@@ -606,3 +606,20 @@ describe('pinsForNextSession exposes the exact average', () => {
     expect(Math.trunc(after)).toBeGreaterThanOrEqual(197);
   });
 });
+
+// Ported from a leaderboard feature since removed, because the property
+// itself is still real: an average must be weighted by GAMES, not by
+// nights. A bowler with one 3-game night and one 1-game night averages
+// (200+210+190+220)/4 = 205 -- an average-of-per-session-averages bug
+// would compute (200/210/190 avg) + 220, then average THOSE two numbers,
+// giving 210. cAvg's flatMap-then-average shape already avoids this; this
+// test exists so a future refactor can't reintroduce the bug silently.
+describe('cAvg is game-weighted, not session-weighted', () => {
+  it('averages across every game directly, regardless of session size', () => {
+    const sessions = [
+      { bowler: 'You', league: 'Tuesday House Shot', date: '1', scores: [200, 210, 190] },
+      { bowler: 'You', league: 'Tuesday House Shot', date: '2', scores: [220] },
+    ];
+    expect(cAvg(sessions, 'You', null)).toBe(205);
+  });
+});
