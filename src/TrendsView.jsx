@@ -111,7 +111,7 @@ export default function TrendsView({
                 setStatsBowler(""); setStatsLeague(id);
               }
             }}>
-            <option value="">Everything</option>
+            <option value="">Everyone on this device</option>
             {displayName && (
               <option value={`bowler:${displayName}`}>{displayName}</option>
             )}

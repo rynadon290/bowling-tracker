@@ -119,7 +119,7 @@ bowlers.length>1&&(
                         if(kind==="bowler"){setStatsBowler(id);setStatsLeague("");}
                         else{setStatsLeague(id);setStatsBowler("");}
                       }}>
-                      <option value="">Everything</option>
+                      <option value="">Everyone on this device</option>
                       {/* You first -- it's your own stats screen. */}
                       {displayName&&(
                         <option value={`bowler:${displayName}`}>{displayName}</option>
@@ -185,19 +185,19 @@ bowlers.length>1&&(
                             }
                           }}>
                           <option value="">None</option>
-                          {/* Bowlers in the local roster -- teammates you
-                              log for, guests, anyone with shots on this
-                              device. Dropped by mistake when this became a
-                              dropdown, which left the list empty for
-                              anyone with no friends added yet even though
-                              they had a full team to compare against. */}
-                          {bowlers.filter(b=>b!==statsBowler).length>0&&(
-                            <optgroup label="Bowlers">
-                              {bowlers.filter(b=>b!==statsBowler).map(b=>(
-                                <option key={b} value={`bowler:${b}`}>{b}</option>
-                              ))}
-                            </optgroup>
-                          )}
+                          {/* Friends and teams only.
+                          
+                              This used to list `bowlers` -- the LOCAL
+                              roster, which holds guests, anyone you've
+                              ever logged for, and every name off an
+                              imported scorecard. That list grows with
+                              every guest and includes people who aren't
+                              yours to compare against.
+                              
+                              A friend is someone who agreed to the
+                              connection, and teammates become friends
+                              automatically, so the people worth comparing
+                              to are all reachable here. */}
                           {friends.length>0&&(
                             <optgroup label="Friends">
                               {friends.map(f=>(
@@ -215,6 +215,16 @@ bowlers.length>1&&(
                             </optgroup>
                           )}
                         </select>
+                        {/* Nothing to compare against yet is a real
+                            state, and a lone "None" reads as broken.
+                            Teammates become friends automatically, so the
+                            fix is usually to finish setting up the team. */}
+                        {friends.length===0&&leagues.filter(l=>l!==statsLeague).length===0&&(
+                          <div style={{fontSize:"11px",color:C.textMuted,marginTop:"6px",lineHeight:1.4}}>
+                            Nobody to compare against yet. Add a friend, or set up your team — teammates
+                            are added as friends automatically.
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
