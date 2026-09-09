@@ -76,6 +76,12 @@ export function normalizeImportRecord(raw) {
     date: raw.date || "",
     importedScores: cleanScores(raw.importedScores) || [],
     correctedScores: cleanScores(raw.correctedScores),
+    // Proposed frame data, when the scorecard had frames to read. Kept
+    // as-is rather than cleaned like scores: these are shot objects, and
+    // the only meaningful validation is whether they convert to real
+    // frames, which convertExtractedGameToShots already did upstream.
+    importedShots: Array.isArray(raw.importedShots) ? raw.importedShots : [],
+    correctedShots: Array.isArray(raw.correctedShots) ? raw.correctedShots : null,
     status: IMPORT_STATUSES.includes(raw.status) ? raw.status : "pending",
     respondedAt: raw.respondedAt || "",
     correctedBy: raw.correctedBy || "",
@@ -108,6 +114,9 @@ export function isConfirmed(record) {
 
 export function approve(record, at = new Date().toISOString()) {
   const r = normalizeImportRecord(record);
+  // correctedShots is left as-is rather than nulled alongside
+  // correctedScores: approving means "these frames are right", and the
+  // corrected set (if the teammate edited any) IS the right one.
   return { ...r, status: "verified", respondedAt: at, correctedScores: null };
 }
 

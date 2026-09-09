@@ -102,3 +102,37 @@ describe('validation', () => {
     expect(pendingFor([base], 'Dave')).toHaveLength(0);
   });
 });
+
+// Frame data travels with an import as a PROPOSAL. The photo always
+// contained every bowler's frames; they used to be discarded, so a
+// teammate could never get shot-level stats from an import even though
+// the data existed when it was scanned.
+describe('imported frame data', () => {
+  const withFrames = {
+    bowler: 'Sam', league: 'Tuesday House Shot', date: '2026-09-03',
+    importedScores: [200, 180, 210],
+    importedShots: [{ gameNumber: 1, ballUsed: 'Ion Max', shots: [{ frame: '1', result: 'Strike' }] }],
+  };
+
+  it('carries frames through normalization', () => {
+    expect(normalizeImportRecord(withFrames).importedShots).toHaveLength(1);
+  });
+
+  // A card showing only totals is a normal case, not a failure.
+  it('defaults to no frames when the card had none', () => {
+    const r = normalizeImportRecord({ bowler: 'Sam', importedScores: [200] });
+    expect(r.importedShots).toEqual([]);
+    expect(r.correctedShots).toBeNull();
+  });
+
+  it('survives approval rather than being dropped with correctedScores', () => {
+    const approved = approve(normalizeImportRecord(withFrames));
+    expect(approved.status).toBe('verified');
+    expect(approved.importedShots).toHaveLength(1);
+  });
+
+  it('ignores a non-array, so bad cloud data cannot crash the inbox', () => {
+    const r = normalizeImportRecord({ ...withFrames, importedShots: 'nope' });
+    expect(r.importedShots).toEqual([]);
+  });
+});

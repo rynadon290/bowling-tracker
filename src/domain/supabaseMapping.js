@@ -19,6 +19,9 @@ export function shotToSupabaseRow(shot,userId,leagueIdsMap){
     user_id:userId,
     team_id:teamId,
     league_id:leagueIdsMap[shot.league]||null,
+    // Null for a shot the bowler logged themselves; the source import's
+    // id when it arrived from someone else's scorecard photo.
+    imported_from:shot.importedFrom||null,
     bowler_name:shot.bowler||"",
     date:shot.date,
     game:parseInt(shot.game)||1,
@@ -57,6 +60,7 @@ export function shotFromSupabaseRow(row,leagueNameById){
     teamId:row.team_id||"",
     league:leagueNameById[row.league_id]||"",
     date:row.date,
+    importedFrom:row.imported_from||null,
     game:String(row.game),
     frame:String(row.frame),
     ballNum:row.ball_num,
