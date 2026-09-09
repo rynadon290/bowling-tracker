@@ -374,6 +374,30 @@ const SCREENS = {
     </Phone>
   ),
 
+  insights: () => (
+    <Phone title="Improve">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>What's costing you pins</div>
+          {/* Written the way the real analysis reads: specific, about
+              this bowler's last few nights, not generic advice. */}
+          {[
+            ["🎯", "Ten pin conversion is 71% over your last four nights — down from 84%. That's your biggest leak right now."],
+            ["🎳", "The Ion Max carries better in game one than game three. Worth a surface change or a ball switch for the transition."],
+            ["📈", "Your third-game average is 11 pins below your first. Fatigue or lane change — worth watching."],
+          ].map(([icon, line]) => (
+            <div key={line} style={{ display: "flex", gap: "6px", padding: "5px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "11px" }}>{icon}</span>
+              <span style={{ fontSize: "10px", color: C.text, lineHeight: 1.4 }}>{line}</span>
+            </div>
+          ))}
+          <div style={{ ...muted, marginTop: "6px" }}>Updated after every night — nothing to press.</div>
+        </div>
+      </Spot>
+      <Nav active={3} />
+    </Phone>
+  ),
+
   improve: () => (
     <Phone title="Improve">
       <Spot>
@@ -393,6 +417,48 @@ const SCREENS = {
         <span style={chip(true)}>Start a drill</span>
       </div>
       <Nav active={3} />
+    </Phone>
+  ),
+
+  arsenal: () => (
+    <Phone title="Vault">
+      <div style={card}>
+        <div style={label}>Arsenal</div>
+        {/* Real-sounding balls with the specs a bowler actually tracks:
+            surface grit and the layout the driller used. */}
+        {[
+          ["Phaze II", "Solid · 2000 · 60×4×40"],
+          ["Ion Max Pearl", "Pearl · Polish · 55×5×35"],
+          ["Bionic", "Solid · 1500 · 45×4×30"],
+          ["White Dot", "Plastic · spare ball"],
+        ].map(([name, spec]) => (
+          <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: C.text }}>{name}</span>
+            <span style={muted}>{spec}</span>
+          </div>
+        ))}
+        <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted, marginTop: "6px" }}>
+          + Add a ball
+        </div>
+      </div>
+
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Bags</div>
+          <div style={{ display: "flex", gap: "5px", marginBottom: "8px" }}>
+            <span style={chip(true)}>League bag</span>
+            <span style={chip(false)}>Tournament bag</span>
+          </div>
+          {/* The league bag holds three; a tournament bag might be capped
+              at four, or two, depending on the event. */}
+          {["Phaze II", "Ion Max Pearl", "White Dot"].map(b => (
+            <div key={b} style={{ fontSize: "10px", color: C.text, padding: "2px 0" }}>✓ {b}</div>
+          ))}
+          <div style={{ ...muted, marginTop: "4px" }}>3 balls · what you bring on Tuesday</div>
+        </div>
+      </Spot>
+      <Note>Different bags for league and tournament</Note>
+      <Nav active={4} />
     </Phone>
   ),
 

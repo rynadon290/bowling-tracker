@@ -5,6 +5,7 @@ import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import Tour from "./Tour.jsx";
+import { tourSteps, tourToOffer, markTourSeen, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
@@ -145,7 +146,7 @@ const ONBOARDED_KEY = "bowling-onboarded-v1";
 // The walkthrough after setup. Separate from ONBOARDED_KEY so an
 // existing bowler who already finished setup doesn't get a tour they
 // never asked for on the next update.
-const TOURED_KEY = "bowling-toured-v1";
+const TOURS_SEEN_KEY = "bowling-tours-seen-v1";
 const GOALS_KEY = "bowling-goals-v1";
 const MATCHES_KEY = "bowling-matches-v1";
 const LANE_PATTERNS_KEY = "bowling-lane-patterns-v1";
@@ -660,13 +661,34 @@ export default function BowlingTracker(){
   });
   // Shown once, after setup. Read synchronously like the flag above --
   // an async read would flash the tour at someone who'd already done it.
-  const[toured,setToured]=useState(()=>{
-    try{return window.localStorage.getItem(TOURED_KEY)==="1";}
-    catch{return true;} // storage unavailable: don't nag
+  // Which tours this bowler has seen -- one per environment, plus coach.
+  // A list rather than a flag, because someone who signed up casual and
+  // comes back for a league shouldn't have to find the league features
+  // alone, but shouldn't sit through the casual tour again either.
+  const[toursSeen,setToursSeen]=useState(()=>{
+    try{return JSON.parse(window.localStorage.getItem(TOURS_SEEN_KEY)||"[]");}
+    catch{return [];}
   });
+  // The tour showing right now, if any: a track key, or "" for none.
+  const[activeTour,setActiveTour]=useState("");
+
   function finishTour(){
-    setToured(true);
-    try{window.localStorage.setItem(TOURED_KEY,"1");}catch{}
+    if(activeTour){
+      const next=markTourSeen(toursSeen,activeTour);
+      setToursSeen(next);
+      try{window.localStorage.setItem(TOURS_SEEN_KEY,JSON.stringify(next));}catch{}
+    }
+    setActiveTour("");
+  }
+
+  // Start a specific tour on demand -- from Settings, or from the
+  // league-setup nudge.
+  function startTour(track){
+    setActiveTour(track);
+    const first=tourSteps(
+      track==="coach"?preferences:{...preferences,environment:track},
+      track==="coach"?{track:"coach"}:undefined)[0];
+    if(first?.tab)setView(first.tab);
   }
   // Latched at mount, deliberately NOT recomputed as data arrives.
   //
@@ -2495,10 +2517,8 @@ export default function BowlingTracker(){
     cloudWrite("bowler_goals",goalsToRow(normalized,bowler,user?.id||null),{onConflict:"created_by,bowler_name"});
   }
 
-  function replayTour(){
-    setToured(false);
-    try{window.localStorage.removeItem(TOURED_KEY);}catch{}
-    setView("log");
+  function replayTour(track){
+    startTour(track||preferences.environment||"league");
   }
 
   function restartOnboarding(){
@@ -2517,12 +2537,6 @@ export default function BowlingTracker(){
   }
 
   function finishOnboarding(){
-    // A bowler who just completed setup gets the walkthrough. Set here
-    // rather than defaulting to "not toured" so an existing bowler --
-    // who never runs finishOnboarding again -- is never shown it.
-    setToured(false);
-    try{window.localStorage.removeItem(TOURED_KEY);}catch{}
-
     // Commit what onboarding collected. The name creates the bowler --
     // everything downstream keys off bowler name, so this has to happen
     // before anything else can be logged.
@@ -3841,6 +3855,17 @@ export default function BowlingTracker(){
   const myProfile=normalizeProfile(profiles[ownerName]||profiles[activeBowler],ownerName||activeBowler);
   // Requires BOTH the profile flag and the toggle -- see coachViewActive.
   const coachViewOn=coachViewActive(preferences,myProfile);
+
+  // Offer the coach walkthrough the first time coach mode is turned on.
+  // Keyed on coachViewOn flipping true, not on being a coach: someone can
+  // be marked a coach and never open the coach view, and the tour is
+  // about that view.
+  useEffect(()=>{
+    if(!coachViewOn||!onboarded)return;
+    const offer=tourToOffer({environment:preferences.environment,isCoach:true,seen:toursSeen});
+    if(offer==="coach")startTour("coach");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[coachViewOn]);
   // The tab appears for anyone who coaches OR is in any coaching
   // relationship, so a bowler being coached can reach their tasks without
   // being told to flip a coach setting that isn't about them.
@@ -4509,9 +4534,10 @@ export default function BowlingTracker(){
       {/* The walkthrough, over the top of the real app rather than
           instead of it -- a new bowler reads each step while looking at
           the tab it describes. */}
-      {!toured&&onboarded&&(
+      {activeTour&&onboarded&&(
         <Tour
           preferences={preferences}
+          track={activeTour}
           onNavigate={setView}
           onFinish={finishTour}/>
       )}
@@ -4743,7 +4769,7 @@ export default function BowlingTracker(){
           <Settings
             mode="leagues"
             onCreateTeam={createTeamForLeague}
-            restartOnboarding={restartOnboarding} replayTour={replayTour}
+            restartOnboarding={restartOnboarding} replayTour={replayTour} isCoach={showCoachingTab}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
             importText={importText} setImportText={setImportText}
@@ -4797,7 +4823,7 @@ export default function BowlingTracker(){
         {(view==="settings"||view==="history")&&(
           <Settings
             mode={view==="history"?"history":"settings"}
-            restartOnboarding={restartOnboarding} replayTour={replayTour}
+            restartOnboarding={restartOnboarding} replayTour={replayTour} isCoach={showCoachingTab}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
             importText={importText} setImportText={setImportText}
@@ -4857,7 +4883,7 @@ export default function BowlingTracker(){
             getLanePattern={getLanePattern} getMatch={getMatch} handleBallChange={handleBallChange} handleLeaveToggle={handleLeaveToggle} handleLineChange={handleLineChange}
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
-            leagueBuyIns={leagueBuyIns} onSaveLeagueBuyIns={saveLeagueBuyIns}
+            leagueBuyIns={leagueBuyIns} onSaveLeagueBuyIns={saveLeagueBuyIns} onReplayTour={replayTour}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} maxScoreThisGame={maxScoreThisGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
             preferences={logPreferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}
@@ -4876,7 +4902,14 @@ export default function BowlingTracker(){
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             showSessionStart={showSessionStart} dismissSessionStart={dismissSessionStart}
-            sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={()=>setSessionEnvChosen(true)}
+            sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={()=>{
+              setSessionEnvChosen(true);
+              // First time in this environment? Walk them through it.
+              // Coach mode has its own tour, offered when coach mode is
+              // turned on -- see the coachViewOn effect.
+              const offer=tourToOffer({environment:preferences.environment,isCoach:false,seen:toursSeen});
+              if(offer&&onboarded)startTour(offer);
+            }}
             routineNote={routine.mode&&!showSessionStart?`Your usual ${DAY_NAMES_SHORT[routine.weekday]}`:""}
             updatePreferences={updatePreferences}
           />

@@ -3,6 +3,7 @@ import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
 import { THEMES, DARK_THEME_IDS, LIGHT_THEME_IDS } from "./domain/themes.js";
 import { useAuth } from "./AuthProvider.jsx";
 import HistoryView from "./HistoryView.jsx";
+import { availableTours } from "./domain/tour.js";
 import SessionHistory from "./SessionHistory.jsx";
 import CenterPicker from "./CenterPicker.jsx";
 import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
@@ -26,7 +27,7 @@ const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, 
 
 export default function Settings({
   mode = "both",
-  restartOnboarding, replayTour,
+  restartOnboarding, replayTour, isCoach = false,
   showBackup, setShowBackup, backupStatus, setBackupStatus,
   importText, setImportText, exportData, importData,
   confirmClear, setConfirmClear, clearAllData, hasData,
@@ -613,18 +614,32 @@ export default function Settings({
       {/* Replay the walkthrough. Separate from Reset settings: someone
           who wants a reminder of what a tab does shouldn't have to
           consider wiping their theme and layout to get it. */}
+      {/* Every walkthrough, replayable. One per way of bowling, because
+          the league tour explains rosters and money games that a casual
+          bowler never sees, and the casual tour would bore a league
+          bowler. Coaching is gated to coaches -- offering it to everyone
+          would advertise a mode most people will never use. */}
       {showCard("reset") && replayTour && (
-        <div style={{ ...S.card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>Show me around again</div>
-            <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>
-              A quick walkthrough of what each tab does.
-            </div>
+        <div style={S.card}>
+          <div style={S.label}>Walkthroughs</div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
+            Watch any of these again, any time.
           </div>
-          <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px", flexShrink: 0 }}
-            onClick={replayTour}>
-            Replay
-          </button>
+          {availableTours(!!isCoach).map(t => (
+            <div key={t.key} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              gap: "10px", padding: "8px 0", borderTop: `1px solid ${C.border}`,
+            }}>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>{t.label}</div>
+                <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "1px" }}>{t.blurb}</div>
+              </div>
+              <button style={{ ...S.btn(), padding: "7px 12px", fontSize: "12px", flexShrink: 0 }}
+                onClick={() => replayTour(t.key)}>
+                Watch
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

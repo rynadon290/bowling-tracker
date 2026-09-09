@@ -5,6 +5,7 @@ import { rAvg, cAvg, threeSixNineResults } from "./domain/stats.js";
 import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js";
 import { visibleMoneyGames } from "./domain/preferences.js";
 import { nextLeagueDate, prebowlConflict } from "./domain/sessions.js";
+import { needsLeagueSetup } from "./domain/tour.js";
 import { inferLeagueDay } from "./domain/reminders.js";
 import Scoresheet from "./Scoresheet.jsx";
 import TournamentSession from "./TournamentSession.jsx";
@@ -30,7 +31,7 @@ export default function LogView({
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
-  leagueBuyIns, onSaveLeagueBuyIns,
+  leagueBuyIns, onSaveLeagueBuyIns, onReplayTour,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, maxScoreThisGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
@@ -502,8 +503,35 @@ export default function LogView({
                 their container league is created for them -- so telling a
                 practice bowler to "pick tonight's league" is asking for
                 something that doesn't exist in that mode. */}
+            {/* No league or team at all -- not "pick one", there's
+                nothing to pick. Scores are filed against a league, so
+                this is a genuine dead end without setup, and a blank
+                screen would read as the app being broken. */}
+            {!editingId&&activeBowler&&needsLeagueSetup({
+              environment:preferences.environment,leagues,teams,
+            })&&(
+              <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
+                <div style={{fontSize:"15px",fontWeight:700,color:C.text,marginBottom:"6px"}}>
+                  We love leagues too! 🎳
+                </div>
+                <div style={{fontSize:"13px",color:C.textMuted,lineHeight:1.55,marginBottom:"12px"}}>
+                  To set you up for success, let's get your league and team configured. Don't worry — it's fast, easy, and only needed once. Unless you join more teams later, of course, but you'll be a My Bowling Vault pro by then and won't need us.
+                </div>
+                <button style={S.btn("primary")} onClick={()=>setView("locker")}>
+                  Set up my league and team
+                </button>
+                {onReplayTour&&(
+                  <button style={{...S.btn(),width:"100%",marginTop:"8px",fontSize:"12px"}}
+                    onClick={()=>onReplayTour("league")}>
+                    Show me how first
+                  </button>
+                )}
+              </div>
+            )}
+
             {!editingId&&activeBowler&&!effectiveSessionLeague
               &&preferences.environment==="league"
+              &&!needsLeagueSetup({environment:preferences.environment,leagues,teams})
               &&preferences.trackingMode==="game"&&(
               <div style={{...S.card,backgroundColor:C.surface}}>
                 <div style={S.label}>Enter Game Scores</div>
