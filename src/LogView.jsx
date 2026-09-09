@@ -16,7 +16,7 @@ import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
 export default function LogView({
-  shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit,
+  shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit, deleteShot,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,
   sessionLeague, setSessionLeague, effectiveSessionLeague, sessionDate, setSessionDate,
@@ -668,6 +668,24 @@ export default function LogView({
                     <Chip key={label} label={label} selected={form.result===stored}
                       onToggle={()=>{
                         const newResult=form.result===stored?"":stored;
+
+                        // Deselecting the result of a SAVED shot deletes
+                        // it. The result is what a frame is -- a shot with
+                        // no result isn't an empty frame, it's a row that
+                        // can't be scored and would sit in the scoresheet
+                        // as a permanent blank.
+                        //
+                        // Confirmed, because it can't be undone, and
+                        // cancelled by putting the result back rather than
+                        // leaving the frame in a broken state.
+                        if(!newResult&&editingId&&deleteShot){
+                          const which=`frame ${form.frame}${form.ballNum?`, ball ${form.ballNum}`:""} of game ${form.game}`;
+                          if(!window.confirm(`Clearing the result deletes ${which}. Delete it?`))return;
+                          deleteShot(editingId);
+                          cancelEdit?.();
+                          return;
+                        }
+
                         setForm(f=>({
                           ...f,
                           result:newResult,
@@ -1586,6 +1604,26 @@ export default function LogView({
             )}
             {editingId&&(
               <button style={{...S.btn("warn"),marginTop:"8px"}} onClick={cancelEdit}>Cancel Edit</button>
+            )}
+            {/* Delete the shot being edited.
+            
+                Editing was reachable from the Bowl tab -- tap a frame on
+                the scoresheet -- but deleting was not, so a frame logged
+                by mistake meant going to History > Shots to find and
+                remove it. That's the hunt the scoresheet exists to avoid.
+                
+                Confirmed because it can't be undone, and named so the
+                dialog says WHICH frame rather than "are you sure?". */}
+            {editingId&&deleteShot&&(
+              <button style={{...S.btn(),marginTop:"8px",width:"100%",color:C.miss,borderColor:C.miss+"55"}}
+                onClick={()=>{
+                  const which=`frame ${form.frame}${form.ballNum?`, ball ${form.ballNum}`:""} of game ${form.game}`;
+                  if(!window.confirm(`Delete ${which}? This can't be undone.`))return;
+                  deleteShot(editingId);
+                  cancelEdit?.();
+                }}>
+                Delete this shot
+              </button>
             )}
           </div>
           )}
