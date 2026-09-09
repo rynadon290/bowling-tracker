@@ -450,6 +450,21 @@ export default function BowlingTracker(){
     }
   }
 
+  // Re-run when the roster changes.
+  //
+  // loadFriends fires on login, but `teams` arrives later in the startup
+  // batch -- so the first pass sees an empty roster and auto-friends
+  // nobody. Keyed on the teammate ids rather than the array so it doesn't
+  // re-run on every unrelated team edit.
+  const teammateKey=(teams||[])
+    .flatMap(t=>(t.members||[]).map(m=>(typeof m==="string"?m:m?.userId)))
+    .filter(Boolean).sort().join(",");
+  useEffect(()=>{
+    if(!user?.id||!teammateKey)return;
+    loadFriends();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[user?.id,teammateKey]);
+
   // Buy-ins load from local storage on mount. Deliberately device-local
   // rather than synced: they're a convenience default for filling in
   // costs, not a fact about the league that other people need.
@@ -470,6 +485,46 @@ export default function BowlingTracker(){
     });
   }
 
+  // Teammates become friends automatically.
+  //
+  // They already see each other's sessions and shots -- RLS grants
+  // is_team_member and are_friends identical read access -- so this adds
+  // no new exposure. What it adds is presence in the friends list, which
+  // is what Compare To and the Trends/Stats viewing pickers are built on.
+  //
+  // Created as ACCEPTED with no request: asking someone to confirm a
+  // person they already share a roster with is a notification for
+  // nothing. Removing a teammate from the team doesn't remove the
+  // friendship -- people who bowled together stay connected unless one of
+  // them says otherwise.
+  async function syncTeammateFriendships(existing){
+    const myId=user?.id;
+    if(!myId)return existing;
+
+    const already=new Set(existing.map(f=>
+      f.requester_id===myId?f.addressee_id:f.requester_id));
+
+    const teammateIds=new Set();
+    for(const t of (teams||[])){
+      for(const mem of (t.members||[])){
+        const id=typeof mem==="string"?null:mem?.userId;
+        if(id&&id!==myId&&!already.has(id))teammateIds.add(id);
+      }
+    }
+    if(!teammateIds.size)return existing;
+
+    const created=[];
+    for(const otherId of teammateIds){
+      const row={id:crypto.randomUUID(),requester_id:myId,addressee_id:otherId,status:"accepted"};
+      const res=await cloudWrite("friendships",row);
+      // A failure here is not worth surfacing: the friendship is a
+      // convenience, and the queue retries. Nothing the bowler did has
+      // failed.
+      if(res.synced!==false)created.push(row);
+    }
+    return [...existing,...created];
+  }
+
   async function loadFriends(){
     const{data,online}=await cloudRead("friendships",q=>q.select("id,requester_id,addressee_id,status"));
     if(!online||!data)return;
@@ -481,7 +536,16 @@ export default function BowlingTracker(){
       const profRes=await cloudRead("profiles",q=>q.select("id,display_name").in("id",otherIds));
       if(profRes.online&&profRes.data)profRes.data.forEach(p=>{profilesById[p.id]=p.display_name;});
     }
-    const{accepted}=categorizeFriendships(relevant,myId,profilesById);
+    // Teammates first, so they appear in the same pass rather than only
+    // after a reload.
+    const withTeammates=await syncTeammateFriendships(relevant);
+    const otherIds2=[...new Set(withTeammates.map(f=>f.requester_id===myId?f.addressee_id:f.requester_id))];
+    const unknown=otherIds2.filter(id=>!profilesById[id]);
+    if(unknown.length){
+      const more=await cloudRead("profiles",q=>q.select("id,display_name").in("id",unknown));
+      if(more.online&&more.data)more.data.forEach(p=>{profilesById[p.id]=p.display_name;});
+    }
+    const{accepted}=categorizeFriendships(withTeammates,myId,profilesById);
     setFriends(accepted);
   }
 
@@ -4860,6 +4924,7 @@ export default function BowlingTracker(){
             arsenals={arsenals} gameEquipment={gameEquipment}
             statsBowler={statsBowler} setStatsBowler={setStatsBowler}
             statsLeague={statsLeague} setStatsLeague={setStatsLeague}
+            friends={friends} displayName={displayName}
             isSplit={isSplit}
             isCornerPinLeave={shot=>isCornerPinLeave(shot,trendsLeftHanded)}
             leftHanded={trendsLeftHanded}/>

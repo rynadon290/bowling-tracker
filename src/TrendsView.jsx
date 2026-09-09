@@ -14,6 +14,7 @@ import { allGamesSeries, allGamesSummary,
 export default function TrendsView({
   sessions, shots, bowlers, leagues,
   statsBowler, setStatsBowler, statsLeague, setStatsLeague, teams, arsenals, gameEquipment,
+  friends = [], displayName = "",
   isSplit, isCornerPinLeave, leftHanded = false,
 }) {
   const [metricId, setMetricId] = useState("average");
@@ -83,28 +84,52 @@ export default function TrendsView({
 
   return (
     <>
-      {bowlers.length > 1 && (
+      {/* A grouped dropdown, matching the Stats tab.
+      
+          `bowlers` is the local roster -- guests, anyone ever logged for,
+          every name off an imported scorecard -- so a chip row listed
+          people who aren't yours to look at and grew with every guest.
+          Friends and teams are the set that means something, and
+          teammates are auto-added as friends so they show up here without
+          anyone having to send a request. */}
+      {(friends.length > 0 || teamChips.length > 0) && (
         <div style={S.card}>
           <div style={S.label}>Viewing</div>
-          <div style={S.chips}>
-            {bowlers.map(b => (
-              <Chip key={b} label={b} selected={statsBowler === b}
-                onToggle={() => setStatsBowler(statsBowler === b ? "" : b)} />
-            ))}
-            {/* Team trends work -- an empty bowler already means "everyone"
-                in the domain -- but there was no way to ASK for that except
-                by deselecting, which reads as clearing a filter rather than
-                choosing the team. Selecting it also picks the league, since
-                a team trend blended across two leagues is meaningless. */}
-            {teamChips.map(({ league, label }) => (
-              <Chip key={league} label={label} selected={!statsBowler && statsLeague === league}
-                onToggle={() => {
-                  if (!statsBowler && statsLeague === league) { setStatsLeague(""); return; }
-                  setStatsBowler("");
-                  setStatsLeague(league);
-                }} />
-            ))}
-          </div>
+          <select style={S.sel} value={
+              statsBowler ? `bowler:${statsBowler}`
+              : statsLeague ? `team:${statsLeague}`
+              : ""
+            }
+            onChange={e => {
+              const v = e.target.value;
+              if (!v) { setStatsBowler(""); setStatsLeague(""); return; }
+              const [kind, id] = v.split(/:(.*)/s);
+              if (kind === "bowler") { setStatsBowler(id); setStatsLeague(""); }
+              else {
+                // A team trend blended across two leagues is meaningless,
+                // so choosing a team sets its league too.
+                setStatsBowler(""); setStatsLeague(id);
+              }
+            }}>
+            <option value="">Everything</option>
+            {displayName && (
+              <option value={`bowler:${displayName}`}>{displayName}</option>
+            )}
+            {friends.length > 0 && (
+              <optgroup label="Friends">
+                {friends.map(f => (
+                  <option key={f.userId} value={`bowler:${f.displayName}`}>{f.displayName}</option>
+                ))}
+              </optgroup>
+            )}
+            {teamChips.length > 0 && (
+              <optgroup label="Teams">
+                {teamChips.map(({ league, label }) => (
+                  <option key={league} value={`team:${league}`}>{label}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
         </div>
       )}
 
