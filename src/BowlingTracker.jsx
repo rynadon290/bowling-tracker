@@ -282,7 +282,6 @@ export default function BowlingTracker(){
   const[dataTab,setDataTab]=useState("stats");
   // Teams and Friends share one nav slot. Which of the two is showing is
   // its own bit of state so switching between them doesn't disturb `view`.
-  const[socialTab,setSocialTab]=useState("teams");
   const[shots,setShots]=useState([]);
   const[sessions,setSessions]=useState([]);
   const[bowlers,setBowlers]=useState([]);
@@ -4322,23 +4321,12 @@ export default function BowlingTracker(){
         {/* ══════════════════════════════════════════════════════════════════ */}
         {/* SOCIAL VIEW — Teams + Friends share one nav slot                  */}
         {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* Friends only. Teams moved to Vault, beside the Leagues editor,
+            because roster setup is part of setting up a league -- not a
+            social activity. With one thing left here the tab switcher is
+            just a row that does nothing. */}
         {view==="social"&&(
-          <>
-            <div style={{...S.card,padding:"10px 12px"}}>
-              <div style={S.chips}>
-                <Chip label="Teams" selected={socialTab==="teams"} onToggle={()=>setSocialTab("teams")}/>
-                <Chip label="Friends" selected={socialTab==="friends"} onToggle={()=>setSocialTab("friends")}/>
-              </div>
-            </div>
-            {socialTab==="teams"&&(
-              <TeamManagement
-                leagues={leagues}
-                onTeamsChange={persistTeams}
-                onLeagueAdd={addLeague}
-              />
-            )}
-            {socialTab==="friends"&&<Friends onRequestsChanged={loadFriendRequests}/>}
-          </>
+          <Friends onRequestsChanged={loadFriendRequests}/>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -4411,7 +4399,7 @@ export default function BowlingTracker(){
             on Improve. */}
         {view==="locker"&&!coachViewOn&&(
           <button style={{...S.btn(),width:"100%",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("social")}>
-            👥 Friends &amp; teams
+            👥 Friends
           </button>
         )}
 
@@ -4438,6 +4426,24 @@ export default function BowlingTracker(){
             hiddenLeagues={hiddenLeagues} leagueIds={leagueIdsRef.current} toggleLeagueHidden={toggleLeagueHidden}
             shots={shots}
             teams={teams} activeBowler={activeBowler} leaveTeam={leaveTeam} leftHandedForBowler={leftHandedForBowler}/>
+        )}
+
+        {/* Teams, directly under the Leagues editor.
+        
+            These belong together: you add a league, then immediately want
+            a team for it. Teams previously lived on the Friends screen --
+            a different tab entirely -- so setting up a league meant
+            finishing here, navigating away, and finding a tab that mixes
+            roster management with friend requests.
+            
+            Friends stays where it is: adding a friend is a different task
+            from managing a roster, and it isn't part of league setup. */}
+        {view==="locker"&&(
+          <TeamManagement
+            leagues={leagues}
+            onTeamsChange={persistTeams}
+            onLeagueAdd={addLeague}
+          />
         )}
 
         {/* The History tab carries the inbox badge, so tapping it has to
