@@ -382,6 +382,15 @@ export default function ImportScorecard({
                 break;
               default: {
                 detail=body.error;
+                // requestId first: the function no longer returns its
+                // internals (raw Gemini output, the whole response object,
+                // String(err)) on a public endpoint, so this short id is
+                // the handle that ties what the bowler saw to the entry in
+                // the function logs. Without showing it, removing the leak
+                // would have left nothing diagnosable in its place.
+                if(body.requestId) detail+=` (reference ${body.requestId})`;
+                // Still shown when EXPOSE_UPSTREAM_ERRORS is on, which is
+                // a deliberate development setting rather than the default.
                 if(body.detail){
                   const extra=typeof body.detail==="string"?body.detail:JSON.stringify(body.detail);
                   detail+=` — ${extra.slice(0,400)}`;
