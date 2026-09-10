@@ -189,6 +189,41 @@ const ALL_STEPS = [
   },
 ];
 
+// ── The general tour ────────────────────────────────────────────────────
+//
+// Everyone gets this one, whatever they answered at setup. It covers the
+// things that are true in every mode: where you log, the two tracking
+// depths, the scoresheet, how to record a strike, a spare and an open
+// frame, and where History, Stats and Insights live.
+//
+// Splitting it out keeps the MODE tours short and about what's actually
+// different -- a tournament bowler shouldn't sit through nine screens of
+// basics before reaching the cut line, and a league bowler who later
+// tries practice shouldn't be re-taught the scoresheet.
+export const MODE_TRACKS = ["practice", "league", "tournament"];
+
+export const GENERAL_STEP_IDS = [
+  "bowl", "tracking", "scoresheet",
+  "score-strike", "score-spare", "score-miss",
+  "import", "history", "stats", "insights", "improve", "arsenal",
+];
+
+export function generalSteps(preferences = {}) {
+  const env = preferences?.environment || "league";
+  return ALL_STEPS.filter(s => {
+    if (!GENERAL_STEP_IDS.includes(s.id)) return false;
+    if (s.envs && !s.envs.includes(env)) return false;
+    return !s.when || s.when(preferences);
+  });
+}
+
+// What's left for a given mode: only the steps unique to it.
+export function modeSteps(environment) {
+  return ALL_STEPS.filter(s =>
+    !GENERAL_STEP_IDS.includes(s.id) &&
+    (!s.envs || s.envs.includes(environment)));
+}
+
 // The coach track.
 //
 // Separate from the main tour because it's a different job: a coach
@@ -246,15 +281,24 @@ export const COACH_STEPS = [
 // explained, and showing it would make the app look like more work than
 // it is -- which is the moment a casual bowler decides it isn't for them.
 export function tourSteps(preferences = {}, { track = "main", skipSeen = [] } = {}) {
-  const base = track === "coach"
-    ? COACH_STEPS
-    : (() => {
-        const env = preferences?.environment || "league";
-        return ALL_STEPS.filter(s => {
-          if (s.envs && !s.envs.includes(env)) return false;
-          return !s.when || s.when(preferences);
-        });
-      })();
+  const base = (() => {
+    if (track === "coach") return COACH_STEPS;
+
+    // "general" is the everyone tour -- the basics, whatever mode they
+    // chose. The mode tracks are only what's different about that mode,
+    // which is what keeps them short enough to actually watch.
+    if (track === "general") return generalSteps(preferences);
+
+    const env = MODE_TRACKS.includes(track) ? track : (preferences?.environment || "league");
+    if (MODE_TRACKS.includes(track)) return modeSteps(env);
+
+    // No track named: the full tour for this environment. Kept for the
+    // replay-everything case and for anything that predates the split.
+    return ALL_STEPS.filter(s => {
+      if (s.envs && !s.envs.includes(env)) return false;
+      return !s.when || s.when(preferences);
+    });
+  })();
 
   // Steps already seen in an earlier tour are dropped.
   //
@@ -352,6 +396,7 @@ export function needsLeagueSetup({ environment, leagues = [], teams = [] } = {})
 // bowls league most weeks might still want the tournament walkthrough
 // before their first one.
 export const TOUR_TRACKS = [
+  { key: "general",    label: "The basics",    blurb: "Logging, scoring, stats — everyone gets this" },
   { key: "casual",     label: "Just bowling",  blurb: "Logging a night with friends" },
   { key: "practice",   label: "Practice",      blurb: "Drills, goals and shot-by-shot" },
   { key: "league",     label: "League",        blurb: "Leagues, teams, money games" },
@@ -361,4 +406,28 @@ export const TOUR_TRACKS = [
 
 export function availableTours(isCoach = false) {
   return TOUR_TRACKS.filter(t => !t.coachOnly || isCoach);
+}
+
+// The mode walkthrough waiting for this bowler, if any.
+//
+// Offered through the inbox rather than played at signup. Everyone gets
+// the general tour when they finish setup; stacking the mode tour onto
+// the end of it makes signup twenty screens long, which is where people
+// close the app. The inbox lets them come back to it.
+//
+// Casual gets nothing: there are no casual-only features to explain, and
+// a casual bowler is the least likely to want more onboarding.
+export function pendingModeTour({ environment, seen = [] } = {}) {
+  if (!MODE_TRACKS.includes(environment)) return null;
+  if (hasSeenTour(seen, environment)) return null;
+  if (!modeSteps(environment).length) return null;
+
+  const track = TOUR_TRACKS.find(t => t.key === environment);
+  const detail = {
+    practice: "Drills, and how practice tracking stays separate from your league nights.",
+    league: "Leagues, team rosters and money games — the parts that only apply to league.",
+    tournament: "Blocks, the cut line, brackets and match play.",
+  }[environment];
+
+  return { key: environment, label: track?.label || environment, detail };
 }

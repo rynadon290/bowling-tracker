@@ -41,6 +41,7 @@ function sortItems(items) {
 // pile of guards at every call site.
 export function buildInbox({
   bowler,
+  pendingTour = null,
   userId,
   importedScores = [],
   sessions = [],
@@ -55,6 +56,22 @@ export function buildInbox({
   coachViewOn = false,
 } = {}) {
   const items = [];
+
+  // ── The walkthrough for the mode they chose ──
+  //
+  // A task rather than an interruption. Everyone gets the general tour
+  // at setup; this offers the shorter, mode-specific one when they're
+  // ready for it, instead of stacking twenty screens onto signup.
+  if (pendingTour) {
+    items.push({
+      id: `tour-${pendingTour.key}`,
+      type: "pendingTour",
+      title: `${pendingTour.label} walkthrough`,
+      detail: pendingTour.detail,
+      view: "settings",
+      track: pendingTour.key,
+    });
+  }
 
   // ── Scores imported from a teammate's photo ──
   const pendingScores = pendingFor(importedScores, bowler);

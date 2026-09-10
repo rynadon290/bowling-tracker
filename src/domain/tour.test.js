@@ -4,6 +4,7 @@ import {
   tourToOffer, markTourSeen, hasSeenTour, needsLeagueSetup,
   availableTours, COACH_STEPS,
   recordStepsSeen,
+  pendingModeTour,
 } from './tour.js';
 
 const league = { environment: 'league', trackingMode: 'shot', showMoneyGames: true };
@@ -308,5 +309,63 @@ describe('mode-specific content', () => {
   it('gives every mode more than the casual minimum', () => {
     expect(ids('practice').length).toBeGreaterThan(ids('casual').length);
     expect(ids('tournament').length).toBeGreaterThan(ids('casual').length);
+  });
+});
+
+// Split into a general tour everyone gets and short mode tours offered
+// through the inbox. Stacking both onto signup made it twenty screens
+// long, which is where people close the app.
+describe('general vs mode tours', () => {
+  const league = { environment: 'league', trackingMode: 'shot', showMoneyGames: true };
+  const ids = (prefs, track) => tourSteps(prefs, { track }).map(s => s.id);
+
+  it('puts the basics in the general tour', () => {
+    const g = ids(league, 'general');
+    for (const id of ['bowl', 'tracking', 'scoresheet', 'score-strike', 'history', 'stats']) {
+      expect(g).toContain(id);
+    }
+  });
+
+  it('keeps mode tours short and mode-specific', () => {
+    for (const [env, expected] of [
+      ['practice', ['practice-modes', 'practice-drill', 'practice-depth']],
+      ['league', ['vault', 'roster', 'money']],
+      ['tournament', ['tourney-setup', 'tourney-cut', 'tourney-pots', 'tourney-match']],
+    ]) {
+      const m = ids({ ...league, environment: env }, env);
+      for (const id of expected) expect(m).toContain(id);
+      expect(m.length).toBeLessThan(8);
+    }
+  });
+
+  // The whole point of the split: no step appears in both.
+  it('never repeats a general step inside a mode tour', () => {
+    const g = new Set(ids(league, 'general'));
+    for (const env of ['practice', 'league', 'tournament']) {
+      for (const id of ids({ ...league, environment: env }, env)) {
+        expect(g.has(id)).toBe(false);
+      }
+    }
+  });
+});
+
+describe('pendingModeTour', () => {
+  it('offers the mode tour once', () => {
+    expect(pendingModeTour({ environment: 'tournament', seen: [] })?.key).toBe('tournament');
+    expect(pendingModeTour({ environment: 'tournament', seen: ['tournament'] })).toBeNull();
+  });
+
+  // No casual-only features to explain, and a casual bowler is the least
+  // likely to want more onboarding.
+  it('offers nothing for casual', () => {
+    expect(pendingModeTour({ environment: 'casual', seen: [] })).toBeNull();
+  });
+
+  it('describes what the tour covers', () => {
+    for (const env of ['practice', 'league', 'tournament']) {
+      const t = pendingModeTour({ environment: env, seen: [] });
+      expect(t.label).toBeTruthy();
+      expect(t.detail).toBeTruthy();
+    }
   });
 });
