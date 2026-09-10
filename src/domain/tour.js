@@ -185,7 +185,7 @@ const ALL_STEPS = [
     // Said plainly rather than discovered: someone who opens this on
     // night one and finds it empty concludes the feature is weak, when
     // it just hasn't got enough to work with yet.
-    footnote: "This needs about ten games of shot-by-shot logging before it can say anything honest, and it sharpens from there. Scores from casual nights don't feed it — there are no frames behind them to read.",
+    footnote: "This needs about ten games of shot-by-shot logging before it can say anything meaningful, and it sharpens from there. Scores from casual nights aren't included.",
   },
   {
     id: "improve",
