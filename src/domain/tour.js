@@ -296,10 +296,20 @@ export const GENERAL_STEP_IDS = [
 ];
 
 export function generalSteps(preferences = {}) {
-  const env = preferences?.environment || "league";
   return ALL_STEPS.filter(s => {
     if (!GENERAL_STEP_IDS.includes(s.id)) return false;
-    if (s.envs && !s.envs.includes(env)) return false;
+
+    // Deliberately NOT filtered by environment either.
+    //
+    // "The basics" is the everyone tour. Filtering it by the bowler's
+    // CURRENT mode meant someone sitting in Just Bowling lost the import
+    // pages entirely -- import is scoped to practice/league/tournament,
+    // so a casual bowler replaying the basics got 10 steps instead of 13
+    // and never saw how importing works.
+    //
+    // Same mistake as the trackingMode filter below, fixed only halfway
+    // last time: the tour teaches what the app CAN do, not what this
+    // bowler's settings happen to be right now.
 
     // Deliberately NOT filtered by trackingMode.
     //
