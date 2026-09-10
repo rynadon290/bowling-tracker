@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import HistoryView from "./HistoryView.jsx";
 import LogView from "./LogView.jsx";
-import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
-import Tour from "./Tour.jsx";
+// Lazy: the tour is a full-screen takeover gated on activeTour, so a
+// returning bowler pays for none of it. Its TourScreen mock-ups are
+// the single biggest chunk that was loading on every open.
+const Tour = lazy(() => import("./Tour.jsx"));
 import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import CasualLeaderboard from "./CasualLeaderboard.jsx";
@@ -4814,11 +4816,13 @@ export default function BowlingTracker(){
           instead of it -- a new bowler reads each step while looking at
           the tab it describes. */}
       {activeTour&&onboarded&&(
-        <Tour
-          preferences={preferences}
-          track={activeTour}
-          onNavigate={setView}
-          onFinish={finishTour}/>
+        <Suspense fallback={null}>
+          <Tour
+            preferences={preferences}
+            track={activeTour}
+            onNavigate={setView}
+            onFinish={finishTour}/>
+        </Suspense>
       )}
 
       {showSyncDetail&&syncBreakdown&&(()=>{
