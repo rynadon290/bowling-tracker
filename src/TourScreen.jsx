@@ -202,15 +202,19 @@ const SCREENS = {
     <Phone title="Bowl">
       <Spot>
         <div style={card}>
-          <div style={label}>Tonight's session</div>
-          <div style={{ display: "flex", gap: "5px", marginBottom: "8px" }}>
-            <span style={chip(true)}>Tuesday</span>
-            <span style={chip(false)}>Thursday</span>
+          <div style={label}>What are you bowling?</div>
+          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "8px" }}>
+            <span style={chip(false)}>Practice</span>
+            <span style={chip(true)}>League</span>
+            <span style={chip(false)}>Tournament</span>
           </div>
           <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px" }}>Tue 15 Sep</div>
+          <div style={{ ...muted, marginTop: "6px" }}>
+            Each one asks for what it actually needs.
+          </div>
         </div>
       </Spot>
-      <Note>Pick your league and date to start</Note>
+      <Note>This sets up everything else</Note>
       <Nav active={0} />
     </Phone>
   ),
@@ -527,6 +531,102 @@ const SCREENS = {
       </div>
       <Note>Log their scores today — they connect when they sign up</Note>
       <Nav active={4} />
+    </Phone>
+  ),
+
+  "shot-detail": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Result</div>
+        <span style={chip(false, C.strike)}>Strike</span>{" "}
+        <span style={chip(true, C.spare)}>Other Leave</span>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Pins standing</div>
+          <PinRack standing={["10"]} />
+          <div style={{ ...label, marginTop: "6px" }}>Spare made?</div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <span style={chip(true, C.strike)}>Yes</span>
+            <span style={chip(false, C.miss)}>No</span>
+          </div>
+          <div style={{ ...muted, marginTop: "8px" }}>
+            Ball: Phaze II · every shot splits your stats by equipment
+          </div>
+        </div>
+      </Spot>
+      <Note>Which pins, and whether you made it</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "import-verify": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Map each column</div>
+        {[["Column 1", "You"], ["Column 2", "Brooklyn Barry"], ["Column 3", "skip"]].map(([c, who]) => (
+          <div key={c} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "3px 0" }}>
+            <span style={{ ...muted, flex: 1 }}>{c}</span>
+            <div style={{ ...S.input, width: "110px", padding: "4px 7px", fontSize: "10px", color: C.text }}>
+              {who}
+            </div>
+          </div>
+        ))}
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Check what it read</div>
+          <div style={{ display: "flex", gap: "5px" }}>
+            {["213", "196", "203"].map((v, i) => (
+              <div key={i} style={{ ...S.input, flex: 1, padding: "6px 4px", textAlign: "center",
+                fontSize: "13px", fontWeight: 700, color: C.text }}>{v}</div>
+            ))}
+          </div>
+          <div style={{ ...muted, marginTop: "6px" }}>Fix anything misread before it saves.</div>
+        </div>
+      </Spot>
+      <Note>A proposal, not a fact</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "practice-goals": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Goal</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+            <span style={{ fontSize: "11px", color: C.text }}>Ten pin conversion</span>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: C.strike }}>84%</span>
+          </div>
+          <div style={{ height: "6px", borderRadius: "3px", background: C.border, marginBottom: "8px" }}>
+            <div style={{ width: "84%", height: "100%", borderRadius: "3px", background: C.strike }} />
+          </div>
+          <div style={{ fontSize: "11px", color: C.text, lineHeight: 1.4 }}>
+            Make 9 of your next 10 ten pins — 1 more than you are now.
+          </div>
+        </div>
+      </Spot>
+      <Note>In bowling terms, not percentages</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "practice-fields": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>This shot</div>
+          {[["Ball speed", "16.2 mph"], ["Rev rate", "340"], ["Axis rotation", "45°"], ["Board at arrows", "10"]].map(([n, v]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.textMuted }}>{n}</span>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: C.text }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Turn on only what you're working on</Note>
+      <Nav active={0} />
     </Phone>
   ),
 
