@@ -133,10 +133,37 @@ async function requireUser(req, cors) {
 // an in-process counter resets on cold start and isn't shared between
 // instances -- so the count lives in a table.
 //
-// Fails OPEN on an unexpected error: a rate limiter that breaks should
-// degrade to "no limit", not "nobody can use the app". The auth check
-// above is the security boundary; this is cost control.
-async function withinRateLimit(req, endpoint, limit, windowInterval) {
+// Fails SAFE, not open. The database check is still the real limiter --
+// shared across instances, surviving cold starts -- but when it is
+// unavailable this degrades to a conservative in-process cap rather than
+// to no cap at all. Both failure paths previously returned true, so a
+// dropped or erroring check_api_rate_limit made every signed-in account
+// unlimited against a billed API, silently.
+//
+// The fallback is weaker on purpose and worth naming: an in-process Map
+// resets on cold start and is not shared between instances, so N warm
+// instances allow up to N x limit. Bounded, where the previous behaviour
+// was not. A backstop for a broken limiter, not a replacement for one.
+const fallbackHits = new Map<string, number[]>();
+
+function withinFallbackLimit(userId: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const recent = (fallbackHits.get(userId) || []).filter((t) => now - t < windowMs);
+  if (recent.length >= limit) {
+    fallbackHits.set(userId, recent);
+    return false;
+  }
+  recent.push(now);
+  fallbackHits.set(userId, recent);
+  if (fallbackHits.size > 5000) {
+    for (const [k, v] of fallbackHits) {
+      if (!v.some((t) => now - t < windowMs)) fallbackHits.delete(k);
+    }
+  }
+  return true;
+}
+
+async function withinRateLimit(req, endpoint, limit, windowInterval, userId, windowMs) {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL"),
@@ -148,10 +175,14 @@ async function withinRateLimit(req, endpoint, limit, windowInterval) {
       p_limit: limit,
       p_window: windowInterval,
     });
-    if (error) return true;
+    if (error) {
+      console.error(`rate limit check failed for ${endpoint}, falling back:`, error.message);
+      return withinFallbackLimit(userId, limit, windowMs);
+    }
     return data !== false;
-  } catch {
-    return true;
+  } catch (e) {
+    console.error(`rate limit check threw for ${endpoint}, falling back:`, String(e));
+    return withinFallbackLimit(userId, limit, windowMs);
   }
 }
 
@@ -202,7 +233,7 @@ Deno.serve(async (req) => {
   const auth = await requireUser(req, CORS);
   if (auth.response) return auth.response;
 
-  if (!(await withinRateLimit(req, "analyze-performance", 30, "1 hour"))) {
+  if (!(await withinRateLimit(req, "analyze-performance", 30, "1 hour", auth.user.id, 60 * 60 * 1000))) {
     return new Response(JSON.stringify({
       error: "You've used this quite a lot in the last hour. Give it a little while and try again.",
     }), { status: 429, headers: { ...CORS, "Content-Type": "application/json" } });
