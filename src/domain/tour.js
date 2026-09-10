@@ -191,13 +191,13 @@ const ALL_STEPS = [
     // A casual night has no printed scorecard to photograph, and the
     // import flow asks "which team?" which a casual bowler doesn't have.
     envs: ["practice", "league", "tournament"],
-    body: "Rather than typing a whole night in, photograph the scoring monitor. Tap Import at the top, say what you're importing and pick the date, then add the photo. The app reads every column on the card — all the games, and the frames behind them.",
+    body: "Rather than typing a whole night in, take a picture of the scoring monitor or a nightly print out. Tap Import at the top, say what you're importing and pick the date, then add the photo. The app reads the games and the frames behind them to save you manual entry.",
   },
   {
     id: "import-verify",
     tab: null,
     title: "Checking an import",
-    body: "Nothing saves until you've checked it. You tell it who each column belongs to, fix anything the camera misread, and confirm. Columns you map to a teammate are sent to them, and they get the same check before it counts for them.",
+    body: "Nothing saves until you've checked it. You tell it who belongs to each row, fix anything the camera misread, and confirm. Rows you map to a teammate are sent to their app inbox where they'll verify it all looks good before it counts for their data.",
   },
   {
     id: "stats",
@@ -208,7 +208,7 @@ const ALL_STEPS = [
     // Stats.
     tab: "data",
     title: "Stats",
-    body: "Averages, spare conversion, which ball is working. Compare yourself to a teammate, a friend or your team.",
+    body: "Averages, spare conversion, which ball is working. Compare yourself to a friend, teammate, or your whole team.",
   },
   {
     id: "insights",
@@ -221,19 +221,10 @@ const ALL_STEPS = [
     footnote: "This needs about ten games of shot-by-shot logging before it can say anything even somewhat meaningful, so be patient — and the more you bowl, the more tailored to you and better it'll get. Scores from casual nights aren't included.",
   },
   {
-    id: "improve",
-    tab: "insights",
-    title: "Goals and drills",
-    body: "Set a goal — spare conversion, average, strike rate — and watch it move as you bowl. Drills are for practice: pick a target, and the app counts your makes and misses.",
-    // A goal against a casual night's scores isn't meaningful, and drills
-    // are a practice tool.
-    envs: ["practice", "league", "tournament"],
-  },
-  {
     id: "arsenal",
     tab: "locker",
     title: "Your balls and bags",
-    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold different balls, and tournaments often cap how many you may carry, so you can keep several. Logging which ball threw which shot is what makes the per-ball stats work. Everything else is in there too — History has every night you've bowled, and we love stats, so they're all waiting on the Stats tab for you to dig through.",
+    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold the same or different balls, and tournaments often cap how many you may bring, so feel free to keep several bags.",
     // A casual bowler is on a house ball. Nothing here applies.
     envs: ["practice", "league", "tournament"],
   },
@@ -292,7 +283,7 @@ export const GENERAL_STEP_IDS = [
   // choice actually buys you.
   "bowl", "tracking", "shot-detail", "scoresheet",
   "score-strike", "score-spare", "score-miss",
-  "import", "import-verify", "stats", "insights", "improve", "arsenal",
+  "import", "import-verify", "stats", "insights", "arsenal",
 ];
 
 export function generalSteps(preferences = {}) {
