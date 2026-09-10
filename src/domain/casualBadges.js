@@ -139,8 +139,8 @@ export const CASUAL_BADGES = [
     id: "gutter-night",
     emoji: "\u{1F573}\uFE0F",
     name: "Rough night",
-    blurb: "Everyone has one. Under 80.",
-    earn: ({ lowGame }) => lowGame != null && lowGame < 80,
+    blurb: "Everyone has one. Under 70.",
+    earn: ({ lowGame }) => lowGame != null && lowGame < 70,
   },
   {
     id: "photo-finish",

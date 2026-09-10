@@ -1,3 +1,4 @@
+import { CASUAL_BADGES } from "./casualBadges.js";
 // The app's documentation, as searchable data.
 //
 // Written as structured entries rather than prose pages so the same
@@ -10,6 +11,12 @@
 //   log, history, data, insights, locker, profile, settings, inbox,
 //   social, coaching, import
 // A null view means the entry is explanatory with nowhere to jump.
+
+// Built from the real badge list, so the documentation can't drift out
+// of sync with what the app actually awards.
+const BADGE_HELP_BODY = "There are " + CASUAL_BADGES.length +
+  " to collect, and they're not all about bowling well: " +
+  CASUAL_BADGES.map(b => `${b.emoji} ${b.name} — ${b.blurb.replace(/\.$/, "")}`).join("; ") + ".";
 
 export const HELP = [
   // ── Logging ───────────────────────────────────────────────────────────
@@ -181,6 +188,7 @@ export const HELP = [
   },
   {
     id: "themes-glow",
+    casual: true,
     view: "settings",
     title: "Changing how the app looks",
     keywords: ["glow", "theme", "appearance", "dark", "light", "colour", "color", "look"],
@@ -196,6 +204,7 @@ export const HELP = [
   },
   {
     id: "casual-leaderboard",
+    casual: true,
     view: "social",
     title: "The friends leaderboard",
     keywords: ["leaderboard", "friends", "who won", "ranking", "standings",
@@ -203,7 +212,71 @@ export const HELP = [
     body: "Everyone you've added to a Just Bowling scoresheet turns up here, ranked by average, with how many games they've bowled, their best single game, and the badges they've earned. It builds up over time, so the more nights you log the more there is to argue about.",
   },
   {
+    id: "everything-gone",
+    casual: true,
+    view: "settings",
+    title: "Where did everything go?",
+    keywords: ["missing", "gone", "disappeared", "where is", "no stats", "no history",
+               "tabs missing", "lost", "wrong mode", "went back", "help"],
+    body: "If you picked Just Bowling, the app hides everything that mode doesn't use — History, Stats, Improve and the Vault. Nothing is deleted; it's all still there. Open Settings, change what you're bowling to Practice, League or Tournament, and it all comes back.",
+  },
+  {
+    id: "casual-scores",
+    casual: true,
+    view: "log",
+    title: "Entering scores for the group",
+    keywords: ["score", "enter", "type", "table", "add someone", "friends",
+               "who's bowling", "scoresheet", "total"],
+    body: "Names down the side, games across the top. Tap a cell and type the final score for that game — totals add themselves. Add whoever's on the lane with the box underneath and they become a row; they don't need the app or an account. Bowl more than a few games and the scores slide across while the names stay put.",
+  },
+  {
+    id: "casual-badges",
+    casual: true,
+    view: "social",
+    title: "The badges you can earn",
+    keywords: ["badge", "badges", "achievement", "award", "trophy", "collect",
+               "how do i get", "unlock", "earn"],
+    body: BADGE_HELP_BODY,
+  },
+  {
+    id: "tips-basics",
+    casual: true,
+    view: null,
+    title: "Tips: rolling a better ball",
+    keywords: ["tip", "tips", "how to bowl", "beginner", "better", "improve",
+               "advice", "technique", "help me bowl", "new to bowling"],
+    body: "Pick a ball you can hold comfortably — too heavy and you'll throw it with your arm instead of letting it swing. Aim at the arrows on the lane, not the pins: they're much closer, so they're far easier to hit consistently. Let your arm swing like a pendulum rather than pushing, and try to finish with your hand up where you were aiming. Most beginners improve more from rolling the same ball the same way twice than from anything else.",
+  },
+  {
+    id: "tips-spares",
+    casual: true,
+    view: null,
+    title: "Tips: picking up spares",
+    keywords: ["spare", "tips", "corner pin", "10 pin", "7 pin", "miss",
+               "leave", "second ball", "pick up"],
+    body: "Spares are where casual scores are won. If pins are left on the right, move your feet LEFT and aim across the lane at them; if they're on the left, move right. It feels backwards and it works. For a single pin, aim at the arrow closest to it rather than staring at the pin. Converting even half your spares will do more for your score than any strike will.",
+  },
+  {
+    id: "tips-scoring",
+    casual: true,
+    view: null,
+    title: "Tips: how scoring actually works",
+    keywords: ["scoring", "how does scoring work", "strike", "spare", "frame",
+               "300", "explain", "rules", "what is a turkey"],
+    body: "Ten frames, two balls each. All ten pins on the first ball is a strike, and you get the next two balls added on top. Knocking them all down across both balls is a spare, and you get the next one ball added. That's why strikes are worth chasing — a good game is mostly about not leaving gaps rather than striking every frame. Three strikes in a row is a turkey. A perfect game is 300.",
+  },
+  {
+    id: "tips-fun",
+    casual: true,
+    view: null,
+    title: "Tips: making the night better",
+    keywords: ["fun", "night out", "group", "kids", "bumpers", "party",
+               "what to do", "first time"],
+    body: "Bowl in the same order each game so it stays easy to follow. Ask for bumpers if anyone's small — nobody minds and it keeps everyone in it. Lighter balls are usually on the racks nearest the lanes. If someone's having a rough game, remember there's a badge for it. Rented shoes are meant to slide, so don't fight it on the approach.",
+  },
+  {
     id: "sync",
+    casual: true,
     view: null,
     title: "Syncing and offline use",
     keywords: ["offline", "sync", "wifi", "backup", "cloud", "pending"],
@@ -229,6 +302,21 @@ function norm(s) {
 // get the arsenal entry above one that merely mentions a ball in passing.
 // Title matches beat keyword matches beat body matches, and an exact
 // phrase beats scattered words.
+// The entries that apply to a given mode.
+//
+// A Just Bowling user's docs should describe THEIR app. Returning
+// articles about league rosters, money games and shot-by-shot tracking
+// to someone whose app has none of those is worse than returning
+// nothing: it implies they've lost features, or that the search is
+// broken.
+//
+// "Where did everything go?" is deliberately in the casual set -- it's
+// the way back for someone who picked the mode by accident.
+export function helpFor(environment) {
+  if (environment !== "casual") return HELP;
+  return HELP.filter(e => e.casual);
+}
+
 export function searchHelp(query, entries = HELP) {
   const q = norm(query);
   if (!q) return [];
