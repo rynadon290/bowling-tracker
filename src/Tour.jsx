@@ -49,7 +49,19 @@ export default function Tour({ preferences = {}, track, onNavigate, onFinish }) 
     // Still switch the app behind the tour, so finishing leaves the
     // bowler on the tab the last step described.
     const s = steps[clamped];
-    if (s?.tab && onNavigate) onNavigate(s.tab);
+    // Only navigate when the tab exists in the CURRENT mode.
+    //
+    // The casual tour's Standings steps point at "social", which is the
+    // leaderboard in Just Bowling and the Friends screen everywhere
+    // else. Replaying the casual tour from Settings as a league bowler
+    // therefore walked them into Friends -- a screen the tour isn't
+    // describing, behind an overlay they can't interact with.
+    //
+    // The mock-up already shows what the step is about, so showing the
+    // step without moving the app behind it is the safe failure.
+    const env = preferences?.environment || "league";
+    const tabFitsMode = !(s?.tab === "social" && track === "casual" && env !== "casual");
+    if (s?.tab && tabFitsMode && onNavigate) onNavigate(s.tab);
   }
 
   return (
