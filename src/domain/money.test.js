@@ -192,3 +192,36 @@ describe('costArraysFor participation', () => {
     expect(c.highGameCost).toEqual([0, 0, 0]);
   });
 });
+
+// `playing` is an object of {potKey: true} at every call site, but an
+// array is the obvious way to express the same thing -- and passing one
+// silently charged NOTHING for every pot, because array["pokerQuarter"]
+// is undefined. Money quietly reading as zero is the worst kind of
+// wrong: nobody notices until the pot is short at the counter.
+describe('which pots you are in', () => {
+  const rates = { pokerQuarter: 0.25, pokerDollar: 1, threeSixNine: 2, highGame: 5 };
+  const sum = a => (Array.isArray(a) ? a.reduce((x, y) => x + y, 0) : a);
+
+  it('charges every pot when none is specified', () => {
+    const c = costArraysFor(rates, 3, null);
+    expect(sum(c.pokerQuarterCost)).toBeCloseTo(0.75);
+    expect(sum(c.pokerDollarCost)).toBeCloseTo(3);
+  });
+
+  it('accepts an object and an array identically', () => {
+    const obj = costArraysFor(rates, 3, { pokerQuarter: true });
+    const arr = costArraysFor(rates, 3, ['pokerQuarter']);
+    expect(sum(arr.pokerQuarterCost)).toBeCloseTo(sum(obj.pokerQuarterCost));
+    expect(sum(arr.pokerDollarCost)).toBeCloseTo(sum(obj.pokerDollarCost));
+  });
+
+  it('charges nothing for a pot you sat out', () => {
+    const c = costArraysFor(rates, 3, { pokerQuarter: true });
+    expect(sum(c.pokerDollarCost)).toBe(0);
+  });
+
+  it('charges per game bowled, not a flat rate', () => {
+    expect(sum(costArraysFor(rates, 1, null).pokerDollarCost)).toBeCloseTo(1);
+    expect(sum(costArraysFor(rates, 3, null).pokerDollarCost)).toBeCloseTo(3);
+  });
+});

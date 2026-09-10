@@ -134,7 +134,15 @@ export function costArraysFor(rates, gamesBowled, playing = null) {
   //
   // Null means "all of them", which keeps every existing caller and
   // every already-saved session behaving exactly as before.
-  const isIn = key => (playing == null ? true : !!playing[key]);
+  // Accepts either shape.
+  //
+  // `playing` is an object of {potKey: true} at every call site today,
+  // but ["pokerQuarter"] is the obvious way to express the same thing --
+  // and passing one silently charged NOTHING for every pot, because
+  // array["pokerQuarter"] is undefined. Money quietly reading as zero is
+  // the worst kind of wrong here: nobody notices until the pot is short.
+  const inSet = Array.isArray(playing) ? new Set(playing) : null;
+  const isIn = key => (playing == null ? true : (inSet ? inSet.has(key) : !!playing[key]));
   const per = (v, key) => [0, 1, 2].map(i => (i < n && isIn(key) ? (Number(v) || 0) : 0));
 
   return {

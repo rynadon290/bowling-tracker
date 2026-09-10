@@ -623,3 +623,29 @@ describe('cAvg is game-weighted, not session-weighted', () => {
     expect(cAvg(sessions, 'You', null)).toBe(205);
   });
 });
+
+// arr() was applied only on the league branch, so calling seasonRecord
+// without a league handed the raw argument straight to forEach.
+describe('seasonRecord with no league', () => {
+  it('does not throw on missing or malformed input', () => {
+    for (const v of [null, undefined, 0, 'x', {}]) {
+      expect(() => seasonRecord(v)).not.toThrow();
+      expect(() => seasonRecord(v, 'Tuesday')).not.toThrow();
+    }
+  });
+
+  it('counts every league when none is given', () => {
+    const r = seasonRecord([
+      { league: 'A', games: [true, false], series: true },
+      { league: 'B', games: [true], series: null },
+    ]);
+    expect(r.gameWins).toBe(2);
+    expect(r.gameLosses).toBe(1);
+  });
+
+  it('does not count unbowled games', () => {
+    const r = seasonRecord([{ league: 'A', games: [true, null, null], series: null }], 'A');
+    expect(r.gameWins).toBe(1);
+    expect(r.gameLosses).toBe(0);
+  });
+});

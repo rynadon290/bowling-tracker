@@ -94,7 +94,9 @@ export function teamHighSeries(sessions,league){
 // Tallies game/series wins-losses and points won/available from match
 // records for a league (or every league combined, if none given).
 export function seasonRecord(matches,league){
-  const ms=league?arr(matches).filter(m=>m.league===league):matches;
+  // arr() was applied only on the league branch, so calling this
+  // without a league handed the raw argument straight to forEach.
+  const ms=league?arr(matches).filter(m=>m&&m.league===league):arr(matches);
   let gameWins=0,gameLosses=0,seriesWins=0,seriesLosses=0,pointsWon=0,pointsAvailable=0;
   ms.forEach(m=>{
     (m.games||[]).forEach(g=>{

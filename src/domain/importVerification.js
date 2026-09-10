@@ -150,7 +150,12 @@ export function laterSessionEnded(record, sessions, today = new Date()) {
 // Deliberately restrictive. Order matters: a bowler may always fix their
 // own scores, and everything below that is the exception path for when
 // they have gone quiet.
-export function canCorrect(record, actor, { sessions = [], verifiedTeammates = [], today = new Date() } = {}) {
+export function canCorrect(record, actor, opts) {
+  // A default parameter applies to undefined, not null -- and a caller
+  // reading options from state will naturally pass null before they
+  // load.
+  const { sessions = [], verifiedTeammates = [], today = new Date() } =
+    (opts && typeof opts === "object") ? opts : {};
   const r = normalizeImportRecord(record);
   if (!r || !actor) return { allowed: false, reason: "no record" };
 
