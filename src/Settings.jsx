@@ -68,8 +68,8 @@ export default function Settings({
   const cardsFor = {
     leagues: ["leagues"],
     settings: casualMode
-      ? ["look", "environment", "backup", "dangerZone"]
-      : ["look", "environment", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "reset", "dangerZone"],
+      ? ["look", "backup", "dangerZone"]
+      : ["look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "reset", "dangerZone"],
   };
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);
