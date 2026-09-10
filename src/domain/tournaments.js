@@ -46,6 +46,9 @@ export function emptyTournamentDay(dayNumber = 1) {
 
 export function emptyTournament() {
   return {
+    // Recorded, not computed -- scores alone cannot show a win.
+    placement: "",
+    placementNote: "",
     id: "",
     bowler: "",
     name: "",
@@ -90,6 +93,11 @@ export function normalizeTournament(raw) {
     bowler: raw.bowler || "",
     name: raw.name || "",
     center: raw.center || "",
+    // Listed here as well as in emptyTournament: this function rebuilds
+    // the object field by field, so anything missing HERE is dropped on
+    // every save.
+    placement: raw.placement || "",
+    placementNote: raw.placementNote || "",
     days,
     buyIn: raw.buyIn ?? "",
     winnings: raw.winnings ?? "",
