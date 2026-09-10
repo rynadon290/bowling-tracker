@@ -526,6 +526,182 @@ const SCREENS = {
     </Phone>
   ),
 
+  // ── Practice ──────────────────────────────────────────────────────
+
+  "practice-modes": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Practice</div>
+          <div style={{ display: "flex", gap: "5px" }}>
+            <span style={chip(true)}>Games</span>
+            <span style={chip(false)}>Drill</span>
+          </div>
+          <div style={{ ...muted, marginTop: "8px" }}>Tracking tonight</div>
+          <div style={{ display: "flex", gap: "5px", marginTop: "4px" }}>
+            <span style={chip(true)}>Shot by shot</span>
+            <span style={chip(false)}>Scores only</span>
+          </div>
+        </div>
+      </Spot>
+      <Note>A normal night, or targeted work</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "practice-drill": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Drill</div>
+        <div style={{ display: "flex", gap: "5px" }}>
+          <span style={chip(false)}>Games</span>
+          <span style={chip(true)}>Drill</span>
+        </div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
+            10 pin
+          </div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            <div style={{ flex: 1, padding: "8px", borderRadius: "8px", textAlign: "center",
+              border: `1px solid ${C.strike}66`, background: C.strike + "12" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: C.strike }}>14</div>
+              <div style={muted}>made</div>
+            </div>
+            <div style={{ flex: 1, padding: "8px", borderRadius: "8px", textAlign: "center",
+              border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: C.miss }}>6</div>
+              <div style={muted}>missed</div>
+            </div>
+          </div>
+          <div style={{ ...muted, textAlign: "center" }}>70% tonight · 61% last week</div>
+        </div>
+      </Spot>
+      <Note>No frames, no score — just the count</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "practice-depth": () => (
+    <Phone title="Bowl">
+      <div style={card}>
+        <div style={label}>Tracking tonight</div>
+        <div style={{ display: "flex", gap: "5px", marginBottom: "8px" }}>
+          <span style={chip(false)}>Shot by shot</span>
+          <span style={chip(true)}>Scores only</span>
+        </div>
+        <div style={{ ...muted, lineHeight: 1.4 }}>
+          Applies to this practice only.
+        </div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Your league nights</div>
+          <div style={{ display: "flex", gap: "5px" }}>
+            <span style={chip(true)}>Shot by shot</span>
+            <span style={chip(false)}>Scores only</span>
+          </div>
+          <div style={{ ...muted, marginTop: "6px" }}>Unchanged</div>
+        </div>
+      </Spot>
+      <Note>Remembered separately</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  // ── Tournament ────────────────────────────────────────────────────
+
+  "tourney-setup": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Tournament</div>
+        <div style={{ fontSize: "11px", fontWeight: 600, color: C.text }}>Spring Open · Sunset Lanes</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Blocks</div>
+          {[["Day 1 · Squad A", "8 games · lanes 11-12"],
+            ["Day 2 · Squad B", "8 games · lanes 3-4"]].map(([n, d]) => (
+            <div key={n} style={{ padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "11px", fontWeight: 600, color: C.text }}>{n}</div>
+              <div style={muted}>{d}</div>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>A block per day, games underneath</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "tourney-cut": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Cut line</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+            <span style={{ fontSize: "22px", fontWeight: 700, color: C.strike }}>+47</span>
+            <span style={muted}>through 5 of 8</span>
+          </div>
+          <div style={{ height: "6px", borderRadius: "3px", background: C.border, marginBottom: "6px" }}>
+            <div style={{ width: "64%", height: "100%", borderRadius: "3px", background: C.strike }} />
+          </div>
+          <div style={{ ...muted, lineHeight: 1.4 }}>
+            Cut at 1680 · you're on 1727. Need 199 average over the last three to stay above it.
+          </div>
+        </div>
+      </Spot>
+      <Note>The number you're actually bowling to</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "tourney-pots": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Brackets & side pots</div>
+          {[["Brackets ×4", "$20 in", "$60 won", C.strike],
+            ["Eliminator", "$10 in", "—", C.textMuted],
+            ["High game", "$5 in", "$25 won", C.strike]].map(([n, inn, out, col]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.text }}>{n}</span>
+              <span style={muted}>{inn}</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{out}</span>
+            </div>
+          ))}
+          <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>$85 won · $35 in · up $50</div>
+        </div>
+      </Spot>
+      <Note>What the weekend actually cost</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "tourney-match": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Match play · round of 16</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          {[["R1 vs J. Carver", "224-198", "W +30", C.strike],
+            ["R2 vs M. Boone", "191-217", "L", C.miss],
+            ["R3 vs T. Willis", "236-205", "W +30", C.strike]].map(([m, sc, res, col]) => (
+            <div key={m} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.text }}>{m}</span>
+              <span style={muted}>{sc}</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{res}</span>
+            </div>
+          ))}
+          <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>2-1 · bonus pins included</div>
+        </div>
+      </Spot>
+      <Nav active={0} />
+    </Phone>
+  ),
+
   // ── Coach track ───────────────────────────────────────────────────
   //
   // These had no mock-ups at all -- I checked every bowler step had one
