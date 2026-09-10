@@ -109,7 +109,7 @@ const ALL_STEPS = [
     id: "casual-badges",
     tab: "social",
     title: "Badges",
-    body: `There are ${CASUAL_BADGES.length} to collect, and they're not all about bowling well. Some are for turning up, one or two you'd rather not have, and everyone earns something — even on a rough night.`,
+    body: `There are ${CASUAL_BADGES.length} to collect, and they're not all about bowling well. Some are for showing up, one or two you'd rather not have, and everyone earns something — even on a rough night.`,
     envs: ["casual"],
   },
   {
