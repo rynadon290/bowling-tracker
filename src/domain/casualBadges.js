@@ -193,7 +193,8 @@ export function badgesFor(stats) {
 // derived here so the badge definitions stay declarative.
 
 export function casualStatsFor(bowler, nights = []) {
-  const mine = nights
+  const list = Array.isArray(nights) ? nights : [];
+  const mine = list
     .map(n => ({ ...n, scores: (n.scoresByBowler?.[bowler] || []).filter(v => v != null).map(Number) }))
     .filter(n => n.scores.length);
 
@@ -303,12 +304,13 @@ export function casualStatsFor(bowler, nights = []) {
 // numbers of games — the games count is shown so a 3-game average isn't
 // mistaken for a 30-game one.
 export function casualLeaderboard(nights = []) {
+  const list = Array.isArray(nights) ? nights : [];
   const people = new Set();
-  for (const n of nights) for (const who of Object.keys(n.scoresByBowler || {})) people.add(who);
+  for (const n of list) for (const who of Object.keys(n.scoresByBowler || {})) people.add(who);
 
   return [...people]
     .map(who => {
-      const stats = casualStatsFor(who, nights);
+      const stats = casualStatsFor(who, list);
       return stats ? { ...stats, badges: badgesFor(stats) } : null;
     })
     .filter(Boolean)

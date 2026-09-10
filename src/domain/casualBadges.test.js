@@ -111,3 +111,31 @@ describe('casualLeaderboard', () => {
     expect(casualLeaderboard([])).toEqual([]);
   });
 });
+
+// The Standings tab renders before any night has loaded, so the
+// leaderboard is handed an empty or missing list as a matter of course.
+describe('bad input', () => {
+  const junk = [null, undefined, '', 5, {}, [], NaN, true];
+
+  it('never throws', () => {
+    for (const v of junk) {
+      expect(() => casualLeaderboard(v)).not.toThrow();
+      expect(() => casualStatsFor('Ryan', v)).not.toThrow();
+      expect(() => badgesFor(v)).not.toThrow();
+    }
+  });
+
+  it('returns an empty board rather than guessing', () => {
+    expect(casualLeaderboard(null)).toEqual([]);
+    expect(casualStatsFor('Ryan', null)).toBeNull();
+  });
+
+  // Malformed nights shouldn't poison the whole board.
+  it('survives malformed nights', () => {
+    const nights = [{ date: '1' }, { date: '2', scoresByBowler: null },
+      { date: '3', scoresByBowler: { Ryan: [150, null, 120] } }];
+    const rows = casualLeaderboard(nights);
+    expect(rows.length).toBe(1);
+    expect(rows[0].bowler).toBe('Ryan');
+  });
+});

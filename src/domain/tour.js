@@ -395,7 +395,11 @@ export const COACH_STEPS = [
 // Someone bowling casually with friends doesn't need a league roster
 // explained, and showing it would make the app look like more work than
 // it is -- which is the moment a casual bowler decides it isn't for them.
-export function tourSteps(preferences = {}, { track = "main", skipSeen = [] } = {}) {
+export function tourSteps(preferences = {}, opts = {}) {
+  const { track = "main", skipSeen = [] } = opts || {};
+  // Step predicates destructure this, so a non-object would throw
+  // inside the filter rather than here.
+  if (!preferences || typeof preferences !== "object") preferences = {};
   const base = (() => {
     if (track === "coach") return COACH_STEPS;
 
@@ -435,7 +439,7 @@ export function stepsSeenFrom(seenSteps) {
 
 export function recordStepsSeen(seenSteps, steps) {
   const set = new Set(stepsSeenFrom(seenSteps));
-  for (const s of steps || []) set.add(s.id);
+  for (const s of (Array.isArray(steps) ? steps : [])) set.add(s?.id);
   return [...set];
 }
 
@@ -532,7 +536,8 @@ export function availableTours(isCoach = false) {
 //
 // Casual gets nothing: there are no casual-only features to explain, and
 // a casual bowler is the least likely to want more onboarding.
-export function pendingModeTour({ environment, seen = [] } = {}) {
+export function pendingModeTour(arg) {
+  const { environment, seen = [] } = arg || {};
   // Casual is excluded: the casual track IS their first tour, played at
   // setup, so there's no follow-up to offer.
   if (environment === "casual") return null;

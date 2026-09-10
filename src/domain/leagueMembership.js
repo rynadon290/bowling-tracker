@@ -32,8 +32,8 @@ export function isContainerLeague(name) {
 }
 
 export function visibleLeagues(leagues, hiddenIds, leagueIdsByName) {
-  const hidden = new Set(hiddenIds || []);
-  return (leagues || []).filter(name => {
+  const hidden = new Set(Array.isArray(hiddenIds) ? hiddenIds : []);
+  return (Array.isArray(leagues) ? leagues : []).filter(name => {
     if (isContainerLeague(name)) return false;
     const id = leagueIdsByName?.[name];
     return !id || !hidden.has(id);

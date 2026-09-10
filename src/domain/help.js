@@ -321,6 +321,7 @@ export function helpFor(environment) {
 }
 
 export function searchHelp(query, entries = HELP) {
+  if (!Array.isArray(entries)) entries = HELP;
   const q = norm(query);
   if (!q) return [];
   const words = q.split(" ").filter(Boolean);
@@ -356,6 +357,7 @@ export function searchHelp(query, entries = HELP) {
 
 // Entries grouped for browsing when nothing has been typed yet.
 export function helpByArea(entries = HELP) {
+  if (!Array.isArray(entries)) entries = HELP;
   const AREAS = [
     { view: "log", label: "Bowling" },
     { view: "import", label: "Importing" },

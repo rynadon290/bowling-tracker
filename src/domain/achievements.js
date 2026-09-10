@@ -21,8 +21,9 @@ export const HONOR_SERIES = 800;
 
 // A perfect game, or an 800 series.
 export function honorScores(games = [], seriesTotal = null) {
+  const list = Array.isArray(games) ? games : [];
   const out = [];
-  for (const g of games) {
+  for (const g of list) {
     if (Number(g) === HONOR_GAME) {
       out.push({
         kind: "honor",
@@ -34,7 +35,7 @@ export function honorScores(games = [], seriesTotal = null) {
       });
     }
   }
-  const total = seriesTotal ?? (games.some(g => g == null) ? null : games.reduce((a, b) => a + Number(b), 0));
+  const total = seriesTotal ?? (list.some(g => g == null) ? null : list.reduce((a, b) => a + Number(b), 0));
   if (total != null && total >= HONOR_SERIES) {
     out.push({
       kind: "honor",
@@ -52,8 +53,10 @@ export function honorScores(games = [], seriesTotal = null) {
 // nothing on record yet, which is NOT an achievement: everyone's first
 // night would trigger one and the moment would mean nothing.
 export function personalBests(games = [], seriesTotal = null, previous = {}) {
+  previous = (previous && typeof previous === "object") ? previous : {};
+  const list = Array.isArray(games) ? games : [];
   const out = [];
-  const best = games.filter(g => g != null).map(Number);
+  const best = list.filter(g => g != null).map(Number);
   const high = best.length ? Math.max(...best) : null;
   const prevGame = Number(previous.highGame) || null;
   const prevSeries = Number(previous.highSeries) || null;
@@ -70,7 +73,7 @@ export function personalBests(games = [], seriesTotal = null, previous = {}) {
     });
   }
 
-  const total = seriesTotal ?? (best.length === games.length && games.length
+  const total = seriesTotal ?? (best.length === list.length && list.length
     ? best.reduce((a, b) => a + b, 0) : null);
   if (total != null && prevSeries && total > prevSeries) {
     out.push({
@@ -118,10 +121,11 @@ export function placementAchievement(placementId, tournamentName = "") {
 //
 // Honor scores lead, then placement, then personal bests -- that's the
 // order a bowler would tell someone about them in.
-export function achievementsFor({
-  games = [], seriesTotal = null, previous = {},
-  placementId = null, tournamentName = "",
-} = {}) {
+export function achievementsFor(arg) {
+  const {
+    games = [], seriesTotal = null, previous = {},
+    placementId = null, tournamentName = "",
+  } = (arg && typeof arg === "object") ? arg : {};
   const placement = placementAchievement(placementId, tournamentName);
   return [
     ...honorScores(games, seriesTotal),
@@ -132,7 +136,7 @@ export function achievementsFor({
 
 // A one-line summary for a share card.
 export function achievementHeadline(achievements = []) {
-  if (!achievements.length) return "";
+  if (!Array.isArray(achievements) || !achievements.length) return "";
   const a = achievements[0];
   return `${a.emoji} ${a.title}`.trim();
 }

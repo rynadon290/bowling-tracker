@@ -100,3 +100,36 @@ describe('achievementsFor', () => {
     expect(achievementHeadline([])).toBe('');
   });
 });
+
+// Bad input shouldn't crash a domain function.
+//
+// achievementsFor({games: null}) threw. No call site passes that today
+// -- they all guard with (scores || []) -- but a domain function that
+// depends on every future caller remembering a guard is a crash waiting
+// for the next screen that uses it. A session with no scores logged yet
+// is a completely ordinary state.
+describe('bad input', () => {
+  const junk = [null, undefined, '', 5, {}, [], NaN, true];
+
+  it('never throws, whatever it is handed', () => {
+    for (const v of junk) {
+      expect(() => achievementsFor(v)).not.toThrow();
+      expect(() => achievementsFor({ games: v })).not.toThrow();
+      expect(() => honorScores(v)).not.toThrow();
+      expect(() => personalBests(v, v, v)).not.toThrow();
+      expect(() => achievementHeadline(v)).not.toThrow();
+    }
+  });
+
+  it('returns nothing rather than guessing', () => {
+    expect(achievementsFor({ games: null })).toEqual([]);
+    expect(achievementHeadline(null)).toBe('');
+  });
+
+  // The hardening must not have loosened the rules.
+  it('still gets the real cases right', () => {
+    expect(achievementsFor({ games: [300] })[0].id).toBe('perfect-game');
+    expect(achievementsFor({ games: [299] })).toEqual([]);
+    expect(achievementsFor({ games: [267, 267, 266] })[0].id).toBe('honor-series');
+  });
+});
