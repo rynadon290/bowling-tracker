@@ -56,12 +56,19 @@ vi.mock('./supabaseClient.js', () => ({
 }));
 
 const { cloudWrite, cloudDelete, flushPendingQueue, getPendingCount } = await import('./syncQueue.js');
+const { setActiveUserId } = await import('./domain/userScope.js');
 
 function resetDb() { dbState.store = []; dbState.nextId = 1; }
 function delay(ms, value) { return new Promise(resolve => setTimeout(() => resolve(value), ms)); }
 
 beforeEach(() => {
   resetDb();
+  // The queue is user-scoped: every item records who queued it, and
+  // nothing is counted or flushed for anyone else. Without a signed-in
+  // user there is no owner to stamp, so writes queue but are not this
+  // user's backlog -- which is the point, and which made every count
+  // assertion below read zero until this line existed.
+  setActiveUserId('test-user');
   supabaseState.upsert = async () => ({ error: null });
   supabaseState.delete = async () => ({ error: null });
 });
@@ -139,5 +146,57 @@ describe('flushPendingQueue', () => {
 
     expect(attempted).toEqual(['x', 'y']); // never reaches z
     expect(await getPendingCount()).toBe(2); // y and z both still queued
+  });
+});
+
+// The cross-account bug, at the unit level. A logs a shot offline, signs
+// out, B signs in, the 30-second flush timer fires -- and A's shot used
+// to land in B's account and be deleted from the queue on success, so A
+// did not merely leak it, A lost it.
+describe('user scoping', () => {
+  it('does not flush one user\'s queued writes through another user\'s session', async () => {
+    supabaseState.upsert = async () => { throw new Error('offline'); };
+    setActiveUserId('bowler-a');
+    await cloudWrite('shots', { id: 'a-shot' }, { timeoutMs: 50 });
+    expect(await getPendingCount()).toBe(1);
+
+    const attempted = [];
+    supabaseState.upsert = async (_table, record) => { attempted.push(record.id); return { error: null }; };
+
+    setActiveUserId('bowler-b'); // A signs out, B signs in
+    expect(await getPendingCount()).toBe(0); // not B's backlog
+    await flushPendingQueue();
+    expect(attempted).toEqual([]); // nothing sent under B's session
+
+    setActiveUserId('bowler-a'); // A comes back
+    expect(await getPendingCount()).toBe(1); // still theirs, not lost
+    await flushPendingQueue();
+    expect(attempted).toEqual(['a-shot']);
+    expect(await getPendingCount()).toBe(0);
+  });
+
+  it('flushes nothing at all when signed out', async () => {
+    supabaseState.upsert = async () => { throw new Error('offline'); };
+    setActiveUserId('bowler-a');
+    await cloudWrite('shots', { id: 'a-shot' }, { timeoutMs: 50 });
+
+    const attempted = [];
+    supabaseState.upsert = async (_table, record) => { attempted.push(record.id); return { error: null }; };
+    setActiveUserId(null);
+    await flushPendingQueue();
+    expect(attempted).toEqual([]);
+  });
+
+  it('counts only the current user\'s backlog', async () => {
+    supabaseState.upsert = async () => { throw new Error('offline'); };
+    setActiveUserId('bowler-a');
+    await cloudWrite('shots', { id: 'a1' }, { timeoutMs: 50 });
+    await cloudWrite('shots', { id: 'a2' }, { timeoutMs: 50 });
+    setActiveUserId('bowler-b');
+    await cloudWrite('shots', { id: 'b1' }, { timeoutMs: 50 });
+
+    expect(await getPendingCount()).toBe(1);
+    setActiveUserId('bowler-a');
+    expect(await getPendingCount()).toBe(2);
   });
 });

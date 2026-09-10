@@ -103,7 +103,15 @@ export async function inspectPendingQueue() {
     ? Date.now() - Math.min(...all.map(i => i.createdAt || Date.now()))
     : 0;
 
-  return { total: all.length, byTable, reasonsByTable, items: all, firstError, oldestAgeMs };
+  // Unowned items are excluded from `all` above, so without this they
+  // would sit in IndexedDB invisible to every accessor -- getPendingCount
+  // reporting 0 while rows are actually present is exactly how silent
+  // data loss stays silent. Surfaced as a separate number rather than
+  // folded into the total, because they are not this bowler's backlog
+  // and must not be flushed as if they were.
+  const unownedTotal = partitionQueue(await (await getDb()).getAll(STORE_NAME), getActiveUserId()).unowned.length;
+
+  return { total: all.length, byTable, reasonsByTable, items: all, firstError, oldestAgeMs, unownedTotal };
 }
 
 // Discards every queued write without attempting to sync it. Use with real
@@ -170,7 +178,14 @@ async function queueWrite(table, operation, payload, reason, onConflict, errorCo
   // userId is stamped at queue time, not at flush time. Flush time is
   // exactly when it is already wrong -- the whole failure is that the
   // person signed in then is not the person who made the write.
-  await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, userId: getActiveUserId(), createdAt: Date.now() });
+  const userId = getActiveUserId();
+  // Queueing without an owner should not be possible: AuthGate does not
+  // render the tracker without a session. If it happens anyway the write
+  // is still kept -- discarding a bowler's game to keep the invariant
+  // tidy would be the worse trade -- but it will not flush on its own,
+  // so it must not do that quietly.
+  if (!userId) console.warn(`sync queue: ${operation} on ${table} queued with no signed-in user; it will not flush until claimed`);
+  await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, userId, createdAt: Date.now() });
   notifyListeners(await getPendingCount());
 }
 
