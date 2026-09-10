@@ -90,11 +90,19 @@ export default function Profile({
     );
   }
 
-  const profile = normalizeProfile(profiles[activeBowler], activeBowler) || emptyProfile(activeBowler);
-  const membership = membershipFor(activeBowler, teams);
-  const balls = arsenals[activeBowler] || [];
+  // Your own profile, not whoever the Bowl tab happens to have selected.
+  //
+  // These cards used to follow activeBowler, with a "Whose Profile"
+  // switcher on top -- so logging a night for a teammate left the
+  // profile screen editing THEIR handedness, aliases and book average.
+  // The switcher made that visible but didn't make it right: a
+  // teammate's profile isn't yours to edit from your own profile screen.
+  const profileBowler = displayName || activeBowler;
+  const profile = normalizeProfile(profiles[profileBowler], profileBowler) || emptyProfile(profileBowler);
+  const membership = membershipFor(profileBowler, teams);
+  const balls = arsenals[profileBowler] || [];
   const resolvedHomeCenters = resolveHomeCenters(profile, centers || []);
-  const bowlerBagCount = (bags || []).filter(b => b.bowlerName === activeBowler).length;
+  const bowlerBagCount = (bags || []).filter(b => b.bowlerName === profileBowler).length;
 
   function addAlias() {
     const clean = aliasDraft.trim();
@@ -104,22 +112,11 @@ export default function Profile({
   }
 
   function update(next) {
-    setProfile(activeBowler, next);
+    setProfile(profileBowler, next);
   }
 
   return (
     <div>
-      {bowlers.length > 1 && show("whoseProfile") && (
-        <CollapsibleCard title="Whose Profile" summary={activeBowler}
-          expanded={expanded.whoseProfile} onToggle={() => toggle("whoseProfile")}>
-          <div style={S.chips}>
-            {bowlers.map(b => (
-              <Chip key={b} label={b} selected={activeBowler === b} onToggle={() => selectBowler(b)} />
-            ))}
-          </div>
-        </CollapsibleCard>
-      )}
-
       {/* Your ACCOUNT name -- what other people see when they search for
           you or view a roster. Distinct from the bowler profiles below,
           which are per-bowler and can include proxy-logged teammates.
@@ -142,6 +139,35 @@ export default function Profile({
             <button style={S.btn()} onClick={()=>setEditingMyName(false)}>Cancel</button>
           </div>
         )}
+
+      {show("aliases") && (
+      <CollapsibleCard title="Scorecard Names"
+        summary={profile.aliases?.length ? `${profile.aliases.length} alias${profile.aliases.length === 1 ? "" : "es"}` : "None"}
+        expanded={expanded.aliases} onToggle={() => toggle("aliases")}>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+          How your name shows up on the screens at your center — "R. Nadon", "RYAN N", a nickname.
+          Adding these lets a scorecard photo find you instead of asking every time.
+        </div>
+        {(profile.aliases || []).map((alias, i) => (
+          <div key={`${alias}-${i}`} style={{ display: "flex", gap: "6px", marginBottom: "6px", alignItems: "center" }}>
+            <div style={{ flex: 1, fontSize: "13px", color: C.text }}>{alias}</div>
+            <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
+              onClick={() => update(setProfileField(profile, "aliases",
+                normalizeAliases((profile.aliases || []).filter((_, j) => j !== i))))}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: "6px" }}>
+          <input style={{ ...S.input, flex: 1, fontSize: "12px" }}
+            placeholder="e.g. R. Nadon"
+            value={aliasDraft} onChange={e => setAliasDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") addAlias(); }} />
+          <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+            disabled={!aliasDraft.trim()} onClick={addAlias}>Add</button>
+        </div>
+      </CollapsibleCard>
+      )}
         <div style={{fontSize:"11px",color:C.textMuted,marginTop:"8px"}}>
           This is what teammates see when they search for you or view the roster — it defaults to your email prefix until you set it.
         </div>
@@ -149,7 +175,7 @@ export default function Profile({
       )}
 
       {show("identity") && (
-      <CollapsibleCard title={activeBowler}
+      <CollapsibleCard title={profileBowler}
         summary={`${profile.leftHanded ? "Left" : "Right"}-handed · ${profile.twoHanded ? "Two-handed" : "One-handed"}`}
         expanded={expanded.identity} onToggle={() => toggle("identity")}>
         <div style={S.label}>Handedness</div>
@@ -181,34 +207,6 @@ export default function Profile({
           only to match a scorecard photo back to the right person -- a
           wrong match writes someone else's game into your record, and
           that is far worse than an import that stops to ask. */}
-      {show("aliases") && (
-      <CollapsibleCard title="Scorecard Names"
-        summary={profile.aliases?.length ? `${profile.aliases.length} alias${profile.aliases.length === 1 ? "" : "es"}` : "None"}
-        expanded={expanded.aliases} onToggle={() => toggle("aliases")}>
-        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-          How your name shows up on the screens at your center — "R. Nadon", "RYAN N", a nickname.
-          Adding these lets a scorecard photo find you instead of asking every time.
-        </div>
-        {(profile.aliases || []).map((alias, i) => (
-          <div key={`${alias}-${i}`} style={{ display: "flex", gap: "6px", marginBottom: "6px", alignItems: "center" }}>
-            <div style={{ flex: 1, fontSize: "13px", color: C.text }}>{alias}</div>
-            <button style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", textDecoration: "underline", padding: 0 }}
-              onClick={() => update(setProfileField(profile, "aliases",
-                normalizeAliases((profile.aliases || []).filter((_, j) => j !== i))))}>
-              Remove
-            </button>
-          </div>
-        ))}
-        <div style={{ display: "flex", gap: "6px" }}>
-          <input style={{ ...S.input, flex: 1, fontSize: "12px" }}
-            placeholder="e.g. R. Nadon"
-            value={aliasDraft} onChange={e => setAliasDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") addAlias(); }} />
-          <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
-            disabled={!aliasDraft.trim()} onClick={addAlias}>Add</button>
-        </div>
-      </CollapsibleCard>
-      )}
 
       {/* Coaching is opt-in and off by default. Someone who doesn't coach
           never sees coaching UI at all, rather than an empty version of
@@ -245,8 +243,8 @@ export default function Profile({
             <BookAverageUpdatePrompt
               currentAverage={profile.bookAverage}
               suggestion={bookAverageSuggestion}
-              onSave={value => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate, value)}
-              onDismiss={() => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate)} />
+              onSave={value => acknowledgeBookAverageUpdate(profileBowler, bookAverageTriggerLeague.endDate, value)}
+              onDismiss={() => acknowledgeBookAverageUpdate(profileBowler, bookAverageTriggerLeague.endDate)} />
           ) : (
             <>
               <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
@@ -255,7 +253,7 @@ export default function Profile({
                 You can still update it yourself below, or skip for now.
               </div>
               <button style={{ ...S.btn(), width: "100%" }}
-                onClick={() => acknowledgeBookAverageUpdate(activeBowler, bookAverageTriggerLeague.endDate)}>
+                onClick={() => acknowledgeBookAverageUpdate(profileBowler, bookAverageTriggerLeague.endDate)}>
                 Skip — I'll update it myself
               </button>
             </>
@@ -280,6 +278,27 @@ export default function Profile({
         </div>
         <input style={{ ...S.input, marginTop: "6px" }} placeholder="Season (e.g. 2025-26 Winter)"
           value={profile.bookSeason} onChange={e => update(setProfileField(profile, "bookSeason", e.target.value))} />
+
+        {/* All-time bests, so a personal-best achievement has something to
+            beat from day one.
+            
+            Without a starting figure the app can only compare against
+            what it has seen -- so a bowler's first logged night either
+            fires a meaningless "best ever" or nothing fires until they've
+            logged most of a season. Asking once here solves both. */}
+        <div style={{ ...S.divider, margin: "12px 0" }} />
+        <div style={{ ...S.label, marginBottom: "4px" }}>Your best ever</div>
+        <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
+          Including before you started using the app. We'll tell you when you beat them.
+        </div>
+        <div style={S.row}>
+          <input style={{ ...S.input, flex: 1 }} type="number" inputMode="numeric" placeholder="High game"
+            value={profile.allTimeHighGame}
+            onChange={e => update(setProfileField(profile, "allTimeHighGame", e.target.value))} />
+          <input style={{ ...S.input, flex: 1 }} type="number" inputMode="numeric" placeholder="High series"
+            value={profile.allTimeHighSeries}
+            onChange={e => update(setProfileField(profile, "allTimeHighSeries", e.target.value))} />
+        </div>
       </CollapsibleCard>
       )}
 

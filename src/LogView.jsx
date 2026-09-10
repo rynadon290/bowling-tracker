@@ -6,6 +6,7 @@ import { buyInsForLeague, costArraysFor, sessionMoney } from "./domain/money.js"
 import { anyMoneyGameShown, visibleMoneyGames } from "./domain/preferences.js";
 import { nextLeagueDate, prebowlConflict } from "./domain/sessions.js";
 import { needsLeagueSetup } from "./domain/tour.js";
+import { achievementsFor, PLACEMENTS } from "./domain/achievements.js";
 import { inferLeagueDay } from "./domain/reminders.js";
 import Scoresheet from "./Scoresheet.jsx";
 import TournamentSession from "./TournamentSession.jsx";
@@ -1121,7 +1122,35 @@ export default function LogView({
               const csReleases=Array.isArray(cs.releases)?cs.releases:[];
               const mDist=MISSES.map(m=>({m,c:csMisses.filter(x=>x===m).length})).filter(x=>x.c>0);
               const gR=csReleases.filter(r=>r==="Good").length,bR=csReleases.filter(r=>r==="Bad").length,rT=csReleases.length;
+              // Honor scores, personal bests and tournament placement.
+              // Above the numbers, because a 300 or a new personal best
+              // is the thing a bowler looks for first and the thing
+              // they'll actually share.
+              const nightAchievements=achievementsFor({
+                games:(cs.scores||[]).filter(v=>v!=null),
+                seriesTotal:cs.total??null,
+                previous:{
+                  highGame:profiles?.[cs.bowler]?.allTimeHighGame,
+                  highSeries:profiles?.[cs.bowler]?.allTimeHighSeries,
+                },
+                placementId:cs.placement,
+                tournamentName:cs.tournamentName||"",
+              });
               return(
+                <>
+                {nightAchievements.length>0&&(
+                  <div style={{...S.card,border:`1px solid ${C.spare}66`,backgroundColor:C.spare+"0F"}}>
+                    {nightAchievements.map(a=>(
+                      <div key={a.id} style={{display:"flex",gap:"10px",alignItems:"flex-start",marginBottom:"6px"}}>
+                        <span style={{fontSize:"22px",lineHeight:1}}>{a.emoji}</span>
+                        <div>
+                          <div style={{fontSize:"14px",fontWeight:700,color:C.text}}>{a.title}</div>
+                          {a.detail&&<div style={{fontSize:"12px",color:C.textMuted,marginTop:"1px"}}>{a.detail}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
                   <div style={{...S.label}}>
                     {cs.bowler?`${cs.bowler}'s night`:"Tonight"}
@@ -1448,6 +1477,7 @@ export default function LogView({
                     }}/>
                   </div>
                 </div>
+                </>
               );
             })()}
 

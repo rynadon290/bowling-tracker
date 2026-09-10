@@ -1,3 +1,4 @@
+import { achievementsFor } from "./domain/achievements.js";
 import { C, S } from "./ui.jsx";
 import ShareButton from "./ShareButton.jsx";
 import { formatDate } from "./constants.js";
@@ -210,10 +211,54 @@ function DrillRecap({ recap, comparison }) {
   );
 }
 
+// Honor scores, personal bests and tournament placement.
+//
+// Sits above the numbers deliberately: a 300 or a new personal best is
+// the thing a bowler wants to see first and the thing they'll actually
+// share. Renders nothing on an ordinary night rather than showing an
+// empty "no achievements" card, which would make every normal night feel
+// like a miss.
+function AchievementsCard({ achievements = [], onShare }) {
+  if (!achievements.length) return null;
+  return (
+    <div style={{ ...S.card, border: `1px solid ${C.spare}66`, backgroundColor: C.spare + "0F" }}>
+      {achievements.map(a => (
+        <div key={a.id} style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "8px" }}>
+          <span style={{ fontSize: "22px", lineHeight: 1 }}>{a.emoji}</span>
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: C.text }}>{a.title}</div>
+            {a.detail && (
+              <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "1px" }}>{a.detail}</div>
+            )}
+          </div>
+        </div>
+      ))}
+      {onShare && (
+        <button style={{ ...S.btn(), width: "100%", fontSize: "12px", marginTop: "2px" }}
+          onClick={onShare}>
+          Share this
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function SessionRecap({
   environment, manualScores, bowler, allBowlers, league, date, priorAverage,
-  drills, leftHandedForBowler,
+  drills, leftHandedForBowler, profile, placementId, tournamentName,
 }) {
+  // What's worth celebrating from this night. Computed here rather than
+  // per-branch so league, practice, tournament and casual all get it.
+  const achievementsForLine = line => achievementsFor({
+    games: (line?.scores || []).filter(v => v != null),
+    seriesTotal: line?.total ?? null,
+    previous: {
+      highGame: profile?.allTimeHighGame,
+      highSeries: profile?.allTimeHighSeries,
+    },
+    placementId,
+    tournamentName,
+  });
   // What the share carries for THIS bowler on this night.
   const myLine = (recap) => (recap?.lines || []).find(l => l.bowler === bowler) || null;
   const shareFor = (recap, extras = []) => {
@@ -239,6 +284,7 @@ export default function SessionRecap({
     const mine = shareFor(recap);
     return (
       <>
+        <AchievementsCard achievements={achievementsForLine(myLine(recap))} />
         <CasualRecap recap={recap} />
         {/* Casual bowlers are the ones most likely to share -- it's the
             one night, and the point was the people. The card says who
@@ -267,6 +313,7 @@ export default function SessionRecap({
     if (!recap && !dRecap) return null;
     return (
       <>
+        <AchievementsCard achievements={achievementsForLine(recap)} />
         {recap && <PracticeRecap recap={recap} comparison={comparison} />}
         {dRecap && <DrillRecap recap={dRecap} comparison={dComparison} />}
         {recap && recap.scores && (

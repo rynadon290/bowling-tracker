@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PLACEMENTS } from "./domain/achievements.js";
 import { C, S, Chip } from "./ui.jsx";
 import {
   addGame, removeGame, setGameField, addDay, removeDay, setDayField, updateDay,
@@ -660,6 +661,33 @@ export default function TournamentSession({ tournament, onChange, onSave, saved,
       <SidePots tournament={tournament} onChange={onChange} />
 
       <MatchPlay tournament={tournament} onChange={onChange} />
+
+      {/* How it finished.
+      
+          Recorded, not computed: the app knows your scores but has no
+          idea what anyone else shot, so it can't tell a win from a
+          middling weekend. Sits right before Save because it's the last
+          thing you know. */}
+      <div style={S.card}>
+        <div style={S.label}>How did it finish?</div>
+        <div style={S.chips}>
+          {PLACEMENTS.map(p => (
+            <Chip key={p.id} label={p.emoji ? `${p.emoji} ${p.label}` : p.label}
+              selected={tournament.placement === p.id}
+              color={p.id === "won" ? C.strike : undefined}
+              onToggle={() => onChange({
+                ...tournament,
+                placement: tournament.placement === p.id ? "" : p.id,
+              })} />
+          ))}
+        </div>
+        {tournament.placement && tournament.placement !== "none" && (
+          <input style={{ ...S.input, marginTop: "8px" }}
+            placeholder="Anything worth remembering about it?"
+            value={tournament.placementNote || ""}
+            onChange={e => onChange({ ...tournament, placementNote: e.target.value })} />
+        )}
+      </div>
 
       <div style={S.card}>
         <div style={S.label}>Tournament Notes</div>
