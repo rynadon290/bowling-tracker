@@ -147,7 +147,7 @@ export const COACH_STEPS = [
     id: "coach-roster",
     tab: "coaching",
     title: "Everyone you coach, one screen",
-    body: "Your bowlers in a single list: what each is working on right now, how far along they are, when you next see them, and which league night they bowl. No hunting through five separate profiles before a session.",
+    body: "Your bowlers in a single list: what each is working on right now, how far along they are, when you next see them, and which league night they bowl.",
   },
   {
     id: "coach-open",
@@ -171,13 +171,13 @@ export const COACH_STEPS = [
     id: "coach-session",
     tab: "coaching",
     title: "Scheduling the next session",
-    body: "Set when you next see each bowler, with a note about what you'll cover. Deliberately separate from their league night — you'll often coach on a practice lane on a different day, and guessing that wrong is worse than leaving it blank.",
+    body: "Set when you next see each bowler, with a note about what you'll cover.",
   },
   {
     id: "coach-between",
     tab: "coaching",
     title: "What happens between sessions",
-    body: "Their nights keep logging whether you're there or not. Come back a week later and the roster already shows what changed — no 'so how did it go?' to start every session.",
+    body: "Their nights keep logging whether you're there or not. Come back a week later and the roster already shows what changed — no more 'so how'd it go?'",
   },
 ];
 
