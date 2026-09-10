@@ -63,6 +63,59 @@ const ALL_STEPS = [
     body: "Same start: Other Leave, then the pins on the rack. Answer Spare Made? — No. Then use − and + to set the total pins for the frame — both balls added together. Leave a 3-10 and knock one down, that's 9.",
     when: ({ trackingMode }) => trackingMode === "shot",
   },
+  // ── Practice ────────────────────────────────────────────────────────
+  {
+    id: "practice-modes",
+    tab: "log",
+    title: "Games or drills",
+    body: "Practice splits two ways. Games is a normal night you happen to be bowling alone — full frames, real scores. Drill is targeted work: pick one thing, throw at it repeatedly, and the app counts makes and misses without pretending it's a game.",
+    envs: ["practice"],
+  },
+  {
+    id: "practice-drill",
+    tab: "log",
+    title: "Running a drill",
+    body: "Choose a target — a specific spare, a pin combination, your own setup — then log each attempt as made or missed. No frames, no score, just the count. Come back next week and the same drill shows whether you're actually getting better at it.",
+    envs: ["practice"],
+  },
+  {
+    id: "practice-depth",
+    tab: "log",
+    title: "Practice doesn't change your league",
+    body: "Tracking depth here applies to tonight only. A scores-only practice won't quietly switch your league nights to scores-only too — the two are remembered separately, so you can grind shot-by-shot on a Sunday and keep league simple.",
+    envs: ["practice"],
+  },
+
+  // ── Tournament ──────────────────────────────────────────────────────
+  {
+    id: "tourney-setup",
+    tab: "log",
+    title: "Setting up the tournament",
+    body: "Name it, set the format, and add the blocks you're bowling. Multi-day events get a block per day; a one-day squad is a single block. Games, lanes and the pattern all live under the block they belong to.",
+    envs: ["tournament"],
+  },
+  {
+    id: "tourney-cut",
+    tab: "log",
+    title: "The cut line",
+    body: "Enter the cut and the app tracks where you stand against it as you bowl — how far above or below, and what you need across the games left. That's the number you're actually bowling to in a qualifier.",
+    envs: ["tournament"],
+  },
+  {
+    id: "tourney-pots",
+    tab: "log",
+    title: "Brackets and side pots",
+    body: "Log what you entered and what came back. Brackets, side pots and the eliminator all sit together, so at the end of a long weekend you know what the entry fees actually cost you against what you won.",
+    envs: ["tournament"],
+  },
+  {
+    id: "tourney-match",
+    tab: "log",
+    title: "Match play",
+    body: "Past the cut, record each match, your opponent and the result. Bonus pins are handled for you, and your match record carries alongside your scores instead of living on a scrap of paper.",
+    envs: ["tournament"],
+  },
+
   {
     id: "import",
     tab: null,

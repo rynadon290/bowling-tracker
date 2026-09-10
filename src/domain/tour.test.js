@@ -35,9 +35,14 @@ describe('tourSteps by environment', () => {
     }
   });
 
-  it('gives casual the shortest tour', () => {
-    expect(tourLength(casual)).toBeLessThan(tourLength(practice));
-    expect(tourLength(practice)).toBeLessThan(tourLength(league));
+  // Casual is the shortest -- that's the claim worth pinning. Practice
+  // and league are now the same length by coincidence, since practice
+  // gained its own drill steps while skipping the roster and money ones.
+  // Asserting an order between THOSE two was pinning an accident.
+  it('gives casual much the shortest tour', () => {
+    for (const prefs of [practice, league, tournament]) {
+      expect(tourLength(casual)).toBeLessThan(tourLength(prefs));
+    }
   });
 
   // A casual bowler is on a house ball; a league roster means nothing
@@ -263,5 +268,45 @@ describe('coach tour content', () => {
         .flatMap(e => tourSteps({ environment: e, trackingMode: 'shot', showMoneyGames: true }).map(s => s.id))
     );
     for (const s of COACH_STEPS) expect(bowlerIds.has(s.id)).toBe(false);
+  });
+});
+
+// Practice and tournament used to be the league tour with steps removed
+// -- nothing described what either mode actually does differently, which
+// is the whole reason someone picks it.
+describe('mode-specific content', () => {
+  const ids = env => tourSteps({
+    environment: env, trackingMode: 'shot', showMoneyGames: env !== 'casual',
+  }).map(s => s.id);
+
+  it('teaches practice its own features', () => {
+    const p = ids('practice');
+    for (const id of ['practice-modes', 'practice-drill', 'practice-depth']) {
+      expect(p).toContain(id);
+    }
+  });
+
+  it('teaches tournament its own features', () => {
+    const t = ids('tournament');
+    for (const id of ['tourney-setup', 'tourney-cut', 'tourney-pots', 'tourney-match']) {
+      expect(t).toContain(id);
+    }
+  });
+
+  // A league bowler shouldn't be told about cut lines and drills, and a
+  // practice bowler shouldn't get match play.
+  it('keeps mode-specific steps out of other tours', () => {
+    for (const env of ['casual', 'league']) {
+      const list = ids(env);
+      expect(list.some(id => id.startsWith('practice-'))).toBe(false);
+      expect(list.some(id => id.startsWith('tourney-'))).toBe(false);
+    }
+    expect(ids('practice').some(id => id.startsWith('tourney-'))).toBe(false);
+    expect(ids('tournament').some(id => id.startsWith('practice-'))).toBe(false);
+  });
+
+  it('gives every mode more than the casual minimum', () => {
+    expect(ids('practice').length).toBeGreaterThan(ids('casual').length);
+    expect(ids('tournament').length).toBeGreaterThan(ids('casual').length);
   });
 });
