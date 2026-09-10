@@ -30,6 +30,7 @@ function Phone({ children, title, headerIcon }) {
           <span style={lit(headerIcon === "help")}>🔍</span>
           <span style={lit(headerIcon === "import")}>📷</span>
           <span style={{ opacity: 0.55 }}>👤</span>
+          <span style={lit(headerIcon === "settings")}>⚙️</span>
         </span>
       </div>
       <div style={{ padding: "10px", minHeight: "230px" }}>{children}</div>
@@ -365,25 +366,50 @@ const SCREENS = {
 
   stats: () => (
     <Phone title="Stats">
-      <Spot>
-        <div style={{ ...card, marginBottom: 0 }}>
-          <div style={label}>Viewing</div>
-          <div style={{ ...S.sel, padding: "6px 9px", fontSize: "11px" }}>You ▾</div>
-        </div>
-      </Spot>
-      <Note>Compare to a friend or your team</Note>
-      <div style={{ ...card, marginTop: "8px" }}>
-        <div style={label}>Average</div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "5px", height: "54px" }}>
-          {[38, 50, 44, 60, 54, 66].map((h, i) => (
-            <div key={i} style={{
-              flex: 1, height: `${h}px`, borderRadius: "3px 3px 0 0",
-              background: C.accent, opacity: 0.45 + i * 0.08,
-            }} />
+      {/* The app's deepest screen, so the mock-up shows depth: headline
+          numbers, a trend, per-ball breakdown and spare detail all at
+          once. A single bar chart undersold it. */}
+      <div style={{ ...card, marginBottom: "6px", display: "flex", gap: "5px" }}>
+        {[["204", "average"], ["58%", "strikes"], ["81%", "spares"]].map(([v, l]) => (
+          <div key={l} style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent }}>{v}</div>
+            <div style={{ ...muted, fontSize: "8px" }}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Average over time</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", height: "34px" }}>
+          {[24, 30, 26, 33, 29, 34, 31, 34].map((h, i) => (
+            <div key={i} style={{ flex: 1, height: `${h}px`, borderRadius: "2px 2px 0 0",
+              background: C.accent, opacity: 0.4 + i * 0.07 }} />
           ))}
         </div>
-        <div style={{ ...muted, marginTop: "5px" }}>196 → 204 over six weeks</div>
       </div>
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>By ball</div>
+        {[["Phaze II", "62%", 62], ["Ion Max", "54%", 54]].map(([n, v, pct]) => (
+          <div key={n} style={{ marginBottom: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "9px", color: C.text }}>{n}</span>
+              <span style={{ fontSize: "9px", fontWeight: 700, color: C.strike }}>{v}</span>
+            </div>
+            <div style={{ height: "4px", borderRadius: "2px", background: C.border }}>
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: "2px", background: C.strike }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...card, marginBottom: 0 }}>
+        <div style={label}>Spares by split</div>
+        {[["Baby split", "75%"], ["7-10", "0%"], ["Single pin", "92%"]].map(([n, v]) => (
+          <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+            <span style={{ fontSize: "9px", color: C.textMuted }}>{n}</span>
+            <span style={{ fontSize: "9px", fontWeight: 600, color: C.text }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      <Note>And a lot more besides</Note>
       <Nav active={2} />
     </Phone>
   ),
@@ -532,6 +558,22 @@ const SCREENS = {
             <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted, marginTop: "4px" }}>
               Email
             </div>
+            {/* The way out when you don't have someone's address. */}
+            <div style={{
+              marginTop: "5px", padding: "5px 8px", borderRadius: "7px", fontSize: "9px",
+              border: `1px solid ${C.accent}`, background: C.accent + "11", color: C.text,
+            }}>
+              ✓ I don't have their email
+            </div>
+            <div style={{
+              marginTop: "4px", padding: "5px 8px", borderRadius: "7px",
+              background: C.surface, border: `1px solid ${C.border}`,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", fontWeight: 700,
+                letterSpacing: "1px", color: C.accent }}>MX57-D6W7</span>
+              <span style={{ ...muted, fontSize: "8px" }}>text this</span>
+            </div>
           </div>
         </Spot>
       </div>
@@ -619,7 +661,10 @@ const SCREENS = {
   ),
 
   "practice-fields": () => (
-    <Phone title="Bowl">
+    <Phone title="Bowl" headerIcon="settings">
+      {/* Points UP at the gear in the header, so "in Settings" isn't an
+          instruction to go hunting. */}
+      <Note up={false}>Switch them on here</Note>
       <Spot>
         <div style={{ ...card, marginBottom: 0 }}>
           <div style={label}>This shot</div>
@@ -900,6 +945,81 @@ const SCREENS = {
             </div>
           ))}
           <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>2-1 · bonus pins included</div>
+        </div>
+      </Spot>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "practice-recap": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Practice summary</div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
+            Sun 14 Sep · 2 games + drill
+          </div>
+          {[["Ten pin drill", "14 of 20 · was 11 of 20", C.strike],
+            ["Spare conversion", "81% · up 4", C.strike],
+            ["Goal: ten pins", "84% → 90%", C.spare]].map(([n, v, col]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.textMuted }}>{n}</span>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: col }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Next week starts with a comparison</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "league-recap": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Tonight</div>
+          <div style={{ display: "flex", gap: "5px", marginBottom: "8px" }}>
+            {["213", "196", "203"].map(v => (
+              <div key={v} style={{ flex: 1, textAlign: "center", padding: "5px 0",
+                borderRadius: "6px", background: C.surface }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.text }}>{v}</div>
+              </div>
+            ))}
+            <div style={{ flex: 1, textAlign: "center", padding: "5px 0", borderRadius: "6px",
+              background: C.accent + "18", border: `1px solid ${C.accent}66` }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: C.accent }}>612</div>
+            </div>
+          </div>
+          {[["Team", "won 3 of 4"], ["Strikes", "22 · 58%"], ["Spares", "17 of 21"], ["Money games", "up $12.75"], ["Average", "201 → 204"]].map(([n, v]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.textMuted }}>{n}</span>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: C.text }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>One tap to the team chat</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "tourney-recap": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Spring Open</div>
+          {[["Block 1", "1727 · 8 games"],
+            ["Block 2", "1689 · 8 games"],
+            ["Cut", "made it · +47"],
+            ["Match play", "2-1"],
+            ["Entries & pots", "$35 in · $85 won"]].map(([n, v]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.textMuted }}>{n}</span>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: C.text }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>Saved as one tournament</div>
         </div>
       </Spot>
       <Nav active={0} />
