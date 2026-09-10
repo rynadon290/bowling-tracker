@@ -659,7 +659,11 @@ export default function LogView({
                 }}/>
             )}
 
-            {!editingId&&preferences.environment!=="tournament"&&(
+            {/* Not in Just Bowling: the scores table lists everyone and
+                takes their scores directly, so a separate "who am I
+                keeping score for" card is the same information twice
+                and a switch nobody needs to flip. */}
+            {!editingId&&preferences.environment!=="tournament"&&preferences.environment!=="casual"&&(
               <div style={{...S.card,padding:"10px 12px"}}>
                 {/* Below Shot Context and kept short: this is a setting
                     you touch once a night, not something to scroll past
@@ -914,7 +918,135 @@ export default function LogView({
                 being logged, a derived score is already showing, and an
                 accidental keystroke silently overriding it would be worse
                 than the inconvenience of one extra tap. */}
-            {!editingId&&activeBowler&&effectiveSessionLeague&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
+            {/* Just Bowling gets a scoring TABLE, not a per-bowler form.
+            
+                A casual night is several people on one lane and one phone
+                keeping score, so the natural shape is the sheet on the
+                monitor: names down the side, games across the top. That
+                also removes the need to keep switching "who's bowling
+                for" between every entry -- the whole group is on screen
+                at once.
+                
+                Never collapsible: in this mode it's the only thing on the
+                tab that matters. */}
+            {!editingId&&preferences.environment==="casual"&&effectiveSessionLeague&&(()=>{
+              const people=scoreOptions.length?scoreOptions:[ownerName].filter(Boolean);
+              const highest=[1,2,3,4,5,6,7,8,9,10].reduce((hi,g)=>
+                people.some(p=>getManualScore(manualScores,p,effectiveSessionLeague,sessionDate,g)!=null)?g:hi,0);
+              // One more empty column than anyone has filled, so there's
+              // always somewhere to type the next game without a button.
+              const cols=Math.min(10,Math.max(3,highest+1));
+              const gameNums=Array.from({length:cols},(_,i)=>i+1);
+
+              const NAME_W=92;
+              const CELL_W=54;
+              return(
+                <div style={{...S.card,paddingBottom:"10px"}}>
+                  <div style={S.label}>Scores</div>
+                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px"}}>
+                    Just the final score for each game. Totals add themselves.
+                  </div>
+
+                  {/* The name column is frozen and the games scroll, so a
+                      long night doesn't squeeze the names into nothing. */}
+                  <div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:"10px",overflow:"hidden"}}>
+                    <div style={{flexShrink:0,width:`${NAME_W}px`,borderRight:`1px solid ${C.border}`,backgroundColor:C.surface}}>
+                      <div style={{height:"30px",display:"flex",alignItems:"center",padding:"0 8px",
+                                   borderBottom:`1px solid ${C.border}`}}>
+                        <span style={{fontSize:"10px",fontWeight:700,color:C.textMuted,letterSpacing:"0.06em"}}>BOWLER</span>
+                      </div>
+                      {people.map(p=>(
+                        <div key={p} style={{height:"42px",display:"flex",alignItems:"center",padding:"0 8px",
+                                             borderBottom:`1px solid ${C.border}`}}>
+                          <span style={{fontSize:"12px",fontWeight:600,color:C.text,
+                                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
+                        </div>
+                      ))}
+                      <div style={{height:"34px",display:"flex",alignItems:"center",padding:"0 8px"}}>
+                        <span style={{fontSize:"11px",fontWeight:700,color:C.textMuted}}>Total</span>
+                      </div>
+                    </div>
+
+                    <div style={{overflowX:"auto",flex:1}}>
+                      <div style={{display:"flex",height:"30px",borderBottom:`1px solid ${C.border}`,backgroundColor:C.surface}}>
+                        {gameNums.map(g=>(
+                          <div key={g} style={{width:`${CELL_W}px`,flexShrink:0,display:"flex",alignItems:"center",
+                                               justifyContent:"center",borderRight:`1px solid ${C.border}`}}>
+                            <span style={{fontSize:"10px",fontWeight:700,color:C.textMuted}}>G{g}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {people.map(p=>(
+                        <div key={p} style={{display:"flex",height:"42px",borderBottom:`1px solid ${C.border}`}}>
+                          {gameNums.map(g=>{
+                            const v=getManualScore(manualScores,p,effectiveSessionLeague,sessionDate,g);
+                            return(
+                              <div key={g} style={{width:`${CELL_W}px`,flexShrink:0,borderRight:`1px solid ${C.border}`}}>
+                                <input
+                                  type="number" inputMode="numeric"
+                                  value={v==null?"":String(v)}
+                                  onChange={e=>updateManualScore(p,effectiveSessionLeague,sessionDate,g,e.target.value)}
+                                  aria-label={`${p}, game ${g}`}
+                                  style={{width:"100%",height:"100%",border:"none",outline:"none",
+                                          background:"transparent",textAlign:"center",
+                                          fontSize:"15px",fontWeight:600,color:C.text,
+                                          fontFamily:F.num,padding:0}}/>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                      <div style={{display:"flex",height:"34px"}}>
+                        {gameNums.map(g=>(
+                          <div key={g} style={{width:`${CELL_W}px`,flexShrink:0,borderRight:`1px solid ${C.border}`}}/>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Series totals, pinned on the right so they stay
+                        visible however far the games scroll. */}
+                    <div style={{flexShrink:0,width:"52px",borderLeft:`1px solid ${C.border}`,backgroundColor:C.surface}}>
+                      <div style={{height:"30px",display:"flex",alignItems:"center",justifyContent:"center",
+                                   borderBottom:`1px solid ${C.border}`}}>
+                        <span style={{fontSize:"10px",fontWeight:700,color:C.textMuted}}>TOTAL</span>
+                      </div>
+                      {people.map(p=>{
+                        const t=seriesTotal(gameNums.map(g=>getManualScore(manualScores,p,effectiveSessionLeague,sessionDate,g)));
+                        return(
+                          <div key={p} style={{height:"42px",display:"flex",alignItems:"center",justifyContent:"center",
+                                               borderBottom:`1px solid ${C.border}`}}>
+                            <span style={{fontSize:"14px",fontWeight:700,color:t!=null?C.accent:C.textMuted,fontFamily:F.num}}>
+                              {t!=null?t:"—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div style={{height:"34px"}}/>
+                    </div>
+                  </div>
+
+                  {/* Adding people lives here now -- the table IS the
+                      who's-bowling list, so a separate card for it was
+                      the same information twice. */}
+                  <div style={{...S.row,marginTop:"10px"}}>
+                    <input style={{...S.input,flex:1,fontSize:"13px"}} placeholder="Add someone bowling with you"
+                      value={newGuestName} onChange={e=>setNewGuestName(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter")addGuestBowler();}}/>
+                    <button style={S.btn("sm")} onClick={addGuestBowler}>+</button>
+                  </div>
+                  {(guests||[]).length>0&&(
+                    <div style={{...S.chips,marginTop:"6px"}}>
+                      {guests.map(g=>(
+                        <Chip key={g} label={`${g}  ×`} dense selected color={C.textMuted}
+                          onToggle={()=>removeGuestBowler(g)}/>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {!editingId&&activeBowler&&effectiveSessionLeague&&preferences.environment!=="casual"&&!(preferences.environment==="practice"&&practiceMode==="drill")&&(()=>{
               // How many game rows to show.
               //
               // Was hardcoded to 3, which is right for a league night and

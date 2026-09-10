@@ -14,7 +14,7 @@ import { C, S, F } from "./ui.jsx";
 
 // A phone-shaped frame, so it reads as "this is a screen" rather than
 // as more of the tour's own UI.
-function Phone({ children, title, headerIcon }) {
+function Phone({ children, title, headerIcon, casual }) {
   return (
     <div style={{
       border: `1px solid ${C.border}`, borderRadius: "18px", overflow: "hidden",
@@ -28,7 +28,7 @@ function Phone({ children, title, headerIcon }) {
         <span style={{ fontSize: "13px", fontWeight: 700, color: C.text, fontFamily: F.body }}>{title}</span>
         <span style={{ display: "flex", gap: "8px", fontSize: "13px" }}>
           <span style={lit(headerIcon === "help")}>🔍</span>
-          <span style={lit(headerIcon === "import")}>📷</span>
+          {!casual && <span style={lit(headerIcon === "import")}>📷</span>}
           <span style={{ opacity: 0.55 }}>👤</span>
           <span style={lit(headerIcon === "settings")}>⚙️</span>
         </span>
@@ -77,8 +77,10 @@ const label = { ...S.label, fontSize: "10px", marginBottom: "6px" };
 const chip = (sel, col) => ({ ...S.chip(sel, col), fontSize: "10px", padding: "5px 9px" });
 const muted = { fontSize: "10px", color: C.textMuted, fontFamily: F.body };
 
-function Nav({ active }) {
-  const tabs = [["🎳", "Bowl"], ["📖", "History"], ["📈", "Stats"], ["🎯", "Improve"], ["🔒", "Vault"]];
+function Nav({ active, casual }) {
+  const tabs = casual
+    ? [["🎳", "Bowl"], ["🏆", "Friends"]]
+    : [["🎳", "Bowl"], ["📖", "History"], ["📈", "Stats"], ["🎯", "Improve"], ["🔒", "Vault"]];
   return (
     <div style={{
       display: "flex", borderTop: `1px solid ${C.border}`,
@@ -194,6 +196,54 @@ function ResultCard({ stage }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// The casual scoresheet, drawn the way it really works: the name column
+// is fixed, the games scroll, and the total sits on the right. Showing a
+// fourth part-visible column is what tells a bowler it scrolls.
+function ScoreTable({ rows = [] }) {
+  const total = vals => {
+    const nums = vals.filter(v => v !== "").map(Number);
+    return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
+  };
+  const cell = { width: "34px", flexShrink: 0, textAlign: "center", fontSize: "11px" };
+  return (
+    <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: "6px", overflow: "hidden" }}>
+      <div style={{ flexShrink: 0, width: "52px", background: C.surface, borderRight: `1px solid ${C.border}` }}>
+        <div style={{ ...muted, height: "18px", lineHeight: "18px", paddingLeft: "5px", fontSize: "8px" }}>BOWLER</div>
+        {rows.map(([name]) => (
+          <div key={name} style={{ height: "24px", lineHeight: "24px", paddingLeft: "5px",
+            fontSize: "10px", fontWeight: 600, color: C.text, borderTop: `1px solid ${C.border}` }}>{name}</div>
+        ))}
+      </div>
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <div style={{ display: "flex", height: "18px", background: C.surface }}>
+          {["G1", "G2", "G3", "G4"].map(g => (
+            <div key={g} style={{ ...cell, ...muted, lineHeight: "18px", fontSize: "8px" }}>{g}</div>
+          ))}
+        </div>
+        {rows.map(([name, vals]) => (
+          <div key={name} style={{ display: "flex", height: "24px", borderTop: `1px solid ${C.border}` }}>
+            {[...vals, ""].map((v, i) => (
+              <div key={i} style={{ ...cell, lineHeight: "24px", fontWeight: 600,
+                color: v ? C.text : C.textMuted }}>{v || ""}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{ flexShrink: 0, width: "38px", background: C.surface, borderLeft: `1px solid ${C.border}` }}>
+        <div style={{ ...muted, height: "18px", lineHeight: "18px", textAlign: "center", fontSize: "8px" }}>TOTAL</div>
+        {rows.map(([name, vals]) => {
+          const t = total(vals);
+          return (
+            <div key={name} style={{ height: "24px", lineHeight: "24px", textAlign: "center",
+              fontSize: "11px", fontWeight: 700, color: t != null ? C.accent : C.textMuted,
+              borderTop: `1px solid ${C.border}` }}>{t != null ? t : "—"}</div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -691,55 +741,46 @@ const SCREENS = {
     </Phone>
   ),
 
+
   // ── Just bowling ──────────────────────────────────────────────────
 
   "casual-scores": () => (
-    <Phone title="Bowl">
+    <Phone title="Bowl" casual>
       <Spot>
         <div style={{ ...card, marginBottom: 0 }}>
-          <div style={label}>Tonight</div>
-          <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px", marginBottom: "8px" }}>Fri 12 Sep</div>
-          <div style={{ display: "flex", gap: "5px" }}>
-            {["142", "168", ""].map((v, i) => (
-              <div key={i} style={{
-                ...S.input, flex: 1, padding: "8px 4px", textAlign: "center",
-                fontSize: "15px", fontWeight: 700,
-                color: v ? C.text : C.textMuted,
-                borderColor: v ? C.border : C.accent,
-              }}>{v || "—"}</div>
-            ))}
-          </div>
-          <div style={{ ...muted, marginTop: "5px", textAlign: "center" }}>Game 1 · 2 · 3</div>
+          <div style={label}>Scores</div>
+          <ScoreTable rows={[
+            ["You", ["142", "168", "155"]],
+            ["Sam", ["120", "99", "143"]],
+            ["Jess", ["161", "", ""]],
+          ]} />
         </div>
       </Spot>
-      <Note>Type the score, nothing else</Note>
-      <Nav active={0} />
+      <Note>Totals add themselves</Note>
+      <Nav active={0} casual />
     </Phone>
   ),
 
+  // The scoring table both casual steps describe: names frozen on the
+  // left, games across, totals pinned right.
   "casual-people": () => (
-    <Phone title="Bowl">
+    <Phone title="Bowl" casual>
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Scores</div>
+        <ScoreTable rows={[["You", ["", "", ""]], ["Sam", ["", "", ""]], ["Jess", ["", "", ""]]]} />
+      </div>
       <Spot>
-        <div style={{ ...card, marginBottom: 0 }}>
-          <div style={label}>Keeping score for</div>
-          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "8px" }}>
-            <span style={chip(true)}>You</span>
-            <span style={chip(false)}>Sam</span>
-            <span style={chip(false)}>Jess</span>
-            <span style={chip(false)}>Marcus</span>
-          </div>
-          <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted }}>
-            + Add someone bowling with you
-          </div>
+        <div style={{ ...S.input, padding: "7px 9px", fontSize: "10px", color: C.textMuted }}>
+          Add someone bowling with you
         </div>
       </Spot>
-      <Note>They don't need the app at all</Note>
-      <Nav active={0} />
+      <Note>Each person becomes a row</Note>
+      <Nav active={0} casual />
     </Phone>
   ),
 
   "casual-winner": () => (
-    <Phone title="Bowl">
+    <Phone title="Bowl" casual>
       <Spot>
         <div style={{ ...card, marginBottom: 0 }}>
           <div style={{ textAlign: "center", marginBottom: "8px" }}>
@@ -756,12 +797,12 @@ const SCREENS = {
         </div>
       </Spot>
       <Note>Worked out for you</Note>
-      <Nav active={0} />
+      <Nav active={0} casual />
     </Phone>
   ),
 
   "casual-share": () => (
-    <Phone title="Bowl">
+    <Phone title="Bowl" casual>
       <div style={{ ...card, marginBottom: "8px", textAlign: "center" }}>
         <div style={{ fontSize: "10px", fontWeight: 700, color: C.accent, letterSpacing: "1px" }}>
           FRIDAY NIGHT
@@ -776,7 +817,7 @@ const SCREENS = {
         </div>
       </Spot>
       <Note>Straight to the group chat</Note>
-      <Nav active={0} />
+      <Nav active={0} casual />
     </Phone>
   ),
 

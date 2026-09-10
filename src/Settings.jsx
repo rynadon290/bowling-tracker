@@ -68,8 +68,11 @@ export default function Settings({
   const cardsFor = {
     leagues: ["leagues"],
     settings: casualMode
-      ? ["look", "backup", "dangerZone"]
-      : ["look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "reset", "dangerZone"],
+      // Walkthroughs stay: a casual bowler is the most likely to want to
+      // rewatch one, and it used to ride on the "reset" id -- so cutting
+      // Reset silently cut the tours too.
+      ? ["look", "walkthroughs", "backup", "dangerZone"]
+      : ["look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "walkthroughs", "reset", "dangerZone"],
   };
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);
@@ -628,7 +631,7 @@ export default function Settings({
           bowler never sees, and the casual tour would bore a league
           bowler. Coaching is gated to coaches -- offering it to everyone
           would advertise a mode most people will never use. */}
-      {showCard("reset") && replayTour && (
+      {showCard("walkthroughs") && replayTour && (
         <div style={S.card}>
           <div style={S.label}>Walkthroughs</div>
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
