@@ -14,7 +14,7 @@ const ALL_STEPS = [
     id: "bowl",
     tab: "log",
     title: "Bowl",
-    body: "Everything starts here. Say what you're bowling — practice, a league night, or a tournament — and the app sets itself up for it. Each one asks for different things, so you're never entering a lane pattern for a Sunday practice or a drill target on league night.",
+    body: "Everything starts here. Choose how you're bowling tonight — practice, a league night, or a tournament — and the app sets itself up for it. Each one asks for different things, so you're never entering a lane pattern for a Sunday practice or a drill target on league night.",
   },
   {
     id: "tracking",
@@ -105,6 +105,9 @@ const ALL_STEPS = [
     envs: ["casual"],
   },
 
+  // Each mode tour ends on what it produces -- the payoff for the setup
+  // the rest of the tour just explained.
+
   // ── Practice ────────────────────────────────────────────────────────
   {
     id: "practice-modes",
@@ -133,6 +136,13 @@ const ALL_STEPS = [
     tab: "log",
     title: "The extra detail",
     body: "Practice is where the accessory fields earn their place — ball speed, rev rate, axis rotation and plenty more. Turn on only the ones you're working on; they're per-field switches in Settings, not all or nothing.",
+    envs: ["practice"],
+  },
+  {
+    id: "practice-recap",
+    tab: "log",
+    title: "Your practice summary",
+    body: "End the session and you get what actually happened: how the drill went against last week, which spares you converted, and whether the thing you came to work on moved. It's saved, so next week starts with a comparison rather than a guess.",
     envs: ["practice"],
   },
 
@@ -167,19 +177,27 @@ const ALL_STEPS = [
   },
 
   {
+    id: "tourney-recap",
+    tab: "log",
+    title: "Your tournament, summed up",
+    body: "At the end you get the whole event in one place: every block, where you finished against the cut, your match record, and what the entries and side pots netted out to. It stays in your history as a complete tournament, not a pile of loose games.",
+    envs: ["tournament"],
+  },
+
+  {
     id: "import",
     tab: null,
     title: "Import a scorecard",
     // A casual night has no printed scorecard to photograph, and the
     // import flow asks "which team?" which a casual bowler doesn't have.
     envs: ["practice", "league", "tournament"],
-    body: "Snap the monitor at the end of the night and the 📷 button at the top reads it — yours and your teammates'.",
+    body: "Rather than typing a whole night in, photograph the scoring monitor. Tap Import at the top, say what you're importing and pick the date, then add the photo. The app reads every column on the card — all the games, and the frames behind them.",
   },
   {
     id: "import-verify",
     tab: null,
     title: "Checking an import",
-    body: "Read scores land as a proposal, not a fact. You map each column to a bowler, fix anything the camera misread, and only then does it save. Send a teammate their scores and they get the same check on their end before it counts.",
+    body: "Nothing saves until you've checked it. You tell it who each column belongs to, fix anything the camera misread, and confirm. Columns you map to a teammate are sent to them, and they get the same check before it counts for them.",
   },
   {
     id: "stats",
@@ -200,7 +218,7 @@ const ALL_STEPS = [
     // Said plainly rather than discovered: someone who opens this on
     // night one and finds it empty concludes the feature is weak, when
     // it just hasn't got enough to work with yet.
-    footnote: "This needs about ten games of shot-by-shot logging before it can say anything even somewhat meaningful — and the more you bowl, the more tailored it gets. Scores from casual nights aren't included.",
+    footnote: "This needs about ten games of shot-by-shot logging before it can say anything even somewhat meaningful, so be patient — and the more you bowl, the more tailored to you and better it'll get. Scores from casual nights aren't included.",
   },
   {
     id: "improve",
@@ -234,7 +252,7 @@ const ALL_STEPS = [
     tab: "locker",
     title: "Adding your teammates",
     envs: ["league"],
-    body: "Build your roster in bowling order. Add each teammate with their name and email — that works whether or not they've signed up yet. You can start logging their scores immediately, no account needed. When they do sign up with that email, the invite is waiting for them, and accepting it connects them to everything you've already recorded.",
+    body: "Add each teammate with their name and email — that works whether or not they've signed up yet. When they do sign up with that email, the invite is waiting for them, and accepting it connects them to everything you've already logged under their name. Don't have someone's email? Tick the box and you'll get a short code to text them; they enter it when they sign up and land on the same spot.",
   },
   {
     id: "money",
@@ -245,6 +263,13 @@ const ALL_STEPS = [
     envs: ["league"],
     body: "Tap the pots you're in each night. Buy-ins are remembered per league, so you enter them once.",
     when: ({ showMoneyGames }) => !!showMoneyGames,
+  },
+  {
+    id: "league-recap",
+    tab: "log",
+    title: "Your night, summed up",
+    body: "Finish the night and the recap pulls it together: your series, how the team did, your strikes and spares, the money games settled, and where it puts your average. Share it to the team chat in one tap.",
+    envs: ["league"],
   },
 ];
 
