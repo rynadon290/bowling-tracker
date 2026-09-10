@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabaseClient.js';
-import { cloudRead, cloudWrite } from './syncQueue.js';
+import { cloudRead, cloudWrite, adoptLegacyQueueItems, flushPendingQueue } from './syncQueue.js';
+import { setStorageUser, adoptLegacyData } from './scopedStorage.js';
 import { normalizePreferences, defaultPreferences } from './domain/preferences.js';
 
 const AuthContext = createContext(null);
@@ -10,11 +11,26 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState('');
   const [preferences, setPreferences] = useState(defaultPreferences());
+  // Whether local storage is ready to be read as THIS user. Adoption
+  // moves pre-scoping data into their namespace, and the tracker's load
+  // effect reads that namespace on mount -- so mounting before adoption
+  // finishes is a race the offline case loses: the load would find an
+  // empty namespace, cache an empty result into it, and adoption would
+  // then decline to overwrite what it found. A returning bowler with no
+  // signal would open the app to a blank history.
+  const [scopeReady, setScopeReady] = useState(false);
 
   useEffect(() => {
     // Check for an existing session on first load (e.g. returning visitor
     // whose session is still valid).
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Set before setSession, not after. setSession schedules a render,
+      // and anything that render triggers -- a cached read, a queued
+      // write -- must already know whose device this is. Doing it in an
+      // effect that reacts to session would leave a window where the
+      // answer is "nobody", and a read in that window falls back to the
+      // unscoped key.
+      setStorageUser(session?.user?.id || null);
       setSession(session);
       setLoading(false);
     });
@@ -24,6 +40,10 @@ export function AuthProvider({ children }) {
     // library finishes parsing the tokens out of the URL automatically.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        // Sign-out lands here too, and clearing the active user is what
+        // makes the previous bowler's cache unreadable rather than merely
+        // unattributed.
+        setStorageUser(session?.user?.id || null);
         setSession(session);
         setLoading(false);
       }
@@ -41,6 +61,35 @@ export function AuthProvider({ children }) {
       .then(({ data, online }) => {
         if (online && data) setDisplayName(data.display_name || '');
       });
+  }, [session?.user?.id]);
+
+  // One-time claim of pre-scoping data, on the first sign-in after this
+  // shipped. Cache and queue are adopted together and guarded by the same
+  // device marker, so they cannot disagree about whether it has run --
+  // half-adopted state (queue claimed, cache not) would be worse than
+  // either outcome.
+  //
+  // The flush afterwards is deliberate: those adopted items have been
+  // unflushable since the update landed, and now have an owner.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    let cancelled = false;
+    setScopeReady(false);
+    (async () => {
+      try {
+        const { skipped } = await adoptLegacyData(userId);
+        if (!skipped) {
+          await adoptLegacyQueueItems(userId);
+          await flushPendingQueue();
+        }
+      } catch {}
+      // Ready even if adoption threw. A failed adoption means some legacy
+      // data stays where it is; refusing to render at all over that would
+      // turn a partial cache miss into a bricked app.
+      if (!cancelled) setScopeReady(true);
+    })();
+    return () => { cancelled = true; };
   }, [session?.user?.id]);
 
   const PREFERENCES_KEY = 'bowling-preferences-v1';
@@ -134,6 +183,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     session,
+    scopeReady,
     user: session?.user ?? null,
     displayName,
     preferences,

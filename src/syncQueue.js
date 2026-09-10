@@ -1,6 +1,18 @@
 import { openDB } from 'idb';
 import { supabase } from './supabaseClient.js';
 export { classifySyncError, shouldSurfaceSyncIssue } from './domain/syncErrors.js';
+import { getActiveUserId, partitionQueue, ownedBy } from './domain/userScope.js';
+
+// Every queued write records WHO queued it, and nothing is ever replayed
+// through a different person's session.
+//
+// Without this, the queue was a bearer token: it held a table, an
+// operation and a payload, and flushPendingQueue sent them through
+// whichever supabase client happened to be signed in when it next ran.
+// Bowler A logging a shot offline, signing out, and handing the phone to
+// bowler B put A's shot in B's account -- and deleted it from the queue
+// on success, so A did not get it back. Confirmed in a real browser
+// against real IndexedDB before this was written.
 
 // Requires the `idb` package (a small, standard Promise wrapper around the
 // browser's IndexedDB API): npm install idb
@@ -60,9 +72,11 @@ export function onPendingCountChange(callback) {
   return () => listeners.delete(callback);
 }
 
+// The pending-sync badge must count MY unsynced writes. Counting the
+// whole store would show a bowler another bowler's backlog and, worse,
+// imply their own games were still in flight when they were not.
 export async function getPendingCount() {
-  const db = await getDb();
-  return db.count(STORE_NAME);
+  return (await myItems()).length;
 }
 
 // A per-table breakdown of what's actually stuck in the queue, for
@@ -70,8 +84,7 @@ export async function getPendingCount() {
 // at the first failure to preserve ordering, so one permanently-broken
 // item can freeze everything queued behind it indefinitely.
 export async function inspectPendingQueue() {
-  const db = await getDb();
-  const all = await db.getAll(STORE_NAME);
+  const all = await myItems();
   const byTable = {};
   const reasonsByTable = {};
   all.forEach(item => {
@@ -105,7 +118,10 @@ export async function inspectPendingQueue() {
 // of someone's night isn't collateral damage.
 export async function clearPendingQueue() {
   const db = await getDb();
-  const all = await db.getAll(STORE_NAME);
+  // Blunt, but only within one account. Discarding another bowler's
+  // backlog because this bowler's queue was wedged would be a second
+  // cross-account bug wearing the first one's clothes.
+  const all = await myItems();
   for (const item of all) {
     await db.delete(STORE_NAME, item.queueId);
   }
@@ -121,6 +137,11 @@ export async function clearPendingQueue() {
 // backlog, which meant losing good writes to get rid of one bad one.
 export async function discardQueuedItem(queueId) {
   const db = await getDb();
+  // Ownership is re-checked here rather than trusted from the UI: the id
+  // came from a list this user was shown, but a stale render or a second
+  // tab could hand over an id that is no longer theirs.
+  const item = await db.get(STORE_NAME, queueId);
+  if (!item || !ownedBy(item, getActiveUserId())) return;
   await db.delete(STORE_NAME, queueId);
   notifyListeners(await getPendingCount());
 }
@@ -130,7 +151,7 @@ export async function discardQueuedItem(queueId) {
 // queue is fine.
 export async function discardQueuedTable(table) {
   const db = await getDb();
-  const all = await db.getAll(STORE_NAME);
+  const all = await myItems();
   for (const item of all) {
     if (item.table === table) await db.delete(STORE_NAME, item.queueId);
   }
@@ -146,8 +167,37 @@ async function queueWrite(table, operation, payload, reason, onConflict, errorCo
   // separately from the human-readable reason because classification
   // keys off the code -- message wording varies between PostgREST
   // versions, the code does not.
-  await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, createdAt: Date.now() });
+  // userId is stamped at queue time, not at flush time. Flush time is
+  // exactly when it is already wrong -- the whole failure is that the
+  // person signed in then is not the person who made the write.
+  await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, userId: getActiveUserId(), createdAt: Date.now() });
   notifyListeners(await getPendingCount());
+}
+
+// Every read below goes through this, so a new accessor cannot forget to
+// filter. `mine` excludes unowned legacy items deliberately; those move
+// only through adoptLegacyQueueItems.
+async function myItems() {
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  return partitionQueue(all, getActiveUserId()).mine;
+}
+
+// Claims pre-scoping queue items for the first user to sign in after this
+// shipped. They carry no userId, so they would otherwise never flush and
+// a real unsynced game would sit there forever. Runs once per device --
+// the caller (AuthProvider) owns that guard, alongside the matching cache
+// adoption, so the two cannot disagree about whether it has happened.
+export async function adoptLegacyQueueItems(userId) {
+  if (!userId) return 0;
+  const db = await getDb();
+  const all = await db.getAll(STORE_NAME);
+  let adopted = 0;
+  for (const item of all) {
+    if (!item.userId) { await db.put(STORE_NAME, { ...item, userId }); adopted++; }
+  }
+  if (adopted) notifyListeners(await getPendingCount());
+  return adopted;
 }
 
 // Every pending record still needs a stable id the UI can reference before
@@ -281,8 +331,7 @@ export async function cloudReadDelta(table, sinceIso, { timeoutMs = 6000 } = {})
 // (e.g. loading shot history) can merge them in — otherwise a shot logged
 // while offline would be invisible until the queue actually flushes.
 export async function getQueuedRecordsForTable(table) {
-  const db = await getDb();
-  const all = await db.getAll(STORE_NAME);
+  const all = await myItems();
   return all.filter((item) => item.table === table && item.operation === 'upsert').map((item) => item.payload);
 }
 
@@ -293,7 +342,13 @@ export async function getQueuedRecordsForTable(table) {
 // succeed fastest.
 export async function flushPendingQueue() {
   const db = await getDb();
-  const all = await db.getAll(STORE_NAME);
+  // Only this user's writes, and nothing at all when signed out. The
+  // periodic 30s timer below fires regardless of who is signed in, which
+  // is precisely how A's shot used to reach B without anyone touching
+  // the app.
+  const userId = getActiveUserId();
+  if (!userId) return;
+  const all = await myItems();
 
   for (const item of all) {
     try {

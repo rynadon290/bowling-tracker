@@ -1,3 +1,11 @@
+// FIRST import, deliberately. Module bodies evaluate in import order,
+// and BowlingTracker installs a plain window.storage adapter at module
+// scope. scopedStorage can wrap an existing adapter, so either order
+// works -- but relying on that is a silent dependency on the order of
+// two lines in this file, which a future tidy-up would reorder without
+// knowing. Installing the scoped adapter first makes BowlingTracker's
+// own installer a no-op and removes the question.
+import './scopedStorage.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import BowlingTracker from './BowlingTracker.jsx';
@@ -15,17 +23,25 @@ if ('serviceWorker' in navigator) {
 }
 
 function AuthGate() {
-  const { user, loading } = useAuth();
+  const { user, loading, scopeReady } = useAuth();
 
   // Avoid a flash of the sign-in screen while the initial session check is
   // still in flight (getSession() takes a beat on first load).
-  if (loading) {
+  // scopeReady gates on the one-time legacy adoption as well as the
+  // session check, so the tracker never mounts against a namespace that
+  // is still being filled.
+  if (loading || (user && !scopeReady)) {
     // Reads the live palette so the pre-auth blank doesn't flash the old
     // slate for a beat on a light or warm theme.
     return <div style={{ minHeight: '100vh', backgroundColor: C.bg }} />;
   }
 
-  return user ? <BowlingTracker /> : <SignIn />;
+  // Keyed on the user id so switching accounts remounts from scratch.
+  // Without it React reconciles the same instance and every piece of the
+  // previous bowler's in-memory state -- shots, sessions, arsenal --
+  // survives the switch, which is the same leak as the cache one but in
+  // React state instead of localStorage.
+  return user ? <BowlingTracker key={user.id} /> : <SignIn />;
 }
 
 createRoot(document.getElementById('root')).render(
