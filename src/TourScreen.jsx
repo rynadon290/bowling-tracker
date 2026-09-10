@@ -526,6 +526,164 @@ const SCREENS = {
     </Phone>
   ),
 
+  // ── Coach track ───────────────────────────────────────────────────
+  //
+  // These had no mock-ups at all -- I checked every bowler step had one
+  // and never checked the coach track, so all six showed text over blank
+  // space. Same invented names as the roster screen: never a real one.
+
+  "coach-roster": () => (
+    <Phone title="Coach">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Your bowlers</div>
+          {[
+            ["Leadoff Larry", "Ten pin conversion", "72%", "Tue 22nd", C.strike],
+            ["Brooklyn Barry", "Ball speed control", "45%", "Thu 24th", C.spare],
+            ["Tessa Tenpin", "Spare shooting", "88%", "Tue 22nd", C.strike],
+            ["Anchor Annie", "Nothing set", "—", "not booked", C.textMuted],
+          ].map(([name, task, pct, next, col]) => (
+            <div key={name} style={{ padding: "6px 0", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: C.text }}>{name}</span>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{pct}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={muted}>{task}</span>
+                <span style={muted}>{next}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Everyone, and where they are, on one screen</Note>
+      <Nav active={3} />
+    </Phone>
+  ),
+
+  "coach-open": () => (
+    <Phone title="Coach">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text }}>Leadoff Larry</div>
+        <div style={muted}>Tuesday House Shot · 14 nights logged</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Spare conversion by split</div>
+          {[["Baby split", "3-10", "75%", C.strike],
+            ["7-10", "", "0%", C.miss],
+            ["Big four", "4-6-7-10", "20%", C.miss]].map(([n, pins, r, col]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
+              <span style={{ fontSize: "10px", color: C.text }}>
+                {n} {pins && <span style={{ color: C.textMuted }}>{pins}</span>}
+              </span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{r}</span>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Their logged data, not a summary they typed</Note>
+      <Nav active={3} />
+    </Phone>
+  ),
+
+  "coach-tasks": () => (
+    <Phone title="Coach">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={muted}>Task for Leadoff Larry</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>What to work on</div>
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px", color: C.text, marginBottom: "5px" }}>
+            Ten pin conversion
+          </div>
+          <div style={{ display: "flex", gap: "5px" }}>
+            <div style={{ ...S.input, flex: 1, padding: "6px 9px", fontSize: "11px", color: C.text }}>90%</div>
+            <div style={{ ...S.input, flex: 1, padding: "6px 9px", fontSize: "11px", color: C.text }}>by the 15th</div>
+          </div>
+          <div style={{ ...muted, marginTop: "8px", lineHeight: 1.4 }}>
+            They'll see: <span style={{ color: C.text }}>"Make 9 of your next 10 ten pins"</span>
+          </div>
+        </div>
+      </Spot>
+      <Note>Set in numbers, shown to them in bowling terms</Note>
+      <Nav active={3} />
+    </Phone>
+  ),
+
+  "coach-goals": () => (
+    <Phone title="Coach">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={muted}>Goal for Tessa Tenpin</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Their goals</div>
+          {[["Spare conversion", "88%", 88], ["Average", "184 / 190", 72]].map(([n, v, pct]) => (
+            <div key={n} style={{ marginBottom: "7px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                <span style={{ fontSize: "10px", color: C.text }}>{n}</span>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: C.strike }}>{v}</span>
+              </div>
+              <div style={{ height: "5px", borderRadius: "3px", background: C.border }}>
+                <div style={{ width: `${pct}%`, height: "100%", borderRadius: "3px", background: C.strike }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted, marginTop: "6px" }}>
+            + Set another goal
+          </div>
+        </div>
+      </Spot>
+      <Note>The same number you both watch between sessions</Note>
+      <Nav active={3} />
+    </Phone>
+  ),
+
+  "coach-session": () => (
+    <Phone title="Coach">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={muted}>Next session with Brooklyn Barry</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>When</div>
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px", color: C.text, marginBottom: "6px" }}>
+            Thu 24 Sep
+          </div>
+          <div style={label}>What you'll cover</div>
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted }}>
+            Speed control off the 4th arrow
+          </div>
+        </div>
+      </Spot>
+      <Nav active={3} />
+    </Phone>
+  ),
+
+  "coach-between": () => (
+    <Phone title="Coach">
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={label}>Since you last saw them</div>
+      </div>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          {[["Leadoff Larry", "3 nights · ten pins 64% → 72%", C.strike],
+            ["Tessa Tenpin", "2 nights · average up 6 pins", C.strike],
+            ["Anchor Annie", "1 night · spares slipped to 61%", C.miss]].map(([n, change, col]) => (
+            <div key={n} style={{ padding: "5px 0", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "11px", fontWeight: 600, color: C.text }}>{n}</div>
+              <div style={{ fontSize: "10px", color: col }}>{change}</div>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Already there when you arrive</Note>
+      <Nav active={3} />
+    </Phone>
+  ),
+
   money: () => (
     <Phone title="Bowl">
       <div style={card}>
