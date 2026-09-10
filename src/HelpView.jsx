@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { C, S } from "./ui.jsx";
-import { searchHelp, helpByArea, HELP } from "./domain/help.js";
+import { searchHelp, helpByArea, helpFor, HELP } from "./domain/help.js";
 
 // Help that navigates, not just explains.
 //
 // A bowler searching "buy-in" doesn't want an article, they want the
 // money card on the Bowl tab. Every entry that lives somewhere carries
 // the view it belongs to, so a result can take you there.
-export default function HelpView({ onNavigate, onClose, onReplayTour }) {
+export default function HelpView({ onNavigate, onClose, onReplayTour, environment }) {
   const [query, setQuery] = useState("");
-  const results = query.trim() ? searchHelp(query) : null;
-  const areas = helpByArea();
+  // Scoped to the mode: a Just Bowling user's docs should describe their
+  // app, not features their app doesn't have.
+  const scoped = helpFor(environment);
+  const results = query.trim() ? searchHelp(query, scoped) : null;
+  const areas = helpByArea(scoped);
 
   function Entry({ entry }) {
     return (

@@ -16,7 +16,7 @@ export default function StatsView({
   preferences,
   view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
-  compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, compareSessions, displayName="",
+  compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, onOpenFriends, compareSessions, displayName="",
   statsLeague, setStatsLeague,
   compareLeague, setCompareLeague, matches,
   FRAME_POSITION_RELIABILITY_THRESHOLD, SHOT_SAMPLE_THRESHOLD, allFirstBalls, bStats, bowlerLeagueCount,
@@ -238,6 +238,16 @@ bowlers.length>1&&(
                             Nobody to compare against yet. Add a friend, or set up your team — teammates
                             are added as friends automatically.
                           </div>
+                        )}
+                        {/* Friends lives here rather than in the Vault: this
+                            dropdown is the only place friend data is used,
+                            so the way to add someone belongs beside it. */}
+                        {onOpenFriends&&(
+                          <button style={{...S.btn(),width:"100%",marginTop:"8px",fontSize:"12px",
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}
+                            onClick={onOpenFriends}>
+                            👥 {friends.length?"Manage friends":"Add a friend"}
+                          </button>
                         )}
                       </>
                     )}

@@ -4600,10 +4600,14 @@ export default function BowlingTracker(){
                 <span style={{position:"absolute",top:"-4px",right:"-6px",minWidth:"15px",height:"15px",borderRadius:"8px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"15px",textAlign:"center",padding:"0 3px"}}>{inboxCount}</span>
               </button>
             )}
-            {/* Search and Import are hidden in Just Bowling: the docs
-                are mostly about features that mode doesn't have, and
-                there's no scorecard to photograph on a casual night. */}
-            {!casualMode&&<button onClick={()=>setView("help")}
+            {/* Search stays in Just Bowling -- it's the only way back
+                for someone who picked that mode by accident and watched
+                four tabs disappear. Its CONTENT is filtered instead; see
+                the mode filter in domain/help.js.
+                
+                Import is genuinely hidden: there's no scorecard to
+                photograph on a casual night. */}
+            {<button onClick={()=>setView("help")}
               style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}}
               aria-label="Search help">🔍</button>}
 
@@ -4857,15 +4861,17 @@ export default function BowlingTracker(){
             with your equipment, not buried in app settings. Same Settings
             component in a card-filtered mode, so there is still exactly
             one Leagues editor rather than two that can drift. */}
-        {/* Friends and teams sit in Vault, not Improve: they're people you
-            manage, alongside your leagues and equipment. A coach is
-            different -- that IS improvement -- so the Coach button stays
-            on Improve. */}
-        {view==="locker"&&!coachViewOn&&(
-          <button style={{...S.btn(),width:"100%",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}} onClick={()=>setView("social")}>
-            👥 Friends
-          </button>
-        )}
+        {/* Friends moved to Stats, beside Compare To.
+        
+            It was in the Vault, alongside leagues and equipment -- but a
+            person isn't equipment, and for a league bowler "Friends"
+            isn't really a destination: teammates are auto-friended,
+            requests arrive in the inbox, and the list exists almost
+            entirely to populate the Compare To dropdown.
+            
+            Putting it where that dropdown lives makes it contextual: you
+            open Compare To, find nobody there, and the fix is right
+            beside it. */}
 
         {view==="locker"&&(
           <Settings
@@ -4966,6 +4972,7 @@ export default function BowlingTracker(){
 
         {view==="help"&&(
           <HelpView
+            environment={preferences.environment}
             onNavigate={setView}
             onClose={()=>setView("log")}
             onReplayTour={replayTour}/>
@@ -5102,7 +5109,7 @@ export default function BowlingTracker(){
             view={view} shots={shots} sessions={sessions} bowlers={bowlers} teams={teams} leagues={leagues} arsenals={arsenals} saved={saved}
             statsBowler={statsBowler} setStatsBowler={chooseStatsBowler} compareBowler={compareBowler} setCompareBowler={setCompareBowler}
             compareFriendId={compareFriendId} setCompareFriendId={setCompareFriendId}
-            friends={friends} onLoadFriendData={loadFriendData} compareSessions={compareSessions} displayName={displayName}
+            friends={friends} onLoadFriendData={loadFriendData} onOpenFriends={()=>setView("social")} compareSessions={compareSessions} displayName={displayName}
             statsLeague={statsLeague} setStatsLeague={chooseStatsLeague}
             compareLeague={compareLeague} setCompareLeague={setCompareLeague}
             matches={matches}
