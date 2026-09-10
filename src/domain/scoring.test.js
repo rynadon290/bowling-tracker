@@ -580,3 +580,74 @@ describe('frameScoresheet', () => {
     expect(frameScoresheet([s1])[0].shot).toBe(s1);
   });
 });
+
+// Scores every bowler knows, checked against values computed
+// independently of this code. Tests written alongside an implementation
+// can encode the same wrong assumption it makes; these can't.
+describe('agrees with the scoring monitor', () => {
+  const strike = (f, b = null) => ({ frame: String(f), ballNum: b, result: 'Strike' });
+  const open = (f, pins, left, b = null) => ({
+    frame: String(f), ballNum: b, result: 'Other Leave',
+    otherLeave: left, spareMade: 'No', pinCount: String(pins),
+  });
+  const spare = (f, first, left, b = null) => ({
+    frame: String(f), ballNum: b, result: 'Other Leave',
+    otherLeave: left, spareMade: 'Yes', pinCount: String(first),
+  });
+  const finalScore = shots => {
+    const rows = frameScoresheet(shots);
+    for (let i = rows.length - 1; i >= 0; i--) if (rows[i].running != null) return rows[i].running;
+    return null;
+  };
+
+  it('scores a perfect game as 300', () => {
+    expect(finalScore([
+      ...[1,2,3,4,5,6,7,8,9].map(f => strike(f)),
+      strike(10, 1), strike(10, 2), strike(10, 3),
+    ])).toBe(300);
+  });
+
+  it('scores a spare in every frame then 9 as 190', () => {
+    expect(finalScore([
+      ...[1,2,3,4,5,6,7,8,9].map(f => spare(f, 9, ['10'])),
+      spare(10, 9, ['10'], 1),
+      open(10, 9, ['10'], 3),
+    ])).toBe(190);
+  });
+
+  it('scores nine every frame with no spares as 90', () => {
+    expect(finalScore([
+      ...[1,2,3,4,5,6,7,8,9].map(f => open(f, 9, ['10'])),
+      open(10, 9, ['10'], 1),
+    ])).toBe(90);
+  });
+
+  it('scores a gutter game as 0, not null', () => {
+    const all = ['1','2','3','4','5','6','7','8','9','10'];
+    expect(finalScore([
+      ...[1,2,3,4,5,6,7,8,9].map(f => open(f, 0, all)),
+      open(10, 0, all, 1),
+    ])).toBe(0);
+  });
+
+  // A spare on the tenth's first ball embeds both balls in one record,
+  // and the scoresheet took only the FIRST mark — so a spare-out showed
+  // as "9 9", which reads as an open frame. The tenth is the one place
+  // a bowler checks the app against the monitor.
+  it('shows a slash for a tenth-frame spare', () => {
+    const rows = frameScoresheet([
+      ...[1,2,3,4,5,6,7,8,9].map(f => strike(f)),
+      spare(10, 9, ['10'], 1),
+      open(10, 9, ['10'], 3),
+    ]);
+    expect(rows[9].marks).toEqual(['9', '/', '9']);
+  });
+
+  it('shows three Xs for a strike-out', () => {
+    const rows = frameScoresheet([
+      ...[1,2,3,4,5,6,7,8,9].map(f => strike(f)),
+      strike(10, 1), strike(10, 2), strike(10, 3),
+    ]);
+    expect(rows[9].marks).toEqual(['X', 'X', 'X']);
+  });
+});

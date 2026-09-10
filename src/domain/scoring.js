@@ -539,7 +539,21 @@ export function frameScoresheet(shots) {
     if (f === 10) {
       rows.push({
         frame: 10,
-        marks: [f10b1, f10b2, f10b3].filter(Boolean).map(b => (isStk(b) ? "X" : marksFor(b)[0] || "")),
+        // flatMap, not [0].
+        //
+        // A spare on the tenth's first ball embeds both balls in one
+        // shot record, so marksFor returns ["9","/"] -- and taking only
+        // [0] threw the slash away. The scoresheet showed "9 9" for a
+        // spare-out, which reads as an open frame and is the one place
+        // a bowler checks the app against the monitor.
+        marks: [f10b1, f10b2, f10b3].filter(Boolean)
+          .flatMap((b, i) => {
+            if (isStk(b)) return ["X"];
+            const m = marksFor(b).filter(x => x !== "");
+            // Ball 3 is a single fill ball -- it has no "second ball",
+            // so only its first mark is real.
+            return b.ballNum === 3 ? m.slice(0, 1) : m;
+          }),
         running: throughHere,
         shot: f10b1,
         tenth: { ball1: f10b1, ball2: f10b2, ball3: f10b3 },
