@@ -58,9 +58,18 @@ export default function Settings({
   // Vault tab -- where you bowl belongs with your equipment, not buried in
   // app settings -- and the settings icon renders everything else. One
   // component, so there is still exactly one Leagues editor.
+  // Just Bowling gets a much shorter Settings.
+  //
+  // Accessory fields, money games and the stats card layout all
+  // configure features that mode doesn't have, and Reset offers to
+  // restore defaults for settings it never shows. Four cards of dead
+  // options make a simple mode feel complicated.
+  const casualMode = preferences.environment === "casual";
   const cardsFor = {
     leagues: ["leagues"],
-    settings: ["look", "environment", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "reset", "dangerZone"],
+    settings: casualMode
+      ? ["look", "environment", "backup", "dangerZone"]
+      : ["look", "environment", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "reset", "dangerZone"],
   };
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);

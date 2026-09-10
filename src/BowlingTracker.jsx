@@ -7,6 +7,7 @@ import Onboarding from "./Onboarding.jsx";
 import Tour from "./Tour.jsx";
 import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
+import CasualLeaderboard from "./CasualLeaderboard.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
 import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
@@ -45,7 +46,7 @@ import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSea
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
-import { setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
+import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, F, Chip, applyTheme } from "./ui.jsx";
@@ -3991,7 +3992,20 @@ export default function BowlingTracker(){
   // "log" -- so every existing view==="..." check keeps working; only the
   // tab that reaches it is new. Social and Coach are reachable from
   // inside Improve rather than being destinations of their own.
-  const navTabs=[
+  // Just Bowling gets two tabs, not five.
+  //
+  // History, Stats, Improve and Vault are all built on shot data,
+  // leagues or equipment -- none of which a casual bowler has. Showing
+  // four tabs that lead to empty screens makes the app look like it
+  // isn't working, and makes a simple night look like homework.
+  //
+  // Friends replaces them: the leaderboard of everyone who's been on a
+  // scoresheet, which is the only other thing a casual bowler wants.
+  const casualMode=preferences.environment==="casual";
+  const navTabs=casualMode?[
+    {id:"log",    label:"Bowl",    icon:"🎳"},
+    {id:"social", label:"Friends", icon:"🏆"},
+  ]:[
     {id:"log",     label:"Bowl",    icon:"🎳"},
     {id:"history", label:"History", icon:"📖"},
     {id:"data",    label:"Stats",   icon:"📈"},
@@ -4586,10 +4600,12 @@ export default function BowlingTracker(){
                 <span style={{position:"absolute",top:"-4px",right:"-6px",minWidth:"15px",height:"15px",borderRadius:"8px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"15px",textAlign:"center",padding:"0 3px"}}>{inboxCount}</span>
               </button>
             )}
-            {/* Search the documentation, and jump to what it describes. */}
-            <button onClick={()=>setView("help")}
+            {/* Search and Import are hidden in Just Bowling: the docs
+                are mostly about features that mode doesn't have, and
+                there's no scorecard to photograph on a casual night. */}
+            {!casualMode&&<button onClick={()=>setView("help")}
               style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}}
-              aria-label="Search help">🔍</button>
+              aria-label="Search help">🔍</button>}
 
             {/* Import lives here rather than on the Log tab. On Log it was
                 gated on the current environment AND on a league already
@@ -4601,7 +4617,7 @@ export default function BowlingTracker(){
             {/* Labelled, not just an icon. A bare camera reads as "take a
                 photo" -- several bowlers looked for import on the Bowl
                 tab and gave up. There's room in the header for the words. */}
-            <button onClick={()=>setView("import")}
+            {!casualMode&&<button onClick={()=>setView("import")}
               style={{background:"none",border:`1px solid ${C.border}`,cursor:"pointer",
                 fontSize:"12px",fontWeight:600,color:C.text,
                 padding:"5px 9px",borderRadius:"7px",lineHeight:1,
@@ -4609,7 +4625,7 @@ export default function BowlingTracker(){
               aria-label="Import scorecard">
               <span style={{fontSize:"13px"}}>📷</span>
               <span>Import</span>
-            </button>
+            </button>}
             <button onClick={()=>setView("profile")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Profile">👤</button>
             <button onClick={()=>setView("settings")} style={{background:"none",border:"none",cursor:"pointer",fontSize:"17px",padding:0,lineHeight:1}} aria-label="Settings">⚙️</button>
           </div>
@@ -4772,7 +4788,7 @@ export default function BowlingTracker(){
             because roster setup is part of setting up a league -- not a
             social activity. With one thing left here the tab switcher is
             just a row that does nothing. */}
-        {view==="social"&&(
+        {view==="social"&&!casualMode&&(
           <Friends onRequestsChanged={loadFriendRequests}/>
         )}
 
@@ -4939,6 +4955,15 @@ export default function BowlingTracker(){
             it is and files accordingly, rather than inheriting whichever
             mode the Log tab was left in. Reaching it from the header
             means Log may not even be the last screen the bowler was on. */}
+        {/* Just Bowling's Friends tab: the leaderboard. The normal
+            Friends screen is about requests and rosters, neither of
+            which a casual bowler has. */}
+        {view==="social"&&casualMode&&(
+          <CasualLeaderboard
+            nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)}
+            me={displayName||activeBowler}/>
+        )}
+
         {view==="help"&&(
           <HelpView
             onNavigate={setView}
