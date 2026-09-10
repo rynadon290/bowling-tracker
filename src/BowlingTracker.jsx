@@ -50,7 +50,7 @@ import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipment
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, F, Chip, applyTheme } from "./ui.jsx";
-import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName } from "./constants.js";
+import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, casualLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName, isCasualLeagueName } from "./constants.js";
 import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -1356,9 +1356,17 @@ export default function BowlingTracker(){
         // one matching THIS user is mapped, so a shared read can't point
         // practice at someone else's row.
         const myPractice=user?.id?practiceLeagueCloudName(user.id):null;
+        // Casual has a per-user container row too, mapped exactly like
+        // practice: only the one matching THIS user, and never listed as
+        // a league anyone can pick.
+        const myCasual=user?.id?casualLeagueCloudName(user.id):null;
         const register=r=>{
           if(isPracticeLeagueName(r.name)){
             if(r.name===myPractice)leagueIdsRef.current[PRACTICE_SESSION_KEY]=r.id;
+            return;
+          }
+          if(isCasualLeagueName(r.name)){
+            if(r.name===myCasual)leagueIdsRef.current[CASUAL_SESSION_KEY]=r.id;
             return;
           }
           leagueIdsRef.current[r.name]=r.id;
@@ -1369,11 +1377,17 @@ export default function BowlingTracker(){
             if(r.name===myPractice&&!leagueIdsRef.current[PRACTICE_SESSION_KEY])leagueIdsRef.current[PRACTICE_SESSION_KEY]=r.id;
             return;
           }
+          if(isCasualLeagueName(r.name)){
+            if(r.name===myCasual&&!leagueIdsRef.current[CASUAL_SESSION_KEY])leagueIdsRef.current[CASUAL_SESSION_KEY]=r.id;
+            return;
+          }
           if(!leagueIdsRef.current[r.name])leagueIdsRef.current[r.name]=r.id;
         });
-        const listable=r=>isPracticeLeagueName(r.name)
-          ?(r.name===myPractice?PRACTICE_SESSION_KEY:null)
-          :r.name;
+        const listable=r=>{
+          if(isPracticeLeagueName(r.name))return r.name===myPractice?PRACTICE_SESSION_KEY:null;
+          if(isCasualLeagueName(r.name))return r.name===myCasual?CASUAL_SESSION_KEY:null;
+          return r.name;
+        };
         const names=[...new Set([...data.map(listable),...pending.map(listable)].filter(Boolean))];
         if(names.length){
           setLeagues(names);
@@ -1625,6 +1639,50 @@ export default function BowlingTracker(){
       cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:practiceId},{onConflict:"user_id,league_id"});
     }
     return practiceId;
+  }
+
+  // Casual gets a league row too, so casual scores sync.
+  //
+  // updateManualScore bails on `if(!leagueId)return`, so without a row
+  // every casual night lived only in device storage -- a reinstall or a
+  // new phone lost the friends leaderboard and every badge on it. Now
+  // that it builds up over months, that's real data.
+  //
+  // Same shape as ensurePracticeLeague: per-user cloud name, hidden from
+  // league pickers, and a failure just means it stays local and retries
+  // later rather than blocking the night.
+  const casualLeagueEnsured=useRef(false);
+  async function ensureCasualLeague(){
+    if(casualLeagueEnsured.current)return leagueIdsRef.current[CASUAL_SESSION_KEY]||null;
+    casualLeagueEnsured.current=true;
+    if(!user?.id)  {casualLeagueEnsured.current=false;return null;}
+
+    if(!leagues.includes(CASUAL_SESSION_KEY)){
+      await saveLeagues([...leagues,CASUAL_SESSION_KEY]);
+    }
+    const cloudName=casualLeagueCloudName(user.id);
+    if(!leagueIdsRef.current[CASUAL_SESSION_KEY]){
+      const failedCloud=await ensureLeaguesInCloud([cloudName]);
+      if(!failedCloud.length&&leagueIdsRef.current[cloudName]){
+        leagueIdsRef.current[CASUAL_SESSION_KEY]=leagueIdsRef.current[cloudName];
+      }
+    }
+    const casualId=leagueIdsRef.current[CASUAL_SESSION_KEY]||null;
+    if(!casualId){
+      // Offline, or the write failed. Casual still works on-device
+      // exactly as it did; this retries on a later session.
+      casualLeagueEnsured.current=false;
+      return null;
+    }
+    // Hidden from league pickers -- "Just Bowling" is a container, not a
+    // league anyone chooses from a list.
+    if(!hiddenLeagues.includes(casualId)){
+      const updated=[...hiddenLeagues,casualId];
+      setHiddenLeagues(updated);
+      try{await window.storage.set(HIDDEN_LEAGUES_KEY,JSON.stringify(updated));}catch{}
+      cloudWrite("hidden_leagues",{id:crypto.randomUUID(),user_id:user?.id||null,league_id:casualId},{onConflict:"user_id,league_id"});
+    }
+    return casualId;
   }
 
   async function addLeague(name,startDate,endDate){
@@ -3926,6 +3984,9 @@ export default function BowlingTracker(){
     if(preferences.environment==="league")setExpandedSections(e=>({...e,tonightSession:true}));
     if(preferences.environment!=="practice")setPracticeTracking(null);
     if(preferences.environment==="practice"&&user?.id)ensurePracticeLeague();
+    // Casual gets its row the same way, so casual scores sync instead of
+    // living only on this phone.
+    if(preferences.environment==="casual"&&user?.id)ensureCasualLeague();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[preferences.environment,user?.id]);
 

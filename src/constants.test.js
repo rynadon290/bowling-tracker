@@ -6,6 +6,9 @@ import { strikeDescriptionsForHand, storedStrikeDescriptionFor,
   isPracticeLeagueName,
   formatDate,
   formatDateShort,
+  casualLeagueCloudName,
+  isCasualLeagueName,
+  CASUAL_SESSION_KEY,
 } from './constants.js';
 
 
@@ -99,5 +102,34 @@ describe('display dates', () => {
 
   it('has a short form for tight spots', () => {
     expect(formatDateShort('2026-09-01', today)).not.toMatch(/Tue/);
+  });
+});
+
+// Casual scores used to be device-local: no league row meant the cloud
+// write bailed on `if(!leagueId)return`, so a reinstall lost every
+// casual night and every badge earned with it.
+describe('casual league container', () => {
+  it('is per user, like practice', () => {
+    expect(casualLeagueCloudName('a')).not.toBe(casualLeagueCloudName('b'));
+  });
+
+  it('is recognised as a casual container', () => {
+    expect(isCasualLeagueName(casualLeagueCloudName('a'))).toBe(true);
+  });
+
+  it('reads back as its display name', () => {
+    expect(practiceLeagueDisplayName(casualLeagueCloudName('a'))).toBe(CASUAL_SESSION_KEY);
+  });
+
+  // The two containers must not be confused for each other -- a casual
+  // night filed under practice would land in real stats.
+  it('is not mistaken for a practice league', () => {
+    expect(isPracticeLeagueName(casualLeagueCloudName('a'))).toBe(false);
+    expect(isCasualLeagueName(practiceLeagueCloudName('a'))).toBe(false);
+  });
+
+  it('leaves a real league alone', () => {
+    expect(isCasualLeagueName('Tuesday House Shot')).toBe(false);
+    expect(practiceLeagueDisplayName('Tuesday House Shot')).toBe('Tuesday House Shot');
   });
 });

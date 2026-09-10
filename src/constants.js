@@ -41,8 +41,23 @@ export function isPracticeLeagueName(name) {
   return typeof name === "string" && name.startsWith(`${PRACTICE_SESSION_KEY}\u00b7`);
 }
 
-// Any per-user practice league reads back as plain "Practice".
+// Casual gets the same treatment, for the same reason.
+//
+// Casual scores used to be device-local: no league row meant the cloud
+// write bailed out, so a reinstall or a new phone lost every casual
+// night and every badge earned with it. Now that the friends
+// leaderboard builds up over months, that's real data to lose.
+export function casualLeagueCloudName(userId) {
+  return `${CASUAL_SESSION_KEY}\u00b7${userId}`;
+}
+
+export function isCasualLeagueName(name) {
+  return typeof name === "string" && name.startsWith(`${CASUAL_SESSION_KEY}\u00b7`);
+}
+
+// Any per-user league reads back as its plain display name.
 export function practiceLeagueDisplayName(name) {
+  if (isCasualLeagueName(name)) return CASUAL_SESSION_KEY;
   return isPracticeLeagueName(name) ? PRACTICE_SESSION_KEY : name;
 }
 export const CASUAL_SESSION_KEY = "Just Bowling";
