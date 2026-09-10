@@ -9,9 +9,7 @@ import { needsLeagueSetup } from "./domain/tour.js";
 import { achievementsFor, PLACEMENTS } from "./domain/achievements.js";
 import { inferLeagueDay } from "./domain/reminders.js";
 import Scoresheet from "./Scoresheet.jsx";
-// Lazy: only tournament mode renders this, so league, practice and
-// casual bowlers should not pay 33KB for it on every open.
-const TournamentSession = lazy(() => import("./TournamentSession.jsx"));
+import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import DrillSession from "./DrillSession.jsx";
 import SessionRecap from "./SessionRecap.jsx";
@@ -221,14 +219,12 @@ export default function LogView({
                 days with their own cut lines. The tournament form replaces
                 it entirely rather than trying to bend one into the other. */}
             {!editingId&&activeBowler&&preferences.environment==="tournament"&&(
-              <Suspense fallback={null}>
               <TournamentSession
                 tournament={activeTournament}
                 onChange={updateTournament}
                 onSave={saveTournament}
                 saved={tournamentSaved}
                 oilPatterns={oilPatterns} submitOilPattern={submitOilPattern} tournaments={tournaments}/>
-              </Suspense>
             )}
 
             {/* "Tonight's Session" is league framing -- series, money games,

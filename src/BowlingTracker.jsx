@@ -4816,7 +4816,15 @@ export default function BowlingTracker(){
           instead of it -- a new bowler reads each step while looking at
           the tab it describes. */}
       {activeTour&&onboarded&&(
-        <Suspense fallback={null}>
+        // A dimmed backdrop rather than null while the chunk loads.
+        //
+        // The tour is a full-screen takeover, so with fallback={null} a
+        // bowler taps "Watch" and nothing visibly happens -- and taps
+        // again. A backdrop makes the tap feel registered, and it's the
+        // same colour the tour lands on, so there's no flash.
+        <Suspense fallback={
+          <div style={{position:"fixed",inset:0,zIndex:200,backgroundColor:C.bg}}/>
+        }>
           <Tour
             preferences={preferences}
             track={activeTour}
