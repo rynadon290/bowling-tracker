@@ -214,11 +214,14 @@ export const HELP = [
   {
     id: "everything-gone",
     casual: true,
-    view: "settings",
+    // The mode picker is on the BOWL tab, in the "Bowling today?" card
+    // -- not in Settings. Sending someone to Settings to fix this would
+    // strand the exact person the entry exists to help.
+    view: "log",
     title: "Where did everything go?",
     keywords: ["missing", "gone", "disappeared", "where is", "no stats", "no history",
                "tabs missing", "lost", "wrong mode", "went back", "help"],
-    body: "If you picked Just Bowling, the app hides everything that mode doesn't use — History, Stats, Improve and the Vault. Nothing is deleted; it's all still there. Open Settings, change what you're bowling to Practice, League or Tournament, and it all comes back.",
+    body: "If you picked Just Bowling, the app hides everything that mode doesn't use — History, Stats, Improve and the Vault. Nothing is deleted; it's all still there. Go to the Bowl tab, find the card at the top showing what you're bowling, tap Change, and pick Practice, League or Tournament. Everything comes straight back.",
   },
   {
     id: "casual-scores",

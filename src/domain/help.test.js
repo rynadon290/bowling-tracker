@@ -129,3 +129,25 @@ describe('helpFor', () => {
     expect(body).toContain(String(CASUAL_BADGES.length));
   });
 });
+
+// The mode picker is on the BOWL tab, in the "Bowling today?" card --
+// not in Settings. This entry exists for someone who picked Just
+// Bowling by accident and watched four tabs vanish, so sending them to
+// the wrong screen strands the exact person it's meant to rescue.
+describe('the way back from Just Bowling', () => {
+  const entry = HELP.find(e => e.id === 'everything-gone');
+
+  it('jumps to the Bowl tab, not Settings', () => {
+    expect(entry.view).toBe('log');
+  });
+
+  it('names the card and the control', () => {
+    expect(entry.body).toMatch(/Bowl tab/);
+    expect(entry.body).toMatch(/Change/);
+    expect(entry.body).not.toMatch(/Open Settings/);
+  });
+
+  it('reassures them nothing was deleted', () => {
+    expect(entry.body).toMatch(/still there|Nothing is deleted/);
+  });
+});
