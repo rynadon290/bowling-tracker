@@ -18,6 +18,7 @@
 // Get a free key (no credit card required) at https://aistudio.google.com
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { validateExtraction } from "./validate.ts";
 
 // Reads BOTH spellings. analyze-performance has always used the
 // lowercase "gemini_api_key", and this function used the uppercase one --
@@ -136,9 +137,43 @@ Respond with valid JSON matching the provided schema exactly. If a screenshot sh
 // tightest limit. Auth already stops a stranger; this stops one account
 // looping.
 //
-// Fails OPEN: a broken rate limiter should degrade to "no limit", not
-// "nobody can import". Auth is the security boundary; this is cost control.
-async function withinRateLimit(req, endpoint, limit, windowInterval) {
+// Fails SAFE, not open. The database check is still the real limiter --
+// it is shared across instances and survives cold starts -- but when it
+// is unavailable this now degrades to a conservative in-process cap
+// rather than to no cap at all.
+//
+// Previously both failure paths returned true. If check_api_rate_limit
+// were dropped, renamed, or simply erroring, every signed-in account
+// became unlimited against a vision model billed per image, and nothing
+// would have said so.
+//
+// Worth being clear about what this fallback is NOT: an in-process Map
+// resets on cold start and is not shared between instances, so N warm
+// instances allow up to N x limit. That is a real weakening, and it is
+// still bounded where the previous behaviour was not. It is a backstop
+// for a broken limiter, not a replacement for one.
+const fallbackHits = new Map<string, number[]>();
+
+function withinFallbackLimit(userId: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const recent = (fallbackHits.get(userId) || []).filter((t) => now - t < windowMs);
+  if (recent.length >= limit) {
+    fallbackHits.set(userId, recent);
+    return false;
+  }
+  recent.push(now);
+  fallbackHits.set(userId, recent);
+  // Bounded memory: a long-lived instance must not accumulate an entry
+  // per user seen since boot.
+  if (fallbackHits.size > 5000) {
+    for (const [k, v] of fallbackHits) {
+      if (!v.some((t) => now - t < windowMs)) fallbackHits.delete(k);
+    }
+  }
+  return true;
+}
+
+async function withinRateLimit(req, endpoint, limit, windowInterval, userId, windowMs) {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL"),
@@ -148,10 +183,14 @@ async function withinRateLimit(req, endpoint, limit, windowInterval) {
     const { data, error } = await supabase.rpc("check_api_rate_limit", {
       p_endpoint: endpoint, p_limit: limit, p_window: windowInterval,
     });
-    if (error) return true;
+    if (error) {
+      console.error(`rate limit check failed for ${endpoint}, falling back:`, error.message);
+      return withinFallbackLimit(userId, limit, windowMs);
+    }
     return data !== false;
-  } catch {
-    return true;
+  } catch (e) {
+    console.error(`rate limit check threw for ${endpoint}, falling back:`, String(e));
+    return withinFallbackLimit(userId, limit, windowMs);
   }
 }
 
@@ -184,6 +223,16 @@ function corsFor(req) {
 
 Deno.serve(async (req) => {
   const corsHeaders = corsFor(req);
+  // One id per request, returned to the caller and attached to every
+  // server-side log line for it. This is what replaces shipping
+  // internals to the client: a bowler who hits a problem can quote a
+  // short id, and the exception is findable in the function logs.
+  //
+  // What used to go back instead: `detail: String(err)` (any thrown
+  // error, including stack text and anything a driver puts in a
+  // message), the entire Gemini response object, and Gemini's raw
+  // output text. All three on a public endpoint.
+  const requestId = crypto.randomUUID().slice(0, 8);
 
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -221,7 +270,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!(await withinRateLimit(req, "import-scorecard", 20, "1 hour"))) {
+    if (!(await withinRateLimit(req, "import-scorecard", 20, "1 hour", user.id, 60 * 60 * 1000))) {
       return new Response(JSON.stringify({
         error: "You've imported a lot in the last hour. Give it a little while and try again.",
       }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -355,7 +404,8 @@ Deno.serve(async (req) => {
     const geminiData = await geminiRes.json();
     const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
-      return new Response(JSON.stringify({ error: "Gemini returned no extractable content", detail: geminiData }), {
+      console.error(`[${requestId}] gemini returned no extractable content:`, JSON.stringify(geminiData).slice(0, 2000));
+      return new Response(JSON.stringify({ error: "Gemini returned no extractable content", requestId }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -365,17 +415,40 @@ Deno.serve(async (req) => {
     try {
       extracted = JSON.parse(text);
     } catch {
-      return new Response(JSON.stringify({ error: "Gemini's response wasn't valid JSON", detail: text }), {
+      console.error(`[${requestId}] gemini response was not valid JSON:`, String(text).slice(0, 2000));
+      return new Response(JSON.stringify({ error: "Gemini's response wasn't valid JSON", requestId }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify(extracted), {
+    // Validated HERE, before the result crosses into application data.
+    // The client does its own defensive work, but the client is not the
+    // boundary -- nothing stops a caller skipping it entirely, and
+    // anything that got this far has already been paid for.
+    //
+    // Spread rather than rebuilt, so a field added to RESPONSE_SCHEMA
+    // later is not silently discarded on the way out (HANDOFF 4.3).
+    const validated = validateExtraction(extracted);
+    const { dropped, nulled, repaired } = validated;
+    if (dropped.games || dropped.frames || repaired.pins
+        || Object.values(nulled).some((n) => n > 0)) {
+      console.warn(`[${requestId}] extraction validation:`, JSON.stringify({ dropped, nulled, repaired }));
+    }
+
+    return new Response(JSON.stringify({
+      ...extracted,
+      games: validated.games,
+      // Additive, so an existing client that reads only `games` is
+      // unaffected. It lets the review step say "two frames could not be
+      // read" instead of quietly showing a game with holes in it.
+      validation: { dropped, nulled, repaired, requestId },
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
+    console.error(`[${requestId}] unexpected error:`, err instanceof Error ? (err.stack || err.message) : String(err));
+    return new Response(JSON.stringify({ error: "Unexpected error", requestId }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
