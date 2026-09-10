@@ -8,6 +8,7 @@ import Tour from "./Tour.jsx";
 import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import CasualLeaderboard from "./CasualLeaderboard.jsx";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
 import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./domain/inbox.js";
@@ -4794,6 +4795,12 @@ export default function BowlingTracker(){
       })()}
 
       <div style={S.content}>
+        {/* A crash in one screen used to unmount the whole app, leaving
+            a blank white page with no message and no way back. This
+            keeps the nav alive and shows what broke -- on a phone there
+            are no dev tools, so if the app does not say, nobody can.
+            Keyed on view so switching tabs clears a stuck error. */}
+        <ErrorBoundary key={view}>
       {/* One boundary around every view. A lazy screen shows this for the
           moment its code is fetched on first visit, then it's cached for
           the session. Deliberately plain -- a spinner that flashes for
@@ -5202,6 +5209,7 @@ export default function BowlingTracker(){
           />
         )}
       </Suspense>
+        </ErrorBoundary>
       </div>
 
       {/* Bottom nav. At the bottom because the top of a phone is out of
