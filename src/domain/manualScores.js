@@ -151,3 +151,28 @@ export function defaultPracticeBall(arsenal, plasticName = "Plastic") {
   const real = (Array.isArray(arsenal) ? arsenal : []).filter(b => b && b !== plasticName);
   return real.length === 1 ? real[0] : "";
 }
+
+// Casual nights, reshaped for the friends leaderboard.
+//
+// manualScores is a flat map keyed bowler|league|date|game, which is the
+// right shape for entry and the wrong shape for a leaderboard. This
+// groups it into one entry per night with everyone's scores together,
+// which is what casualLeaderboard expects.
+//
+// Casual only: league nights have their own session records with far
+// more in them, and mixing the two would rank a league bowler's serious
+// average against a Friday night with friends.
+export function casualNightsFrom(scores, casualLeagueKey) {
+  const byDate = {};
+  for (const [key, value] of Object.entries(scores || {})) {
+    const [bowler, league, date, game] = key.split(KEY_SEP);
+    if (league !== casualLeagueKey) continue;
+    if (value == null) continue;
+    const night = byDate[date] || (byDate[date] = { date, scoresByBowler: {} });
+    const list = night.scoresByBowler[bowler] || (night.scoresByBowler[bowler] = []);
+    list[Number(game) - 1] = Number(value);
+  }
+  // Oldest first: several badges look at how a bowler changed over time,
+  // which needs chronological order.
+  return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+}
