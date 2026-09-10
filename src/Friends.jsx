@@ -200,7 +200,7 @@ export default function Friends({ onRequestsChanged } = {}) {
             {visibleResults.map(p=>(
               <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
                 <span style={{color:C.text}}>{p.display_name}</span>
-                <button style={S.button} onClick={()=>sendRequest(p)}>Add</button>
+                <button style={S.btn()} onClick={()=>sendRequest(p)}>Add</button>
               </div>
             ))}
           </div>
@@ -229,8 +229,8 @@ export default function Friends({ onRequestsChanged } = {}) {
             <div key={entry.friendshipId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
               <span style={{color:C.text}}>{entry.displayName}</span>
               <div style={{display:"flex",gap:"6px"}}>
-                <button style={{...S.button,color:C.strike}} onClick={()=>acceptRequest(entry)}>Accept</button>
-                <button style={{...S.button,color:C.danger}} onClick={()=>declineRequest(entry)}>Decline</button>
+                <button style={{...S.btn(),color:C.strike}} onClick={()=>acceptRequest(entry)}>Accept</button>
+                <button style={{...S.btn(),color:C.miss}} onClick={()=>declineRequest(entry)}>Decline</button>
               </div>
             </div>
           ))}
@@ -243,7 +243,7 @@ export default function Friends({ onRequestsChanged } = {}) {
           {outgoing.map(entry=>(
             <div key={entry.friendshipId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
               <span style={{color:C.textMuted,fontStyle:"italic"}}>{entry.displayName}</span>
-              <button style={S.button} onClick={()=>cancelRequest(entry)}>Cancel</button>
+              <button style={S.btn()} onClick={()=>cancelRequest(entry)}>Cancel</button>
             </div>
           ))}
         </div>
@@ -257,7 +257,7 @@ export default function Friends({ onRequestsChanged } = {}) {
         {friends.map(entry=>(
           <div key={entry.friendshipId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
             <span style={{color:C.text}}>{entry.displayName}</span>
-            <button style={{...S.button,color:C.danger}} onClick={()=>removeFriend(entry)}>Remove</button>
+            <button style={{...S.btn(),color:C.miss}} onClick={()=>removeFriend(entry)}>Remove</button>
           </div>
         ))}
       </div>

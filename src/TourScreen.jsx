@@ -806,6 +806,57 @@ const SCREENS = {
     </Phone>
   ),
 
+  "casual-standings": () => (
+    <Phone title="Standings" casual>
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Standings</div>
+          {[["👑", "Jess", "168", "12 games", "best 201"],
+            ["2", "You", "155", "12 games", "best 178"],
+            ["3", "Sam", "131", "9 games", "best 152"]].map(([pos, name, avg, games, best]) => (
+            <div key={name} style={{ padding: "5px 0", borderTop: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                <span style={{ ...muted, width: "14px" }}>{pos}</span>
+                <span style={{ flex: 1, fontSize: "11px", fontWeight: 600, color: C.text }}>{name}</span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: C.text }}>{avg}</span>
+              </div>
+              <div style={{ ...muted, paddingLeft: "20px" }}>{games} · {best}</div>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Games bowled sits next to the average</Note>
+      <Nav active={1} casual />
+    </Phone>
+  ),
+
+  "casual-badges": () => (
+    <Phone title="Standings" casual>
+      <div style={{ ...card, marginBottom: "6px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "6px" }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: C.text, flex: 1 }}>Sam</span>
+          <span style={{ fontSize: "13px", fontWeight: 700, color: C.text }}>131</span>
+        </div>
+        <Spot>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", padding: "2px" }}>
+            {[["🎳", "First night"], ["1️⃣", "Triple figures"], ["🚀", "Comeback"],
+              ["🕳️", "Rough night"], ["🥄", "Wooden spoon"]].map(([e, n]) => (
+              <span key={n} style={{
+                fontSize: "8px", padding: "2px 5px", borderRadius: "8px",
+                background: C.surface, border: `1px solid ${C.border}`, color: C.textMuted,
+                whiteSpace: "nowrap",
+              }}>{e} {n}</span>
+            ))}
+          </div>
+        </Spot>
+      </div>
+      <div style={{ ...muted, textAlign: "center" }}>
+        Even the worst night earns something.
+      </div>
+      <Nav active={1} casual />
+    </Phone>
+  ),
+
   "casual-share": () => (
     <Phone title="Bowl" casual>
       <div style={{ ...card, marginBottom: "8px", textAlign: "center" }}>

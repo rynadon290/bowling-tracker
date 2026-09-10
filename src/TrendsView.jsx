@@ -5,6 +5,7 @@ import { useState } from "react";
 // against the installed package from the build environment -- the average
 // is shown in the stat boxes below the chart instead.
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { isContainerLeague } from "./domain/leagueMembership.js";
 import { C, S, Chip } from "./ui.jsx";
 import ShareButton from "./ShareButton.jsx";
 import { allGamesSeries, allGamesSummary,
@@ -189,7 +190,7 @@ export default function TrendsView({
             <div style={{ ...S.label, marginTop: "12px" }}>League</div>
             <div style={S.chips}>
               <Chip label="All" selected={!statsLeague} onToggle={() => setStatsLeague("")} color={C.accent} />
-              {leagues.map(l => (
+              {leagues.filter(l => !isContainerLeague(l)).map(l => (
                 <Chip key={l} label={!statsBowler ? teamNameForLeague(l) : l.replace(" House Shot", "")} selected={statsLeague === l}
                   onToggle={() => setStatsLeague(statsLeague === l ? "" : l)} color={C.accent} />
               ))}

@@ -9,12 +9,13 @@ import {
 } from "./domain/stats.js";
 import { lineupSort } from "./domain/leagues.js";
 import { totalMoney } from "./domain/money.js";
+import { isContainerLeague } from "./domain/leagueMembership.js";
 import { anyMoneyGameShown, visibleStatsCardOrder } from "./domain/preferences.js";
 
 export default function StatsView({
   centerStats,
   preferences,
-  view, shots, sessions, bowlers, teams, leagues, arsenals, saved,
+  view, shots, sessions, bowlers, teams, leagues: allLeagues, arsenals, saved,
   statsBowler, setStatsBowler, compareBowler, setCompareBowler,
   compareFriendId, setCompareFriendId, friends=[], onLoadFriendData, onOpenFriends, compareSessions, displayName="",
   statsLeague, setStatsLeague,
@@ -31,6 +32,12 @@ export default function StatsView({
   theoreticalScoreForGame,
   viewedLeftHanded=false,
 }) {
+  // Practice and Just Bowling are containers, not teams -- nobody plays
+  // FOR them, so "compare me to Practice" is a comparison against a
+  // filing cabinet. Filtered once here rather than at each of the five
+  // places leagues are listed below.
+  const leagues = (allLeagues || []).filter(l => !isContainerLeague(l));
+
   // Fixed cards keep anchored positions: "Viewing" is the selector that
   // controls everything below it, and "Danger Zone" holds destructive
   // actions -- neither should float into the middle of the stats.
