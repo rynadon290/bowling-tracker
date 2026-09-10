@@ -263,7 +263,16 @@ export default function TeamManagement({
 
     const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id"));
     const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,left_handed,is_sub,profiles(display_name)"));
-    const invitesRes = await cloudRead("pending_invites", q => q.select("id,team_id,invited_name,invited_email,lineup_position,left_handed,is_sub").is("accepted_at", null));
+    // Selecting signup_code fails outright if migration_signup_codes.sql
+    // hasn't been run -- and a failed select here blanks the whole Vault.
+    // Try with it, fall back without, so a database one migration behind
+    // loses the codes rather than the screen.
+    let invitesRes = await cloudRead("pending_invites", q =>
+      q.select("id,team_id,invited_name,invited_email,lineup_position,left_handed,is_sub,signup_code").is("accepted_at", null));
+    if (!invitesRes.online || invitesRes.error) {
+      invitesRes = await cloudRead("pending_invites", q =>
+        q.select("id,team_id,invited_name,invited_email,lineup_position,left_handed,is_sub").is("accepted_at", null));
+    }
 
     if (teamsRes.online && teamsRes.data) {
       const membersByTeam = {};
@@ -285,6 +294,7 @@ export default function TeamManagement({
         invitesByTeam[inv.team_id].push({
           id: inv.id, name: inv.invited_name, email: inv.invited_email, lineupPosition: inv.lineup_position,
           leftHanded: !!inv.left_handed, isSub: !!inv.is_sub,
+          signupCode: inv.signup_code || null,
         });
       });
 
@@ -434,13 +444,21 @@ export default function TeamManagement({
     cloudWrite("pending_invites", {
       id, team_id: teamId, invited_name: invite.name, invited_email: invite.email,
       lineup_position: invite.lineupPosition, created_by: user?.id || null,
-      signup_code: invite.signupCode,
+      // Only sent when there IS a code.
+      //
+      // Writing signup_code: null unconditionally means every invite --
+      // including ordinary email ones -- references a column that
+      // doesn't exist until migration_signup_codes.sql has been run,
+      // and Postgres rejects the whole insert. That took the Vault down
+      // for anyone whose database was a migration behind.
+      //
       // A month is long enough to catch someone who signs up next
       // Tuesday, short enough that an abandoned code doesn't sit live
       // forever.
-      code_expires_at: invite.signupCode
-        ? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
-        : null,
+      ...(invite.signupCode ? {
+        signup_code: invite.signupCode,
+        code_expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      } : {}),
     });
   }
 

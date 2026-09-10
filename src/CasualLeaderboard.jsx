@@ -100,7 +100,7 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
         <div style={S.label}>Badges</div>
         <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.5 }}>
           There are {CASUAL_BADGES.length} to collect, and they're not all about bowling well —
-          some are about turning up, and one or two you'd rather not have.
+          some are about showing up, and one or two you'd rather not have.
         </div>
       </div>
     </>
