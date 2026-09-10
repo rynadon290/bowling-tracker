@@ -4993,10 +4993,17 @@ export default function BowlingTracker(){
               // First time in this environment? Walk them through it.
               // Coach mode has its own tour, offered when coach mode is
               // turned on -- see the coachViewOn effect.
-              // The general tour, once, for everyone. The mode-specific
-              // one arrives as an inbox task instead -- stacking both
-              // onto signup makes it twenty screens long.
-              if(onboarded&&!hasSeenTour(toursSeen,"general"))startTour("general");
+              // Casual gets its OWN tour; everyone else gets the basics.
+              //
+              // The basics tour opens on picking a league and covers
+              // goals, stats and history -- none of which a casual bowler
+              // is doing. Four screens about getting scores in beats
+              // twelve about features they'll never open.
+              //
+              // The mode-specific tour arrives later as an inbox task, so
+              // signup stays short.
+              const firstTour=preferences.environment==="casual"?"casual":"general";
+              if(onboarded&&!hasSeenTour(toursSeen,firstTour))startTour(firstTour);
             }}
             routineNote={routine.mode&&!showSessionStart?`Your usual ${DAY_NAMES_SHORT[routine.weekday]}`:""}
             updatePreferences={updatePreferences}

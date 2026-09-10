@@ -21,10 +21,19 @@ import TourScreen from "./TourScreen.jsx";
 // their first one, without switching modes to do it.
 export default function Tour({ preferences = {}, track, onNavigate, onFinish }) {
   const [index, setIndex] = useState(0);
-  const opts = track === "coach"
-    ? { track: "coach" }
-    : undefined;
-  const prefs = track && track !== "coach"
+  // The track must reach tourSteps, whatever it is.
+  //
+  // This used to build opts only for "coach" and pass undefined for
+  // everything else -- so "general", "casual" and the mode tracks were
+  // silently ignored and every one of them played the full environment
+  // tour instead. That's why the casual tour still opened on "pick your
+  // league".
+  const opts = track ? { track } : undefined;
+  // Mode tracks also set the environment, so environment-scoped steps
+  // resolve against the track being watched rather than the bowler's
+  // current mode -- that's what lets a league bowler replay the
+  // tournament tour from Settings.
+  const prefs = track && track !== "coach" && track !== "general"
     ? { ...preferences, environment: track }
     : preferences;
   const steps = tourSteps(prefs, opts);
@@ -71,6 +80,17 @@ export default function Tour({ preferences = {}, track, onNavigate, onFinish }) 
         </div>
 
         <TourScreen stepId={step.id} track={track} />
+
+        {/* A caveat that belongs UNDER the picture, not in the body --
+            it qualifies what was just shown rather than describing it. */}
+        {step.footnote && (
+          <div style={{
+            fontSize: "12px", color: C.textMuted, lineHeight: 1.5,
+            marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}`,
+          }}>
+            {step.footnote}
+          </div>
+        )}
       </div>
 
       <div style={{

@@ -530,6 +530,95 @@ const SCREENS = {
     </Phone>
   ),
 
+  // ── Just bowling ──────────────────────────────────────────────────
+
+  "casual-scores": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Tonight</div>
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px", marginBottom: "8px" }}>Fri 12 Sep</div>
+          <div style={{ display: "flex", gap: "5px" }}>
+            {["142", "168", ""].map((v, i) => (
+              <div key={i} style={{
+                ...S.input, flex: 1, padding: "8px 4px", textAlign: "center",
+                fontSize: "15px", fontWeight: 700,
+                color: v ? C.text : C.textMuted,
+                borderColor: v ? C.border : C.accent,
+              }}>{v || "—"}</div>
+            ))}
+          </div>
+          <div style={{ ...muted, marginTop: "5px", textAlign: "center" }}>Game 1 · 2 · 3</div>
+        </div>
+      </Spot>
+      <Note>Type the score, nothing else</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "casual-people": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={label}>Keeping score for</div>
+          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "8px" }}>
+            <span style={chip(true)}>You</span>
+            <span style={chip(false)}>Sam</span>
+            <span style={chip(false)}>Jess</span>
+            <span style={chip(false)}>Marcus</span>
+          </div>
+          <div style={{ ...S.input, padding: "6px 9px", fontSize: "10px", color: C.textMuted }}>
+            + Add someone bowling with you
+          </div>
+        </div>
+      </Spot>
+      <Note>They don't need the app at all</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "casual-winner": () => (
+    <Phone title="Bowl">
+      <Spot>
+        <div style={{ ...card, marginBottom: 0 }}>
+          <div style={{ textAlign: "center", marginBottom: "8px" }}>
+            <div style={{ fontSize: "22px" }}>👑</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text }}>Jess</div>
+            <div style={muted}>486 · won by 31</div>
+          </div>
+          {[["Sam", "455"], ["You", "441"], ["Marcus", "398"]].map(([n, sc]) => (
+            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "11px", color: C.text }}>{n}</span>
+              <span style={muted}>{sc}</span>
+            </div>
+          ))}
+        </div>
+      </Spot>
+      <Note>Worked out for you</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
+  "casual-share": () => (
+    <Phone title="Bowl">
+      <div style={{ ...card, marginBottom: "8px", textAlign: "center" }}>
+        <div style={{ fontSize: "10px", fontWeight: 700, color: C.accent, letterSpacing: "1px" }}>
+          FRIDAY NIGHT
+        </div>
+        <div style={{ fontSize: "18px" }}>👑</div>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text }}>Jess · 486</div>
+        <div style={{ ...muted, marginTop: "3px" }}>Sam 455 · You 441 · Marcus 398</div>
+      </div>
+      <Spot>
+        <div style={{ ...S.btn("primary"), padding: "9px", fontSize: "11px", textAlign: "center", borderRadius: "8px" }}>
+          Share
+        </div>
+      </Spot>
+      <Note>Straight to the group chat</Note>
+      <Nav active={0} />
+    </Phone>
+  ),
+
   // ── Practice ──────────────────────────────────────────────────────
 
   "practice-modes": () => (
