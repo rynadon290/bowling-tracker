@@ -63,6 +63,41 @@ const ALL_STEPS = [
     body: "Same start: Other Leave, then the pins on the rack. Answer Spare Made? — No. Then use − and + to set the total pins for the frame — both balls added together. Leave a 3-10 and knock one down, that's 9.",
     when: ({ trackingMode }) => trackingMode === "shot",
   },
+  // ── Just bowling ────────────────────────────────────────────────────
+  //
+  // Its own track, not a trimmed version of the basics. A casual bowler
+  // isn't picking a league, isn't setting goals, and won't get much from
+  // History or Stats after two nights a year. Four screens: get scores
+  // in, see who won, share it.
+  {
+    id: "casual-scores",
+    tab: "log",
+    title: "Just type the scores",
+    body: "Pick the date and type each game's final score. That's it — no frames, no setup, nothing to configure first.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-people",
+    tab: "log",
+    title: "Everyone you're bowling with",
+    body: "Add whoever's on the lane with you and keep all their scores on your phone. They don't need the app, or an account, or to do anything at all.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-winner",
+    tab: "log",
+    title: "Who won",
+    body: "Finish the night and the app works out the winner, the margin, and a few awards worth arguing about. Ties get called out too.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-share",
+    tab: "log",
+    title: "Share the night",
+    body: "One tap makes a card with everyone's scores on it, ready for the group chat.",
+    envs: ["casual"],
+  },
+
   // ── Practice ────────────────────────────────────────────────────────
   {
     id: "practice-modes",
@@ -146,7 +181,11 @@ const ALL_STEPS = [
     id: "insights",
     tab: "insights",
     title: "What's costing you pins",
-    body: "The app reads your nights and tells you what it sees — the spare you keep missing, the ball that stopped carrying, whether your third game falls off. It needs a few nights of data first, and it gets sharper the more you log: three nights gives you a hint, a month gives you something worth acting on.",
+    body: "The app reads your nights and tells you what it sees — the spare you keep missing, the ball that stopped carrying, whether your third game falls off.",
+    // Said plainly rather than discovered: someone who opens this on
+    // night one and finds it empty concludes the feature is weak, when
+    // it just hasn't got enough to work with yet.
+    footnote: "This needs about ten games of shot-by-shot logging before it can say anything honest, and it sharpens from there. Scores from casual nights don't feed it — there are no frames behind them to read.",
   },
   {
     id: "improve",
@@ -200,7 +239,7 @@ const ALL_STEPS = [
 // different -- a tournament bowler shouldn't sit through nine screens of
 // basics before reaching the cut line, and a league bowler who later
 // tries practice shouldn't be re-taught the scoresheet.
-export const MODE_TRACKS = ["practice", "league", "tournament"];
+export const MODE_TRACKS = ["casual", "practice", "league", "tournament"];
 
 export const GENERAL_STEP_IDS = [
   "bowl", "tracking", "scoresheet",
@@ -397,7 +436,7 @@ export function needsLeagueSetup({ environment, leagues = [], teams = [] } = {})
 // before their first one.
 export const TOUR_TRACKS = [
   { key: "general",    label: "The basics",    blurb: "Logging, scoring, stats — everyone gets this" },
-  { key: "casual",     label: "Just bowling",  blurb: "Logging a night with friends" },
+  { key: "casual",     label: "Just bowling",  blurb: "Scores, who won, sharing it" },
   { key: "practice",   label: "Practice",      blurb: "Drills, goals and shot-by-shot" },
   { key: "league",     label: "League",        blurb: "Leagues, teams, money games" },
   { key: "tournament", label: "Tournament",    blurb: "Squads, side pots and import" },
@@ -418,6 +457,9 @@ export function availableTours(isCoach = false) {
 // Casual gets nothing: there are no casual-only features to explain, and
 // a casual bowler is the least likely to want more onboarding.
 export function pendingModeTour({ environment, seen = [] } = {}) {
+  // Casual is excluded: the casual track IS their first tour, played at
+  // setup, so there's no follow-up to offer.
+  if (environment === "casual") return null;
   if (!MODE_TRACKS.includes(environment)) return null;
   if (hasSeenTour(seen, environment)) return null;
   if (!modeSteps(environment).length) return null;
