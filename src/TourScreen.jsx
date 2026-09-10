@@ -662,9 +662,14 @@ const SCREENS = {
 
   "practice-fields": () => (
     <Phone title="Bowl" headerIcon="settings">
-      {/* Points UP at the gear in the header, so "in Settings" isn't an
-          instruction to go hunting. */}
-      <Note up={false}>Switch them on here</Note>
+      {/* Sits hard against the header so its arrow points at the gear
+          directly above it -- "in Settings" shouldn't send anyone
+          hunting. Right-aligned to sit under the icon itself. */}
+      <div style={{ textAlign: "right", marginTop: "-6px", marginBottom: "8px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: C.accent }}>
+          ▲ Settings lives here
+        </span>
+      </div>
       <Spot>
         <div style={{ ...card, marginBottom: 0 }}>
           <div style={label}>This shot</div>
