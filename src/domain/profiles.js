@@ -40,6 +40,12 @@ export function emptyProfile(bowlerName = "") {
     // never touches automatically. See suggestBookAverage below for the
     // end-of-season update flow.
     bookAverage: "",
+    // All-time bests, so a personal-best achievement has something to
+    // beat from day one. Without these, a bowler's first night would
+    // either trigger a meaningless "best ever" or nothing would fire
+    // until they'd logged enough for the app to work it out itself.
+    allTimeHighGame: "",
+    allTimeHighSeries: "",
     bookGames: "",
     bookSeason: "",
     // The end_date of the most recent league-season this bowler has
@@ -82,6 +88,11 @@ export function normalizeProfile(raw, bowlerName = "") {
       : [],
     notes: typeof raw.notes === "string" ? raw.notes : "",
     bookAverage: raw.bookAverage === null || raw.bookAverage === undefined ? "" : String(raw.bookAverage),
+    // Listed here as well as in the empty profile: normalizeProfile
+    // rebuilds the object field by field, so anything missing HERE is
+    // silently dropped on every save.
+    allTimeHighGame: raw.allTimeHighGame == null ? "" : String(raw.allTimeHighGame),
+    allTimeHighSeries: raw.allTimeHighSeries == null ? "" : String(raw.allTimeHighSeries),
     bookGames: raw.bookGames === null || raw.bookGames === undefined ? "" : String(raw.bookGames),
     bookSeason: typeof raw.bookSeason === "string" ? raw.bookSeason : "",
     bookAverageAsOf: typeof raw.bookAverageAsOf === "string" ? raw.bookAverageAsOf : "",
@@ -252,6 +263,8 @@ export function profileToRow(profile, userId) {
     // before these fields existed has neither, and Number(undefined) is
     // NaN, which Postgres rejects.
     book_average: numOrNull(profile.bookAverage, 0, 300),
+    all_time_high_game: numOrNull(profile.allTimeHighGame, 0, 300),
+    all_time_high_series: numOrNull(profile.allTimeHighSeries, 0, 900),
     book_games: (() => { const n = numOrNull(profile.bookGames, 1, 10000); return n === null ? null : Math.round(n); })(),
     book_season: profile.bookSeason || null,
     book_average_as_of: profile.bookAverageAsOf || null,
@@ -270,6 +283,8 @@ export function profileFromRow(row) {
     homeCenters: row.home_centers || [],
     notes: row.notes || "",
     bookAverage: row.book_average,
+    allTimeHighGame: row.all_time_high_game,
+    allTimeHighSeries: row.all_time_high_series,
     bookGames: row.book_games,
     bookSeason: row.book_season,
     bookAverageAsOf: row.book_average_as_of,

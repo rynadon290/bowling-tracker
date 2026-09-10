@@ -268,7 +268,7 @@ const ALL_STEPS = [
     id: "league-recap",
     tab: "log",
     title: "Your night, summed up",
-    body: "Finish the night and the recap pulls it together: your series, how the team did, your strikes and spares, the money games settled, and where it puts your average. Share it to the team chat in one tap.",
+    body: "Finish the night and the recap pulls it together: your series, how the team did, your strikes and spares, the money games settled, and where it puts your average. Share it with your friends in one tap too.",
     envs: ["league"],
   },
 ];

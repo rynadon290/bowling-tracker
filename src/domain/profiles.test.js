@@ -163,7 +163,8 @@ describe('supabase round trip', () => {
     const full = {
       bowlerName: 'Ryan', leftHanded: true, twoHanded: true, isCoach: false, aliases: [],
       homeCenters: ['Bowlero'], notes: 'thumb tape',
-      bookAverage: '213', bookGames: '90', bookSeason: '2025-26 Winter', bookAverageAsOf: '2026-08-01',
+      bookAverage: '213', allTimeHighGame: '279', allTimeHighSeries: '742',
+      bookGames: '90', bookSeason: '2025-26 Winter', bookAverageAsOf: '2026-08-01',
     };
     expect(profileFromRow(profileToRow(full, 'user-1'))).toEqual(full);
   });
@@ -176,7 +177,8 @@ describe('supabase round trip', () => {
     const coach = {
       bowlerName: 'Dave', leftHanded: false, twoHanded: false, isCoach: true, aliases: [],
       homeCenters: [], notes: '',
-      bookAverage: '', bookGames: '', bookSeason: '', bookAverageAsOf: '',
+      bookAverage: '', allTimeHighGame: '', allTimeHighSeries: '',
+      bookGames: '', bookSeason: '', bookAverageAsOf: '',
     };
     expect(profileToRow(coach, 'user-1').is_coach).toBe(true);
     expect(profileFromRow(profileToRow(coach, 'user-1'))).toEqual(coach);
