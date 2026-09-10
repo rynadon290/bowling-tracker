@@ -682,6 +682,11 @@ export default function BowlingTracker(){
     catch{return [];}
   });
   // The tour showing right now, if any: a track key, or "" for none.
+  // How many game columns the casual table shows. Two by default; the
+  // "+ Add a game" button raises it. Resets with the session, since
+  // last Friday's six games say nothing about tonight.
+  const[casualExtraGames,setCasualExtraGames]=useState(2);
+
   const[activeTour,setActiveTour]=useState("");
 
   function finishTour(){
@@ -3780,6 +3785,10 @@ export default function BowlingTracker(){
     // Only clear when not mid-edit -- an edit holds the shot's own ball,
     // and wiping it would change a saved shot's equipment silently.
     if(!editingId)setForm(f=>({...f,ball:"",surface:""}));
+    // A new night starts at two columns again. Six games last Friday
+    // says nothing about tonight, and a table that opens wide implies
+    // games nobody has bowled.
+    setCasualExtraGames(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[sessionKey]);
 
@@ -4065,7 +4074,7 @@ export default function BowlingTracker(){
   const casualMode=preferences.environment==="casual";
   const navTabs=casualMode?[
     {id:"log",    label:"Bowl",    icon:"🎳"},
-    {id:"social", label:"Friends", icon:"🏆"},
+    {id:"social", label:"Standings", icon:"📊"},
   ]:[
     {id:"log",     label:"Bowl",    icon:"🎳"},
     {id:"history", label:"History", icon:"📖"},
@@ -4637,7 +4646,7 @@ export default function BowlingTracker(){
               : <div style={S.title}>{navTabs.find(t=>t.id===view)?.label
                   ||(view==="settings"?"Settings":view==="profile"?"Profile"
                     :view==="inbox"?"Inbox":view==="coaching"?"Coach"
-                    :view==="help"?"Help":view==="social"?"Friends":view==="import"?"Import scorecard":"")}</div>}
+                    :view==="help"?"Help":view==="social"?(casualMode?"Standings":"Friends"):view==="import"?"Import scorecard":"")}</div>}
           </div>
 
           <div style={{display:"flex",gap:"12px",flexShrink:0,alignItems:"center"}}>
@@ -5063,6 +5072,7 @@ export default function BowlingTracker(){
             handleSpareMadeToggle={handleSpareMadeToggle} matchHandicap={matchHandicap} previousShotBall={previousShotBall} removeBall={removeBall} removeBowler={removeBowler}
             selectBowler={selectBowler} set={set} setLanePattern={setLanePattern} setMatchHandicap={setMatchHandicap} setMatchOpponent={setMatchOpponent} setPokerWinnings={setPokerWinnings} setThreeSixNineWinnings={setThreeSixNineWinnings} winningsSaved={winningsSaved} confirmWinningsSaved={confirmWinningsSaved} setView={setView}
             leagueBuyIns={leagueBuyIns} onSaveLeagueBuyIns={saveLeagueBuyIns} onReplayTour={replayTour}
+            casualExtraGames={casualExtraGames} setCasualExtraGames={setCasualExtraGames}
             stepPinCount={stepPinCount} submitSession={submitSession} submitShot={submitShot} theoreticalScoreForGame={theoreticalScoreForGame} maxScoreThisGame={maxScoreThisGame} toggle={toggle} toggleMulti={toggleMulti} toggleSection={toggleSection}
             preferences={logPreferences}
             setSessionMoneyArray={setSessionMoneyArray} setSessionMoneyValue={setSessionMoneyValue}

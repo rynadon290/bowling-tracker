@@ -79,7 +79,7 @@ const muted = { fontSize: "10px", color: C.textMuted, fontFamily: F.body };
 
 function Nav({ active, casual }) {
   const tabs = casual
-    ? [["🎳", "Bowl"], ["🏆", "Friends"]]
+    ? [["🎳", "Bowl"], ["📊", "Standings"]]
     : [["🎳", "Bowl"], ["📖", "History"], ["📈", "Stats"], ["🎯", "Improve"], ["🔒", "Vault"]];
   return (
     <div style={{
@@ -208,7 +208,7 @@ function ScoreTable({ rows = [] }) {
     const nums = vals.filter(v => v !== "").map(Number);
     return nums.length ? nums.reduce((a, b) => a + b, 0) : null;
   };
-  const cell = { width: "34px", flexShrink: 0, textAlign: "center", fontSize: "11px" };
+  const cell = { width: "48px", flexShrink: 0, textAlign: "center", fontSize: "11px" };
   return (
     <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: "6px", overflow: "hidden" }}>
       <div style={{ flexShrink: 0, width: "52px", background: C.surface, borderRight: `1px solid ${C.border}` }}>
@@ -220,13 +220,13 @@ function ScoreTable({ rows = [] }) {
       </div>
       <div style={{ flex: 1, overflow: "hidden" }}>
         <div style={{ display: "flex", height: "18px", background: C.surface }}>
-          {["G1", "G2", "G3", "G4"].map(g => (
+          {["G1", "G2"].map(g => (
             <div key={g} style={{ ...cell, ...muted, lineHeight: "18px", fontSize: "8px" }}>{g}</div>
           ))}
         </div>
         {rows.map(([name, vals]) => (
           <div key={name} style={{ display: "flex", height: "24px", borderTop: `1px solid ${C.border}` }}>
-            {[...vals, ""].map((v, i) => (
+            {vals.map((v, i) => (
               <div key={i} style={{ ...cell, lineHeight: "24px", fontWeight: 600,
                 color: v ? C.text : C.textMuted }}>{v || ""}</div>
             ))}
@@ -750,10 +750,15 @@ const SCREENS = {
         <div style={{ ...card, marginBottom: 0 }}>
           <div style={label}>Scores</div>
           <ScoreTable rows={[
-            ["You", ["142", "168", "155"]],
-            ["Sam", ["120", "99", "143"]],
-            ["Jess", ["161", "", ""]],
+            ["You", ["142", "168"]],
+            ["Sam", ["120", "99"]],
+            ["Jess", ["161", ""]],
           ]} />
+          {/* The real table opens at two games and grows on request. */}
+          <div style={{ ...S.input, padding: "5px", marginTop: "5px", fontSize: "9px",
+            textAlign: "center", color: C.textMuted }}>
+            + Add a game
+          </div>
         </div>
       </Spot>
       <Note>Totals add themselves</Note>
@@ -767,7 +772,7 @@ const SCREENS = {
     <Phone title="Bowl" casual>
       <div style={{ ...card, marginBottom: "6px" }}>
         <div style={label}>Scores</div>
-        <ScoreTable rows={[["You", ["", "", ""]], ["Sam", ["", "", ""]], ["Jess", ["", "", ""]]]} />
+        <ScoreTable rows={[["You", ["", ""]], ["Sam", ["", ""]], ["Jess", ["", ""]]]} />
       </div>
       <Spot>
         <div style={{ ...S.input, padding: "7px 9px", fontSize: "10px", color: C.textMuted }}>

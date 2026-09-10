@@ -32,7 +32,7 @@ export default function LogView({
   getLanePattern, getMatch, handleBallChange, handleLeaveToggle, handleLineChange,
   handleSpareMadeToggle, matchHandicap, previousShotBall, removeBall, removeBowler,
   selectBowler, set, setLanePattern, setMatchHandicap, setMatchOpponent, setPokerWinnings, setThreeSixNineWinnings, winningsSaved, confirmWinningsSaved, setView,
-  leagueBuyIns, onSaveLeagueBuyIns, onReplayTour,
+  leagueBuyIns, onSaveLeagueBuyIns, onReplayTour, casualExtraGames = 2, setCasualExtraGames,
   stepPinCount, submitSession, submitShot, theoreticalScoreForGame, maxScoreThisGame, toggle, toggleMulti, toggleSection,
   preferences, setSessionMoneyArray, setSessionMoneyValue, activeBowlerLeftHanded,
   ballLayouts, setBallLayout,
@@ -933,9 +933,15 @@ export default function LogView({
               const people=scoreOptions.length?scoreOptions:[ownerName].filter(Boolean);
               const highest=[1,2,3,4,5,6,7,8,9,10].reduce((hi,g)=>
                 people.some(p=>getManualScore(manualScores,p,effectiveSessionLeague,sessionDate,g)!=null)?g:hi,0);
-              // One more empty column than anyone has filled, so there's
-              // always somewhere to type the next game without a button.
-              const cols=Math.min(10,Math.max(3,highest+1));
+              // Starts at two games, grows on request.
+              //
+              // Auto-growing by one every time someone filled a column
+              // meant the table crept wider on its own and never settled
+              // -- there was always one empty column implying another
+              // game. Two is the honest default for a casual night, and
+              // an explicit button means the width is the bowler's
+              // choice rather than a side effect of typing.
+              const cols=Math.min(10,Math.max(2,highest,casualExtraGames));
               const gameNums=Array.from({length:cols},(_,i)=>i+1);
 
               const NAME_W=92;
@@ -1024,6 +1030,13 @@ export default function LogView({
                       <div style={{height:"34px"}}/>
                     </div>
                   </div>
+
+                  {cols<10&&(
+                    <button style={{...S.btn(),width:"100%",marginTop:"8px",fontSize:"12px"}}
+                      onClick={()=>setCasualExtraGames(Math.min(10,cols+1))}>
+                      + Add a game
+                    </button>
+                  )}
 
                   {/* Adding people lives here now -- the table IS the
                       who's-bowling list, so a separate card for it was

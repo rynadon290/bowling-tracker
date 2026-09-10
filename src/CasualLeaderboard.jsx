@@ -16,7 +16,7 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
   if (!rows.length) {
     return (
       <div style={S.card}>
-        <div style={S.label}>Friends</div>
+        <div style={S.label}>Standings</div>
         <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.5 }}>
           Nobody here yet. Add people to your scoresheet on the Bowl tab and they'll
           show up once you've bowled a night together.
@@ -28,7 +28,7 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
   return (
     <>
       <div style={S.card}>
-        <div style={S.label}>Leaderboard</div>
+        <div style={S.label}>Standings</div>
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
           Everyone you've bowled with, by average. {rows.length === 1 ? "Add someone to compare against." : ""}
         </div>
