@@ -10,7 +10,7 @@ import { isContainerLeague, isLeagueHidden, teamsInLeague } from "./domain/leagu
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
-import { MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
+import { ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
   resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
@@ -65,14 +65,15 @@ export default function Settings({
   // restore defaults for settings it never shows. Four cards of dead
   // options make a simple mode feel complicated.
   const casualMode = preferences.environment === "casual";
+  const ENV_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
   const cardsFor = {
     leagues: ["leagues"],
     settings: casualMode
       // Walkthroughs stay: a casual bowler is the most likely to want to
       // rewatch one, and it used to ride on the "reset" id -- so cutting
       // Reset silently cut the tours too.
-      ? ["look", "walkthroughs", "backup", "dangerZone"]
-      : ["look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "walkthroughs", "reset", "dangerZone"],
+      ? ["session", "look", "walkthroughs", "backup", "dangerZone"]
+      : ["session", "look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "walkthroughs", "reset", "dangerZone"],
   };
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);
@@ -92,7 +93,7 @@ export default function Settings({
   // internal confirmation steps -- collapsing them is an extra deliberate
   // step before reaching something destructive or data-heavy.
   const [expanded, setExpanded] = useState({
-    look: false, environment: true, whereYouBowl: false, trackingDetail: false,
+    session: true, look: false, trackingDetail: false,
     accessoryFields: false, moneyGames: false, statsLayout: false,
     backup: false, reset: false, dangerZone: false,
   });
@@ -268,6 +269,65 @@ export default function Settings({
       {/* First, because it's the one setting a person changes and then
           looks at everything else through. Swatches rather than names
           alone: nobody can picture "Urethane" from the word. */}
+      {/* Bowling mode and tracking style, duplicated here on purpose.
+      
+          Both live on the Bowl tab, in the "Bowling today?" card -- which
+          is the right place to CHANGE them on a given night. But that
+          card collapses to a one-line summary once answered, and a
+          bowler who can't find their stats, or who picked Just Bowling
+          by accident and watched four tabs vanish, looks in Settings.
+          
+          Two places to find the same switch beats one place nobody
+          thinks of. */}
+      {showCard("session") && (
+      <CollapsibleCard title="What you're bowling"
+        summary={`${ENV_LABELS[preferences.environment] || "League"}${
+          preferences.environment === "casual" ? "" : ` · ${preferences.trackingMode === "shot" ? "Shot by shot" : "Scores only"}`}`}
+        expanded={expanded.session} onToggle={() => toggle("session")}>
+        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
+          You can also change these at the top of the Bowl tab. Each mode shows
+          different things, so switching here changes what the rest of the app offers.
+        </div>
+
+        <div style={S.label}>Mode</div>
+        <div style={{ ...S.chips, marginBottom: "12px" }}>
+          {ENVIRONMENTS.map(env => (
+            <Chip key={env} label={ENV_LABELS[env]}
+              selected={preferences.environment === env}
+              onToggle={() => apply(prev => applyEnvironment(prev, env))} />
+          ))}
+        </div>
+
+        {/* Casual has no tracking choice: it's scores-only by
+            definition, and offering a switch that does nothing would be
+            worse than not offering it. */}
+        {preferences.environment !== "casual" && (
+          <>
+            <div style={S.label}>Tracking style</div>
+            <div style={S.chips}>
+              <Chip label="Shot by shot" selected={preferences.trackingMode === "shot"}
+                onToggle={() => apply(prev => setTrackingMode(prev, "shot"))} />
+              <Chip label="Scores only" selected={preferences.trackingMode === "game"}
+                onToggle={() => apply(prev => setTrackingMode(prev, "game"))} />
+            </div>
+            <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px", lineHeight: 1.4 }}>
+              {preferences.trackingMode === "shot"
+                ? "Every ball: which pins fell, which you left, the ball you threw. Powers spare stats and the scoresheet."
+                : "Just the final score for each game. Faster, and you can switch mid-night."}
+            </div>
+          </>
+        )}
+
+        {preferences.environment === "casual" && (
+          <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.5 }}>
+            Just Bowling keeps things to game scores, and hides History, Stats, Improve
+            and the Vault. Switch to another mode above and they all come back — nothing
+            is deleted.
+          </div>
+        )}
+      </CollapsibleCard>
+      )}
+
       {showCard("look") && (
       <CollapsibleCard title="App appearance" summary={THEMES[preferences.theme]?.label || THEMES.lane.label}
         expanded={expanded.look} onToggle={() => toggle("look")}>
