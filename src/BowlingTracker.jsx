@@ -4981,7 +4981,10 @@ export default function BowlingTracker(){
             from managing a roster, and it isn't part of league setup. */}
         {view==="locker"&&(
           <TeamManagement
-            leagues={leagues}
+            // activeLeagues, not the raw list: Practice and Just Bowling
+            // are containers, and offering to add a team to one is
+            // offering something that can't work.
+            leagues={activeLeagues}
             onTeamsChange={persistTeams}
             focusTeamId={focusTeamId}
           />

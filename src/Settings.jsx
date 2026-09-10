@@ -6,7 +6,7 @@ import HistoryView from "./HistoryView.jsx";
 import { availableTours } from "./domain/tour.js";
 import SessionHistory from "./SessionHistory.jsx";
 import CenterPicker from "./CenterPicker.jsx";
-import { isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
+import { isContainerLeague, isLeagueHidden, teamsInLeague } from "./domain/leagueMembership.js";
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
@@ -320,7 +320,13 @@ export default function Settings({
           <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
             Rename a league, set its center and season dates, or hide one you're not bowling any more.
           </div>
-          {(leagues || []).map((league, i) => {
+          {/* Practice and Just Bowling are filtered out.
+          
+              They're containers that exist so scores have somewhere to
+              hang -- nobody joins them, they have no team, and they
+              can't be renamed or deleted. Offering to add a team to
+              "Practice" is offering something that can't work. */}
+          {(leagues || []).filter(l => !isContainerLeague(l)).map((league, i) => {
             const centerId = leagueCenters?.[league];
             const center = (centers || []).find(c => c.id === centerId) || null;
             return (
