@@ -369,3 +369,35 @@ describe('pendingModeTour', () => {
     }
   });
 });
+
+// The container leagues are not real leagues, so a bowler whose only
+// "league" is Practice or Just Bowling still needs setup.
+//
+// This filtered on "Casual" — the container's OLD name — so it had
+// silently stopped excluding it. Harmless only because the team check
+// caught the same case; it would have bitten the moment a team were
+// attached to the container.
+describe('needsLeagueSetup and container leagues', () => {
+  const ask = (leagues, teams = []) =>
+    needsLeagueSetup({ environment: 'league', leagues, teams });
+
+  it('still needs setup when only containers exist', () => {
+    expect(ask(['Practice'])).toBe(true);
+    expect(ask(['Just Bowling'])).toBe(true);
+    expect(ask(['Practice', 'Just Bowling'])).toBe(true);
+  });
+
+  it('is not satisfied by a team attached to a container', () => {
+    expect(ask(['Just Bowling'], [{ id: 't', league: 'Just Bowling' }])).toBe(true);
+  });
+
+  it('is satisfied by a real league with a team', () => {
+    expect(ask(['Tuesday'], [{ id: 't', league: 'Tuesday' }])).toBe(false);
+  });
+
+  it('only applies to league mode', () => {
+    for (const environment of ['casual', 'practice', 'tournament']) {
+      expect(needsLeagueSetup({ environment, leagues: [], teams: [] })).toBe(false);
+    }
+  });
+});

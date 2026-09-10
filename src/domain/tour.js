@@ -1,4 +1,5 @@
 import { CASUAL_BADGES } from "./casualBadges.js";
+import { isContainerLeague } from "./leagueMembership.js";
 // The tour a new bowler gets after setup.
 //
 // Setup already asks the two questions the app can't work without — your
@@ -502,7 +503,11 @@ export function tourToOffer({ environment, isCoach = false, seen = [] } = {}) {
 // showing an empty screen, say so and offer to fix it.
 export function needsLeagueSetup({ environment, leagues = [], teams = [] } = {}) {
   if (environment !== "league") return false;
-  const realLeagues = (leagues || []).filter(l => l && l !== "Practice" && l !== "Casual");
+  // "Casual" was the old name for the container; it is "Just Bowling"
+  // now, so this filter had stopped excluding it. Harmless today only
+  // because the team check below catches the same case -- but it would
+  // bite the moment a team were attached to it.
+  const realLeagues = (leagues || []).filter(l => l && !isContainerLeague(l));
   if (!realLeagues.length) return true;
   return !(teams || []).some(t => t && t.league && realLeagues.includes(t.league));
 }
