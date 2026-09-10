@@ -5,7 +5,7 @@ import TournamentSession from "./TournamentSession.jsx";
 import SessionStart from "./SessionStart.jsx";
 import Onboarding from "./Onboarding.jsx";
 import Tour from "./Tour.jsx";
-import { tourSteps, tourToOffer, markTourSeen, needsLeagueSetup, availableTours } from "./domain/tour.js";
+import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
@@ -4015,6 +4015,10 @@ export default function BowlingTracker(){
   // you were invisible while you had a teammate selected.
   const myInboxItems=buildInbox({
     bowler:displayName||activeBowler,
+    // Offered as a task, not an interruption -- see pendingModeTour.
+    pendingTour:hasSeenTour(toursSeen,"general")
+      ?pendingModeTour({environment:preferences.environment,seen:toursSeen})
+      :null,
     userId:user?.id,
     importedScores,
     sessions,
@@ -4785,6 +4789,7 @@ export default function BowlingTracker(){
                 The inbox notifies; it doesn't re-implement accepting a
                 coaching invitation in a second place. */}
             <InboxList items={myInboxItems} onOpen={item=>{
+              if(item.type==="pendingTour"&&item.track){startTour(item.track);return;}
               // A task set BY a coach is homework for the bowler, so open
               // the Coach tab on the bowling side rather than dropping
               // them into coach view looking at their own bowlers.
@@ -4988,8 +4993,10 @@ export default function BowlingTracker(){
               // First time in this environment? Walk them through it.
               // Coach mode has its own tour, offered when coach mode is
               // turned on -- see the coachViewOn effect.
-              const offer=tourToOffer({environment:preferences.environment,isCoach:false,seen:toursSeen});
-              if(offer&&onboarded)startTour(offer);
+              // The general tour, once, for everyone. The mode-specific
+              // one arrives as an inbox task instead -- stacking both
+              // onto signup makes it twenty screens long.
+              if(onboarded&&!hasSeenTour(toursSeen,"general"))startTour("general");
             }}
             routineNote={routine.mode&&!showSessionStart?`Your usual ${DAY_NAMES_SHORT[routine.weekday]}`:""}
             updatePreferences={updatePreferences}

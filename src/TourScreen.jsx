@@ -302,15 +302,17 @@ const SCREENS = {
     </Phone>
   ),
 
-  import: () => (
+  // The import screen shows whichever kind the tour is for -- showing a
+  // tournament bowler "League" selected teaches the wrong tap.
+  import: ({ track } = {}) => (
     <Phone title="Bowl" headerIcon="import">
       <Note up={false}>Tap Import in the header</Note>
       <div style={card}>
         <div style={label}>What are you importing?</div>
         <div style={{ display: "flex", gap: "5px" }}>
-          <span style={chip(false)}>Practice</span>
-          <span style={chip(true)}>League</span>
-          <span style={chip(false)}>Tournament</span>
+          <span style={chip(track === "practice")}>Practice</span>
+          <span style={chip(track !== "practice" && track !== "tournament")}>League</span>
+          <span style={chip(track === "tournament")}>Tournament</span>
         </div>
       </div>
       <div style={card}>
@@ -324,7 +326,9 @@ const SCREENS = {
             }}>🖼️</div>
           ))}
         </div>
-        <div style={{ ...muted, marginTop: "6px" }}>Reads every bowler's games and frames.</div>
+        <div style={{ ...muted, marginTop: "6px" }}>
+          Reads your games and frames{track === "tournament" ? ", and your squad's if the card has them" : ", and your teammates'"}.
+        </div>
       </div>
       <Nav active={0} />
     </Phone>
@@ -665,10 +669,10 @@ const SCREENS = {
           {[["Brackets ×4", "$20 in", "$60 won", C.strike],
             ["Eliminator", "$10 in", "—", C.textMuted],
             ["High game", "$5 in", "$25 won", C.strike]].map(([n, inn, out, col]) => (
-            <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
-              <span style={{ fontSize: "10px", color: C.text }}>{n}</span>
-              <span style={muted}>{inn}</span>
-              <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{out}</span>
+            <div key={n} style={{ display: "flex", alignItems: "baseline", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.text, flex: 1 }}>{n}</span>
+              <span style={{ ...muted, width: "48px", textAlign: "right" }}>{inn}</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: col, width: "58px", textAlign: "right" }}>{out}</span>
             </div>
           ))}
           <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>$85 won · $35 in · up $50</div>
@@ -689,10 +693,10 @@ const SCREENS = {
           {[["R1 vs J. Carver", "224-198", "W +30", C.strike],
             ["R2 vs M. Boone", "191-217", "L", C.miss],
             ["R3 vs T. Willis", "236-205", "W +30", C.strike]].map(([m, sc, res, col]) => (
-            <div key={m} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
-              <span style={{ fontSize: "10px", color: C.text }}>{m}</span>
-              <span style={muted}>{sc}</span>
-              <span style={{ fontSize: "10px", fontWeight: 700, color: col }}>{res}</span>
+            <div key={m} style={{ display: "flex", alignItems: "baseline", padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "10px", color: C.text, flex: 1 }}>{m}</span>
+              <span style={{ ...muted, width: "54px", textAlign: "right" }}>{sc}</span>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: col, width: "42px", textAlign: "right" }}>{res}</span>
             </div>
           ))}
           <div style={{ ...muted, marginTop: "6px", textAlign: "right" }}>2-1 · bonus pins included</div>
@@ -888,8 +892,8 @@ const SCREENS = {
   ),
 };
 
-export default function TourScreen({ stepId }) {
+export default function TourScreen({ stepId, track }) {
   const Screen = SCREENS[stepId];
   if (!Screen) return null;
-  return <Screen />;
+  return <Screen track={track} />;
 }

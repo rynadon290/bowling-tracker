@@ -70,7 +70,7 @@ export default function Tour({ preferences = {}, track, onNavigate, onFinish }) 
           {step.body}
         </div>
 
-        <TourScreen stepId={step.id} />
+        <TourScreen stepId={step.id} track={track} />
       </div>
 
       <div style={{
