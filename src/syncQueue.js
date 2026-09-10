@@ -54,11 +54,41 @@ function getDb() {
 // signal right now" and fall back to the local queue — even if the network
 // call might still succeed later on its own; we just won't wait around for
 // it at the lanes.
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
+// A timeout that actually cancels the request, rather than just walking
+// away from it.
+//
+// The old version raced the query against a timer and returned on
+// whichever won. The HTTP request kept going regardless: it stayed on the
+// connection, still counted against the browser's per-host limit, and
+// still landed server-side whenever it eventually arrived. At the lanes,
+// on bad signal, that meant a write the app had already given up on and
+// queued could ALSO succeed minutes later -- the same row written twice,
+// once through each path.
+//
+// It matters more now the queue is user-scoped: a queued write is
+// replayed under its owner's session, but an in-flight one lands under
+// whatever session is current when it finally arrives. Aborting closes
+// that window rather than narrowing it.
+//
+// `work` is a PostgREST builder, or an array of them to run together.
+// Passing a pre-made Promise.all() would defeat the point -- the array
+// has to arrive unwrapped so each builder can be given the signal.
+function withTimeout(work, ms) {
+  const controller = new AbortController();
+  // Guarded rather than assumed: `.abortSignal` is a PostgREST builder
+  // method, and not everything passed through here is one. Anything else
+  // still gets the timeout, just without cancellation.
+  const attach = (q) => (q && typeof q.abortSignal === 'function') ? q.abortSignal(controller.signal) : q;
+  const runnable = Array.isArray(work) ? Promise.all(work.map(attach)) : attach(work);
+
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, ms);
+  });
+  // clearTimeout on settle: without it every call leaves a live timer
+  // behind, which keeps the event loop busy and delays anything waiting
+  // for it to drain.
+  return Promise.race([Promise.resolve(runnable), timeout]).finally(() => clearTimeout(timer));
 }
 
 const listeners = new Set();
@@ -329,11 +359,14 @@ export async function cloudRead(table, queryFn, { timeoutMs = 6000 } = {}) {
 // falls back to whatever it already has cached, untouched.
 export async function cloudReadDelta(table, sinceIso, { timeoutMs = 6000 } = {}) {
   try {
-    const [rowsRes, tombstonesRes] = await withTimeout(Promise.all([
+    // Passed as an array, not Promise.all(...): withTimeout needs the
+    // individual builders to attach the abort signal to each. Wrapping
+    // them first would leave both requests running after a timeout.
+    const [rowsRes, tombstonesRes] = await withTimeout([
       supabase.from(table).select('*').gte('updated_at', sinceIso),
       supabase.from('sync_tombstones').select('row_id,deleted_at')
         .eq('table_name', table).gte('deleted_at', sinceIso),
-    ]), timeoutMs);
+    ], timeoutMs);
     if (rowsRes.error) throw rowsRes.error;
     if (tombstonesRes.error) throw tombstonesRes.error;
     return { rows: rowsRes.data || [], tombstones: tombstonesRes.data || [], online: true };
