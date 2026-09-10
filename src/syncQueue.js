@@ -245,6 +245,38 @@ export async function cloudRead(table, queryFn, { timeoutMs = 6000 } = {}) {
   }
 }
 
+// Only what changed since `sinceIso`, plus the ids of anything deleted
+// since then -- instead of `cloudRead`'s whole-table fetch.
+//
+// This is the actual egress fix: a returning bowler's app open used to
+// pull their entire history every single time, which is most of what a
+// hosted database charges for. Asking for "since X" instead means a
+// quiet week costs almost nothing to sync, and a full season only ever
+// gets paid for once.
+//
+// `table` needs an `updated_at` column that's actually maintained (see
+// migration_delta_sync.sql -- a column that exists but is never bumped
+// on UPDATE would make this silently miss every edit) and a matching
+// trigger writing to sync_tombstones on delete, or deleted rows would
+// keep reappearing forever on other devices.
+//
+// Same online:false contract as cloudRead: on any failure the caller
+// falls back to whatever it already has cached, untouched.
+export async function cloudReadDelta(table, sinceIso, { timeoutMs = 6000 } = {}) {
+  try {
+    const [rowsRes, tombstonesRes] = await withTimeout(Promise.all([
+      supabase.from(table).select('*').gte('updated_at', sinceIso),
+      supabase.from('sync_tombstones').select('row_id,deleted_at')
+        .eq('table_name', table).gte('deleted_at', sinceIso),
+    ]), timeoutMs);
+    if (rowsRes.error) throw rowsRes.error;
+    if (tombstonesRes.error) throw tombstonesRes.error;
+    return { rows: rowsRes.data || [], tombstones: tombstonesRes.data || [], online: true };
+  } catch (err) {
+    return { rows: null, tombstones: null, online: false, reason: formatError(err) };
+  }
+}
+
 // Returns any not-yet-synced records queued for a given table, so a read
 // (e.g. loading shot history) can merge them in — otherwise a shot logged
 // while offline would be invisible until the queue actually flushes.

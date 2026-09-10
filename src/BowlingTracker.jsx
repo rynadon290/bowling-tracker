@@ -15,7 +15,8 @@ import { pendingTeamInvites, buildInbox, inboxCount as countInbox } from "./doma
 import DrillSession from "./DrillSession.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
-import { classifySyncError, cloudRead, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
+import { classifySyncError, cloudRead, cloudReadDelta, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
+import { mergeDelta, nextCursor } from "./domain/deltaSync.js";
 import { normalizeSignupCode, isValidSignupCode } from "./domain/signupCodes.js";
 import { splitConversionByType, isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import { maxPossibleScore,
@@ -101,6 +102,15 @@ if (typeof window !== "undefined" && !window.storage) {
 }
 
 const STORAGE_KEY = "bowling-shots-v2";
+// Delta sync cursors: the timestamp of the latest change this device has
+// already pulled for shots/sessions. Present means "ask for what changed
+// since this"; absent means "this device has never completed a sync" and
+// a full fetch runs instead, same as every load did before this existed.
+//
+// -v1 so a stale cursor from a future format change can't be misread as
+// a valid one — same convention as every other local key here.
+const SHOTS_CURSOR_KEY = "bowling-shots-cursor-v1";
+const SESSIONS_CURSOR_KEY = "bowling-sessions-cursor-v1";
 // Tonight's context: which league, which date, which lane pair.
 //
 // Shots were always saved, but the context needed to FIND them was not --
@@ -268,6 +278,50 @@ async function readCached(key,expect){
     if(expect==="object"&&(typeof v!=="object"||v===null||Array.isArray(v)))return null;
     return v;
   }catch{return null;}
+}
+
+// Merges a delta fetch into a table's local cache and persists both the
+// result and the advanced cursor.
+//
+// One routine shared by shots and sessions rather than two copies, so a
+// fix to the merge logic can't land on one table and not the other by
+// accident — exactly the kind of drift this whole session has been
+// finding and fixing in existing code.
+async function applyDelta(deltaRes,{storageKey,cursorKey,cursor,mapRow,migrate,pendingTable}){
+  if(deltaRes.online){
+    const existingRaw=await window.storage.get(storageKey);
+    let existing=[];
+    if(existingRaw){try{const p=JSON.parse(existingRaw.value);if(Array.isArray(p))existing=p;}catch{}}
+
+    // The same "an unsynced local edit always wins" rule the full-fetch
+    // path already used, reapplied on top of the merge.
+    const pending=await getQueuedRecordsForTable(pendingTable);
+    const pendingIds=new Set(pending.map(p=>p.id));
+    const tombstoneIds=(deltaRes.tombstones||[]).map(t=>t.row_id);
+    const incoming=(deltaRes.rows||[]).filter(row=>!pendingIds.has(row.id)).map(mapRow);
+    const merged=mergeDelta(existing,incoming,tombstoneIds).filter(row=>!pendingIds.has(row.id));
+    const pendingObjs=pending.map(mapRow);
+    const result=migrate([...merged,...pendingObjs]);
+
+    const timestamps=[
+      ...(deltaRes.rows||[]).map(r=>r.updated_at),
+      ...(deltaRes.tombstones||[]).map(t=>t.deleted_at),
+    ];
+    const newCursor=nextCursor(cursor,timestamps);
+    try{
+      await window.storage.set(storageKey,JSON.stringify(result));
+      await window.storage.set(cursorKey,newCursor);
+    }catch{}
+    return result;
+  }
+  // The delta fetch failed -- offline, or a transient error. Same
+  // fallback as every load has always had: whatever is cached, left
+  // untouched, cursor left alone so the next attempt resumes from the
+  // same point instead of losing progress.
+  const r=await window.storage.get(storageKey);
+  let loaded=[];
+  if(r){try{const p=JSON.parse(r.value);if(Array.isArray(p))loaded=p;}catch{}}
+  return migrate(loaded);
 }
 
 export default function BowlingTracker(){
@@ -916,6 +970,30 @@ export default function BowlingTracker(){
         // select is narrowed. Each result keeps its own { online, data }
         // shape, so every guard below works unchanged and one table
         // failing still doesn't take the others down.
+        // Delta sync: a cursor present means this device has synced
+        // before, so ask for only what changed instead of everything.
+        // Absent (first run, or a cleared/reinstalled app) falls
+        // through to the full fetch every load used to do.
+        //
+        // A cursor older than the tombstone retention window is treated
+        // as absent. Tombstones are pruned after 90 days, so a device
+        // that's been away longer could never learn about deletes that
+        // happened while it was gone -- it would silently resurrect
+        // shots the bowler removed. A full resync costs one expensive
+        // load after months away, which is the right trade.
+        const TOMBSTONE_RETENTION_DAYS=90;
+        const cursorIsUsable=iso=>{
+          if(!iso)return false;
+          const t=new Date(iso).getTime();
+          if(!Number.isFinite(t))return false;
+          const ageDays=(Date.now()-t)/86400000;
+          return ageDays<TOMBSTONE_RETENTION_DAYS-7; // a week of margin
+        };
+        const rawShotsCursor=(await window.storage.get(SHOTS_CURSOR_KEY))?.value||null;
+        const rawSessionsCursor=(await window.storage.get(SESSIONS_CURSOR_KEY))?.value||null;
+        const shotsCursor=cursorIsUsable(rawShotsCursor)?rawShotsCursor:null;
+        const sessionsCursor=cursorIsUsable(rawSessionsCursor)?rawSessionsCursor:null;
+
         const [
           shotsRes,
           sessionsRes,
@@ -939,8 +1017,10 @@ export default function BowlingTracker(){
           lanePatternsRes,
           teamsRes,
         ] = await Promise.all([
-          cloudRead("shots",q=>q.select("*")),
-          cloudRead("sessions",q=>q.select("*")),
+          // Byte-for-byte the same call as before whenever there is no
+          // cursor yet, so a first run behaves exactly as it always has.
+          shotsCursor?cloudReadDelta("shots",shotsCursor):cloudRead("shots",q=>q.select("*")),
+          sessionsCursor?cloudReadDelta("sessions",sessionsCursor):cloudRead("sessions",q=>q.select("*")),
           cloudRead("bowler_names",q=>q.select("name")),
           cloudRead("arsenals",q=>q.select("bowler_name,ball,layout_system,layout_values,group_id,coverstock,core_type,weight,rg,diff,int_diff")),
           cloudRead("bowler_profiles",q=>q.select("bowler_name,left_handed,two_handed,is_coach,aliases,home_centers,notes,book_average,book_games,book_season,book_average_as_of")),
@@ -968,7 +1048,17 @@ export default function BowlingTracker(){
 
 
 
-        if(shotsRes.online&&shotsRes.data){
+        if(shotsCursor){
+          // A device that's synced before: only what changed since last
+          // time, merged into what's already cached -- instead of
+          // re-downloading a whole career on every single open.
+          migratedShots=await applyDelta(shotsRes,{
+            storageKey:STORAGE_KEY,cursorKey:SHOTS_CURSOR_KEY,cursor:shotsCursor,
+            mapRow:row=>shotFromSupabaseRow(row,leagueNameById),
+            migrate:migrateShots,pendingTable:"shots",
+          });
+          setShots(migratedShots);
+        }else if(shotsRes.online&&shotsRes.data){
           const pending=await getQueuedRecordsForTable("shots");
           const pendingIds=new Set(pending.map(p=>p.id));
           const cloudShots=shotsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>shotFromSupabaseRow(row,leagueNameById));
@@ -976,6 +1066,10 @@ export default function BowlingTracker(){
           migratedShots=migrateShots([...cloudShots,...pendingShots]);
           setShots(migratedShots);
           try{await window.storage.set(STORAGE_KEY,JSON.stringify(migratedShots));}catch{}
+          // A completed full sync -- from here on, later opens can ask
+          // for only what changed instead of repeating this.
+          const seed=nextCursor(null,shotsRes.data.map(r=>r.updated_at))||new Date().toISOString();
+          try{await window.storage.set(SHOTS_CURSOR_KEY,seed);}catch{}
         }else{
           const r=await window.storage.get(STORAGE_KEY);
           if(r){
@@ -990,7 +1084,14 @@ export default function BowlingTracker(){
             }
           }
         }
-                if(sessionsRes.online&&sessionsRes.data){
+                if(sessionsCursor){
+          const migratedSessions=await applyDelta(sessionsRes,{
+            storageKey:SESSIONS_KEY,cursorKey:SESSIONS_CURSOR_KEY,cursor:sessionsCursor,
+            mapRow:row=>sessionFromSupabaseRow(row,leagueNameById),
+            migrate:migrateSessions,pendingTable:"sessions",
+          });
+          setSessions(migratedSessions);
+        }else if(sessionsRes.online&&sessionsRes.data){
           const pendingSessions=await getQueuedRecordsForTable("sessions");
           const pendingIds=new Set(pendingSessions.map(p=>p.id));
           const cloudSessions=sessionsRes.data.filter(row=>!pendingIds.has(row.id)).map(row=>sessionFromSupabaseRow(row,leagueNameById));
@@ -998,6 +1099,8 @@ export default function BowlingTracker(){
           const migratedSessions=migrateSessions([...cloudSessions,...pendingSessionObjs]);
           setSessions(migratedSessions);
           try{await window.storage.set(SESSIONS_KEY,JSON.stringify(migratedSessions));}catch{}
+          const seed=nextCursor(null,sessionsRes.data.map(r=>r.updated_at))||new Date().toISOString();
+          try{await window.storage.set(SESSIONS_CURSOR_KEY,seed);}catch{}
         }else{
           const s=await window.storage.get(SESSIONS_KEY);
           if(s){
