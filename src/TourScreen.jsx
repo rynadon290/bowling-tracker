@@ -198,23 +198,29 @@ function ResultCard({ stage }) {
 }
 
 const SCREENS = {
+  // Mirrors SessionStart's real card: same heading, same four options in
+  // the same order, and NOTHING selected -- this is the screen as it
+  // looks before the bowler has answered.
   bowl: () => (
     <Phone title="Bowl">
       <Spot>
         <div style={card}>
-          <div style={label}>What are you bowling?</div>
-          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "8px" }}>
-            <span style={chip(false)}>Practice</span>
-            <span style={chip(true)}>League</span>
-            <span style={chip(false)}>Tournament</span>
+          <div style={{ fontSize: "12px", fontWeight: 700, color: C.text, marginBottom: "3px" }}>
+            Bowling today?
           </div>
-          <div style={{ ...S.input, padding: "6px 9px", fontSize: "11px" }}>Tue 15 Sep</div>
-          <div style={{ ...muted, marginTop: "6px" }}>
-            Each one asks for what it actually needs.
+          <div style={{ ...muted, marginBottom: "8px" }}>
+            Two quick questions and the app sets itself up for tonight.
+          </div>
+          <div style={label}>Where are you bowling?</div>
+          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+            <span style={chip(false)}>Practice</span>
+            <span style={chip(false)}>League</span>
+            <span style={chip(false)}>Tournament</span>
+            <span style={chip(false)}>Just Bowling</span>
           </div>
         </div>
       </Spot>
-      <Note>This sets up everything else</Note>
+      <Note>Answer this and everything else falls into place</Note>
       <Nav active={0} />
     </Phone>
   ),
@@ -623,6 +629,11 @@ const SCREENS = {
               <span style={{ fontSize: "10px", fontWeight: 600, color: C.text }}>{v}</span>
             </div>
           ))}
+          {/* Four rows plus an ellipsis: showing a closed list made it
+              look like that was all of them. */}
+          <div style={{ ...muted, padding: "4px 0", borderTop: `1px solid ${C.border}` }}>
+            …and more in Settings
+          </div>
         </div>
       </Spot>
       <Note>Turn on only what you're working on</Note>
