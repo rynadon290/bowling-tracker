@@ -580,8 +580,8 @@ export default function TeamManagement({
               <div style={S.label}>Team Name</div>
               <div style={{display:"flex",gap:"8px"}}>
                 <input value={editingName} onChange={e=>setEditingName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveRename(team.id);}} autoFocus style={{...S.input,flex:1}}/>
-                <button style={S.btn("primary")} onClick={()=>saveRename(team.id)}>Save</button>
-                <button style={S.btn()} onClick={()=>{setEditingTeamId(null);setEditingName("");}}>Cancel</button>
+                <button style={S.primary} onClick={()=>saveRename(team.id)}>Save</button>
+                <button style={S.button} onClick={()=>{setEditingTeamId(null);setEditingName("");}}>Cancel</button>
               </div>
             </div>
           ) : (
@@ -594,8 +594,8 @@ export default function TeamManagement({
                 </div>
               </div>
               <div style={{display:"flex",gap:"6px"}}>
-                <button style={S.btn()} onClick={()=>startRename(team)}>Rename</button>
-                <button style={{...S.btn(),color:C.miss}} onClick={()=>deleteTeam(team.id)}>Delete</button>
+                <button style={S.button} onClick={()=>startRename(team)}>Rename</button>
+                <button style={{...S.button,color:C.danger}} onClick={()=>deleteTeam(team.id)}>Delete</button>
               </div>
             </div>
           )}
@@ -608,13 +608,13 @@ export default function TeamManagement({
             <div key={member.userId} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
               <div style={{width:"24px",color:C.textMuted,fontWeight:700}}>{index+1}.</div>
               <div style={{flex:1,color:C.text}}>{member.displayName}</div>
-              <button style={{...S.btn(),minWidth:"28px"}} title="Bowling hand — tap to switch"
+              <button style={{...S.button,minWidth:"28px"}} title="Bowling hand — tap to switch"
                 onClick={()=>setMemberHandedness(team.id,member.userId,!member.leftHanded)}>{member.leftHanded?"L":"R"}</button>
-              <button style={{...S.btn(),color:member.isSub?C.accent:undefined}} title="Sub — tap to toggle"
+              <button style={{...S.button,color:member.isSub?C.accent:undefined}} title="Sub — tap to toggle"
                 onClick={()=>setMemberIsSub(team.id,member.userId,!member.isSub)}>{member.isSub?"Sub ✓":"Sub"}</button>
-              <button style={S.btn()} disabled={index===0} onClick={()=>moveMember(team.id,index,-1)}>↑</button>
-              <button style={S.btn()} disabled={index===team.members.length-1} onClick={()=>moveMember(team.id,index,1)}>↓</button>
-              <button style={{...S.btn(),color:C.miss}} onClick={()=>removeMember(team.id,member.userId)}>×</button>
+              <button style={S.button} disabled={index===0} onClick={()=>moveMember(team.id,index,-1)}>↑</button>
+              <button style={S.button} disabled={index===team.members.length-1} onClick={()=>moveMember(team.id,index,1)}>↓</button>
+              <button style={{...S.button,color:C.danger}} onClick={()=>removeMember(team.id,member.userId)}>×</button>
             </div>
           ))}
           {team.pendingInvites.map(invite => (
@@ -637,7 +637,7 @@ export default function TeamManagement({
                             const msg=`Join our team on My Bowling Vault — sign up and enter code ${invite.signupCode}`;
                             try{navigator.clipboard?.writeText(msg);}catch{}
                           }}
-                          style={{...S.btn(),padding:"3px 8px",fontSize:"10px"}}>
+                          style={{...S.button,padding:"3px 8px",fontSize:"10px"}}>
                           Copy
                         </button>
                       </div>
@@ -647,11 +647,11 @@ export default function TeamManagement({
                     {invite.email ? "invited · not signed in yet" : "placeholder · no email on file"}
                   </div>
                 </div>
-                <button style={{...S.btn(),minWidth:"28px"}} title="Bowling hand — tap to switch"
+                <button style={{...S.button,minWidth:"28px"}} title="Bowling hand — tap to switch"
                   onClick={()=>setInviteHandedness(team.id,invite.id,!invite.leftHanded)}>{invite.leftHanded?"L":"R"}</button>
-                <button style={{...S.btn(),color:invite.isSub?C.accent:undefined}} title="Sub — tap to toggle"
+                <button style={{...S.button,color:invite.isSub?C.accent:undefined}} title="Sub — tap to toggle"
                   onClick={()=>setInviteIsSub(team.id,invite.id,!invite.isSub)}>{invite.isSub?"Sub ✓":"Sub"}</button>
-                <button style={{...S.btn(),color:C.miss}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
+                <button style={{...S.button,color:C.danger}} onClick={()=>cancelInvite(team.id,invite.id)}>×</button>
               </div>
             </div>
           ))}
@@ -677,7 +677,7 @@ export default function TeamManagement({
                   .map(p => (
                     <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
                       <span style={{color:C.text}}>{p.display_name}</span>
-                      <button style={S.btn()} onClick={()=>addMember(team.id, p)}>Add</button>
+                      <button style={S.button} onClick={()=>addMember(team.id, p)}>Add</button>
                     </div>
                   ))}
               </div>
@@ -736,7 +736,7 @@ export default function TeamManagement({
                   {inviteForm[team.id]?.useCode?"✓ ":""}I don't have their email — give me a code to text them
                 </button>
 
-                <button style={S.btn("primary")} onClick={()=>createInvite(team.id)}>Add to Roster</button>
+                <button style={S.primary} onClick={()=>createInvite(team.id)}>Add to Roster</button>
               </div>
             </div>
           </div>
