@@ -14,7 +14,7 @@ const ALL_STEPS = [
     id: "bowl",
     tab: "log",
     title: "Bowl",
-    body: "Where you log. Pick your league and date at the top, then record what happened.",
+    body: "Everything starts here. Say what you're bowling — practice, a league night, or a tournament — and the app sets itself up for it. Each one asks for different things, so you're never entering a lane pattern for a Sunday practice or a drill target on league night.",
   },
   {
     id: "tracking",
@@ -26,6 +26,13 @@ const ALL_STEPS = [
     // concludes the app is heavy going -- when scores-only was there
     // the whole time.
     body: "Shot by shot records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only just takes your final score for each game: 213, 196, 203. You can switch any time, and even start a night one way and finish the other.",
+  },
+  {
+    id: "shot-detail",
+    tab: "log",
+    title: "What shot by shot captures",
+    body: "Every ball: which pins fell, which pins were left, and whether you made the spare. That's what separates 'I shot 180' from knowing you left six ten pins and made two of them. Add the ball you threw and it splits your stats by equipment too.",
+    when: ({ trackingMode }) => trackingMode === "shot",
   },
   {
     id: "scoresheet",
@@ -70,17 +77,17 @@ const ALL_STEPS = [
   // History or Stats after two nights a year. Four screens: get scores
   // in, see who won, share it.
   {
-    id: "casual-scores",
-    tab: "log",
-    title: "Just type the scores",
-    body: "Pick the date and type each game's final score. That's it — no frames, no setup, nothing to configure first.",
-    envs: ["casual"],
-  },
-  {
     id: "casual-people",
     tab: "log",
     title: "Everyone you're bowling with",
     body: "Add whoever's on the lane with you and keep all their scores on your phone. They don't need the app, or an account, or to do anything at all.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-scores",
+    tab: "log",
+    title: "Simply type the scores",
+    body: "Pick the date and type each game's final score. That's it — no frames, no setup, nothing to configure first.",
     envs: ["casual"],
   },
   {
@@ -94,7 +101,7 @@ const ALL_STEPS = [
     id: "casual-share",
     tab: "log",
     title: "Share the night",
-    body: "One tap makes a card with everyone's scores on it, ready for the group chat.",
+    body: "One tap makes a card with everyone's scores on it, ready for the group chat or social media.",
     envs: ["casual"],
   },
 
@@ -113,11 +120,19 @@ const ALL_STEPS = [
     body: "Choose a target — a specific spare, a pin combination, your own setup — then log each attempt as made or missed. No frames, no score, just the count. Come back next week and the same drill shows whether you're actually getting better at it.",
     envs: ["practice"],
   },
+
   {
-    id: "practice-depth",
+    id: "practice-goals",
     tab: "log",
-    title: "Practice doesn't change your league",
-    body: "Tracking depth here applies to tonight only. A scores-only practice won't quietly switch your league nights to scores-only too — the two are remembered separately, so you can grind shot-by-shot on a Sunday and keep league simple.",
+    title: "Working on something specific",
+    body: "Set a goal and practice against it — spare conversion, strike rate, your average. It shows in bowling terms, so 'make 9 of your next 10 ten pins' rather than a percentage, and moves as you bowl.",
+    envs: ["practice"],
+  },
+  {
+    id: "practice-fields",
+    tab: "log",
+    title: "The extra detail",
+    body: "Practice is where the accessory fields earn their place: ball speed, rev rate, axis rotation, your line and where you actually hit. Turn on only what you're working on — they're per-field switches in Settings, not all or nothing.",
     envs: ["practice"],
   },
 
@@ -161,10 +176,10 @@ const ALL_STEPS = [
     body: "Snap the monitor at the end of the night and the 📷 button at the top reads it — yours and your teammates'.",
   },
   {
-    id: "history",
-    tab: "history",
-    title: "History",
-    body: "Every night you've bowled, and every shot. Your own only — teammates keep their own.",
+    id: "import-verify",
+    tab: null,
+    title: "Checking an import",
+    body: "Read scores land as a proposal, not a fact. You map each column to a bowler, fix anything the camera misread, and only then does it save. Send a teammate their scores and they get the same check on their end before it counts.",
   },
   {
     id: "stats",
@@ -185,7 +200,7 @@ const ALL_STEPS = [
     // Said plainly rather than discovered: someone who opens this on
     // night one and finds it empty concludes the feature is weak, when
     // it just hasn't got enough to work with yet.
-    footnote: "This needs about ten games of shot-by-shot logging before it can say anything meaningful, and it sharpens from there. Scores from casual nights aren't included.",
+    footnote: "This needs about ten games of shot-by-shot logging before it can say anything even somewhat meaningful — and the more you bowl, the more tailored it gets. Scores from casual nights aren't included.",
   },
   {
     id: "improve",
@@ -200,7 +215,7 @@ const ALL_STEPS = [
     id: "arsenal",
     tab: "locker",
     title: "Your balls and bags",
-    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold different balls, and tournaments often cap how many you may carry, so you can keep several. Logging which ball threw which shot is what makes the per-ball stats work.",
+    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold different balls, and tournaments often cap how many you may carry, so you can keep several. Logging which ball threw which shot is what makes the per-ball stats work. Everything else is in there too — History has every night you've bowled, and we love stats, so they're all waiting on the Stats tab for you to dig through.",
     // A casual bowler is on a house ball. Nothing here applies.
     envs: ["practice", "league", "tournament"],
   },
@@ -208,7 +223,10 @@ const ALL_STEPS = [
     id: "vault",
     tab: "locker",
     title: "Vault",
-    envs: ["league", "tournament"],
+    // League only. A tournament bowler sets their event up on the Bowl
+    // tab, not in the Vault, and their gear is covered by the arsenal
+    // step in the general tour.
+    envs: ["league"],
     body: "Your leagues, teams and ball arsenal live here. Add a league, then add your team right underneath.",
   },
   {
@@ -222,7 +240,9 @@ const ALL_STEPS = [
     id: "money",
     tab: "log",
     title: "Money games",
-    envs: ["league", "tournament"],
+    // League only. A tournament bowler's entry fees and side pots are
+    // covered by the tournament tour's own brackets step.
+    envs: ["league"],
     body: "Tap the pots you're in each night. Buy-ins are remembered per league, so you enter them once.",
     when: ({ showMoneyGames }) => !!showMoneyGames,
   },
@@ -242,9 +262,12 @@ const ALL_STEPS = [
 export const MODE_TRACKS = ["casual", "practice", "league", "tournament"];
 
 export const GENERAL_STEP_IDS = [
-  "bowl", "tracking", "scoresheet",
+  // Order matters: this is the order they're shown in. Shot detail sits
+  // third, right after the tracking choice, because it's what that
+  // choice actually buys you.
+  "bowl", "tracking", "shot-detail", "scoresheet",
   "score-strike", "score-spare", "score-miss",
-  "import", "history", "stats", "insights", "improve", "arsenal",
+  "import", "import-verify", "stats", "insights", "improve", "arsenal",
 ];
 
 export function generalSteps(preferences = {}) {

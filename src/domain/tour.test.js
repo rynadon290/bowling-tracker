@@ -282,7 +282,7 @@ describe('mode-specific content', () => {
 
   it('teaches practice its own features', () => {
     const p = ids('practice');
-    for (const id of ['practice-modes', 'practice-drill', 'practice-depth']) {
+    for (const id of ['practice-modes', 'practice-drill', 'practice-goals', 'practice-fields']) {
       expect(p).toContain(id);
     }
   });
@@ -321,14 +321,14 @@ describe('general vs mode tours', () => {
 
   it('puts the basics in the general tour', () => {
     const g = ids(league, 'general');
-    for (const id of ['bowl', 'tracking', 'scoresheet', 'score-strike', 'history', 'stats']) {
+    for (const id of ['bowl', 'tracking', 'shot-detail', 'scoresheet', 'score-strike', 'stats']) {
       expect(g).toContain(id);
     }
   });
 
   it('keeps mode tours short and mode-specific', () => {
     for (const [env, expected] of [
-      ['practice', ['practice-modes', 'practice-drill', 'practice-depth']],
+      ['practice', ['practice-modes', 'practice-drill', 'practice-goals', 'practice-fields']],
       ['league', ['vault', 'roster', 'money']],
       ['tournament', ['tourney-setup', 'tourney-cut', 'tourney-pots', 'tourney-match']],
     ]) {
