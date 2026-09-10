@@ -17,9 +17,24 @@
 // Leagues to show in pickers and filters. Hidden ones drop out of the UI
 // but their sessions stay in history and keep counting toward averages --
 // hiding is about decluttering, not erasing.
+// Practice and Just Bowling are containers, not leagues.
+//
+// They exist so scores have somewhere to hang, but nobody joins them,
+// they have no team, and they can't be renamed or deleted. Anywhere a
+// bowler picks or manages a LEAGUE, they should be absent.
+//
+// Matched by NAME rather than by hidden id, because the id only exists
+// once the cloud row is created -- so an offline bowler, or one on their
+// very first practice session, would otherwise see "Practice" sitting in
+// the Vault alongside their real leagues.
+export function isContainerLeague(name) {
+  return name === "Practice" || name === "Just Bowling";
+}
+
 export function visibleLeagues(leagues, hiddenIds, leagueIdsByName) {
   const hidden = new Set(hiddenIds || []);
   return (leagues || []).filter(name => {
+    if (isContainerLeague(name)) return false;
     const id = leagueIdsByName?.[name];
     return !id || !hidden.has(id);
   });
