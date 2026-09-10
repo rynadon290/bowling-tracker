@@ -20,6 +20,13 @@ import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
 
 export default function LogView({
+  // Was used free at the night-achievements block below and never
+  // declared anywhere, so rendering a completed session threw
+  // "profiles is not defined" and took the screen down. Defaulted
+  // to {} so a caller that does not pass it degrades to "no previous
+  // bests known" rather than crashing -- the optional chaining at
+  // the use site already handles an empty object.
+  profiles = {},
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit, deleteShot,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,

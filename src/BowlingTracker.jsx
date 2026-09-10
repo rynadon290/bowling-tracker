@@ -1869,7 +1869,11 @@ export default function BowlingTracker(){
     }
     setSessionLeague(v=>v===oldName?clean:v);
     setStatsLeague(v=>v===oldName?clean:v);
-    setTrendScope(v=>v===oldName?clean:v);
+    // setTrendScope(...) was here and referenced a state that does not
+    // exist -- so renaming a league threw "setTrendScope is not
+    // defined" and took the app down. Trends is scoped by statsLeague
+    // (see the <TrendsView> props), which the line above already
+    // updates, so this was redundant as well as broken.
     setCompareLeague(v=>v===oldName?clean:v);
     setForm(f=>f.league===oldName?{...f,league:clean}:f);
     setPreEditForm(f=>f?.league===oldName?{...f,league:clean}:f);
@@ -5184,6 +5188,7 @@ export default function BowlingTracker(){
 
         {view==="log"&&(
           <LogView
+            profiles={profiles}
             shots={shots} sessions={sessions} bowlers={bowlers} footerHeight={footerHeight} footerRef={footerRef} teams={teams} leagues={activeLeagues} startEdit={startEdit} deleteShot={deleteShot}
             activeBowler={activeBowler} newBowlerName={newBowlerName} setNewBowlerName={setNewBowlerName} arsenals={arsenals} newBallName={newBallName} setNewBallName={setNewBallName}
             form={form} setForm={setForm} editingId={editingId} saved={saved} sessionSaved={sessionSaved} sessionSaveMessage={sessionSaveMessage}
