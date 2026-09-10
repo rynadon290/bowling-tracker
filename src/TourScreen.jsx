@@ -409,7 +409,7 @@ const SCREENS = {
           </div>
         ))}
       </div>
-      <Note>And a lot more besides</Note>
+      <Note>And a lot more</Note>
       <Nav active={2} />
     </Phone>
   ),
@@ -667,7 +667,7 @@ const SCREENS = {
           hunting. Right-aligned to sit under the icon itself. */}
       <div style={{ textAlign: "right", marginTop: "-6px", marginBottom: "8px" }}>
         <span style={{ fontSize: "11px", fontWeight: 700, color: C.accent }}>
-          ▲ Settings lives here
+          Settings lives here ▲
         </span>
       </div>
       <Spot>
