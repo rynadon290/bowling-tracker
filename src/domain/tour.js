@@ -224,7 +224,7 @@ const ALL_STEPS = [
     id: "arsenal",
     tab: "locker",
     title: "Your balls and bags",
-    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold the same or different balls, and tournaments often cap how many you may bring, so feel free to keep several bags.",
+    body: "Add each ball you own — its name, layout and surface. Then build a bag: what you actually bring on the night. A league bag and a tournament bag can hold the same or different balls, and tournaments often cap how many you may bring, so feel free to make several bags.",
     // A casual bowler is on a house ball. Nothing here applies.
     envs: ["practice", "league", "tournament"],
   },
