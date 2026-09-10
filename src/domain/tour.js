@@ -132,7 +132,7 @@ const ALL_STEPS = [
     id: "practice-fields",
     tab: "log",
     title: "The extra detail",
-    body: "Practice is where the accessory fields earn their place: ball speed, rev rate, axis rotation, your line and where you actually hit. Turn on only what you're working on — they're per-field switches in Settings, not all or nothing.",
+    body: "Practice is where the accessory fields earn their place — ball speed, rev rate, axis rotation and plenty more. Turn on only the ones you're working on; they're per-field switches in Settings, not all or nothing.",
     envs: ["practice"],
   },
 
@@ -275,7 +275,19 @@ export function generalSteps(preferences = {}) {
   return ALL_STEPS.filter(s => {
     if (!GENERAL_STEP_IDS.includes(s.id)) return false;
     if (s.envs && !s.envs.includes(env)) return false;
-    return !s.when || s.when(preferences);
+
+    // Deliberately NOT filtered by trackingMode.
+    //
+    // New bowlers default to scores-only, and the shot-by-shot pages --
+    // the scoresheet, and how to record a strike, spare and open frame --
+    // are all gated on trackingMode === "shot". So the basics tour
+    // silently dropped five of its thirteen pages for exactly the people
+    // who most needed them: the step before had just told them
+    // shot-by-shot exists, and then the tour never showed it.
+    //
+    // The tour is teaching what the app CAN do, not narrating what it's
+    // set to right now.
+    return true;
   });
 }
 
