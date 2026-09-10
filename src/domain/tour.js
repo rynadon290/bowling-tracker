@@ -1,3 +1,4 @@
+import { CASUAL_BADGES } from "./casualBadges.js";
 // The tour a new bowler gets after setup.
 //
 // Setup already asks the two questions the app can't work without — your
@@ -80,14 +81,14 @@ const ALL_STEPS = [
     id: "casual-people",
     tab: "log",
     title: "Everyone you're bowling with",
-    body: "Add whoever's on the lane with you and keep all their scores on your phone. They don't need the app, or an account, or to do anything at all.",
+    body: "Add whoever's on the lane and they appear as a row in the scoresheet. They don't need the app, an account, or to do anything at all — one phone keeps score for the whole group.",
     envs: ["casual"],
   },
   {
     id: "casual-scores",
     tab: "log",
     title: "Simply type the scores",
-    body: "Pick the date and type each game's final score. That's it — no frames, no setup, nothing to configure first.",
+    body: "Names down the side, games across the top — the same shape as the sheet on the monitor. Tap a cell, type the score, move on. Totals add themselves as you go, and if you bowl more than a few games the scores slide across while the names stay put.",
     envs: ["casual"],
   },
   {
@@ -95,6 +96,20 @@ const ALL_STEPS = [
     tab: "log",
     title: "Who won",
     body: "Finish the night and the app works out the winner, the margin, and a few awards worth arguing about. Ties get called out too.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-standings",
+    tab: "social",
+    title: "Standings",
+    body: "Every night you log builds up here. Everyone who's been on your scoresheet is listed by average, with how many games they've bowled and their best single game — so a big average over two games doesn't quietly outrank someone who's bowled twenty.",
+    envs: ["casual"],
+  },
+  {
+    id: "casual-badges",
+    tab: "social",
+    title: "Badges",
+    body: `There are ${CASUAL_BADGES.length} to collect, and they're not all about bowling well. Some are for turning up, one or two you'd rather not have, and everyone earns something — even on a rough night.`,
     envs: ["casual"],
   },
   {
