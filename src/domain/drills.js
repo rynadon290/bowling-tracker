@@ -50,7 +50,7 @@ function mirrorTargetId(id) {
 export function normalizeCustomPins(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
-  for (const p of raw) {
+  for (const p of (Array.isArray(raw) ? raw : [])) {
     const n = Number(p);
     if (Number.isInteger(n) && n >= 1 && n <= 10) seen.add(String(n));
   }
@@ -135,15 +135,18 @@ export function normalizeDrill(raw) {
 }
 
 export function recordMade(drill) {
+  if (!drill || typeof drill !== "object") return drill;
   return { ...drill, made: (drill.made || 0) + 1 };
 }
 
 export function recordMissed(drill) {
+  if (!drill || typeof drill !== "object") return drill;
   return { ...drill, missed: (drill.missed || 0) + 1 };
 }
 
 // Undo the last tap. Can't know which it was, so the caller passes it.
 export function undo(drill, wasMade) {
+  if (!drill || typeof drill !== "object") return drill;
   if (wasMade) return { ...drill, made: Math.max(0, (drill.made || 0) - 1) };
   return { ...drill, missed: Math.max(0, (drill.missed || 0) - 1) };
 }
@@ -162,7 +165,7 @@ export function conversionRate(drill) {
 // Trend for one target across drills, newest last, for "is my 10-pin
 // getting better". Only drills with enough attempts to mean something.
 export function targetHistory(drills, bowler, targetId, minAttempts = 10) {
-  return (drills || [])
+  return (Array.isArray(drills) ? drills : [])
     .filter(d => d.bowler === bowler && d.target === targetId && attempts(d) >= minAttempts)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
     .map(d => ({ date: d.date, rate: conversionRate(d), attempts: attempts(d), ball: d.ball }));
@@ -170,6 +173,7 @@ export function targetHistory(drills, bowler, targetId, minAttempts = 10) {
 
 // ── Supabase mapping ────────────────────────────────────────────────────
 export function drillToRow(drill, userId) {
+  if (!drill || typeof drill !== "object") return null;
   return {
     id: drill.id,
     user_id: userId,
@@ -237,7 +241,7 @@ export function weeklyTargetHistory(drills, bowler, targetId, { customPins = nul
   });
 
   const byWeek = new Map();
-  for (const d of mine) {
+  for (const d of (Array.isArray(mine) ? mine : [])) {
     const wk = weekStart(d.date);
     if (!wk) continue;
     if (!byWeek.has(wk)) byWeek.set(wk, { week: wk, made: 0, missed: 0, sessions: 0 });

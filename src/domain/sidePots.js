@@ -74,16 +74,16 @@ export function normalizeSidePots(raw) {
 }
 
 export function addSidePot(pots, type = "Bracket") {
-  const list = pots || [];
+  const list = Array.isArray(pots) ? pots : [];
   return [...list, { ...emptySidePot(type), id: `sp-${Date.now()}-${list.length}` }];
 }
 
 export function removeSidePot(pots, id) {
-  return (pots || []).filter(p => p.id !== id);
+  return (Array.isArray(pots) ? pots : []).filter(p => p.id !== id);
 }
 
 export function setSidePotField(pots, id, field, value) {
-  return (pots || []).map(p => (p.id === id ? { ...p, [field]: value } : p));
+  return (Array.isArray(pots) ? pots : []).map(p => (p.id === id ? { ...p, [field]: value } : p));
 }
 
 // Cost and return for a single entry.
@@ -101,7 +101,7 @@ export function sidePotTotals(pots) {
   const list = normalizeSidePots(pots);
   let cost = 0, won = 0;
   const byType = {};
-  for (const pot of list) {
+  for (const pot of (Array.isArray(list) ? list : [])) {
     const m = sidePotMoney(pot);
     cost += m.cost;
     won += m.won;

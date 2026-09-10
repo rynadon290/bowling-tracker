@@ -230,3 +230,38 @@ describe('every game series', () => {
     expect(allGamesSummary([])).toBeNull();
   });
 });
+
+// Direction must match the data, and scatter must NOT be reported as a
+// trend — telling a bowler their average is climbing when it's noise is
+// worse than saying nothing.
+describe('trend direction on known series', () => {
+  const pts = vals => vals.map((value, i) => ({ value, date: `2026-09-${String(i + 1).padStart(2, '0')}` }));
+
+  it('reads a steadily rising series as up', () => {
+    const d = trendDirection(pts([150, 158, 165, 172, 180, 188]));
+    expect(d.direction).toBe('up');
+    expect(d.confident).toBe(true);
+  });
+
+  it('reads a steadily falling series as down', () => {
+    expect(trendDirection(pts([188, 180, 172, 165, 158, 150])).direction).toBe('down');
+  });
+
+  it('refuses to call scatter a trend', () => {
+    const d = trendDirection(pts([170, 140, 200, 150, 190, 160]));
+    expect(d.direction).toBe('flat');
+    expect(d.confident).toBe(false);
+  });
+
+  it('says how many more nights it needs rather than guessing', () => {
+    const d = trendDirection(pts([150, 160]));
+    expect(d.direction).toBe('unknown');
+    expect(d.pointsNeeded).toBeGreaterThan(0);
+  });
+
+  it('does not throw on junk', () => {
+    for (const v of [null, undefined, 'x', 0, {}, []]) {
+      expect(() => trendDirection(v)).not.toThrow();
+    }
+  });
+});

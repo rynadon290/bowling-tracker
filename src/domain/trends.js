@@ -85,7 +85,7 @@ function bySession(rows, bowler, league) {
 
 function groupByDate(rows) {
   const map = new Map();
-  for (const r of rows) {
+  for (const r of (Array.isArray(rows) ? rows : [])) {
     if (!r.date) continue;
     if (!map.has(r.date)) map.set(r.date, []);
     map.get(r.date).push(r);
@@ -160,7 +160,7 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
   // improving" but "is THIS ball still the right one as the season wears
   // the lanes in". Applied here rather than per-metric so it works for
   // every shot-sourced metric at once.
-  const filtered = ball ? (shots || []).filter(s => s && s.ball === ball) : shots;
+  const filtered = ball ? (Array.isArray(shots) ? shots : []).filter(s => s && s.ball === ball) : shots;
   const rows = bySession(filtered, bowler, league);
   const out = [];
   for (const [date, group] of groupByDate(rows)) {
@@ -193,7 +193,11 @@ export function shotRateSeries(shots, bowler, league, metricId, isSplit = () => 
   return out;
 }
 
-export function seriesFor(metricId, { sessions, shots, bowler, league, isSplit, isCornerPinLeave, ball = "", gameEquipment = null }) {
+export function seriesFor(metricId, opts) {
+  // No default at all on the second argument, so calling this before
+  // data has loaded threw rather than returning an empty series.
+  const { sessions, shots, bowler, league, isSplit, isCornerPinLeave,
+          ball = "", gameEquipment = null } = (opts && typeof opts === "object") ? opts : {};
   const metric = trendMetric(metricId);
   if (!metric) return [];
   // Score metrics are per-NIGHT totals, so a ball filter is meaningless
@@ -330,7 +334,7 @@ export function allGamesSeries(sessions, bowler, league) {
 
   const out = [];
   let i = 0;
-  for (const s of rows) {
+  for (const s of (Array.isArray(rows) ? rows : [])) {
     const scores = (Array.isArray(s.scores) ? s.scores : []).filter(v => Number.isFinite(v));
     scores.forEach((score, gi) => {
       out.push({

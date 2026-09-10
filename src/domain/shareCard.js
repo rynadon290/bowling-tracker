@@ -21,7 +21,9 @@ function scoresLine(scores) {
 // One summary in plain words, the way a bowler would text it. No stats
 // jargon: "617 series" not "series: 617"; a single game is just the
 // score.
-export function shareText({ bowler, scores, league, date, environment, highlights = [] } = {}) {
+export function shareText(arg) {
+  // A default parameter covers undefined, not null.
+  const { bowler, scores, league, date, environment, highlights = [] } = (arg && typeof arg === "object") ? arg : {};
   const clean = (Array.isArray(scores) ? scores : []).filter(v => Number.isFinite(v));
   const series = clean.reduce((a, b) => a + b, 0);
   const who = bowler ? `${bowler} bowled` : "Bowled";
@@ -47,7 +49,9 @@ export function shareText({ bowler, scores, league, date, environment, highlight
 
 // A title for the share sheet, kept short because iOS shows it in the
 // header of the sheet.
-export function shareTitle({ bowler, scores } = {}) {
+export function shareTitle(arg) {
+  // A default parameter covers undefined, not null.
+  const { bowler, scores } = (arg && typeof arg === "object") ? arg : {};
   const clean = (Array.isArray(scores) ? scores : []).filter(v => Number.isFinite(v));
   const series = clean.reduce((a, b) => a + b, 0);
   if (clean.length > 1) return `${bowler ? bowler + ": " : ""}${series} series`;
@@ -189,11 +193,14 @@ export function drawShareCard(ctx, { bowler, scores, league, date, colors, fonts
 // lines beat eight mediocre ones, and a share that scrolls doesn't get
 // read. Everything is derived from data already on the session, so this
 // adds no new tracking burden.
-export function sessionHighlights({
+export function sessionHighlights(arg) {
+  // A null session is what a caller passes before a night has loaded.
+  const {
   scores = [], strikes = 0, shotCount = 0, sparesMade = 0, spareAttempts = 0,
   cleanGames = 0, goalsHit = [], moneyWon = 0, priorBest = null,
   priorAverage = null, environment = "league",
-} = {}) {
+} = (arg && typeof arg === "object") ? arg : {};
+
   const out = [];
   const clean = scores.filter(v => Number.isFinite(v));
   const series = clean.reduce((a, b) => a + b, 0);
@@ -330,7 +337,9 @@ export function drawTrendCard(ctx, { bowler, label, points, league, colors, font
 
 // Text for a shared trend. No series total -- summing a season of games
 // produces a number that means nothing.
-export function trendShareText({ bowler, label, points, league } = {}) {
+export function trendShareText(arg) {
+  // A default parameter covers undefined, not null.
+  const { bowler, label, points, league } = (arg && typeof arg === "object") ? arg : {};
   const vals = (Array.isArray(points) ? points : []).map(p => (typeof p === "number" ? p : p?.value))
     .filter(v => Number.isFinite(v));
   if (!vals.length) return `${label || "Trend"}\n\nTracked with ${APP_NAME} — ${APP_URL}`;

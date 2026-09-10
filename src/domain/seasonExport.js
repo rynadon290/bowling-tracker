@@ -25,7 +25,7 @@ function csvCell(v) {
 }
 
 export function sessionsToCsv(sessions, bowler) {
-  const rows = (sessions || [])
+  const rows = (Array.isArray(sessions) ? sessions : [])
     .filter(s => !bowler || s.bowler === bowler)
     .map(s => {
       const scores = s.scores || [];
@@ -61,7 +61,7 @@ const SHOT_COLUMNS = [
 ];
 
 export function shotsToCsv(shots, bowler) {
-  const rows = (shots || [])
+  const rows = (Array.isArray(shots) ? shots : [])
     .filter(s => !bowler || s.bowler === bowler)
     .map(s => [
       s.date, s.bowler, s.league, s.game, s.frame, s.ballNum ?? "", s.lane, s.ball,
@@ -77,14 +77,14 @@ export function shotsToCsv(shots, bowler) {
 // ── Season summary ──────────────────────────────────────────────────────
 // The numbers a bowler would actually put on a card and show someone.
 export function seasonSummary(sessions, shots, bowler, league) {
-  const mine = (sessions || []).filter(s =>
+  const mine = (Array.isArray(sessions) ? sessions : []).filter(s =>
     (!bowler || s.bowler === bowler) && (!league || s.league === league)
   );
   const games = mine.flatMap(s => s.scores || []).filter(v => typeof v === "number");
   if (!games.length) return null;
 
   const series = mine.map(s => s.total).filter(v => typeof v === "number");
-  const myShots = (shots || []).filter(s =>
+  const myShots = (Array.isArray(shots) ? shots : []).filter(s =>
     (!bowler || s.bowler === bowler) && (!league || s.league === league)
   );
   const firstBalls = myShots.filter(s => !s.ballNum || s.ballNum === 1);

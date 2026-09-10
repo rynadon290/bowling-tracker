@@ -244,6 +244,7 @@ const UNIT_LABELS = {
 };
 
 export function statLabel(key) {
+  if (typeof key !== "string") return null;
   if (key.startsWith("ball:")) return `${key.slice(5)} (ball)`;
   if (key.startsWith("drill:")) return `${key.slice(6)} drill`;
   return STAT_LABELS[key] || key;
@@ -265,6 +266,7 @@ const STAT_KIND = {
 };
 
 export function kindForStat(key) {
+  if (typeof key !== "string") return null;
   if (key.startsWith("ball:")) return "ballComparison";
   if (key.startsWith("drill:")) return "drillTarget";
   return STAT_KIND[key] || key;

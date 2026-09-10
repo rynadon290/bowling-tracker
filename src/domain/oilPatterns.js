@@ -154,7 +154,7 @@ export function describePattern(pattern) {
 }
 
 function key(name) {
-  return (name || "").trim().toLowerCase();
+  return (typeof name === "string" ? name : "").trim().toLowerCase();
 }
 
 // Search-as-you-type over the pattern library. Same ranking approach as
@@ -183,6 +183,7 @@ export function searchPatterns(query, patterns, limit = 8) {
 
 // ── Supabase mapping ────────────────────────────────────────────────────
 export function patternToRow(pattern, userId) {
+  if (!pattern || typeof pattern !== "object") return null;
   return {
     name: pattern.name,
     year: pattern.year ?? null,
