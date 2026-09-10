@@ -580,7 +580,7 @@ export default function TeamManagement({
               <div style={S.label}>Team Name</div>
               <div style={{display:"flex",gap:"8px"}}>
                 <input value={editingName} onChange={e=>setEditingName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveRename(team.id);}} autoFocus style={{...S.input,flex:1}}/>
-                <button style={S.primary} onClick={()=>saveRename(team.id)}>Save</button>
+                <button style={S.btn("primary")} onClick={()=>saveRename(team.id)}>Save</button>
                 <button style={S.btn()} onClick={()=>{setEditingTeamId(null);setEditingName("");}}>Cancel</button>
               </div>
             </div>
@@ -736,7 +736,7 @@ export default function TeamManagement({
                   {inviteForm[team.id]?.useCode?"✓ ":""}I don't have their email — give me a code to text them
                 </button>
 
-                <button style={S.primary} onClick={()=>createInvite(team.id)}>Add to Roster</button>
+                <button style={S.btn("primary")} onClick={()=>createInvite(team.id)}>Add to Roster</button>
               </div>
             </div>
           </div>
