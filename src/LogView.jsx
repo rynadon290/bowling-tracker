@@ -448,7 +448,14 @@ export default function LogView({
                 nothing to pick. Scores are filed against a league, so
                 this is a genuine dead end without setup, and a blank
                 screen would read as the app being broken. */}
-            {!editingId&&activeBowler&&needsLeagueSetup({
+            {/* Not gated on activeBowler.
+            
+                It used to be, which meant a bowler with no active
+                selection got neither the entry form NOR this prompt --
+                a blank tab with no way forward. Needing to set up a
+                league is true whether or not a bowler chip is
+                highlighted. */}
+            {!editingId&&needsLeagueSetup({
               environment:preferences.environment,leagues,teams,
             })&&(
               <div style={{...S.card,border:`1px solid ${C.accent}44`}}>
@@ -673,7 +680,16 @@ export default function LogView({
 
                 <>
                     <div style={{...S.chips,gap:"4px",marginBottom:0}}>
-                      <Chip label={`${ownerName||"Me"} (me)`} selected={activeBowler===ownerName}
+                      {/* Guarded against "" === "".
+                      
+                          With no displayName loaded and no bowlers yet,
+                          both sides are empty strings, so this chip
+                          rendered as SELECTED while activeBowler was
+                          actually "". Every downstream card is gated on
+                          activeBowler, so the bowler saw a chosen chip,
+                          no entry form, and no setup prompt -- a dead
+                          end that looks like a working screen. */}
+                      <Chip label={`${ownerName||"Me"} (me)`} selected={!!ownerName&&activeBowler===ownerName}
                         onToggle={()=>selectBowler(ownerName)} color={C.accent} dense/>
                       {scoringForOthers&&scoreOptions.filter(n=>n!==ownerName).map(b=>(
                         <Chip key={b} label={b} selected={activeBowler===b}
