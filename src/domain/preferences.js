@@ -211,6 +211,46 @@ function presetFor(environment) {
   return ENVIRONMENT_PRESETS[environment] || ENVIRONMENT_PRESETS.league;
 }
 
+// ── What you are bowling, in words ──────────────────────────────────────
+//
+// One source for all three, because there were two identical copies --
+// one in Onboarding.jsx, one in SessionStart.jsx -- and nothing stopped
+// them drifting. Editing the question in one place and not the other is
+// how the same screen ends up saying two things.
+//
+// SHORT labels are for chips and headers, where there is no room for a
+// sentence. QUESTION labels are the answers to "What are you bowling
+// today?", where a phrase reads better than a noun -- "A league night"
+// is an occasion, "League" is an identity, and people were answering the
+// second question when the app meant the first.
+export const ENVIRONMENT_LABELS = {
+  practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling",
+};
+
+export const ENVIRONMENT_QUESTION_LABELS = {
+  practice: "A practice session",
+  league: "A league night",
+  tournament: "A tournament",
+  casual: "A game or two out",
+};
+
+// Each says what the choice DOES, not what sort of person picks it.
+//
+// Focus group Finding 1: 61 of 250 picked the wrong mode. The old
+// descriptions described the occasion, which the label already covered,
+// and left the consequences unsaid.
+//
+// The fourth line breaks the pattern on purpose. Three "enables" then a
+// "hides" is the only signal that one of these four takes something
+// away -- casual forces scores-only and removes four screens, and
+// nothing previously said so.
+export const ENVIRONMENT_DESCRIPTIONS = {
+  practice: "Enables drills and the detail fields.",
+  league: "Enables money games and the team roster.",
+  tournament: "Enables blocks and the cut line.",
+  casual: "Hides everything but scores and the standings.",
+};
+
 // Whether the coach view is switched on. Only meaningful for someone whose
 // profile says they coach -- see coachViewActive below, which is what the
 // app should actually branch on.
