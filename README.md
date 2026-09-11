@@ -1,90 +1,136 @@
-# Shot Tracker 🎳
+# My Bowling Vault 🎳
 
-A mobile-first bowling league tracker for logging shots, sessions and team stats — built for real league play across multiple teams and bowlers, with shot-by-shot detail, session summaries, team standings, and a friends leaderboard.
+A mobile-first bowling tracker for league bowlers — scores, shot-by-shot
+detail, team standings, side pots and season stats. Built for a real
+Tuesday night: one phone, one thumb, four teammates to keep score for, and
+a wifi signal that comes and goes.
 
-**Live app:** https://rynadon290.github.io/bowling-tracker/
+Live at **[rynadon290.github.io/bowling-tracker](https://rynadon290.github.io/bowling-tracker)**.
 
-## Features
+---
 
-- **Shot-by-shot logging** — ball, surface, line, result, release, miss direction, tracked per frame including full 10th-frame handling
-- **Live scoring** — strict frame-by-frame scoring that only shows a running total once every bonus ball needed to resolve it is actually known
-- **Session summaries** — per-night strike %, spare %, 10-pin rate, release quality, and match points (game/series win-loss vs. an opponent)
-- **Team stats** — high game/series records, team averages, score consistency, "hung" tracking, and a "beat the high average bowler" weekly challenge
-- **Theoretical scoring** — what a game would have scored if every makeable spare had been converted
-- **Team Management** — roster with lineup order, placeholders for bowlers without an account yet, handedness, and sub status
-- **Friends & leaderboard** — add friends by account, see a shared average leaderboard
-- **Offline-first** — shots and sessions queue locally and sync to Supabase when back online; proxy-logging supported (one signed-in account can log for a teammate or sub)
+## What it does
 
-## Tech stack
+**Log a night however you want to.** Four modes, chosen per session:
 
-- React 18 + Vite
-- Supabase (Postgres + Auth) for cloud sync and multi-device/multi-user support
-- Recharts for charts
-- Vitest for testing pure domain logic
-- Deployed to GitHub Pages via GitHub Actions
+| | |
+|---|---|
+| **A practice session** | Drills and the detail fields |
+| **A league night** | Money games and the team roster |
+| **A tournament** | Blocks and the cut line |
+| **A game or two out** | Scores and standings only |
 
-## Local development
+Track three numbers or every delivery. Score for yourself or for the whole
+team from one device. Import a scorecard by photographing the monitor.
 
-```bash
-npm install
-npm run dev
-```
+**It works at the lanes.** Everything is local-first: scores are written
+to the device immediately and synced when there's signal. A failed write
+is queued, retried in order, and survives a reload — a night logged in a
+basement alley with no bars is not a night lost.
 
-You'll need a `.env` file at the project root with your own Supabase project's credentials:
+**The stats are the point.** Strike and spare percentages, carry by ball,
+frame position, split conversion, ten-pin leaves, running averages,
+theoretical scores, and where your game is actually costing you pins.
+Cards that need shot-by-shot data hide themselves when it isn't there,
+rather than showing a screen of zeroes.
 
-```
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
-```
+---
 
-Both values come from **Supabase Dashboard → Project Settings → API**. Never put the `service_role`/secret key here — only the anon/publishable key is safe for client-side code.
-
-Other commands:
+## Running it
 
 ```bash
-npm run build      # production build
-npm run preview    # preview the production build locally
-npm test           # run the test suite
+npm ci
+npm run dev      # local dev server
+npm test         # unit tests
+npm run build    # production build
 ```
 
-## Project structure
+Deployment is automatic: merging to `main` builds and publishes to GitHub
+Pages, and Supabase Edge Functions deploy on change.
+
+---
+
+## Layout
 
 ```
-├── BowlingTracker.jsx   # main app component (Log/History/Stats/Teams/Friends views)
-├── TeamManagement.jsx   # roster management, invites, placeholders
-├── Friends.jsx          # friend requests + leaderboard
-├── AuthProvider.jsx     # Supabase auth context
-├── SignIn.jsx
-├── syncQueue.js         # offline write queue + cloud sync helpers
-├── supabaseClient.js
-└── domain/              # pure, dependency-free business logic — no React,
-    │                     no Supabase calls. Everything here takes plain
-    │                     data in and returns plain data out, which is what
-    │                     makes it independently testable.
-    ├── scoring.js        # frame-by-frame scoring, 10th-frame rules
-    ├── splits.js         # split/washout/makeable-spare detection
-    ├── stats.js          # records, averages, consistency, weekly challenges
-    ├── sessions.js       # session-level aggregation
-    ├── leagues.js        # lineup ordering
-    └── supabaseMapping.js # local <-> Supabase row shape conversion
+src/
+  domain/        Pure logic — scoring, stats, money, sync rules.
+                 No React, no browser, fully tested.
+  *.jsx          Screens and components.
+  syncQueue.js   The offline queue and every cloud write.
+  scopedStorage.js  Per-user local storage.
+
+supabase/functions/   Edge Functions (scorecard import, analysis, centers)
+scripts/              Schema tooling, run by CI
+schema-snapshot.csv   The live database's shape, regenerated weekly
 ```
 
-Each file in `domain/` has a matching `.test.js` file. If you're adding new business logic, this is where it should live — a plain function that takes data explicitly rather than reading component state directly stays testable and reusable.
+**`src/domain/` is where logic belongs.** If something can be decided
+without a screen, it goes there and gets tested. The components render;
+they don't compute.
 
-## Testing
+---
 
-```bash
-npm test
-```
+## The database
 
-Runs the full Vitest suite against everything in `domain/`, plus `Friends.jsx`, `TeamManagement.jsx`, and `syncQueue.js`. These test pure logic only — no rendering, no live Supabase calls.
+Supabase Postgres, with row-level security on every table.
 
-## Deployment
+**`schema-snapshot.csv` is generated, never edited.** A GitHub Action runs
+`scripts/audit_schema.sql` against the live database weekly and opens a
+pull request when anything has drifted. `scripts/generate_schema_sql.sql`
+emits runnable DDL from the same connection.
 
-Pushing to `main` or `team-management` triggers `.github/workflows/deploy.yml`, which:
+This matters more than it sounds. A hand-maintained schema file drifted 21
+columns on the `shots` table and caused two separate code reviews to report
+security holes that had already been fixed, because they read the file as
+though it were the database. **If a generated file is wrong, the database
+is wrong, or the query is — don't patch the output.**
 
-1. Runs the test suite
-2. Builds the production bundle (needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set as repo secrets — **Settings → Secrets and variables → Actions**)
-3. Deploys to GitHub Pages
+Setup: add `SUPABASE_DB_URL` (Project Settings → Database → connection
+string, session pooler) as a repository secret.
 
-If dependencies change, `.github/workflows/generate-lockfile.yml` can be run manually from the Actions tab to regenerate and commit `package-lock.json` without needing a local machine — runs `npm install` in the cloud and pushes the resulting lockfile back to the repo.
+---
+
+## Verification
+
+`npm test` runs the unit suite. The full harness is broader and lives
+outside the repo — 23 checks covering:
+
+- **Scoring**, verified against an independent implementation of the rules
+  of bowling across 3,000 random games
+- **Money**, as arithmetic: net equals gross minus cost at every level,
+  season totals equal the sum of their nights
+- **Damaged records** — every domain function called with the shapes a
+  partial sync actually produces
+- **Every component**, rendered with missing and null data
+- **Real-browser suites** in Chromium with real IndexedDB: cross-account
+  isolation, the sync queue, duplicate handling, stale deploys
+
+CI additionally runs a data-flow audit and a live-schema audit, both of
+which fail the build rather than printing warnings.
+
+---
+
+## Conventions worth knowing
+
+**CRLF line endings**, throughout. Mixed endings break the checkers.
+
+**Generated files are not edited by hand** — `schema-snapshot.csv`,
+`schema.sql`, and the audit baselines.
+
+**Guard for type, not truthiness.** `Array.isArray(x) ? x : []` says the
+container is a list and nothing about what's in it; a single null row from
+an interrupted write has taken down whole screens. Filter the elements too.
+
+**A checker that fails on most of what it tries is usually wrong itself.**
+The harness says so out loud when it happens.
+
+---
+
+## Diagnostics
+
+Settings → Diagnostics → **Copy diagnostics** produces a redacted report:
+crashes, failed cloud writes with their SQLSTATE, and writes that reported
+success while changing nothing. Error text is redacted at record time —
+Postgres puts real values in its messages, and those values are other
+people's names.
