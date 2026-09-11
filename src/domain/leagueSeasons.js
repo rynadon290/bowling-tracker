@@ -21,6 +21,9 @@ export function normalizeLeagueDates(raw) {
 }
 
 export function hasLeagueEnded(endDate, today) {
+  // A date that cannot be parsed is not an ended league -- it is an
+  // unknown one, and saying "ended" would hide a league from its bowler.
+  if (Number.isNaN(new Date(endDate).getTime())) return false;
   if (!endDate) return false;
   const todayStr = (today instanceof Date ? today : new Date(today)).toISOString().slice(0, 10);
   return endDate <= todayStr;
@@ -33,6 +36,7 @@ export function hasLeagueEnded(endDate, today) {
 // from whichever leagues the bowler is actually in, since that membership
 // lives elsewhere (teams) and this module doesn't need to know about it.
 export function endedLeagues(leaguesWithDates, today = new Date()) {
+  leaguesWithDates = Array.isArray(leaguesWithDates) ? leaguesWithDates : [];
   return (leaguesWithDates || [])
     .filter(l => hasLeagueEnded(l.endDate, today))
     .sort((a, b) => b.endDate.localeCompare(a.endDate));
@@ -43,6 +47,7 @@ export function endedLeagues(leaguesWithDates, today = new Date()) {
 // asked about (accepted, overrode, or dismissed) -- so a season they've
 // already handled never re-prompts, but any later one still does.
 export function needsBookAverageUpdate(leaguesWithDates, bookAverageAsOf, today = new Date()) {
+  leaguesWithDates = Array.isArray(leaguesWithDates) ? leaguesWithDates : [];
   const ended = endedLeagues(leaguesWithDates, today);
   if (!ended.length) return { needed: false, league: null };
   const mostRecent = ended[0];

@@ -56,6 +56,7 @@ export function teamsInLeague(leagueName, teams, bowlerName) {
 // What leaving this team actually costs, so the confirmation can say it
 // rather than making the user find out afterwards.
 export function describeLeaveImpact(team, leagueName, teams, bowlerName) {
+  if (!team || typeof team !== "object" || Array.isArray(team)) return null;
   const others = teamsInLeague(leagueName, teams, bowlerName)
     .filter(t => t.id !== team.id);
   const remainingMembers = (team.members || []).filter(m => m !== bowlerName);
@@ -75,6 +76,7 @@ export function describeLeaveImpact(team, leagueName, teams, bowlerName) {
 }
 
 export function leaveConfirmationText(impact) {
+  if (!impact || typeof impact !== "object" || Array.isArray(impact)) return "";
   const lines = [`Leave ${impact.teamName}?`];
   if (impact.losesLeague) {
     lines.push(`You'll no longer be part of ${impact.leagueName}.`);

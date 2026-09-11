@@ -123,6 +123,7 @@ export function buyInsForLeague(buyIns, league) {
 // count of non-null scores. Charging a buy-in for a game that doesn't
 // exist would quietly overstate what the night cost.
 export function costArraysFor(rates, gamesBowled, playing = null) {
+  if (!rates || typeof rates !== "object" || Array.isArray(rates)) return null;
   const n = Math.max(0, Math.min(3, gamesBowled || 0));
 
   // `playing` is which pots the bowler actually entered TONIGHT.

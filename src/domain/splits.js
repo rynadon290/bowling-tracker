@@ -225,6 +225,7 @@ export function splitName(key){
 // when a split has never been attempted. Only true splits count --
 // isSplit already applies the headpin-down and gap rules.
 export function splitConversionByType(shots){
+  shots = Array.isArray(shots) ? shots : [];
   const byKey={};
   for(const s of (shots||[])){
     if(!isSplit(s))continue;

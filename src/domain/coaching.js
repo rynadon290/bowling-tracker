@@ -481,10 +481,15 @@ export function nextDateForWeekday(weekday, today = new Date()) {
 // bowler's most urgent open one -- soonest due date first, then oldest --
 // because a coach looking at a roster wants the thing that needs
 // attention, not an arbitrary pick.
-export function coachRoster({
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function coachRoster(options) {
+  const {
   bowlers = [], tasks = [], sessions = [], leagues = [],
   handednessByBowler = {}, today = new Date(),
-} = {}) {
+} = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   return bowlers.map(b => {
     const name = typeof b === "string" ? b : b?.name;
     const relationshipId = typeof b === "string" ? "" : b?.relationshipId || "";

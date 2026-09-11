@@ -113,6 +113,7 @@ export function seasonRecord(matches,league){
 // season's trend. Skips any match with nothing decided yet (no games and
 // no series result logged) rather than plotting a false 0/0 week.
 export function weeklyPointsData(matches,league){
+  matches = Array.isArray(matches) ? matches : [];
   return matches
     .filter(m=>!league||m.league===league)
     .map(m=>{
@@ -357,6 +358,7 @@ export function scoreConsistency(sessions,bowler,league,pooled){
 // equal-width ranges, for histogram-style charting. Not session/shot-
 // specific at all -- takes any plain array of numbers.
 export function histogramBuckets(values,bucketCount=8){
+  values = Array.isArray(values) ? values : [];
   if(!values.length)return[];
   const min=Math.min(...values),max=Math.max(...values);
   if(min===max)return[{label:String(min),count:values.length}];

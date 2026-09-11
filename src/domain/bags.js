@@ -118,6 +118,7 @@ export function bagsForEnvironment(bags, environment) {
 
 // Balls entered but not packed into any bag.
 export function unassignedBalls(allBalls, ballsByBag) {
+  allBalls = Array.isArray(allBalls) ? allBalls : [];
   const assigned = new Set(Object.values(ballsByBag || {}).flat());
   return (allBalls || []).filter(b => !assigned.has(b));
 }

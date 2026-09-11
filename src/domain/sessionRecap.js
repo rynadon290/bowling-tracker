@@ -78,6 +78,7 @@ export function sessionLines(manualScores, bowlers, league, date) {
 const NOTABLE_SWING = 25;
 
 export function awards(lines) {
+  lines = Array.isArray(lines) ? lines : [];
   if (!lines || lines.length === 0) return [];
   const out = [];
   const multi = lines.length > 1;

@@ -150,6 +150,7 @@ function rawAverage(sessions, bowler, league) {
 const MIN_GAMES_FOR_BOOK_AVERAGE = 21;
 
 export function suggestBookAverage(sessions, bowler) {
+  sessions = Array.isArray(sessions) ? sessions : [];
   const leagues = [...new Set(
     (sessions || []).filter(s => s.bowler === bowler && s.league).map(s => s.league)
   )];
@@ -237,6 +238,7 @@ export function hasHomeCenter(profile, centerId) {
 }
 
 export function removeHomeCenter(profile, center) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return profile;
   return {
     ...profile,
     homeCenters: (profile.homeCenters || []).filter(c => c !== center),

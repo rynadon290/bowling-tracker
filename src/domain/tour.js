@@ -491,7 +491,12 @@ export function markTourSeen(seen, key) {
 // an automatic takeover for anything after the first: interrupting
 // someone who opened the app to log a game is worse than letting them
 // find the feature themselves.
-export function tourToOffer({ environment, isCoach = false, seen = [] } = {}) {
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function tourToOffer(options) {
+  const { environment, isCoach = false, seen = [] } = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   const key = tourKeyFor(environment, isCoach);
   return hasSeenTour(seen, key) ? null : key;
 }
@@ -501,7 +506,12 @@ export function tourToOffer({ environment, isCoach = false, seen = [] } = {}) {
 // Choosing "league" with no league or team set up is a dead end: scores
 // are filed against a league, so there's nowhere to put them. Rather than
 // showing an empty screen, say so and offer to fix it.
-export function needsLeagueSetup({ environment, leagues = [], teams = [] } = {}) {
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function needsLeagueSetup(options) {
+  const { environment, leagues = [], teams = [] } = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   if (environment !== "league") return false;
   // "Casual" was the old name for the container; it is "Just Bowling"
   // now, so this filter had stopped excluding it. Harmless today only

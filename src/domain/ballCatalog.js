@@ -166,6 +166,7 @@ export function rejectedBallsFor(bowlerBalls, entriesByKey, acknowledged) {
 
 // Matching key so "Phaze II", "phaze ii", and " Phaze  II " are one ball.
 export function ballKey(name) {
+  name = typeof name === "string" ? name : "";
   return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -201,6 +202,7 @@ export function bestEntry(entries) {
 // "Phaze II" before "Storm Phaze"), then trusted entries above unproven
 // ones, so the first suggestion is the one most likely to be right.
 export function searchCatalog(query, entriesByKey, limit = 6) {
+  query = typeof query === "string" ? query : "";
   const q = ballKey(query);
   if (q.length < 2) return [];
 

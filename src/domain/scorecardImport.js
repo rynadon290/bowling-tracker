@@ -181,6 +181,7 @@ function convertTenthFrame(frame, base, warnings) {
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
 export function convertExtractedGameToShots(extractedGame, context) {
+  if (!extractedGame || typeof extractedGame !== "object" || Array.isArray(extractedGame)) return null;
   const base = {
     bowler: context.bowler, league: context.league, date: context.date,
     teamId: context.teamId || "", game: String(context.game),

@@ -68,6 +68,7 @@ export function seriesTotal(gameScores) {
 }
 
 export function seriesAverage(gameScores) {
+  gameScores = Array.isArray(gameScores) ? gameScores : [];
   const valid = (gameScores || []).filter(v => typeof v === "number");
   if (!valid.length) return null;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
@@ -100,6 +101,7 @@ export function manualScoreToRow(bowler, leagueId, date, game, score, userId, eq
 }
 
 export function manualScoresFromRows(rows, leagueNameById) {
+  rows = Array.isArray(rows) ? rows : [];
   const out = {};
   for (const row of rows || []) {
     const leagueName = leagueNameById?.[row.league_id] || "";
@@ -110,6 +112,7 @@ export function manualScoresFromRows(rows, leagueNameById) {
 
 // The equipment half of the same rows, keyed identically.
 export function gameEquipmentFromRows(rows, leagueNameById) {
+  rows = Array.isArray(rows) ? rows : [];
   const out = {};
   for (const row of rows || []) {
     if (!row.ball && !row.surface) continue;

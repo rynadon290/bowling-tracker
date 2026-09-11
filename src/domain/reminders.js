@@ -16,6 +16,7 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 // most common day. Returns null with too little data to be confident, so
 // the app never nags on a guessed day.
 export function inferLeagueDay(sessions, league, minSessions = 3) {
+  sessions = Array.isArray(sessions) ? sessions : [];
   const days = (sessions || [])
     .filter(s => s.league === league && s.date)
     .map(s => new Date(s.date + "T12:00:00").getDay())
@@ -65,6 +66,7 @@ export function isLeagueDay(reminder, today = new Date()) {
 // a push notification, and arguably better: it survives the app being
 // closed, uninstalled, or forgotten.
 export function reminderToIcs(reminder, centerName) {
+  if (!reminder || typeof reminder !== "object" || Array.isArray(reminder)) return "";
   const [hh, mm] = (reminder.time || "19:00").split(":").map(Number);
   const dayCode = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][reminder.day];
 

@@ -39,7 +39,12 @@ function sortItems(items) {
 // Builds the whole list. Every source is optional -- a bowler with no
 // team, no coach and no friends should get an empty array rather than a
 // pile of guards at every call site.
-export function buildInbox({
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function buildInbox(options) {
+  const {
   bowler,
   pendingTour = null,
   userId,
@@ -54,7 +59,7 @@ export function buildInbox({
   bookAverageDue = null,
   catalogRejections = [],
   coachViewOn = false,
-} = {}) {
+} = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   const items = [];
 
   // ── The walkthrough for the mode they chose ──

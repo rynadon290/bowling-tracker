@@ -53,7 +53,12 @@ export function guestsAreLocalOnly(environment) {
 // `owner`      the signed-in user's own bowler name
 // `teams`      full team list, for roster lookup in league play
 // `guests`     locally-held practice partners
-export function scorekeepingOptions({ environment, owner, league, teams, guests }) {
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function scorekeepingOptions(options) {
+  const { environment, owner, league, teams, guests } = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   const me = owner || "";
   if (!allowsOtherBowlers(environment)) return me ? [me] : [];
 
@@ -105,5 +110,6 @@ export function addGuest(guests, name) {
 }
 
 export function removeGuest(guests, name) {
+  guests = Array.isArray(guests) ? guests : [];
   return (guests || []).filter(g => g !== name);
 }

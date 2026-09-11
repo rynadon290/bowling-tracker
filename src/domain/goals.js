@@ -295,11 +295,16 @@ export function goalsFromRow(row) {
 // The predicates are passed in rather than imported so this module stays
 // free of splits.js and stats.js, matching how seriesFor already takes
 // isSplit/isCornerPinLeave from its caller.
-export function measurementsFor({
+// `= {}` only defaults an argument that is UNDEFINED. Passed null, or a
+// number, destructuring throws on the parameter list itself -- before
+// any guard in the body could run. Taking the argument whole and
+// destructuring inside is the only way to cover it.
+export function measurementsFor(options) {
+  const {
   shots, sessions, bowler, league,
   isSplit, isSinglePinLeave, isCornerPinLeave, leftHanded = false,
   average = null, highGame = null, highSeries = null,
-}) {
+} = (options && typeof options === "object" && !Array.isArray(options)) ? options : {};
   const mine = (Array.isArray(shots) ? shots : []).filter(s =>
     s && (bowler ? s.bowler === bowler : true) && (league ? s.league === league : true));
 

@@ -91,6 +91,7 @@ export function findExistingCenter(candidate, centers) {
 // also means a league that hasn't set its center yet is simply excluded
 // rather than lumped into a fake "unknown" bucket.
 export function statsByCenter(sessions, leagues, centers, bowler) {
+  sessions = Array.isArray(sessions) ? sessions : [];
   const centerByLeague = {};
   (leagues || []).forEach(l => {
     if (l.centerId) centerByLeague[l.name] = l.centerId;
