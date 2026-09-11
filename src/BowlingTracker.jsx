@@ -3844,11 +3844,23 @@ export default function BowlingTracker(){
       await window.storage.set(SESSIONS_KEY,JSON.stringify(nextSessions));
     }catch{}
 
+    // Upsert the WHOLE row, not a partial update of team_id.
+    //
+    // cloudUpdate matches on id, and a session or shot that has never
+    // reached the cloud has no row to match -- so the update changed
+    // nothing and reported success. The diagnostics log caught exactly
+    // this on a real device: "sessions.update / no-rows / matched 0 rows
+    // on id", four times.
+    //
+    // An upsert updates the row if it is there and inserts it if it is
+    // not, which is the right answer either way: a night logged offline
+    // should reach the cloud WITH its team already attached.
+    const leagueIds=leagueIdsRef.current;
     for(const row of shotsToMove){
-      await cloudUpdate("shots",row.id,{team_id:teamId});
+      await cloudWrite("shots",shotToSupabaseRow({...row,teamId},user?.id,leagueIds));
     }
     for(const row of sessionsToMove){
-      await cloudUpdate("sessions",row.id,{team_id:teamId});
+      await cloudWrite("sessions",sessionToSupabaseRow({...row,teamId},user?.id,leagueIds));
     }
   }
 

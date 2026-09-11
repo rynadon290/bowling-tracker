@@ -404,11 +404,24 @@ export default function Settings({
 
           {onAddLeague && (
             <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-              <input style={{ ...S.input, flex: 1, marginBottom: 0 }}
+              {/* minWidth 0 on the input and width auto on the button.
+
+                  S.btn("primary") carries width:100%, so in a flex row it
+                  claimed the whole line and squeezed the input down to a
+                  sliver -- a text field too narrow to read what you had
+                  typed, beside a button the width of the screen. */}
+              <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0 }}
                 value={newLeagueName}
                 onChange={e => setNewLeagueName(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key !== "Enter") return;
+                  const name = newLeagueName.trim();
+                  if (!name) return;
+                  await onAddLeague(name);
+                  setNewLeagueName("");
+                }}
                 placeholder="League name, e.g. Tuesday Night Mixed" />
-              <button style={{ ...S.btn("primary"), flexShrink: 0, padding: "9px 14px", fontSize: "12px" }}
+              <button style={{ ...S.btn("primary"), width: "auto", flexShrink: 0, padding: "9px 16px", fontSize: "13px" }}
                 disabled={!newLeagueName.trim()}
                 onClick={async () => {
                   const name = newLeagueName.trim();
@@ -572,18 +585,41 @@ export default function Settings({
                   );
                 })()}
 
+                {/* Set apart from the league's own settings above.
+
+                    Center, season dates, Hide and Rename all configure the
+                    LEAGUE. Adding a team is a different thing entirely,
+                    and sitting flush underneath them it read as one more
+                    league field -- an unlabelled box with an Add button,
+                    indistinguishable from the row above it. A rule, a
+                    tinted panel and a heading say where the league stops
+                    and the team starts. */}
                 {onCreateTeam && league !== "Practice" && league !== "Casual" && (
-                  <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-                    <input style={{ ...S.input, flex: 1, fontSize: "12px", padding: "8px 10px" }}
+                  <div style={{
+                    marginTop: "12px", paddingTop: "12px",
+                    borderTop: `1px solid ${C.border}`,
+                  }}>
+                    <div style={{
+                      backgroundColor: C.surface, borderRadius: "10px",
+                      padding: "10px 12px",
+                    }}>
+                      <div style={{ ...S.label, marginBottom: "2px" }}>Add a team</div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px", lineHeight: 1.45 }}>
+                        Your scores in this league will join it — including nights you have already logged.
+                      </div>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0, fontSize: "12px", padding: "8px 10px" }}
                       placeholder="Add a team to this league"
                       value={teamDrafts[league] || ""}
                       onChange={e => setTeamDrafts(d => ({ ...d, [league]: e.target.value }))}
                       onKeyDown={e => { if (e.key === "Enter") { onCreateTeam(league, (teamDrafts[league] || "").trim()); setTeamDrafts(d => ({ ...d, [league]: "" })); } }} />
-                    <button style={{ ...S.btn(), padding: "8px 12px", fontSize: "12px" }}
+                    <button style={{ ...S.btn("primary"), width: "auto", flexShrink: 0, padding: "8px 14px", fontSize: "12px" }}
                       disabled={!(teamDrafts[league] || "").trim()}
                       onClick={() => { onCreateTeam(league, (teamDrafts[league] || "").trim()); setTeamDrafts(d => ({ ...d, [league]: "" })); }}>
                       Add
                     </button>
+                  </div>
+                    </div>
                   </div>
                 )}
               </div>
