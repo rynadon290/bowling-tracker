@@ -25,6 +25,7 @@ import { classifySyncError, cloudRead, cloudReadDelta, cloudWrite, cloudUpdate, 
 import { mergeDelta, nextCursor } from "./domain/deltaSync.js";
 import { normalizeSignupCode, isValidSignupCode } from "./domain/signupCodes.js";
 import { shouldOfferShotByShot } from "./domain/trackingPrompt.js";
+import { shouldPromptForTeam, scoresToAdopt } from "./domain/teamPrompt.js";
 import { splitConversionByType, isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import { maxPossibleScore,
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -136,6 +137,10 @@ const PROFILES_KEY = "bowling-bowler-profiles-v1";
 // every other key, so one bowler saying no does not silence it for
 // another person signing in on the same phone.
 const SHOT_PROMPT_KEY = "bowling-shot-prompt-dismissed-v1";
+// Dismissal of the "add a team" reminder. Per user, like every other
+// key, so one bowler saying no does not silence it for someone else
+// signing in on the same phone.
+const TEAM_PROMPT_KEY = "bowling-team-prompt-dismissed-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
 const TOURNAMENTS_KEY = "bowling-tournaments-v1";
 const BAGS_KEY = "bowling-bags-v1";
@@ -399,6 +404,7 @@ export default function BowlingTracker(){
   // NOT stored here; it's derived from the roster so the two can't drift.
   const[profiles,setProfiles]=useState({});
   const[shotPromptDismissed,setShotPromptDismissed]=useState(true); // assume dismissed until storage says otherwise, so it cannot flash on load
+  const[teamPromptDismissed,setTeamPromptDismissed]=useState(true);
   // The tournament currently being entered. Kept as one working record
   // rather than a list -- you're filling in one tournament at a time, and
   // saving commits it to the cloud.
@@ -552,6 +558,7 @@ export default function BowlingTracker(){
     if(user?.id){
       await cloudWrite("team_members",{team_id:id,user_id:user.id,lineup_position:0});
     }
+
 
     if(!result.synced){
       window.alert(`"${clean}" was created locally but couldn't reach the cloud yet (${result.reason||"unknown reason"}). It'll keep retrying in the background.`);
@@ -894,7 +901,8 @@ export default function BowlingTracker(){
   const[showSummary,setShowSummary]=useState(false);
   const[confirmClear,setConfirmClear]=useState(false);
   const[showBackup,setShowBackup]=useState(false);
-  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,manualScores:false,ballPick:false,logGoals:false});
+  const[expandedSections,setExpandedSections]=useState({releaseMiss:false,ballChange:false,notes:false,tonightSession:false,arsenal:false,surface:false,/* open by default: reaching this card means a league is chosen and the
+     bowler is here to enter scores */manualScores:true,ballPick:false,logGoals:false});
   function toggleSection(key){setExpandedSections(s=>({...s,[key]:!s[key]}));}
   const[importText,setImportText]=useState("");
   const[backupStatus,setBackupStatus]=useState("");
@@ -1253,6 +1261,8 @@ export default function BowlingTracker(){
         }else{
           const dismissed=await window.storage.get(SHOT_PROMPT_KEY);
           setShotPromptDismissed(!!dismissed);
+          const teamDismissed=await window.storage.get(TEAM_PROMPT_KEY);
+          setTeamPromptDismissed(!!teamDismissed);
           const pr=await readCached(PROFILES_KEY,"object");
           if(pr)setProfiles(Object.fromEntries(Object.entries(pr).map(([k,v])=>[k,normalizeProfile(v,k)])));
         }
@@ -3782,6 +3792,71 @@ export default function BowlingTracker(){
     environment:preferences.environment,dismissed:shotPromptDismissed,
   });
 
+  // Focus group Finding 2. The rule lives in domain/teamPrompt.js so it
+  // is testable without a render; this supplies today's inputs.
+  const promptForTeam=shouldPromptForTeam({
+    environment:preferences.environment,league:effectiveSessionLeague,
+    teams,sessions,bowler:activeBowler,dismissed:teamPromptDismissed,
+  });
+
+  // Moves existing team-less scores onto a newly created or joined team.
+  //
+  // Local state first, then the cloud: the app should show the change
+  // immediately, and a failed cloud write is queued and retried rather
+  // than losing it. Each row is updated by id, so a partial failure
+  // leaves the rest correct instead of rolling everything back.
+  // Scores logged before a team existed join it as soon as one appears.
+  //
+  // Watching `teams` rather than hooking team CREATION, because a bowler
+  // can also arrive at a team by accepting an invite or entering a signup
+  // code -- three call sites, one of which runs after a page reload. An
+  // effect covers all of them and is idempotent: once the scores carry a
+  // teamId, scoresToAdopt returns nothing and this does no work.
+  //
+  // Focus group Finding 2: a league bowler can log from the moment they
+  // add a league and add the team later. That promise is only kept if the
+  // nights already in the app become the team's nights -- otherwise "add
+  // a team whenever you like" quietly means "start again".
+  useEffect(()=>{
+    if(!activeBowler||!Array.isArray(teams))return;
+    (async()=>{
+      for(const t of teams){
+        if(t&&t.id&&t.league) await adoptScoresIntoTeam(t.id,t.league);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[teams,activeBowler]);
+
+  async function adoptScoresIntoTeam(teamId,leagueName){
+    if(!teamId||!leagueName||!activeBowler)return;
+
+    const shotsToMove=scoresToAdopt(shots,activeBowler,leagueName);
+    const sessionsToMove=scoresToAdopt(sessions,activeBowler,leagueName);
+    if(!shotsToMove.length&&!sessionsToMove.length)return;
+
+    const movedIds=new Set(shotsToMove.map(x=>x.id));
+    const movedSessionIds=new Set(sessionsToMove.map(x=>x.id));
+    const nextShots=shots.map(x=>movedIds.has(x.id)?{...x,teamId}:x);
+    const nextSessions=sessions.map(x=>movedSessionIds.has(x.id)?{...x,teamId}:x);
+    setShots(nextShots); setSessions(nextSessions);
+    try{
+      await window.storage.set(STORAGE_KEY,JSON.stringify(nextShots));
+      await window.storage.set(SESSIONS_KEY,JSON.stringify(nextSessions));
+    }catch{}
+
+    for(const row of shotsToMove){
+      await cloudUpdate("shots",row.id,{team_id:teamId});
+    }
+    for(const row of sessionsToMove){
+      await cloudUpdate("sessions",row.id,{team_id:teamId});
+    }
+  }
+
+  async function dismissTeamPrompt(){
+    setTeamPromptDismissed(true);
+    try{await window.storage.set(TEAM_PROMPT_KEY,new Date().toISOString());}catch{}
+  }
+
   async function dismissShotPrompt(){
     setShotPromptDismissed(true);
     try{await window.storage.set(SHOT_PROMPT_KEY,new Date().toISOString());}catch{}
@@ -4345,7 +4420,16 @@ export default function BowlingTracker(){
   // A selected bag from another environment or another bowler isn't in
   // envBags -- resolve it to "nothing selected" rather than letting the
   // Log tab silently show zero balls with no way to tell why.
-  const effectiveBagId=envBags.some(b=>b.id===selectedBagId)?selectedBagId:"";
+  //
+  // With exactly ONE bag for this environment, it is the answer -- so it
+  // is selected without being asked for. Falling back to "" meant
+  // availableBalls returned the WHOLE arsenal: a bowler who had packed a
+  // tournament bag still saw every ball they own, which is the opposite
+  // of why they packed it. Asking someone to choose between one option
+  // is not a choice.
+  const effectiveBagId=envBags.some(b=>b.id===selectedBagId)
+    ?selectedBagId
+    :(envBags.length===1?envBags[0].id:"");
   const bowlerBalls=arsenals[activeBowler]||[];
   const ballsByBag=ballsByBagFor(ballBags,activeBowler,bowlerBalls);
   // envBags.length tells availableBalls whether this bowler has any bags
@@ -5143,7 +5227,7 @@ export default function BowlingTracker(){
         {view==="locker"&&(
           <Settings
             mode="leagues"
-            onCreateTeam={createTeamForLeague}
+            onCreateTeam={createTeamForLeague} onAddLeague={addLeague}
             restartOnboarding={restartOnboarding} replayTour={replayTour} isCoach={showCoachingTab}
             showBackup={showBackup} setShowBackup={setShowBackup}
             backupStatus={backupStatus} setBackupStatus={setBackupStatus}
@@ -5266,6 +5350,7 @@ export default function BowlingTracker(){
             sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} effectiveSessionLeague={effectiveSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}
             startingLane={startingLane} setStartingLane={setStartingLane} setShowSummary={setShowSummary} expandedSections={expandedSections}
             offerShotByShot={offerShotByShot} onTryShotByShot={tryShotByShot} onDismissShotByShot={dismissShotPrompt}
+            promptForTeam={promptForTeam} onDismissTeamPrompt={dismissTeamPrompt}
             ballNumLabel={ballNumLabel} curSession={curSession} currentLane={currentLane} firstBallPins={firstBallPins} g1score={g1score} g2score={g2score} g3score={g3score}
             hasLeave={hasLeave} inTenth={inTenth} isNoTap={isNoTap} isStrike={isStrike} needsSpareMade={needsSpareMade} sessionTotal={sessionTotal} showPinCount={showPinCount}
             standingPins={standingPins} tenthOptions={tenthOptions}

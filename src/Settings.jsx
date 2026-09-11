@@ -22,6 +22,7 @@ const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", r
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 
 export default function Settings({
+  onAddLeague,
   mode = "both",
   restartOnboarding, replayTour, isCoach = false,
   showBackup, setShowBackup, backupStatus, setBackupStatus,
@@ -90,6 +91,7 @@ export default function Settings({
   // Diagnostics. Loaded once when Settings opens rather than kept live:
   // this is a thing you go and look at, not a thing that should re-render
   // the screen every time a write fails.
+  const [newLeagueName, setNewLeagueName] = useState("");
   const [errLog, setErrLog] = useState({ distinct: 0, total: 0 });
   const [copied, setCopied] = useState(false);
   useEffect(() => { errorLogSummary().then(setErrLog).catch(() => {}); }, []);
@@ -98,6 +100,9 @@ export default function Settings({
     session: true, look: false, trackingDetail: false,
     accessoryFields: false, moneyGames: false, statsLayout: false,
     backup: false, reset: false, dangerZone: false,
+    // Open by default. The other cards are settings you go
+    // looking for; this is the one a lost bowler needs to SEE.
+    walkthroughs: true,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
 
@@ -383,12 +388,42 @@ export default function Settings({
       {/* Centers attach to LEAGUES, not sessions -- a league bowls at one
           house for a season, so this is one entry per season instead of a
           tap every night. */}
-      {(leagues || []).length > 0 && showCard("leagues") && (
+      {/* Rendered even with NO leagues. It used to be hidden until one
+          existed, so a bowler with none saw no Leagues card and no way
+          to make one -- and nothing anywhere else created a league
+          either. addLeague() had existed in BowlingTracker with no
+          caller. */}
+      {showCard("leagues") && (
         <CollapsibleCard title="Leagues" summary={`${leagues.length} league${leagues.length === 1 ? "" : "s"}`}
           expanded={expanded.whereYouBowl} onToggle={() => toggle("whereYouBowl")}>
           <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px" }}>
-            Rename a league, set its center and season dates, or hide one you're not bowling any more.
+            {(leagues || []).filter(l => !isContainerLeague(l)).length
+              ? "Add a league, rename one, set its center and season dates, or hide one you're not bowling any more."
+              : "Add the league you bowl in and you can start putting scores in straight away. A team isn't needed yet."}
           </div>
+
+          {onAddLeague && (
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              <input style={{ ...S.input, flex: 1, marginBottom: 0 }}
+                value={newLeagueName}
+                onChange={e => setNewLeagueName(e.target.value)}
+                placeholder="League name, e.g. Tuesday Night Mixed" />
+              <button style={{ ...S.btn("primary"), flexShrink: 0, padding: "9px 14px", fontSize: "12px" }}
+                disabled={!newLeagueName.trim()}
+                onClick={async () => {
+                  const name = newLeagueName.trim();
+                  if (!name) return;
+                  // Dates are set afterwards from the row below, so this
+                  // asks for one thing: the name. Season dates at this
+                  // moment are the "admin before first value" problem the
+                  // whole change exists to remove.
+                  await onAddLeague(name);
+                  setNewLeagueName("");
+                }}>
+                Add
+              </button>
+            </div>
+          )}
           {/* Practice and Just Bowling are filtered out.
           
               They're containers that exist so scores have somewhere to
@@ -707,8 +742,9 @@ export default function Settings({
           bowler. Coaching is gated to coaches -- offering it to everyone
           would advertise a mode most people will never use. */}
       {showCard("walkthroughs") && replayTour && (
-        <div style={S.card}>
-          <div style={S.label}>Walkthroughs</div>
+        <CollapsibleCard title="Walkthroughs"
+          summary={`${availableTours(!!isCoach).length} available`}
+          expanded={expanded.walkthroughs} onToggle={() => toggle("walkthroughs")}>
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
             Watch any of these again, any time.
           </div>
@@ -727,7 +763,7 @@ export default function Settings({
               </button>
             </div>
           ))}
-        </div>
+        </CollapsibleCard>
       )}
 
       {/* Diagnostics.

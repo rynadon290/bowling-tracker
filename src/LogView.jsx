@@ -30,6 +30,9 @@ export default function LogView({
   // Focus group Finding 3. Passed in rather than computed here so the
   // decision stays in one pure, tested place and LogView only renders.
   offerShotByShot = false, onTryShotByShot, onDismissShotByShot,
+  // Focus group Finding 2. Computed in BowlingTracker so the rule stays
+  // in one tested place; this only renders it.
+  promptForTeam = false, onDismissTeamPrompt,
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit, deleteShot,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,
@@ -507,10 +510,15 @@ export default function LogView({
                   We love leagues too! 🎳
                 </div>
                 <div style={{fontSize:"13px",color:C.textMuted,lineHeight:1.55,marginBottom:"12px"}}>
-                  To set you up for success, let's get your league and team configured. Don't worry — it's fast, easy, and only needed once. Unless you join more teams later, of course, but you'll be a My Bowling Vault pro by then and won't need us.
+                  Add the league you bowl in and you can start putting scores in straight
+                  away. A team isn't needed yet — you can add one whenever you like, and
+                  tonight's scores will join it.
                 </div>
+                {/* The Vault, which is where the Leagues card lives -- it
+                    is <Settings mode="leagues"> rendered under view
+                    "locker", not the Settings screen. */}
                 <button style={S.btn("primary")} onClick={()=>setView("locker")}>
-                  Set up my league and team
+                  Add my league
                 </button>
                 {onReplayTour&&(
                   <button style={{...S.btn(),width:"100%",marginTop:"8px",fontSize:"12px"}}
@@ -521,17 +529,44 @@ export default function LogView({
               </div>
             )}
 
-            {!editingId&&activeBowler&&!effectiveSessionLeague
-              &&preferences.environment==="league"
-              &&!needsLeagueSetup({environment:preferences.environment,leagues,teams})
-              &&preferences.trackingMode==="game"&&(
-              <div style={{...S.card,backgroundColor:C.surface}}>
-                <div style={S.label}>Enter Game Scores</div>
-                <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
-                  Pick tonight's league above and this opens up — scores are filed against a league, so there's nowhere to put them yet.
+            {/* The team, asked for AFTER a night rather than before one.
+
+                Focus group Finding 2: requiring a team before any score
+                could be entered cost 62% of new league bowlers a wall,
+                and 11 of 31 abandoned during team setup -- most at the
+                roster screen, asked for teammates' emails they did not
+                have. "I just wanted to put tonight's scores in."
+
+                So it is a reminder with a reason attached, shown only
+                once a real night exists to attach it to, and dismissible
+                for good. A prompt people learn to swipe away is worse
+                than none. */}
+            {!editingId&&promptForTeam&&(
+              <div style={{backgroundColor:C.accent+"11",border:`1px solid ${C.accent}44`,borderRadius:"10px",padding:"12px 14px",marginBottom:"12px"}}>
+                <div style={{fontSize:"14px",fontWeight:600,color:C.text,marginBottom:"4px"}}>
+                  Want these to count for your team?
+                </div>
+                <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5,marginBottom:"10px"}}>
+                  Your scores are saved and yours either way. Adding a team puts them on the
+                  team sheet too — standings, side pots and everyone's averages in one place.
+                  Everything you've already logged in this league joins automatically.
+                </div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button style={{...S.btn("primary"),flex:1,padding:"8px",fontSize:"12px"}}
+                    onClick={()=>setView("locker")}>Add my team</button>
+                  <button style={{...S.btn(),flex:1,padding:"8px",fontSize:"12px"}}
+                    onClick={onDismissTeamPrompt}>Not now</button>
                 </div>
               </div>
             )}
+
+            {/* The empty "Enter Game Scores" placeholder used to sit here,
+                telling a bowler to pick a league. Removed: the session
+                picker directly above it already asks for one, so this was
+                a second card saying the same thing -- and a card titled
+                "Enter Game Scores" that cannot take a score reads as
+                broken rather than as an instruction. Nothing appears here
+                until a league is chosen, and then the real card does. */}
 
             {/* Shot-form order, top to bottom:
                   context (game, frame, lane) -> result -> ball -> surface
@@ -714,7 +749,15 @@ export default function LogView({
                 takes their scores directly, so a separate "who am I
                 keeping score for" card is the same information twice
                 and a switch nobody needs to flip. */}
-            {!editingId&&preferences.environment!=="tournament"&&preferences.environment!=="casual"&&(
+            {/* Not until a league is chosen either.
+
+                In league mode nothing below can be recorded without one --
+                scores are filed against a league -- so asking who is
+                bowling first is asking for a setting that has nowhere to
+                apply. It puts two cards of setup in front of someone who
+                came to enter a score. */}
+            {!editingId&&preferences.environment!=="tournament"&&preferences.environment!=="casual"
+              &&(preferences.environment!=="league"||!!effectiveSessionLeague)&&(
               <div style={{...S.card,padding:"10px 12px"}}>
                 {/* Below Shot Context and kept short: this is a setting
                     you touch once a night, not something to scroll past
@@ -1138,12 +1181,34 @@ export default function LogView({
               const gameNums=Array.from({length:gameCount},(_,i)=>i+1);
               const entered=gameNums.map(g=>getManualScore(manualScores,activeBowler,effectiveSessionLeague,sessionDate,g));
               const total=seriesTotal(entered);
+              // The card is defaulted OPEN in BowlingTracker's
+              // expandedSections. Reaching it means a league is chosen and
+              // the bowler is here to enter scores -- a closed card is one
+              // more tap between them and the thing they opened the app to
+              // do. Collapsing it by hand still sticks.
               return(
                 <CollapsibleCard
                   title="Enter Game Scores"
                   summary={total!=null?`${total} series`:""}
                   expanded={expandedSections.manualScores}
+
                   onToggle={()=>toggleSection("manualScores")}>
+                  {/* Which bag, asked ONCE rather than per game.
+
+                      Only when there is a choice to make: with one bag it
+                      is already the answer, and with none every ball is
+                      offered. */}
+                  {envBags.length>1&&(
+                    <div style={{marginBottom:"10px"}}>
+                      <div style={{...S.label,marginBottom:"4px"}}>Which bag tonight?</div>
+                      <select style={{...S.sel,width:"100%"}}
+                        value={selectedBagId||""}
+                        onChange={e=>setSelectedBagId(e.target.value)}>
+                        <option value="">All my balls</option>
+                        {envBags.map(bag=>(<option key={bag.id} value={bag.id}>{bag.name}</option>))}
+                      </select>
+                    </div>
+                  )}
                   <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
                     Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
                     {/* `arsenal` is defined further down, INSIDE the
@@ -1186,6 +1251,15 @@ export default function LogView({
                     // Plastic never defaults but is always offered.
                     const defaultBall=defaultPracticeBall(arsenal,PLASTIC_BALL);
                     const shownBall=equip?(equip.ball||defaultBall):"";
+                    // Plastic is always offered -- it is a spare ball, not
+                    // part of a bag -- and a ball already recorded stays
+                    // listed even if it has since left the bag, so an old
+                    // game never loses what it was bowled with.
+                    const gameBalls=[...new Set([
+                      ...(logBalls||[]),
+                      ...(arsenal.includes(PLASTIC_BALL)?[PLASTIC_BALL]:[]),
+                      ...(shownBall?[shownBall]:[]),
+                    ])];
                     return(
                     <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
                       <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
@@ -1205,14 +1279,27 @@ export default function LogView({
                           practice is for: which ball, which surface, what
                           did it average -- and how it held up as the lanes
                           transitioned across the block. */}
-                      {isPracticeGames&&arsenal.length>0&&(
+                      {isPracticeGames&&gameBalls.length>0&&(
                         <div style={{paddingLeft:"36px"}}>
-                          <div style={{...S.chips,marginBottom:"4px"}}>
-                            {arsenal.map(b=>(
-                              <Chip key={b} label={b} selected={shownBall===b} color={b===PLASTIC_BALL?C.strike:undefined}
-                                onToggle={()=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{ball:shownBall===b?"":b})}/>
-                            ))}
-                          </div>
+                          {/* A dropdown, not a chip row.
+
+                              One chip per ball meant a full arsenal wrapped
+                              across several lines under EVERY game -- three
+                              or four times over on one screen, burying the
+                              score fields it sits between.
+
+                              The list is the selected league bag's balls
+                              (logBalls), not the whole arsenal: the balls
+                              actually carried that night are the only ones
+                              that can have bowled the game. With no bag
+                              defined it falls back to everything, so nobody
+                              is forced to pack one first. */}
+                          <select style={{...S.sel,width:"100%",marginBottom:"4px"}}
+                            value={shownBall||""}
+                            onChange={e=>updateGameEquipment(activeBowler,effectiveSessionLeague,sessionDate,g,{ball:e.target.value})}>
+                            <option value="">Ball used…</option>
+                            {gameBalls.map(b=>(<option key={b} value={b}>{b}</option>))}
+                          </select>
                           {shownBall&&shownBall!==PLASTIC_BALL&&(
                             <div style={S.chips}>
                               {SURFACES.map(sf=>(
