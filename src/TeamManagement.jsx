@@ -218,15 +218,37 @@ export default function TeamManagement({
   const shownTeam = teams.find(t => t.id === shownTeamId) || teams[0] || null;
 
   const focusedTeamRef = useRef(null);
+
+  // A team created in the Leagues card above has to be FETCHED before it
+  // can be scrolled to.
+  //
+  // This component loads its own teams once, on mount. A team added from
+  // the card above therefore did not exist in this list at all -- the
+  // scroll had no target, nothing was selected, and the bowler was left
+  // on a page that had visibly not reacted to what they just did. The
+  // team only appeared on the next visit to the Vault.
+  //
+  // Which is the whole "adding players continues straight on from adding
+  // the team" intention failing silently.
   useEffect(() => {
     if (!focusTeamId) return;
-    // Select it as well as scrolling: with one team shown at a time, a
-    // newly created team that isn't selected would scroll to nothing.
-    setShownTeamId(focusTeamId);
-    if (focusedTeamRef.current) {
-      focusedTeamRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [focusTeamId, teams.length]);
+    let cancelled = false;
+    (async () => {
+      if (!teams.some(t => t.id === focusTeamId)) await loadAll();
+      if (!cancelled) setShownTeamId(focusTeamId);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTeamId]);
+
+  // Scroll separately, once the team is actually on screen. Doing it in
+  // the effect above ran before the render that creates the node, so the
+  // ref was still null and the scroll silently did nothing.
+  useEffect(() => {
+    if (!focusTeamId || shownTeamId !== focusTeamId) return;
+    if (!focusedTeamRef.current) return;
+    focusedTeamRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusTeamId, shownTeamId, teams.length]);
   const[editingName, setEditingName] = useState("");
   // Asked at creation because there's no other reliable way to know when a
   // season ends -- leagues in this app have no automatic boundary, so this
@@ -601,8 +623,19 @@ export default function TeamManagement({
           )}
 
           <div style={S.label}>Roster / Bowling Order</div>
+          {/* Directive, not a dead statement.
+
+              This is the exact moment Focus group Finding 2 records people
+              abandoning -- 11 of 31 -- and "No bowlers assigned." told
+              them a fact rather than what to do, or that stopping here was
+              fine. It is fine: the team works with just you on it, and
+              every teammate can be added later. Saying so removes the
+              sense that setup is unfinished. */}
           {team.members.length===0 && team.pendingInvites.length===0 && (
-            <div style={{color:C.textMuted,fontSize:"12px",padding:"6px 0 12px"}}>No bowlers assigned.</div>
+            <div style={{color:C.textMuted,fontSize:"12px",padding:"6px 0 12px",lineHeight:1.5}}>
+              Just you so far — add teammates below, or leave it and come back to it.
+              Your scores count either way.
+            </div>
           )}
           {team.members.map((member, index) => (
             <div key={member.userId} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
