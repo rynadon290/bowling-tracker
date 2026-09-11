@@ -245,6 +245,15 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                 );
               })}
             </div>
+            {/* Focus group Finding 1: 61 of 250 picked the wrong mode and
+                17 asked whether it could be changed. There IS a line above
+                saying it can -- but it is read before anyone has looked at
+                the options, and it does not say WHERE. The reassurance has
+                to sit under the choice, at the moment of committing to one,
+                and name the place. */}
+            <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "16px" }}>
+              You can change this any time on the Bowl tab.
+            </div>
             <button style={S.btn("primary")} onClick={() => setStep(3)}>Next</button>
           </>
         )}

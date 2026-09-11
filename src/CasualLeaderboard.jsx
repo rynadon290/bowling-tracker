@@ -1,5 +1,6 @@
 import { C, S, F } from "./ui.jsx";
 import { casualLeaderboard, CASUAL_BADGES } from "./domain/casualBadges.js";
+import ShareButton from "./ShareButton.jsx";
 
 // Everyone who's been on a Just Bowling scoresheet, ranked.
 //
@@ -32,6 +33,17 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
         <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
           Everyone you've bowled with, by average. {rows.length === 1 ? "Add someone to compare against." : ""}
         </div>
+
+        {/* Focus group Finding 4: 9 of 50 looked for a way to share the
+            running table. The night's recap had a share and this did not
+            -- and the standings are the part people said they would
+            install the app for, to settle arguments in a group chat.
+            Only shown once there is something to argue about. */}
+        {rows.length > 1 && (
+          <div style={{ marginBottom: "10px" }}>
+            <ShareButton summary={{ standings: true, rows, me }} label="Share standings" compact />
+          </div>
+        )}
 
         {rows.map((r, i) => {
           const isMe = r.bowler === me;

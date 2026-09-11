@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, F } from "./ui.jsx";
-import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText, drawShareQr } from "./domain/shareCard.js";
+import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText, drawStandingsCard, standingsShareText, drawShareQr } from "./domain/shareCard.js";
 
 // One tap to share a night's scores.
 //
@@ -25,6 +25,9 @@ async function renderCardBlob(summary) {
     // A trend is a shape over time, not a scoreline -- it gets the graph
     // card instead of the score card.
     if (summary?.trend) drawTrendCard(ctx, { ...summary, colors: C, fonts: F });
+    // A running table is neither a scoreline nor a shape over time, so it
+    // gets its own card rather than being forced into either.
+    else if (summary?.standings) drawStandingsCard(ctx, { ...summary, colors: C, fonts: F });
     else drawShareCard(ctx, { ...summary, colors: C, fonts: F });
     // Additive: mark+name+url are already drawn above, so a QR that
     // fails to load (offline, package unavailable) still leaves a card
@@ -44,8 +47,12 @@ export default function ShareButton({ summary, label = "Share", compact = false 
 
   async function share() {
     setState("working");
-    const text = summary?.trend ? trendShareText(summary) : shareText(summary);
-    const title = summary?.trend ? (summary.label || "Trend") : shareTitle(summary);
+    const text = summary?.trend ? trendShareText(summary)
+      : summary?.standings ? standingsShareText(summary)
+      : shareText(summary);
+    const title = summary?.trend ? (summary.label || "Trend")
+      : summary?.standings ? "Standings"
+      : shareTitle(summary);
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         const blob = await renderCardBlob(summary);

@@ -708,6 +708,44 @@ export default function TeamManagement({
                   placeholder="Their name"
                   style={S.input}
                 />
+                {/* Two equal buttons, not a field plus an afterthought.
+
+                    Focus group Finding 2: only 7 of 22 noticed the code
+                    option, because it sat BELOW the email field as a
+                    single line of muted text. Anything under a filled-in
+                    input reads as a footnote to it -- people had already
+                    committed to typing an email before they saw there was
+                    a choice. Presenting both first makes it a decision
+                    rather than an escape hatch.
+
+                    A captain standing at the lanes with four teammates
+                    and two email addresses needs the second option to be
+                    as visible as the first. */}
+                <div style={{display:"flex",gap:"8px"}}>
+                  {[
+                    {code:false,label:"I have their email"},
+                    {code:true, label:"Text them a code"},
+                  ].map(opt=>{
+                    const on=!!inviteForm[team.id]?.useCode===opt.code;
+                    return (
+                      <button key={String(opt.code)}
+                        onClick={()=>setInviteForm(prev=>({...prev,[team.id]:{
+                          ...prev[team.id],useCode:opt.code,email:"",
+                        }}))}
+                        style={{
+                          flex:1,textAlign:"center",padding:"10px 8px",borderRadius:"8px",
+                          cursor:"pointer",fontSize:"12px",fontWeight:on?700:500,
+                          border:`1px solid ${on?C.accent:C.border}`,
+                          background:on?C.accent+"11":"transparent",
+                          color:on?C.accent:C.textMuted,
+                          WebkitTapHighlightColor:"transparent",
+                        }}>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {!inviteForm[team.id]?.useCode && (
                   <input
                     value={inviteForm[team.id]?.email || ""}
@@ -717,24 +755,11 @@ export default function TeamManagement({
                     style={S.input}
                   />
                 )}
-
-                {/* The way out for a captain standing at the lanes with
-                    four teammates and two email addresses. A code they
-                    can text works the same way an email invite does: the
-                    teammate claims the spot themselves. */}
-                <button
-                  onClick={()=>setInviteForm(prev=>({...prev,[team.id]:{
-                    ...prev[team.id],useCode:!prev[team.id]?.useCode,email:"",
-                  }}))}
-                  style={{
-                    textAlign:"left",padding:"8px 10px",borderRadius:"8px",cursor:"pointer",
-                    fontSize:"12px",
-                    border:`1px solid ${inviteForm[team.id]?.useCode?C.accent:C.border}`,
-                    background:inviteForm[team.id]?.useCode?C.accent+"11":"transparent",
-                    color:inviteForm[team.id]?.useCode?C.text:C.textMuted,
-                  }}>
-                  {inviteForm[team.id]?.useCode?"✓ ":""}I don't have their email — give me a code to text them
-                </button>
+                {inviteForm[team.id]?.useCode && (
+                  <div style={{fontSize:"11px",color:C.textMuted}}>
+                    They will get a code to enter when they sign up. It links them to this spot the same way an email invite does.
+                  </div>
+                )}
 
                 <button style={S.primary} onClick={()=>createInvite(team.id)}>Add to Roster</button>
               </div>
