@@ -518,6 +518,30 @@ export default function BowlingTracker(){
     // cannot be wrong, and it does not depend on `user` being in scope
     // at every call site that ever creates a team.
     const result=await cloudWrite("teams",{id,name:clean,league_id:leagueId});
+
+    // Put the creator on the roster.
+    //
+    // Creating a team used to leave it with no members at all, which was
+    // invisible while every team was world-readable. It is not invisible
+    // now: teams are scoped by is_team_member(), so a team with an empty
+    // roster is one its own creator has no membership claim on. Three
+    // separate policies had to be widened to created_by to paper over
+    // that -- viewing, renaming and deleting. This removes the reason
+    // they are load-bearing: after it, created_by and membership agree
+    // from the moment the team exists.
+    //
+    // Deliberately NOT gated on result.synced. If the team write was
+    // queued because there is no signal at the lanes, this queues behind
+    // it, and the queue flushes in order -- so the membership lands right
+    // after the team rather than being skipped entirely.
+    //
+    // Guarded on user?.id because user_id has no default and cannot be
+    // null; sending undefined would fail the NOT NULL constraint rather
+    // than fall back to anything sensible.
+    if(user?.id){
+      await cloudWrite("team_members",{team_id:id,user_id:user.id,lineup_position:0});
+    }
+
     if(!result.synced){
       window.alert(`"${clean}" was created locally but couldn't reach the cloud yet (${result.reason||"unknown reason"}). It'll keep retrying in the background.`);
     }
