@@ -63,13 +63,26 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
     <div style={{ ...S.card, border: `1px solid ${C.accent}44`, marginBottom: "12px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
         <div style={{ ...S.label, color: C.accent, marginBottom: 0 }}>Bowling today?</div>
-        {/* Re-opened from the collapsed summary: there has to be a way
-            back. Without this, tapping Change and then re-picking the
-            SAME environment left the card open forever -- the only path
-            that closed it was tapping a tracking chip, which someone who
-            just wanted to check their setup never does. */}
-        {collapsed && (
-          <button onClick={() => setOpen(false)}
+        {/* There has to be a way out, in BOTH states.
+
+            This was fixed once for the collapsed summary -- tapping
+            Change and re-picking the SAME environment left the card open
+            forever -- and the identical hole was left in the launch
+            prompt, where `collapsed` is false and this button did not
+            render at all.
+
+            On launch the only exits were picking casual, or tapping a
+            tracking chip. Pick a tournament when the tracking mode
+            already shows what you want and there is nothing left to tap:
+            LogView hides everything below this card while the prompt is
+            up, so the Bowl tab shows the card and a Save button and
+            nothing else. Re-tapping the already-selected tracking chip
+            released it, which is why it looked like a tracking-mode bug.
+
+            The subtitle has said "tap Done" the whole time. Now it
+            exists. */}
+        {(collapsed || envChosen) && (
+          <button onClick={() => { if (collapsed) setOpen(false); else onDismiss(); }}
             style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "12px", padding: "2px 4px" }}>
             Done
           </button>
