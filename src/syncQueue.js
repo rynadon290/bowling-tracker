@@ -519,7 +519,17 @@ export async function flushPendingQueue() {
         // rather than dropped: a 42501 means the write never landed, and
         // silently binning a bowler's game to keep the queue tidy would
         // be the worse failure.
-        recordError({ kind: 'write-failed', where: `${item.table}.${item.operation}`, code: err?.code || '', message: 'permanent — skipped so it cannot wedge the queue' });
+        // The columns too, and the actual error text.
+        //
+        // This entry is the one that REPEATS -- a permanently-failing item
+        // is retried on every flush -- so it is the one most likely to be
+        // read, and it was the least informative thing in the log:
+        // "team_members.upsert / 42501 / permanent". Which of the four
+        // writes that touch that table, and carrying what? Now it says.
+        recordError({
+          kind: 'write-failed', where: `${item.table}.${item.operation}`, code: err?.code || '',
+          message: `permanent, skipped so it cannot wedge the queue — ${formatError(err)}${payloadColumns(item.payload)}`,
+        });
         continue;
       }
 
