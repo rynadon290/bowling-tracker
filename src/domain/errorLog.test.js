@@ -26,6 +26,19 @@ describe('redact', () => {
     expect(out).toContain('violates check');
   });
 
+  // Double-quoted text in a Postgres error is an IDENTIFIER. Blanking it
+  // produced `null value in column "*" of relation "*"` on a real device
+  // -- which says something is null somewhere and nothing more.
+  it('keeps column, table and constraint names', () => {
+    const out = redact('null value in column "score" of relation "manual_scores" violates not-null constraint');
+    expect(out).toContain('score');
+    expect(out).toContain('manual_scores');
+  });
+
+  it('still strips an email that appears inside quotes', () => {
+    expect(redact('key "invited_email"=(maggie@example.com) exists')).not.toContain('maggie@example.com');
+  });
+
   // UUIDs name a row, not a person, and they are how you find it again.
   it('keeps uuids', () => {
     const id = 'd1ef5183-b04d-46a1-a485-eb57351d161d';

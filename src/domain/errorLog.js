@@ -36,11 +36,18 @@ export function redact(message) {
   if (typeof message !== "string") return "";
   return message
     // Key (bowler_name)=(Maggie) -> Key (bowler_name)=(*)
+    // The column name survives; only the VALUE goes.
     .replace(/\)=\([^)]*\)/g, ")=(*)")
-    // Quoted literals: 'Maggie', "maggie@example.com"
+    // Single-quoted literals are values: 'Maggie', 'tuesday night'.
     .replace(/'[^']*'/g, "'*'")
-    .replace(/"[^"]*"/g, '"*"')
-    // Anything shaped like an email, wherever it appears.
+    // DOUBLE-quoted text in a Postgres error is an IDENTIFIER, not a
+    // value -- a column, table or constraint name. Blanking those made
+    // real errors unreadable: `null value in column "*" of relation "*"`
+    // says something is null somewhere, which is no help at all. Names
+    // are schema, and the schema is already in the repo.
+    //
+    // Emails are stripped below wherever they appear, so an address that
+    // turns up inside quotes is still removed.
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "*@*")
     // UUIDs are safe to keep -- they identify a row without naming
     // anyone, and they are how you find it again.
