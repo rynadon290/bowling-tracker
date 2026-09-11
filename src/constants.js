@@ -137,6 +137,19 @@ export const DEFAULT_LEAGUES = ["Tuesday House Shot","Thursday House Shot"];
 // be "tomorrow" in UTC while it's still today locally, silently dating a
 // session one day ahead of when it was actually bowled.
 export function localDateString(d=new Date()){
+  // An unusable date falls back to TODAY, never to "NaN-NaN-NaN".
+  //
+  // The default argument only covers an omitted one. Handed null, a
+  // string, or a Date built from something unparseable, this threw --
+  // or worse, returned "NaN-NaN-NaN", which is a perfectly storable
+  // string. Every session and shot is KEYED by this value, so one of
+  // those would write a row that could never be matched, edited or
+  // deduplicated again: a night that exists and cannot be found.
+  //
+  // Today is the right fallback because that is what the caller meant
+  // by asking; an unusable date is a bug upstream, and the bowler's
+  // night should still land somewhere real.
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) d = new Date();
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,"0");
   const day=String(d.getDate()).padStart(2,"0");
