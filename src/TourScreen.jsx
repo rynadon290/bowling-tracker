@@ -267,7 +267,7 @@ const SCREENS = {
             <span style={chip(false)}>Practice</span>
             <span style={chip(false)}>League</span>
             <span style={chip(false)}>Tournament</span>
-            <span style={chip(false)}>Just Bowling</span>
+            <span style={chip(false)}>Open bowling</span>
           </div>
         </div>
       </Spot>

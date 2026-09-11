@@ -60,7 +60,6 @@ export default function Settings({
   // restore defaults for settings it never shows. Four cards of dead
   // options make a simple mode feel complicated.
   const casualMode = preferences.environment === "casual";
-  const ENV_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
   const cardsFor = {
     leagues: ["leagues"],
     settings: casualMode
@@ -276,7 +275,7 @@ export default function Settings({
           thinks of. */}
       {showCard("session") && (
       <CollapsibleCard title="What you're bowling"
-        summary={`${ENV_LABELS[preferences.environment] || "League"}${
+        summary={`${ENVIRONMENT_LABELS[preferences.environment] || "League"}${
           preferences.environment === "casual" ? "" : ` · ${preferences.trackingMode === "shot" ? "Shot by shot" : "Scores only"}`}`}
         expanded={expanded.session} onToggle={() => toggle("session")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
@@ -287,7 +286,7 @@ export default function Settings({
         <div style={S.label}>Mode</div>
         <div style={{ ...S.chips, marginBottom: "12px" }}>
           {ENVIRONMENTS.map(env => (
-            <Chip key={env} label={ENV_LABELS[env]}
+            <Chip key={env} label={ENVIRONMENT_LABELS[env]}
               selected={preferences.environment === env}
               onToggle={() => apply(prev => applyEnvironment(prev, env))} />
           ))}
