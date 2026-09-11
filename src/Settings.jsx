@@ -11,7 +11,7 @@ import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domai
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
 import {
-  ENVIRONMENT_LABELS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
+  ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
   resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
@@ -291,6 +291,13 @@ export default function Settings({
               onToggle={() => apply(prev => applyEnvironment(prev, env))} />
           ))}
         </div>
+        {/* The same one-line description the question shows, from the
+            same source. Settings had the chips and no description at
+            all, so the only place explaining what a mode does was the
+            screen you see once. */}
+        <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "-6px", marginBottom: "12px", lineHeight: 1.4 }}>
+          {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
+        </div>
 
         {/* Casual has no tracking choice: it's scores-only by
             definition, and offering a switch that does nothing would be
@@ -314,7 +321,7 @@ export default function Settings({
 
         {preferences.environment === "casual" && (
           <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.5 }}>
-            Just Bowling keeps things to game scores, and hides History, Stats, Improve
+            Open bowling keeps things to game scores, and hides History, Stats, Improve
             and the Vault. Switch to another mode above and they all come back — nothing
             is deleted.
           </div>

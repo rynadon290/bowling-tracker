@@ -81,7 +81,7 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
           : "Two quick questions and the app sets itself up for tonight."}
       </div>
 
-      <div style={S.label}>What are you bowling today?</div>
+      <div style={S.label}>Mode</div>
       <div style={S.chips}>
         {ENVIRONMENTS.map(env => (
           <Chip key={env} label={ENVIRONMENT_LABELS[env]}
