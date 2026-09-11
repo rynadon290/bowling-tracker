@@ -98,8 +98,17 @@ export default function StatsView({
   // Counted from the shots actually in view, so switching bowler or
   // league re-evaluates: a teammate you only keep score for shows score
   // cards, and your own shot-by-shot nights show everything.
-  const shotDataCount = shots.length;
-  const ballDataCount = shots.filter(sh => sh && sh.ball).length;
+  // `tot` and `bStats`, NOT the raw shots prop.
+  //
+  // shots is every shot the app holds; tot is the shot count for what is
+  // actually being viewed -- this bowler, this league, this season, or
+  // the whole team. Gating on shots.length meant a team view with shots
+  // somewhere else in the app still rendered "0 Shots / 0% Strike / 0%
+  // Spare", which is exactly the three-zero card that reads as broken.
+  //
+  // The rule: gate on the same number the card itself displays.
+  const shotDataCount = Number(tot) || 0;
+  const ballDataCount = Array.isArray(bStats) ? bStats.length : 0;
   const renderOrder = visibleStatsCards(orderBeforeGating, {
     shotCount: shotDataCount, ballCount: ballDataCount,
   });
