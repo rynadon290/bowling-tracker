@@ -354,6 +354,107 @@ export function trendShareText(arg) {
   ].join("\n");
 }
 
+// ── Standings ──────────────────────────────────────────────────────────
+//
+// Focus group Finding 4: 9 of 50 looked for a way to share the running
+// table, not just one night. The night recap had a share and the
+// standings did not, which is backwards for the thing people said they
+// would install the app to settle arguments with.
+//
+// Ranked by AVERAGE, matching CasualLeaderboard -- people bowl different
+// numbers of games, and the games count travels alongside so a
+// three-game average is not mistaken for a thirty-game one.
+export function drawStandingsCard(ctx, { rows, me, colors, fonts }) {
+  if (!ctx) return null;
+  const W = 1080, H = 1080;
+  const c = colors || {};
+  // Rows are filtered to real objects, not merely checked for being an
+  // array. A null or a stray number in the list throws on .bowler and
+  // takes the whole share down with it -- HANDOFF 4.4, guards that
+  // check null but not type. My first version of this did exactly
+  // that, and a test caught it.
+  const list = (Array.isArray(rows) ? rows : [])
+    .filter(r => r && typeof r === "object")
+    .slice(0, 10);
+
+  ctx.fillStyle = c.bg || "#14110E";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textBaseline = "top";
+  ctx.fillStyle = c.textMuted || "#9A8F80";
+  ctx.font = `500 34px ${fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText("Just Bowling", 80, 84);
+
+  ctx.fillStyle = c.text || "#F4F0E6";
+  ctx.font = `700 60px ${fonts?.display || fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText("Standings", 80, 132);
+
+  if (!list.length) {
+    ctx.fillStyle = c.textMuted || "#9A8F80";
+    ctx.font = `500 30px ${fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText("No nights bowled yet.", 80, 260);
+  }
+
+  let y = 268;
+  const rowH = 66;
+  list.forEach((r, i) => {
+    const mine = !!me && r.bowler === me;
+    if (i > 0) {
+      ctx.strokeStyle = c.border || "#332B22";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(80, y - 10); ctx.lineTo(W - 80, y - 10); ctx.stroke();
+    }
+    // The bowler's own row is marked, because the first thing anyone
+    // does with a table they are in is look for themselves.
+    ctx.fillStyle = mine ? (c.accent || "#E8A33D") : (c.textMuted || "#9A8F80");
+    ctx.font = `700 34px ${fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText(String(i + 1), 80, y + 6);
+
+    ctx.fillStyle = mine ? (c.accent || "#E8A33D") : (c.text || "#F4F0E6");
+    ctx.font = `${mine ? 700 : 500} 38px ${fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText(String(r.bowler || "").slice(0, 22), 150, y);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = c.text || "#F4F0E6";
+    ctx.font = `700 40px ${fonts?.display || fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText(String(r.average ?? ""), W - 200, y);
+    ctx.fillStyle = c.textMuted || "#9A8F80";
+    ctx.font = `500 26px ${fonts?.body || "system-ui, sans-serif"}`;
+    ctx.fillText(`${r.games ?? 0}g`, W - 80, y + 10);
+    ctx.textAlign = "left";
+
+    y += rowH;
+  });
+
+  drawArrowMark(ctx, 80, 985, 34, c.accent || "#E8A33D");
+  ctx.fillStyle = c.accent || "#E8A33D";
+  ctx.font = `700 34px ${fonts?.display || "system-ui, sans-serif"}`;
+  ctx.fillText(APP_NAME, 128, 978);
+  ctx.fillStyle = c.textMuted || "#9A8F80";
+  ctx.font = `500 26px ${fonts?.body || "system-ui, sans-serif"}`;
+  ctx.fillText(APP_URL.replace(/^https?:\/\//, ""), 128, 1015);
+
+  return true;
+}
+
+// Text for shared standings, for every tier below the image share.
+export function standingsShareText(arg) {
+  // A default parameter covers undefined, not null.
+  const { rows, me } = (arg && typeof arg === "object") ? arg : {};
+  // Rows are filtered to real objects, not merely checked for being an
+  // array. A null or a stray number in the list throws on .bowler and
+  // takes the whole share down with it -- HANDOFF 4.4, guards that
+  // check null but not type. My first version of this did exactly
+  // that, and a test caught it.
+  const list = (Array.isArray(rows) ? rows : [])
+    .filter(r => r && typeof r === "object")
+    .slice(0, 10);
+  if (!list.length) return `Standings\n\nTracked with ${APP_NAME} — ${APP_URL}`;
+  const lines = list.map((r, i) =>
+    `${i + 1}. ${r.bowler}${!!me && r.bowler === me ? " (me)" : ""} — ${r.average} avg, ${r.games ?? 0} games`);
+  return ["Standings", ...lines, "", `Tracked with ${APP_NAME} — ${APP_URL}`].join("\n");
+}
+
 // ── QR code, for a card that gets printed or just looked at ─────────────
 //
 // The url text works when the card is viewed on a phone -- someone can
