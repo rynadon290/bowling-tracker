@@ -47,21 +47,28 @@ export default function CenterPicker({ leagueName, currentCenter, onSelect, onSe
 
   return (
     <div>
-      <div style={S.label}>Bowling Center</div>
+      {/* Once chosen, the centre is a settled fact, not a headline.
 
+          It had its own label, a bordered accent-tinted panel, a bold
+          name, the full postal address and a button -- five elements and
+          more visual weight than the LEAGUE it belongs to. A bowler knows
+          which alley they bowl at; they do not need it announced above
+          the league's own name. One quiet line, with Change beside it. */}
       {currentCenter ? (
-        <div style={{ padding: "8px 10px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.accent}44`, marginBottom: "8px" }}>
-          <div style={{ fontSize: "13px", fontWeight: 600, color: C.text }}>{currentCenter.name}</div>
-          {currentCenter.address && (
-            <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "2px" }}>{currentCenter.address}</div>
-          )}
-          <button style={{ ...S.btn(), padding: "4px 10px", fontSize: "11px", marginTop: "6px" }}
+        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "8px" }}>
+          <div style={{ fontSize: "12px", color: C.textMuted, flex: 1, minWidth: 0,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {currentCenter.name}
+          </div>
+          <button style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+            color: C.accent, fontSize: "12px", flexShrink: 0 }}
             onClick={() => onSelect(null)}>
             Change
           </button>
         </div>
       ) : (
         <>
+        <div style={S.label}>Bowling Center</div>
           {/* Practice and Casual are container "leagues", not real ones, so
               the league phrasing reads as if Practice were a person --
               "Where does Practice bowl?". Same question, asked the way it

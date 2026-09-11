@@ -464,7 +464,11 @@ export default function Settings({
                   </div>
                 ) : (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px", gap: "8px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                    {/* The league is the heading of its own section. At
+                        13px semibold it was the same size as the centre
+                        name and the season labels beneath it, so scanning
+                        a list of four leagues gave nothing to anchor on. */}
+                    <div style={{ fontSize: "17px", fontWeight: 700, color: C.text, letterSpacing: "-0.01em" }}>
                       {league.replace(" House Shot", "")}
                     </div>
                     {renameLeague && (
@@ -567,7 +571,8 @@ export default function Settings({
                       {all.map(team => (
                         <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
                           <span style={{ fontSize: "12px", color: mine.has(team.id) ? C.text : C.textMuted }}>
-                            {team.name}{mine.has(team.id) ? " · yours" : ""}
+                            <span style={{ fontSize: "14px", fontWeight: 600, color: C.text }}>{team.name}</span>
+                            {mine.has(team.id) ? <span style={{ color: C.textMuted, fontWeight: 400 }}> · yours</span> : ""}
                           </span>
                           {/* Leaving is scoped to the SIGNED-IN user, not the
                               active bowler -- the active bowler may be a

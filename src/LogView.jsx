@@ -18,6 +18,7 @@ import { sessionHighlights } from "./domain/shareCard.js";
 import { getManualScore, seriesTotal, getGameEquipment, defaultPracticeBall } from "./domain/manualScores.js";
 import { formatLayout } from "./domain/layouts.js";
 import { otherBowlerSource, scorekeepingHelp } from "./domain/scorekeeping.js";
+import { plasticLast } from "./domain/bags.js";
 
 export default function LogView({
   // Was used free at the night-achievements block below and never
@@ -461,9 +462,13 @@ export default function LogView({
                       );
                     })()}
 
-                    <button style={S.btn("primary")} onClick={submitSession}>
-                      {sessionSaveMessage?sessionSaveMessage:sessionSaved?"✓ Session Saved":"Save Session & View Summary"}
-                    </button>
+                    {/* Save moved to the bottom of Enter Game Scores.
+
+                         It sat here, in Tonight's SETUP -- above the card
+                         where the scores are actually typed. You finished
+                         the third game and then scrolled back up past the
+                         entry fields to save. The action belongs where the
+                         work ends. */}
                   </>
                 )}
               </CollapsibleCard>
@@ -1209,16 +1214,14 @@ export default function LogView({
                       </select>
                     </div>
                   )}
-                  <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
-                    Just the final score for each game — the series total adds itself. Use this if you're not logging shot by shot; anything entered here takes precedence over shot data.
-                    {/* `arsenal` is defined further down, INSIDE the
-                        per-game loop -- referencing it here threw
-                        "arsenal is not defined" and crashed the whole
-                        card. Read from the prop directly instead. */}
-                    {preferences.environment!=="casual"&&(arsenals?.[activeBowler]||[]).length>0&&(
-                      <> Noting a ball for a game attributes that whole game to it, so you can see how each ball held up as the lanes transitioned.</>
-                    )}
-                  </div>
+                  {/* The explanatory paragraph is gone.
+
+                      It said the series total adds itself (visible), that
+                      this is for people not logging shot by shot (they
+                      chose that mode), that manual entry wins over shot
+                      data (true, and irrelevant until it happens), and
+                      what noting a ball is for. Four sentences of
+                      instruction above three number fields. */}
                   {/* Only shown in shot mode -- in scores-only mode there is
                       no derived score to protect, so a lock would be pure
                       friction. */}
@@ -1255,11 +1258,11 @@ export default function LogView({
                     // part of a bag -- and a ball already recorded stays
                     // listed even if it has since left the bag, so an old
                     // game never loses what it was bowled with.
-                    const gameBalls=[...new Set([
+                    const gameBalls=plasticLast([...new Set([
                       ...(logBalls||[]),
                       ...(arsenal.includes(PLASTIC_BALL)?[PLASTIC_BALL]:[]),
                       ...(shownBall?[shownBall]:[]),
-                    ])];
+                    ])],PLASTIC_BALL);
                     return(
                     <div key={g} style={{marginBottom:isPracticeGames?"12px":"6px"}}>
                       <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"6px"}}>
@@ -1348,6 +1351,12 @@ export default function LogView({
                       </div>
                     </div>
                   )}
+
+                  {/* Save, where the work ends. */}
+                  <button style={{...S.btn("primary"),marginTop:"12px"}} onClick={submitSession}>
+                    {sessionSaveMessage?sessionSaveMessage:sessionSaved?"\u2713 Session Saved":"Save Session & View Summary"}
+                  </button>
+
                 </CollapsibleCard>
               );
             })()}

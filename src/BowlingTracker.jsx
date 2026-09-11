@@ -47,7 +47,7 @@ import { normalizeImportRecord, effectiveScores, approve as approveImport, rejec
   correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
   pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
 import { coachViewActive, setCoachView, applyEnvironment, setTrackingMode } from "./domain/preferences.js";
-import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
+import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, plasticLast, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
 import { normalizeCenter, centerToRow, centerFromRow, findExistingCenter, statsByCenter } from "./domain/centers.js";
@@ -60,7 +60,7 @@ import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipment
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, F, Chip, applyTheme } from "./ui.jsx";
-import { DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, casualLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName, isCasualLeagueName } from "./constants.js";
+import { PLASTIC_BALL, DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, casualLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName, isCasualLeagueName } from "./constants.js";
 import { validTeamId,
   shotToSupabaseRow, shotFromSupabaseRow, sessionToSupabaseRow, sessionFromSupabaseRow,
   matchToSupabaseRow, matchFromSupabaseRow, lanePatternToSupabaseRow, lanePatternFromSupabaseRow,
@@ -1862,7 +1862,10 @@ export default function BowlingTracker(){
     const clean=name.trim();
     if(!clean)return;
     if(leagues.some(l=>l.toLowerCase()===clean.toLowerCase())){alert("A league with that name already exists.");return;}
-    await saveLeagues([...leagues,clean]);
+    // Newest FIRST. Appending put a new league at the bottom of a list
+    // long enough to scroll, so adding one looked like nothing had
+    // happened -- the thing you just made was off screen.
+    await saveLeagues([clean,...leagues]);
     if(startDate||endDate)await saveLeagueDates(clean,startDate,endDate);
     const failed=await ensureLeaguesInCloud([clean]);
     if(failed.length){
@@ -4447,7 +4450,9 @@ export default function BowlingTracker(){
   // envBags.length tells availableBalls whether this bowler has any bags
   // for this environment at all -- with none, the arsenal is unfiltered
   // rather than empty.
-  const logBalls=availableBalls(preferences.environment,ballsByBag,effectiveBagId,bowlerBalls,envBags.length>0);
+  // Sorted at the source so every picker that uses logBalls gets it:
+  // the shot form, the ball-pick card and the per-game dropdowns.
+  const logBalls=plasticLast(availableBalls(preferences.environment,ballsByBag,effectiveBagId,bowlerBalls,envBags.length>0),PLASTIC_BALL);
 
   const rosterLeftHanded=!!teams.find(t=>t.memberHandedness&&activeBowler in t.memberHandedness)?.memberHandedness?.[activeBowler];
   const activeBowlerLeftHanded=resolveHandedness(profiles[activeBowler],rosterLeftHanded);
