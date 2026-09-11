@@ -452,178 +452,20 @@ constraint,tournaments,tournaments_user_id_fkey,FOREIGN KEY (user_id) REFERENCES
 constraint,user_preferences,user_preferences_pkey,PRIMARY KEY (user_id)
 constraint,user_preferences,user_preferences_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,user_preferences,user_preferences_user_id_key,UNIQUE (user_id)
-policy,arsenals,teammates can view each other's arsenal entries,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = arsenals.created_by)))) :: check none :: to authenticated"
-policy,arsenals,users can add their own arsenal entries,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,arsenals,users can remove their own arsenal entries,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,arsenals,users can update their own arsenal entries,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,arsenals,users can view their own arsenal entries,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bags,teammates can view each other's bags,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bags.created_by)))) :: check none :: to authenticated"
-policy,bags,users can delete their own bags,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bags,users can insert their own bags,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,bags,users can update their own bags,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,bags,users can view their own bags,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,ball_bags,teammates can view each other's ball bag assignments,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_bags.created_by)))) :: check none :: to authenticated"
-policy,ball_bags,users can delete their own ball bag assignments,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,ball_bags,users can insert their own ball bag assignments,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,ball_bags,users can update their own ball bag assignments,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,ball_bags,users can view their own ball bag assignments,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,ball_confirmations,anyone can read confirmations,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
-policy,ball_confirmations,users can change their own vote,UPDATE :: (confirmed_by = auth.uid()) :: check (confirmed_by = auth.uid()) :: to authenticated
-policy,ball_confirmations,users can confirm as themselves,INSERT :: no using :: check (confirmed_by = auth.uid()) :: to authenticated
-policy,ball_confirmations,users can withdraw their own confirmation,DELETE :: (confirmed_by = auth.uid()) :: check none :: to authenticated
-policy,ball_groups,teammates can view each other's ball groups,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_groups.created_by)))) :: check none :: to authenticated"
-policy,ball_groups,users can delete their own ball groups,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,ball_groups,users can insert their own ball groups,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,ball_groups,users can update their own ball groups,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,ball_groups,users can view their own ball groups,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,ball_submissions,anyone can read ball submissions,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
-policy,ball_submissions,users can delete only their own submission,DELETE :: (submitted_by = auth.uid()) :: check none :: to authenticated
-policy,ball_submissions,users can insert their own submission,INSERT :: no using :: check (submitted_by = auth.uid()) :: to authenticated
-policy,ball_submissions,users can update only their own submission,UPDATE :: (submitted_by = auth.uid()) :: check (submitted_by = auth.uid()) :: to authenticated
-policy,bowler_goals,users can delete their own bowler goals,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowler_goals,users can insert their own bowler goals,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_goals,users can update their own bowler goals,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_goals,users can view their own bowler goals,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowler_names,teammates can view each other's bowler names,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bowler_names.created_by)))) :: check none :: to authenticated"
-policy,bowler_names,users can add their own bowler names,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_names,users can remove their own bowler names,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowler_names,users can update their own bowler names,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_names,users can view their own bowler names,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowler_profiles,users can delete their own bowler profiles,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowler_profiles,users can insert their own bowler profiles,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_profiles,users can update their own bowler profiles,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,bowler_profiles,users can view their own bowler profiles,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,bowling_centers,anyone can read bowling centers,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
-policy,bowling_centers,creators can correct their own hand-entered centers,UPDATE :: ((created_by = auth.uid()) AND (here_id IS NULL)) :: check ((created_by = auth.uid()) AND (here_id IS NULL)) :: to authenticated
-policy,bowling_centers,signed-in users can add centers,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
-policy,coaching_notes,authors can delete their own notes,DELETE :: (author_id = auth.uid()) :: check none :: to authenticated
-policy,coaching_notes,authors can edit their own notes,UPDATE :: (author_id = auth.uid()) :: check (author_id = auth.uid()) :: to authenticated
-policy,coaching_notes,both sides can view notes,"SELECT :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
-policy,coaching_notes,both sides can write notes,"INSERT :: no using :: check ((author_id = auth.uid()) AND (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))) :: to authenticated"
-policy,coaching_relationships,either side can end a coaching relationship,DELETE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
-policy,coaching_relationships,either side can update their coaching relationship,UPDATE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: to authenticated
-policy,coaching_relationships,either side can view their coaching relationship,SELECT :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
-policy,coaching_relationships,users can request a coaching relationship,INSERT :: no using :: check ((requested_by = auth.uid()) AND ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))) :: to authenticated
-policy,coaching_tasks,both sides can update tasks,"UPDATE :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: to authenticated"
-policy,coaching_tasks,both sides can view tasks,"SELECT :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
-policy,coaching_tasks,the coach can assign tasks,"INSERT :: no using :: check ((assigned_by = auth.uid()) AND (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid()))))) :: to authenticated"
-policy,coaching_tasks,the coach can remove tasks,"DELETE :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid())))) :: check none :: to authenticated"
-policy,drills,users manage their own drills,ALL :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,friendships,either side can delete a friendship,DELETE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
-policy,friendships,either side can respond to or cancel a request,UPDATE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: to authenticated
-policy,friendships,users can send friend requests,INSERT :: no using :: check (requester_id = auth.uid()) :: to authenticated
-policy,friendships,users can view friendships they're part of,SELECT :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
-policy,hidden_leagues,users can hide leagues for themselves,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,hidden_leagues,users can unhide their own leagues,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,hidden_leagues,users can update their own hidden leagues,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,hidden_leagues,users can view their own hidden leagues,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,imported_scores,bowler or team can update imported scores,UPDATE :: ((bowler_user_id = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
-policy,imported_scores,team can view imported scores,SELECT :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
-policy,imported_scores,teammates can upload scores,INSERT :: no using :: check ((uploaded_by = auth.uid()) AND ((team_id IS NULL) OR is_team_member(team_id))) :: to authenticated
-policy,imported_scores,uploader can delete their upload,DELETE :: (uploaded_by = auth.uid()) :: check none :: to authenticated
-policy,lane_patterns,team members can delete their team's lane patterns,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,lane_patterns,team members can log lane patterns for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
-policy,lane_patterns,team members can update their team's lane patterns,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
-policy,lane_patterns,team members can view their team's lane patterns,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,leagues,league members or its creator can update it,UPDATE :: (is_league_member(id) OR (created_by = auth.uid())) :: check (is_league_member(id) OR (created_by = auth.uid())) :: to authenticated
-policy,leagues,leagues are viewable by any authenticated user,SELECT :: true :: check none :: to authenticated
-policy,leagues,users can create leagues as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,manual_scores,teammates can view each other's manual scores,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = manual_scores.user_id)))) :: check none :: to authenticated"
-policy,manual_scores,users can delete their own manual scores,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,manual_scores,users can insert their own manual scores,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,manual_scores,users can update their own manual scores,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,manual_scores,users can view their own manual scores,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,matches,team members can delete their team's matches,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,matches,team members can log matches for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
-policy,matches,team members can update their team's matches,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
-policy,matches,team members can view their team's matches,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,oil_patterns,anyone can read oil patterns,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
-policy,oil_patterns,creators can correct their own unverified patterns,UPDATE :: ((created_by = auth.uid()) AND (verified = false)) :: check ((created_by = auth.uid()) AND (verified = false)) :: to authenticated
-policy,oil_patterns,signed-in users can add patterns,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
-policy,pending_invites,invitees can answer their own invites,UPDATE :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: to authenticated
-policy,pending_invites,invitees can view their own invites,SELECT :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
-policy,pending_invites,team members can create invites for their teams,INSERT :: no using :: check is_team_member(team_id) :: to authenticated
-policy,pending_invites,team members can delete pending invites for their teams,DELETE :: is_team_member(team_id) :: check none :: to authenticated
-policy,pending_invites,team members can manually link a placeholder to any account,UPDATE :: (is_team_member(team_id) AND (accepted_at IS NULL)) :: check is_team_member(team_id) :: to authenticated
-policy,pending_invites,team members can view pending invites for their teams,SELECT :: is_team_member(team_id) :: check none :: to authenticated
-policy,pending_invites,users can claim invites addressed to their own email,UPDATE :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check (accepted_user_id = auth.uid()) :: to authenticated
-policy,pending_invites,users can view invites addressed to their own email,SELECT :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
-policy,profiles,profiles are viewable by any authenticated user,SELECT :: true :: check none :: to authenticated
-policy,profiles,users can insert their own profile,INSERT :: no using :: check (id = auth.uid()) :: to authenticated
-policy,profiles,users can update their own profile,UPDATE :: (id = auth.uid()) :: check (id = auth.uid()) :: to authenticated
-policy,sessions,coaches can view their bowler's sessions,SELECT :: is_accepted_coach_of(user_id) :: check none :: to authenticated
-policy,sessions,friends can view each other's sessions,SELECT :: are_friends(user_id) :: check none :: to authenticated
-policy,sessions,teammates can view each other's sessions,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,sessions,users can delete their own sessions,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,sessions,users can insert their own sessions,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,sessions,users can update their own sessions,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,sessions,users can view their own sessions,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,shots,coaches can view their bowler's shots,SELECT :: is_accepted_coach_of(user_id) :: check none :: to authenticated
-policy,shots,friends can view each other's shots,SELECT :: are_friends(user_id) :: check none :: to authenticated
-policy,shots,teammates can view each other's shots,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
-policy,shots,users can delete their own shots,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,shots,users can insert their own shots,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,shots,users can update their own shots,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,shots,users can view their own shots,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,sync_tombstones,user can read their own tombstones,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,team_members,team members can remove roster entries,DELETE :: is_team_member(team_id) :: check none :: to authenticated
-policy,team_members,team members can reorder their team's roster,UPDATE :: is_team_member(team_id) :: check is_team_member(team_id) :: to authenticated
-policy,team_members,team members can view their own roster,SELECT :: is_team_member(team_id) :: check none :: to authenticated
-policy,team_members,you can only add yourself to a roster,"INSERT :: no using :: check ((user_id = auth.uid()) AND ((EXISTS ( SELECT 1
-   FROM teams
-  WHERE ((teams.id = team_members.team_id) AND (teams.created_by = auth.uid())))) OR (EXISTS ( SELECT 1
-   FROM pending_invites
-  WHERE ((pending_invites.team_id = team_members.team_id) AND (lower(pending_invites.invited_email) = lower((auth.jwt() ->> 'email'::text))) AND (pending_invites.accepted_at IS NULL)))))) :: to authenticated"
-policy,teams,team creators can delete their team,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,teams,team creators can rename their team,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
-policy,teams,team creators can view their team,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
-policy,teams,team members can delete their team,DELETE :: is_team_member(id) :: check none :: to authenticated
-policy,teams,team members can rename their team,UPDATE :: is_team_member(id) :: check is_team_member(id) :: to authenticated
-policy,teams,team members can view their team,SELECT :: is_team_member(id) :: check none :: to authenticated
-policy,teams,users can create teams as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
-policy,tournaments,teammates can view each other's tournaments,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = tournaments.user_id)))) :: check none :: to authenticated"
-policy,tournaments,users can delete their own tournaments,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,tournaments,users can insert their own tournaments,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,tournaments,users can update their own tournaments,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,tournaments,users can view their own tournaments,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
-policy,user_preferences,users can insert their own preferences,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
-policy,user_preferences,users can update their own preferences,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
-policy,user_preferences,users can view their own preferences,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+function,accept_team_invite,invite_id uuid,boolean
+function,are_friends,other_user uuid,boolean
+function,check_api_rate_limit,"p_endpoint text, p_limit integer, p_window interval",boolean
+function,claim_signup_code,code text,uuid
+function,coached_bowler_handedness,"","TABLE(bowler_user_id uuid, bowler_name text, left_handed boolean)"
+function,handle_new_user,"",trigger
+function,is_accepted_coach_of,target_bowler_id uuid,boolean
+function,is_league_member,check_league_id uuid,boolean
+function,is_team_member,check_team_id uuid,boolean
+function,prune_api_usage,"",void
+function,prune_sync_tombstones,"",integer
+function,record_tombstone,"",trigger
+function,set_updated_at,"",trigger
+function,teammate_bowler_profiles,"","TABLE(bowler_name text, left_handed boolean, two_handed boolean, aliases jsonb)"
 index,api_usage,api_usage_lookup_idx,"CREATE INDEX api_usage_lookup_idx ON public.api_usage USING btree (user_id, endpoint, called_at DESC)"
 index,api_usage,api_usage_pkey,CREATE UNIQUE INDEX api_usage_pkey ON public.api_usage USING btree (id)
 index,arsenals,arsenal_pkey,CREATE UNIQUE INDEX arsenal_pkey ON public.arsenals USING btree (id)
@@ -717,49 +559,211 @@ index,tournaments,tournaments_pkey,CREATE UNIQUE INDEX tournaments_pkey ON publi
 index,tournaments,tournaments_user_bowler_idx,"CREATE INDEX tournaments_user_bowler_idx ON public.tournaments USING btree (user_id, bowler_name)"
 index,user_preferences,user_preferences_pkey,CREATE UNIQUE INDEX user_preferences_pkey ON public.user_preferences USING btree (user_id)
 index,user_preferences,user_preferences_user_id_key,CREATE UNIQUE INDEX user_preferences_user_id_key ON public.user_preferences USING btree (user_id)
-rls,api_usage,enabled,
-rls,arsenals,enabled,
-rls,bags,enabled,
-rls,ball_bags,enabled,
-rls,ball_confirmations,enabled,
-rls,ball_groups,enabled,
-rls,ball_submissions,enabled,
-rls,bowler_goals,enabled,
-rls,bowler_names,enabled,
-rls,bowler_profiles,enabled,
-rls,bowling_centers,enabled,
-rls,coaching_notes,enabled,
-rls,coaching_relationships,enabled,
-rls,coaching_tasks,enabled,
-rls,drills,enabled,
-rls,friendships,enabled,
-rls,hidden_leagues,enabled,
-rls,imported_scores,enabled,
-rls,lane_patterns,enabled,
-rls,leagues,enabled,
-rls,manual_scores,enabled,
-rls,matches,enabled,
-rls,oil_patterns,enabled,
-rls,pending_invites,enabled,
-rls,profiles,enabled,
-rls,sessions,enabled,
-rls,shots,enabled,
-rls,sync_tombstones,enabled,
-rls,team_members,enabled,
-rls,teams,enabled,
-rls,tournaments,enabled,
-rls,user_preferences,enabled,
-function,accept_team_invite,invite_id uuid,security definer
-function,are_friends,other_user uuid,security definer
-function,check_api_rate_limit,"p_endpoint text, p_limit integer, p_window interval",security definer
-function,claim_signup_code,code text,security definer
-function,coached_bowler_handedness,,security definer
-function,handle_new_user,,security definer
-function,is_accepted_coach_of,target_bowler_id uuid,security definer
-function,is_league_member,check_league_id uuid,security definer
-function,is_team_member,check_team_id uuid,security definer
-function,prune_api_usage,,security definer
-function,prune_sync_tombstones,,security definer
-function,record_tombstone,,security definer
-function,set_updated_at,,security invoker
-function,teammate_bowler_profiles,,security definer
+policy,arsenals,teammates can view each other's arsenal entries,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = arsenals.created_by)))) :: check none :: to authenticated"
+policy,arsenals,users can add their own arsenal entries,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,arsenals,users can remove their own arsenal entries,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,arsenals,users can update their own arsenal entries,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,arsenals,users can view their own arsenal entries,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bags,teammates can view each other's bags,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bags.created_by)))) :: check none :: to authenticated"
+policy,bags,users can delete their own bags,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bags,users can insert their own bags,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bags,users can update their own bags,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bags,users can view their own bags,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_bags,teammates can view each other's ball bag assignments,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_bags.created_by)))) :: check none :: to authenticated"
+policy,ball_bags,users can delete their own ball bag assignments,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_bags,users can insert their own ball bag assignments,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_bags,users can update their own ball bag assignments,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_bags,users can view their own ball bag assignments,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_confirmations,anyone can read confirmations,SELECT :: using (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,ball_confirmations,users can change their own vote,UPDATE :: using (confirmed_by = auth.uid()) :: check (confirmed_by = auth.uid()) :: to authenticated
+policy,ball_confirmations,users can confirm as themselves,INSERT :: no using :: check (confirmed_by = auth.uid()) :: to authenticated
+policy,ball_confirmations,users can withdraw their own confirmation,DELETE :: using (confirmed_by = auth.uid()) :: check none :: to authenticated
+policy,ball_groups,teammates can view each other's ball groups,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_groups.created_by)))) :: check none :: to authenticated"
+policy,ball_groups,users can delete their own ball groups,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_groups,users can insert their own ball groups,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_groups,users can update their own ball groups,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_groups,users can view their own ball groups,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_submissions,anyone can read ball submissions,SELECT :: using (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,ball_submissions,users can delete only their own submission,DELETE :: using (submitted_by = auth.uid()) :: check none :: to authenticated
+policy,ball_submissions,users can insert their own submission,INSERT :: no using :: check (submitted_by = auth.uid()) :: to authenticated
+policy,ball_submissions,users can update only their own submission,UPDATE :: using (submitted_by = auth.uid()) :: check (submitted_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can delete their own bowler goals,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_goals,users can insert their own bowler goals,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can update their own bowler goals,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can view their own bowler goals,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_names,teammates can view each other's bowler names,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bowler_names.created_by)))) :: check none :: to authenticated"
+policy,bowler_names,users can add their own bowler names,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_names,users can remove their own bowler names,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_names,users can update their own bowler names,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_names,users can view their own bowler names,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_profiles,users can delete their own bowler profiles,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_profiles,users can insert their own bowler profiles,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_profiles,users can update their own bowler profiles,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_profiles,users can view their own bowler profiles,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowling_centers,anyone can read bowling centers,SELECT :: using (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,bowling_centers,creators can correct their own hand-entered centers,UPDATE :: using ((created_by = auth.uid()) AND (here_id IS NULL)) :: check ((created_by = auth.uid()) AND (here_id IS NULL)) :: to authenticated
+policy,bowling_centers,signed-in users can add centers,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
+policy,coaching_notes,authors can delete their own notes,DELETE :: using (author_id = auth.uid()) :: check none :: to authenticated
+policy,coaching_notes,authors can edit their own notes,UPDATE :: using (author_id = auth.uid()) :: check (author_id = auth.uid()) :: to authenticated
+policy,coaching_notes,both sides can view notes,"SELECT :: using (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
+policy,coaching_notes,both sides can write notes,"INSERT :: no using :: check ((author_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))) :: to authenticated"
+policy,coaching_relationships,either side can end a coaching relationship,DELETE :: using ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
+policy,coaching_relationships,either side can update their coaching relationship,UPDATE :: using ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: to authenticated
+policy,coaching_relationships,either side can view their coaching relationship,SELECT :: using ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
+policy,coaching_relationships,users can request a coaching relationship,INSERT :: no using :: check ((requested_by = auth.uid()) AND ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))) :: to authenticated
+policy,coaching_tasks,both sides can update tasks,"UPDATE :: using (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: to authenticated"
+policy,coaching_tasks,both sides can view tasks,"SELECT :: using (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
+policy,coaching_tasks,the coach can assign tasks,"INSERT :: no using :: check ((assigned_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid()))))) :: to authenticated"
+policy,coaching_tasks,the coach can remove tasks,"DELETE :: using (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid())))) :: check none :: to authenticated"
+policy,drills,users manage their own drills,ALL :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,friendships,either side can delete a friendship,DELETE :: using ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
+policy,friendships,either side can respond to or cancel a request,UPDATE :: using ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: to authenticated
+policy,friendships,users can send friend requests,INSERT :: no using :: check (requester_id = auth.uid()) :: to authenticated
+policy,friendships,users can view friendships they're part of,SELECT :: using ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
+policy,hidden_leagues,users can hide leagues for themselves,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,hidden_leagues,users can unhide their own leagues,DELETE :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,hidden_leagues,users can update their own hidden leagues,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,hidden_leagues,users can view their own hidden leagues,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,imported_scores,bowler or team can update imported scores,UPDATE :: using ((bowler_user_id = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
+policy,imported_scores,team can view imported scores,SELECT :: using ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
+policy,imported_scores,teammates can upload scores,INSERT :: no using :: check ((uploaded_by = auth.uid()) AND ((team_id IS NULL) OR is_team_member(team_id))) :: to authenticated
+policy,imported_scores,uploader can delete their upload,DELETE :: using (uploaded_by = auth.uid()) :: check none :: to authenticated
+policy,lane_patterns,team members can delete their team's lane patterns,DELETE :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,lane_patterns,team members can log lane patterns for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,lane_patterns,team members can update their team's lane patterns,UPDATE :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,lane_patterns,team members can view their team's lane patterns,SELECT :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,leagues,league members or its creator can update it,UPDATE :: using (is_league_member(id) OR (created_by = auth.uid())) :: check (is_league_member(id) OR (created_by = auth.uid())) :: to authenticated
+policy,leagues,leagues are viewable by any authenticated user,SELECT :: using true :: check none :: to authenticated
+policy,leagues,users can create leagues as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,manual_scores,teammates can view each other's manual scores,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = manual_scores.user_id)))) :: check none :: to authenticated"
+policy,manual_scores,users can delete their own manual scores,DELETE :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,manual_scores,users can insert their own manual scores,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,manual_scores,users can update their own manual scores,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,manual_scores,users can view their own manual scores,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,matches,team members can delete their team's matches,DELETE :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,matches,team members can log matches for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,matches,team members can update their team's matches,UPDATE :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,matches,team members can view their team's matches,SELECT :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,oil_patterns,anyone can read oil patterns,SELECT :: using (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,oil_patterns,creators can correct their own unverified patterns,UPDATE :: using ((created_by = auth.uid()) AND (verified = false)) :: check ((created_by = auth.uid()) AND (verified = false)) :: to authenticated
+policy,oil_patterns,signed-in users can add patterns,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
+policy,pending_invites,invitees can answer their own invites,UPDATE :: using (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: to authenticated
+policy,pending_invites,invitees can view their own invites,SELECT :: using (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
+policy,pending_invites,team members can create invites for their teams,INSERT :: no using :: check is_team_member(team_id) :: to authenticated
+policy,pending_invites,team members can delete pending invites for their teams,DELETE :: using is_team_member(team_id) :: check none :: to authenticated
+policy,pending_invites,team members can manually link a placeholder to any account,UPDATE :: using (is_team_member(team_id) AND (accepted_at IS NULL)) :: check is_team_member(team_id) :: to authenticated
+policy,pending_invites,team members can view pending invites for their teams,SELECT :: using is_team_member(team_id) :: check none :: to authenticated
+policy,pending_invites,users can claim invites addressed to their own email,UPDATE :: using ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check (accepted_user_id = auth.uid()) :: to authenticated
+policy,pending_invites,users can view invites addressed to their own email,SELECT :: using ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
+policy,profiles,profiles are viewable by any authenticated user,SELECT :: using true :: check none :: to authenticated
+policy,profiles,users can insert their own profile,INSERT :: no using :: check (id = auth.uid()) :: to authenticated
+policy,profiles,users can update their own profile,UPDATE :: using (id = auth.uid()) :: check (id = auth.uid()) :: to authenticated
+policy,sessions,coaches can view their bowler's sessions,SELECT :: using is_accepted_coach_of(user_id) :: check none :: to authenticated
+policy,sessions,friends can view each other's sessions,SELECT :: using are_friends(user_id) :: check none :: to authenticated
+policy,sessions,teammates can view each other's sessions,SELECT :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,sessions,users can delete their own sessions,DELETE :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,sessions,users can insert their own sessions,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,sessions,users can update their own sessions,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,sessions,users can view their own sessions,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,shots,coaches can view their bowler's shots,SELECT :: using is_accepted_coach_of(user_id) :: check none :: to authenticated
+policy,shots,friends can view each other's shots,SELECT :: using are_friends(user_id) :: check none :: to authenticated
+policy,shots,teammates can view each other's shots,SELECT :: using ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,shots,users can delete their own shots,DELETE :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,shots,users can insert their own shots,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,shots,users can update their own shots,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,shots,users can view their own shots,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,sync_tombstones,user can read their own tombstones,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,team_members,team members can remove roster entries,DELETE :: using is_team_member(team_id) :: check none :: to authenticated
+policy,team_members,team members can reorder their team's roster,UPDATE :: using is_team_member(team_id) :: check is_team_member(team_id) :: to authenticated
+policy,team_members,team members can view their own roster,SELECT :: using is_team_member(team_id) :: check none :: to authenticated
+policy,team_members,you can only add yourself to a roster,"INSERT :: no using :: check ((user_id = auth.uid()) AND ((EXISTS ( SELECT 1
+   FROM teams
+  WHERE ((teams.id = team_members.team_id) AND (teams.created_by = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM pending_invites
+  WHERE ((pending_invites.team_id = team_members.team_id) AND (lower(pending_invites.invited_email) = lower((auth.jwt() ->> 'email'::text))) AND (pending_invites.accepted_at IS NULL)))))) :: to authenticated"
+policy,teams,team creators can delete their team,DELETE :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,teams,team creators can rename their team,UPDATE :: using (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,teams,team creators can view their team,SELECT :: using (created_by = auth.uid()) :: check none :: to authenticated
+policy,teams,team members can delete their team,DELETE :: using is_team_member(id) :: check none :: to authenticated
+policy,teams,team members can rename their team,UPDATE :: using is_team_member(id) :: check is_team_member(id) :: to authenticated
+policy,teams,team members can view their team,SELECT :: using is_team_member(id) :: check none :: to authenticated
+policy,teams,users can create teams as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,tournaments,teammates can view each other's tournaments,"SELECT :: using (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = tournaments.user_id)))) :: check none :: to authenticated"
+policy,tournaments,users can delete their own tournaments,DELETE :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,tournaments,users can insert their own tournaments,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,tournaments,users can update their own tournaments,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,tournaments,users can view their own tournaments,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+policy,user_preferences,users can insert their own preferences,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,user_preferences,users can update their own preferences,UPDATE :: using (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,user_preferences,users can view their own preferences,SELECT :: using (user_id = auth.uid()) :: check none :: to authenticated
+rls,api_usage,enabled,""
+rls,arsenals,enabled,""
+rls,bags,enabled,""
+rls,ball_bags,enabled,""
+rls,ball_confirmations,enabled,""
+rls,ball_groups,enabled,""
+rls,ball_submissions,enabled,""
+rls,bowler_goals,enabled,""
+rls,bowler_names,enabled,""
+rls,bowler_profiles,enabled,""
+rls,bowling_centers,enabled,""
+rls,coaching_notes,enabled,""
+rls,coaching_relationships,enabled,""
+rls,coaching_tasks,enabled,""
+rls,drills,enabled,""
+rls,friendships,enabled,""
+rls,hidden_leagues,enabled,""
+rls,imported_scores,enabled,""
+rls,lane_patterns,enabled,""
+rls,leagues,enabled,""
+rls,manual_scores,enabled,""
+rls,matches,enabled,""
+rls,oil_patterns,enabled,""
+rls,pending_invites,enabled,""
+rls,profiles,enabled,""
+rls,sessions,enabled,""
+rls,shots,enabled,""
+rls,sync_tombstones,enabled,""
+rls,team_members,enabled,""
+rls,teams,enabled,""
+rls,tournaments,enabled,""
+rls,user_preferences,enabled,""
+trigger,sessions,sessions_record_tombstone,record_tombstone
+trigger,sessions,sessions_set_updated_at,set_updated_at
+trigger,shots,shots_record_tombstone,record_tombstone
+trigger,shots,shots_set_updated_at,set_updated_at
