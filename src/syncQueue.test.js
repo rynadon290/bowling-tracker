@@ -101,7 +101,24 @@ describe('cloudWrite', () => {
 describe('cloudDelete', () => {
   it('a fast successful delete is not queued', async () => {
     const result = await cloudDelete('shots', 'some-id', { timeoutMs: 100 });
-    expect(result).toEqual({ synced: true, queued: false });
+    // `affected` is how many rows the delete actually touched. It is here
+    // because RLS denies a command with no matching policy SILENTLY --
+    // zero rows, no error -- and that is how deleting a team appeared to
+    // work for months while changing nothing.
+    //
+    // null, not 0: this mock does not report a count, and an unknown
+    // count must never be read as "nothing happened" or every backend
+    // that answers differently looks like a silent failure.
+    expect(result).toEqual({ synced: true, queued: false, affected: null });
+  });
+
+  it('reports how many rows a delete actually removed', async () => {
+    supabaseState.delete = async () => ({ error: null, count: 0 });
+    const result = await cloudDelete('shots', 'some-id', { timeoutMs: 100 });
+    // Still "synced" -- PostgREST did not error, and pretending otherwise
+    // would queue a retry that fails the same way forever.
+    expect(result.synced).toBe(true);
+    expect(result.affected).toBe(0);
   });
 
   it('accepts a composite match object for tables without a single id column', async () => {
