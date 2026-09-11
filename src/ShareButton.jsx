@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C, S, F } from "./ui.jsx";
-import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText, drawStandingsCard, standingsShareText, drawShareQr } from "./domain/shareCard.js";
+import { shareText, shareTitle, drawShareCard, drawTrendCard, trendShareText, drawStandingsCard, standingsShareText, drawBadgeCard, badgeShareText, drawShareQr } from "./domain/shareCard.js";
 
 // One tap to share a night's scores.
 //
@@ -28,6 +28,10 @@ async function renderCardBlob(summary) {
     // A running table is neither a scoreline nor a shape over time, so it
     // gets its own card rather than being forced into either.
     else if (summary?.standings) drawStandingsCard(ctx, { ...summary, colors: C, fonts: F });
+    // A badge card is meant to be posted somewhere, so it has to stand
+    // alone: their name, what they earned, and the app name for anyone
+    // who asks where it came from.
+    else if (summary?.badges) drawBadgeCard(ctx, { ...summary, colors: C, fonts: F });
     else drawShareCard(ctx, { ...summary, colors: C, fonts: F });
     // Additive: mark+name+url are already drawn above, so a QR that
     // fails to load (offline, package unavailable) still leaves a card
@@ -49,9 +53,11 @@ export default function ShareButton({ summary, label = "Share", compact = false 
     setState("working");
     const text = summary?.trend ? trendShareText(summary)
       : summary?.standings ? standingsShareText(summary)
+      : summary?.badges ? badgeShareText(summary.bowler, summary.badges, summary.link)
       : shareText(summary);
     const title = summary?.trend ? (summary.label || "Trend")
       : summary?.standings ? "Standings"
+      : summary?.badges ? "Badges"
       : shareTitle(summary);
     try {
       if (typeof navigator !== "undefined" && navigator.share) {

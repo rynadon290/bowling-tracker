@@ -1,5 +1,7 @@
 import { C, S } from "./ui.jsx";
-import { CASUAL_BADGES, badgesFor, casualStatsFor } from "./domain/casualBadges.js";
+import { useState, useEffect } from "react";
+import { CASUAL_BADGES, badgesFor, casualStatsFor, badgeHistory } from "./domain/casualBadges.js";
+import { decodeShare, nightsFromPayload, mergeSharedNights, describeImport } from "./domain/badgeShare.js";
 
 // The badge collection.
 //
@@ -20,10 +22,41 @@ import { CASUAL_BADGES, badgesFor, casualStatsFor } from "./domain/casualBadges.
 // "beat someone averaging 30 more than you" is a plan for Friday. Hiding
 // them would make each one a surprise, which sounds nicer and gives a
 // casual bowler nothing to aim at.
-export default function BadgeCollection({ nights = [], me = "" }) {
+export default function BadgeCollection({ nights = [], me = "", onImportNights, pendingImport, onPendingImportDone }) {
   const stats = casualStatsFor(me, nights);
   const earned = badgesFor(stats);
   const earnedIds = new Set(earned.map(b => b.id));
+  // How many times, and when last -- worked out by replaying the nights
+  // in order. A chip saying "Two hundred" is a fact; "3 times, most
+  // recently 18 Sept" is a record.
+  const history = badgeHistory(me, nights);
+
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState("");
+
+  // A link that was tapped rather than a code that was pasted. Same
+  // merge, so the same guarantees -- twice changes nothing.
+  useEffect(() => {
+    if (!pendingImport || !onImportNights) return;
+    const incoming = nightsFromPayload(pendingImport, me);
+    const merged = mergeSharedNights(nights, incoming, me);
+    onImportNights(merged.nights);
+    setResult(describeImport(merged));
+    onPendingImportDone?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport]);
+
+  function loadCode() {
+
+    const payload = decodeShare(code);
+    if (!payload) { setResult("That code did not work. Check it came through in one piece."); return; }
+    // Filed under the name THIS app uses, not the name the sender typed.
+    const incoming = nightsFromPayload(payload, me);
+    const merged = mergeSharedNights(nights, incoming, me);
+    onImportNights?.(merged.nights);
+    setResult(describeImport(merged));
+    setCode("");
+  }
 
   const total = CASUAL_BADGES.length;
   const got = earned.length;
@@ -82,12 +115,47 @@ export default function BadgeCollection({ nights = [], me = "" }) {
                   <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.45 }}>
                     {b.blurb}
                   </div>
+                  {have && (history[b.id]?.lastDate || history[b.id]?.count > 1) && (
+                    <div style={{ fontSize: "11px", color: C.accent, marginTop: "2px" }}>
+                      {history[b.id].count > 1 ? `${history[b.id].count} times` : "Earned"}
+                      {history[b.id].lastDate ? ` \u00b7 ${prettyDate(history[b.id].lastDate)}` : ""}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      {onImportNights && (
+        <div style={S.card}>
+          <div style={S.label}>Someone sent you your badges?</div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
+            Paste the code from their message and your nights come across. Doing it twice is
+            harmless \u2014 nothing doubles up.
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0, fontSize: "12px" }}
+              value={code} onChange={e => setCode(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") loadCode(); }}
+              placeholder="Paste the code" />
+            <button style={{ ...S.btn("primary"), width: "auto", flexShrink: 0, padding: "9px 16px", fontSize: "13px" }}
+              disabled={!code.trim()} onClick={loadCode}>Load</button>
+          </div>
+          {result && (
+            <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "10px" }}>{result}</div>
+          )}
+        </div>
+      )}
     </>
   );
+}
+
+// "18 Sept" rather than "2026-09-18". Nobody thinks of their bowling
+// night as an ISO string.
+function prettyDate(iso) {
+  const d = new Date(String(iso) + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }

@@ -1,5 +1,6 @@
 import { C, S, F } from "./ui.jsx";
 import { casualLeaderboard } from "./domain/casualBadges.js";
+import { buildSharePayload, encodeShare } from "./domain/badgeShare.js";
 import ShareButton from "./ShareButton.jsx";
 
 // Everyone who's been on a Just Bowling scoresheet, ranked.
@@ -12,6 +13,19 @@ import ShareButton from "./ShareButton.jsx";
 // person and tells everyone else they're losing; the badges give the
 // bowler who shot 95 something to have earned too.
 export default function CasualLeaderboard({ nights = [], me = "" }) {
+  // The link that carries a bowler\u2019s own nights to their own phone.
+  //
+  // One phone keeps score for everyone, so everyone else\u2019s badges
+  // exist here and nowhere else. This is how they leave: their nights,
+  // encoded, in something you can text. See domain/badgeShare.js.
+  const linkFor = (bowler) => {
+    const code = encodeShare(buildSharePayload(bowler, nights));
+    if (!code) return "";
+    try {
+      const base = window.location.origin + window.location.pathname;
+      return `${base}#badges=${code}`;
+    } catch { return code; }
+  };
   const rows = casualLeaderboard(nights);
 
   if (!rows.length) {
@@ -101,6 +115,16 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
                       {b.emoji} {b.name}
                     </span>
                   ))}
+                </div>
+              )}
+
+              {/* Their badges, to them. Everyone who is not holding this
+                  phone has no record of their own night, and the picture
+                  works even for someone who will never install anything. */}
+              {!isMe && r.badges.length > 0 && (
+                <div style={{ marginTop: "8px", paddingLeft: "26px" }}>
+                  <ShareButton compact label={`Send ${r.bowler} their badges`}
+                    summary={{ badges: r.badges, bowler: r.bowler, total: r.badges.length, link: linkFor(r.bowler) }} />
                 </div>
               )}
             </div>

@@ -57,6 +57,7 @@ import { normalizeLeagueDates, needsBookAverageUpdate } from "./domain/leagueSea
 import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/drills.js";
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
+import { decodeShare } from "./domain/badgeShare.js";
 import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -406,6 +407,9 @@ export default function BowlingTracker(){
   const[profiles,setProfiles]=useState({});
   const[shotPromptDismissed,setShotPromptDismissed]=useState(true); // assume dismissed until storage says otherwise, so it cannot flash on load
   const[teamPromptDismissed,setTeamPromptDismissed]=useState(true);
+
+  // A payload from a shared link, waiting for the Badges tab to mount.
+  const[pendingBadgeImport,setPendingBadgeImport]=useState(null);
   // The tournament currently being entered. Kept as one working record
   // rather than a list -- you're filling in one tournament at a time, and
   // saving commits it to the cloud.
@@ -3869,7 +3873,58 @@ export default function BowlingTracker(){
     }
   }
 
+  // Nights that arrived in a shared link, written back as manual scores.
+  //
+  // The merge already happened in BadgeCollection -- this takes the whole
+  // merged list and writes the rows it does not already have. Kept LOCAL:
+  // an imported night is somebody else's record of an evening, and
+  // pushing it to the cloud as though this device had scored it would
+  // make two sources of truth for one night.
+  //
+  // See domain/badgeShare.js for why nights travel rather than badges.
+  // A shared link, opened.
+  //
+  // The payload rides in the URL fragment, which never reaches a server --
+  // so someone's nights are not sitting in a web log somewhere. Read once
+  // on open, then cleared from the address bar so a reload does not
+  // re-run it and so the code is not left on screen.
+  //
+  // Tapping the link IS the import. The paste field on the Badges tab is
+  // the fallback for when a link arrives mangled, which group chats do.
+  useEffect(()=>{
+    let hash="";
+    try{ hash=window.location.hash||""; }catch{ return; }
+    const m=/^#badges=(.+)$/.exec(hash);
+    if(!m)return;
+    const payload=decodeShare(m[1]);
+    try{ window.history.replaceState(null,"",window.location.pathname+window.location.search); }catch{}
+    if(!payload)return;
+    setView("badges");
+    setPendingBadgeImport(payload);
+  },[]);
+
+  async function importCasualNights(merged){
+
+    if(!Array.isArray(merged)||!activeBowler)return;
+    let updated=manualScoresRef.current;
+    for(const night of merged){
+      if(!night||typeof night!=="object")continue;
+      const scores=(night.scoresByBowler||{})[activeBowler];
+      if(!Array.isArray(scores))continue;
+      scores.forEach((value,i)=>{
+        if(value==null)return;
+        const existing=getManualScore(updated,activeBowler,CASUAL_SESSION_KEY,night.date,i+1);
+        if(existing!=null)return;   // never overwrite a score this device kept
+        updated=setManualScoreIn(updated,activeBowler,CASUAL_SESSION_KEY,night.date,i+1,value);
+      });
+    }
+    manualScoresRef.current=updated;
+    setManualScores(updated);
+    try{await window.storage.set(MANUAL_SCORES_KEY,JSON.stringify(updated));}catch{}
+  }
+
   async function dismissTeamPrompt(){
+
 
     setTeamPromptDismissed(true);
     try{await window.storage.set(TEAM_PROMPT_KEY,new Date().toISOString());}catch{}
@@ -5172,7 +5227,9 @@ export default function BowlingTracker(){
             social activity. With one thing left here the tab switcher is
             just a row that does nothing. */}
         {view==="badges"&&(
-          <BadgeCollection nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)} me={activeBowler}/>
+          <BadgeCollection nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)} me={activeBowler}
+            onImportNights={importCasualNights}
+            pendingImport={pendingBadgeImport} onPendingImportDone={()=>setPendingBadgeImport(null)}/>
         )}
 
         {view==="social"&&!casualMode&&(
