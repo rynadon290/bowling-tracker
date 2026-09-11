@@ -67,7 +67,7 @@ jobs:
         # A PR rather than a direct commit, so a schema change arrives as
         # something to LOOK at. Silently committing drift would make the
         # snapshot accurate and still leave nobody aware the database moved.
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "Schema snapshot: refresh from live database"
           branch: schema-snapshot-refresh
