@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CASUAL_BADGES, badgesFor, casualStatsFor, casualLeaderboard } from './casualBadges.js';
+import { CASUAL_BADGES, badgesFor, casualStatsFor, casualLeaderboard, badgeHistory } from './casualBadges.js';
 
 const night = (date, scoresByBowler) => ({ date, scoresByBowler });
 
@@ -137,5 +137,59 @@ describe('bad input', () => {
     const rows = casualLeaderboard(nights);
     expect(rows.length).toBe(1);
     expect(rows[0].bowler).toBe('Ryan');
+  });
+});
+
+describe('badgeHistory', () => {
+  const night = (date, ryan, dave) => ({ date, scoresByBowler: { Ryan: ryan, Dave: dave } });
+  const three = [
+    night('2026-09-04', [145, 162, 151], [130, 128, 140]),
+    night('2026-09-11', [168, 152, 205], [141, 150, 133]),
+    night('2026-09-18', [210, 199, 188], [150, 160, 155]),
+  ];
+
+  it('counts a repeatable badge once per night that earns it', () => {
+    const h = badgeHistory('Ryan', three);
+    // Two nights contained a 200+ game; the third did not.
+    expect(h['two-hundred'].count).toBe(2);
+  });
+
+  it('records the most recent date, not the first', () => {
+    const h = badgeHistory('Ryan', three);
+    expect(h['night-winner'].lastDate).toBe('2026-09-18');
+  });
+
+  // "Five nights in" is a threshold crossed once. "Earned 4 times" for it
+  // would be nonsense, which is why the distinction is by MEANING rather
+  // than by how the rule happens to be written.
+  it('counts a one-off badge once, on the night it first appeared', () => {
+    const h = badgeHistory('Ryan', three);
+    expect(h['first-night'].count).toBe(1);
+    expect(h['first-night'].lastDate).toBe('2026-09-04');
+  });
+
+  it('gives an unearned badge a zero count and no date', () => {
+    const h = badgeHistory('Ryan', three);
+    expect(h['fixture'].count).toBe(0);
+    expect(h['fixture'].lastDate).toBe(null);
+  });
+
+  it('scores each bowler separately', () => {
+    const dave = badgeHistory('Dave', three);
+    expect(dave['two-hundred'].count).toBe(0);
+    expect(dave['first-night'].count).toBe(1);
+  });
+
+  // Nights arrive from a merge and may be in any order.
+  it('does not care what order the nights are given in', () => {
+    const shuffled = [three[2], three[0], three[1]];
+    expect(badgeHistory('Ryan', shuffled)).toEqual(badgeHistory('Ryan', three));
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}, [null], [{}]]) {
+      expect(() => badgeHistory('Ryan', junk)).not.toThrow();
+      expect(() => badgeHistory(junk, three)).not.toThrow();
+    }
   });
 });

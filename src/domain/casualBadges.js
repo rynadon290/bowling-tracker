@@ -180,6 +180,68 @@ export const CASUAL_BADGES = [
 ];
 
 // Which badges a bowler has earned, from their stats.
+// Which badges can happen MORE THAN ONCE.
+//
+// "Broke 200" is a thing you did on a night and can do again. "Five
+// nights in" is a threshold you cross once and never re-cross -- showing
+// "earned 4 times" for it would be nonsense.
+//
+// Marked by id rather than inferred, because the distinction is about
+// what the badge MEANS, not about how its rule is written.
+export const REPEATABLE_BADGES = new Set([
+  "marathon", "triple-figures", "one-fifty", "two-hundred",
+  "five-hundred-series", "night-winner", "clean-sweep", "giant-killer",
+  "comeback", "consistent", "personal-best", "gutter-night",
+  "photo-finish", "wooden-spoon", "double-century", "the-spread",
+]);
+
+// Every badge, with how many times it was earned and when it last was.
+//
+// Worked out by replaying the nights in order and asking, after each one,
+// which badges are earned. A badge that turns on between night 4 and
+// night 5 was earned on night 5.
+//
+// For a repeatable badge the count is the number of nights that would
+// have earned it ON THEIR OWN -- so "Broke 200" counts the nights with a
+// 200 in them, not the nights after the first one. A one-off badge is
+// counted once, on the night it first appeared.
+//
+// Nights must carry a date. One without is still scored -- it just
+// cannot say when.
+export function badgeHistory(bowler, nights = []) {
+  const list = (Array.isArray(nights) ? nights : [])
+    .filter(n => n && typeof n === "object")
+    .slice()
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+
+  const out = {};
+  for (const b of CASUAL_BADGES) out[b.id] = { id: b.id, count: 0, lastDate: null };
+
+  let had = new Set();
+  list.forEach((night, i) => {
+    const soFar = list.slice(0, i + 1);
+    const nowIds = new Set(badgesFor(casualStatsFor(bowler, soFar)).map(b => b.id));
+
+    for (const b of CASUAL_BADGES) {
+      if (!nowIds.has(b.id)) continue;
+
+      if (REPEATABLE_BADGES.has(b.id)) {
+        // Does THIS night earn it by itself? That is what makes a repeat
+        // a repeat rather than a threshold staying crossed.
+        const alone = badgesFor(casualStatsFor(bowler, [night])).some(x => x.id === b.id);
+        if (alone) { out[b.id].count++; out[b.id].lastDate = night.date || out[b.id].lastDate; }
+        else if (!had.has(b.id)) { out[b.id].count = 1; out[b.id].lastDate = night.date || null; }
+      } else if (!had.has(b.id)) {
+        out[b.id].count = 1;
+        out[b.id].lastDate = night.date || null;
+      }
+    }
+    had = nowIds;
+  });
+
+  return out;
+}
+
 export function badgesFor(stats) {
   if (!stats) return [];
   return CASUAL_BADGES.filter(b => {

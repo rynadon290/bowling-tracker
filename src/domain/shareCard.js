@@ -262,7 +262,6 @@ export function drawTrendCard(ctx, { bowler, label, points, league, colors, font
   // truthiness: any object passes a truthy test and then throws on
   // the first draw call.
   if (!ctx || typeof ctx.fillRect !== "function") return null;
-  if (!ctx) return null;
   const W = 1080, H = 1080;
   const c = colors || {};
   const vals = (Array.isArray(points) ? points : []).map(p => (typeof p === "number" ? p : p?.value))
@@ -453,6 +452,83 @@ export function drawStandingsCard(ctx, { rows, me, colors, fonts } = {}) {
 }
 
 // Text for shared standings, for every tier below the image share.
+// A bowler's badges, as a picture they can send on.
+//
+// The point is the IMAGE, not the app. Someone who bowls four times a
+// year will post this to a group chat and never install anything, and
+// that is a perfectly good outcome -- so the card has to stand alone:
+// their name, what they earned, and enough branding that anyone curious
+// knows where it came from.
+export function drawBadgeCard(ctx, options) {
+  if (!ctx || typeof ctx.fillRect !== "function") return null;
+  const o = (options && typeof options === "object") ? options : {};
+  const badges = Array.isArray(o.badges) ? o.badges.filter(b => b && typeof b === "object") : [];
+  const name = typeof o.bowler === "string" ? o.bowler : "";
+  const total = Number(o.total) || 0;
+  const colors = o.colors || {};
+  const fonts = o.fonts || {};
+
+  const W = 1080, H = 1080;
+  const bg = colors.bg || "#14110E";
+  const text = colors.text || "#F5F1EA";
+  const muted = colors.muted || "#9A9287";
+  const accent = colors.accent || "#4ADE9B";
+  const body = fonts.body || "system-ui, sans-serif";
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = text;
+  ctx.font = `700 64px ${body}`;
+  ctx.fillText(name || "Badges", 72, 130);
+
+  ctx.fillStyle = accent;
+  ctx.font = `700 40px ${body}`;
+  ctx.fillText(`${badges.length}${total ? ` of ${total}` : ""} badges`, 72, 196);
+
+  // The badges themselves, two columns. Capped at twelve: a card people
+  // actually look at beats a complete one they scroll past.
+  const shown = badges.slice(0, 12);
+  ctx.font = `500 34px ${body}`;
+  shown.forEach((b, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = 72 + col * 480;
+    const y = 300 + row * 92;
+    ctx.fillStyle = text;
+    ctx.fillText(`${b.emoji || ""} ${b.name || ""}`.trim().slice(0, 26), x, y);
+    if (b.count > 1) {
+      ctx.fillStyle = muted;
+      ctx.font = `500 26px ${body}`;
+      ctx.fillText(`x${b.count}`, x + 380, y);
+      ctx.font = `500 34px ${body}`;
+    }
+  });
+
+  if (badges.length > shown.length) {
+    ctx.fillStyle = muted;
+    ctx.font = `500 30px ${body}`;
+    ctx.fillText(`and ${badges.length - shown.length} more`, 72, 300 + Math.ceil(shown.length / 2) * 92 + 20);
+  }
+
+  ctx.fillStyle = muted;
+  ctx.font = `500 30px ${body}`;
+  ctx.fillText("My Bowling Vault", 72, H - 80);
+
+  return { width: W, height: H };
+}
+
+// The words that go with the picture, for a text message.
+export function badgeShareText(bowler, badges, link) {
+  const name = typeof bowler === "string" && bowler.trim() ? bowler.trim() : "You";
+  const list = Array.isArray(badges) ? badges.filter(b => b && typeof b === "object") : [];
+  const head = list.length === 1
+    ? `${name} earned a badge tonight`
+    : `${name} earned ${list.length} badges tonight`;
+  const top = list.slice(0, 3).map(b => `${b.emoji || ""} ${b.name || ""}`.trim()).join(", ");
+  const tail = typeof link === "string" && link ? `\n\nKeep them: ${link}` : "";
+  return `${head}${top ? ` — ${top}` : ""}.${tail}`;
+}
+
 export function standingsShareText(arg) {
   // A default parameter covers undefined, not null.
   const { rows, me } = (arg && typeof arg === "object") ? arg : {};
