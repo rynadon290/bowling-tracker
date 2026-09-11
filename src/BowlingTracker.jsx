@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+// lazyScreen instead of React.lazy: a deploy while the app is open
+// replaces every content-hashed chunk, and a page already loaded asks
+// for names that no longer exist. See src/lazyScreen.js.
+import { lazyScreen } from "./lazyScreen.js";
 import HistoryView from "./HistoryView.jsx";
 import LogView from "./LogView.jsx";
 import SessionStart from "./SessionStart.jsx";
@@ -6,7 +10,7 @@ import Onboarding from "./Onboarding.jsx";
 // Lazy: the tour is a full-screen takeover gated on activeTour, so a
 // returning bowler pays for none of it. Its TourScreen mock-ups are
 // the single biggest chunk that was loading on every open.
-const Tour = lazy(() => import("./Tour.jsx"));
+const Tour = lazyScreen("Tour", () => import("./Tour.jsx"));
 import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import CasualLeaderboard from "./CasualLeaderboard.jsx";
@@ -72,16 +76,16 @@ import { validTeamId,
 // Each still renders exactly as before; only WHEN its code arrives
 // changes. Suspense shows a brief placeholder on first visit to a tab,
 // then it's cached for the session.
-const TeamManagement = lazy(() => import("./TeamManagement.jsx"));
-const Friends = lazy(() => import("./Friends.jsx"));
+const TeamManagement = lazyScreen("TeamManagement", () => import("./TeamManagement.jsx"));
+const Friends = lazyScreen("Friends", () => import("./Friends.jsx"));
 import { categorizeFriendships } from "./Friends.jsx";
-const StatsView = lazy(() => import("./StatsView.jsx"));
-const ImportScorecard = lazy(() => import("./ImportScorecard.jsx"));
-const Settings = lazy(() => import("./Settings.jsx"));
-const Profile = lazy(() => import("./Profile.jsx"));
-const TrendsView = lazy(() => import("./TrendsView.jsx"));
-const CoachingView = lazy(() => import("./CoachingView.jsx"));
-const InsightsView = lazy(() => import("./InsightsView.jsx"));
+const StatsView = lazyScreen("StatsView", () => import("./StatsView.jsx"));
+const ImportScorecard = lazyScreen("ImportScorecard", () => import("./ImportScorecard.jsx"));
+const Settings = lazyScreen("Settings", () => import("./Settings.jsx"));
+const Profile = lazyScreen("Profile", () => import("./Profile.jsx"));
+const TrendsView = lazyScreen("TrendsView", () => import("./TrendsView.jsx"));
+const CoachingView = lazyScreen("CoachingView", () => import("./CoachingView.jsx"));
+const InsightsView = lazyScreen("InsightsView", () => import("./InsightsView.jsx"));
 
 
 // Browser persistence adapter. The original app used the ChatGPT host
