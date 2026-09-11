@@ -32,30 +32,52 @@ vi.mock('idb', () => ({
 }));
 
 // Configurable fake Supabase client. Each test sets `supabaseState.upsert`/
-// `.delete` to whatever behavior it wants to exercise (fast success, slow
-// timeout, immediate error).
+// `.delete`/`.update` to whatever behavior it wants to exercise (fast
+// success, slow timeout, immediate error, zero rows affected).
+//
+// `signals` records every AbortSignal handed to a query, which is how the
+// timeout behaviour is checked: withTimeout must CANCEL a request it has
+// given up on, not merely stop waiting for it.
 const supabaseState = vi.hoisted(() => ({
   upsert: async () => ({ error: null }),
   delete: async () => ({ error: null }),
+  update: async () => ({ error: null }),
+  select: async () => ({ data: [], error: null }),
+  signals: [],
 }));
+
+// Shaped like a PostgREST builder: thenable, chainable, and carrying
+// .abortSignal(). The real client has all three, and a mock missing any
+// of them silently skips the code path that uses it.
+function fakeQuery(run) {
+  const filters = {};
+  const q = {
+    eq(k, v) { filters[k] = v; return q; },
+    gte(k, v) { filters[k] = v; return q; },
+    // select/gte are here because cloudRead and cloudReadDelta use them.
+    // Nothing below tests those yet -- but a mock that silently lacks a
+    // method the code calls fails as "x is not a function" three layers
+    // down, which reads like a bug in the code rather than a gap in the
+    // fake.
+    select() { return q; },
+    abortSignal(sig) { supabaseState.signals.push(sig); return q; },
+    then(resolve, reject) { Promise.resolve().then(() => run(filters)).then(resolve, reject); },
+  };
+  return q;
+}
 
 vi.mock('./supabaseClient.js', () => ({
   supabase: {
     from: (table) => ({
-      upsert: (record) => supabaseState.upsert(table, record),
-      delete: () => {
-        const filters = {};
-        const query = {
-          eq(k, v) { filters[k] = v; return query; },
-          then(resolve, reject) { supabaseState.delete(table, filters).then(resolve, reject); },
-        };
-        return query;
-      },
+      upsert: (record) => fakeQuery(() => supabaseState.upsert(table, record)),
+      delete: () => fakeQuery((filters) => supabaseState.delete(table, filters)),
+      update: (changes) => fakeQuery((filters) => supabaseState.update(table, filters, changes)),
+      select: () => fakeQuery((filters) => supabaseState.select(table, filters)),
     }),
   },
 }));
 
-const { cloudWrite, cloudDelete, flushPendingQueue, getPendingCount } = await import('./syncQueue.js');
+const { cloudWrite, cloudDelete, cloudUpdate, flushPendingQueue, getPendingCount } = await import('./syncQueue.js');
 const { setActiveUserId } = await import('./domain/userScope.js');
 
 function resetDb() { dbState.store = []; dbState.nextId = 1; }
@@ -71,6 +93,9 @@ beforeEach(() => {
   setActiveUserId('test-user');
   supabaseState.upsert = async () => ({ error: null });
   supabaseState.delete = async () => ({ error: null });
+  supabaseState.update = async () => ({ error: null });
+  supabaseState.select = async () => ({ data: [], error: null });
+  supabaseState.signals = [];
 });
 
 describe('cloudWrite', () => {
@@ -132,6 +157,71 @@ describe('cloudDelete', () => {
     supabaseState.delete = async () => { throw new Error('offline'); };
     await cloudDelete('team_members', { team_id: 'team-1', user_id: 'user-1' }, { timeoutMs: 50 });
     expect(await getPendingCount()).toBe(1);
+  });
+});
+
+describe('cloudUpdate', () => {
+  it('sends the changes and matches on every key it was given', async () => {
+    let seen = null;
+    supabaseState.update = async (_t, filters, changes) => { seen = { filters, changes }; return { error: null }; };
+    await cloudUpdate('team_members', { team_id: 't1', user_id: 'u1' }, { lineup_position: 2 }, { timeoutMs: 100 });
+    expect(seen.filters).toEqual({ team_id: 't1', user_id: 'u1' });
+    expect(seen.changes).toEqual({ lineup_position: 2 });
+  });
+
+  it('treats a bare id as a match on id', async () => {
+    let seen = null;
+    supabaseState.update = async (_t, filters) => { seen = filters; return { error: null }; };
+    await cloudUpdate('teams', 'team-1', { name: 'x' }, { timeoutMs: 100 });
+    expect(seen).toEqual({ id: 'team-1' });
+  });
+
+  it('falls back to the queue on failure', async () => {
+    supabaseState.update = async () => { throw new Error('offline'); };
+    const result = await cloudUpdate('teams', 'team-1', { name: 'x' }, { timeoutMs: 50 });
+    expect(result.queued).toBe(true);
+    expect(await getPendingCount()).toBe(1);
+  });
+
+  // The silent-failure case. With RLS on, a command with no matching
+  // policy is denied by matching ZERO rows and returning NO error -- so
+  // the client sees success. Three bugs of this exact shape shipped:
+  // deleting a team did nothing, editing a coaching note did not save,
+  // and a roster row could not be written by the team's own creator.
+  it('reports how many rows it changed, so a denial is visible', async () => {
+    supabaseState.update = async () => ({ error: null, count: 0 });
+    const result = await cloudUpdate('teams', 'team-1', { name: 'x' }, { timeoutMs: 100 });
+    expect(result.synced).toBe(true);
+    expect(result.affected).toBe(0);
+  });
+
+  it('does not read an unknown count as zero', async () => {
+    supabaseState.update = async () => ({ error: null });
+    const result = await cloudUpdate('teams', 'team-1', { name: 'x' }, { timeoutMs: 100 });
+    expect(result.affected).toBe(null);
+  });
+});
+
+// A timeout that stops waiting but leaves the request running is how the
+// same row got written twice: the app gave up, queued a retry, and the
+// original landed minutes later.
+describe('timed-out requests are cancelled', () => {
+  it('attaches an abort signal to the query', async () => {
+    await cloudWrite('shots', { id: 'a' }, { timeoutMs: 100 });
+    expect(supabaseState.signals.length).toBeGreaterThan(0);
+  });
+
+  it('aborts the signal when the timeout wins', async () => {
+    supabaseState.upsert = () => delay(500, { error: null });
+    await cloudWrite('shots', { id: 'slow' }, { timeoutMs: 30 });
+    await delay(20);
+    expect(supabaseState.signals.some(sig => sig.aborted)).toBe(true);
+  });
+
+  it('leaves a request that finished in time alone', async () => {
+    await cloudWrite('shots', { id: 'fast' }, { timeoutMs: 5000 });
+    await delay(20);
+    expect(supabaseState.signals.some(sig => sig.aborted)).toBe(false);
   });
 });
 
