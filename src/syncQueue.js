@@ -198,6 +198,19 @@ export async function discardQueuedTable(table) {
   notifyListeners(await getPendingCount());
 }
 
+// The columns a queued write was carrying, for the error log. Names
+// only -- a payload's VALUES are bowler names, emails and ids.
+function payloadColumns(payload) {
+  try {
+    const body = payload && typeof payload === 'object'
+      ? (payload.changes || payload.match || payload)
+      : null;
+    if (!body || typeof body !== 'object') return '';
+    const keys = Object.keys(body).sort();
+    return keys.length ? ` [${keys.join(',')}]` : '';
+  } catch { return ''; }
+}
+
 async function queueWrite(table, operation, payload, reason, onConflict, errorCode = "") {
   const db = await getDb();
   // onConflict is stored with the item so the retry resolves against the
@@ -220,7 +233,19 @@ async function queueWrite(table, operation, payload, reason, onConflict, errorCo
   // A queued write is a write that did not land. Recording it at the
   // one point every failure passes through catches the whole class --
   // RLS denials, timeouts, offline -- with the SQLSTATE that says which.
-  recordError({ kind: 'write-failed', where: `${table}.${operation}`, code: errorCode || '', message: reason || '' });
+  // Column NAMES from the payload, never their values.
+  //
+  // `team_members.upsert / 42501` says a write was refused and nothing
+  // about WHICH write -- creating a team, accepting an invite and
+  // reordering a roster all land on that table, and they fail for
+  // different reasons. The set of columns tells them apart at a glance.
+  //
+  // Names are schema, already in the repo. Values are bowlers' names and
+  // ids and stay out, exactly as in the redaction rules.
+  recordError({
+    kind: 'write-failed', where: `${table}.${operation}`, code: errorCode || '',
+    message: `${reason || ''}${payloadColumns(payload)}`,
+  });
   await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, userId, createdAt: Date.now() });
   notifyListeners(await getPendingCount());
 }
