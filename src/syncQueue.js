@@ -298,14 +298,46 @@ export async function cloudWrite(table, record, { timeoutMs = 6000, onConflict }
 // not exist yet -- it updates, it does not create. Callers must ensure the
 // row was created first (arsenals rows are created when the ball is added,
 // well before any specs or layout edit can be debounced through here).
+// A write that changed nothing, reported as success.
+//
+// This is the failure this app keeps producing. With RLS on, a command
+// with no matching policy is DENIED SILENTLY -- Postgres matches zero
+// rows and returns no error, so the client sees success, updates local
+// state, and the change reappears undone on the next sync. Three
+// separate bugs of exactly this shape turned up in one day: deleting a
+// team did nothing, editing a coaching note did not save, and a roster
+// row could not be written by the person who had just created the team.
+//
+// `count: 'exact'` asks PostgREST how many rows it actually touched,
+// without asking for the rows themselves -- so it does not depend on a
+// SELECT policy permitting the caller to read them back, which for a
+// just-deleted row is a rule nobody would think to write.
+//
+// A null count means the server did not tell us. That is NOT zero, and
+// treating it as a failure would cry wolf on every backend that answers
+// differently. Only a definite zero is reported.
+function noteIfNothingChanged(table, operation, matchObj, count) {
+  if (count !== 0) return;
+  console.warn(`${operation} on ${table} matched no rows — likely denied by RLS`);
+  recordError({
+    kind: 'write-noop',
+    where: `${table}.${operation}`,
+    code: 'no-rows',
+    // Column NAMES, never their values: a match object holds user ids
+    // and bowler names.
+    message: `matched 0 rows on ${Object.keys(matchObj || {}).sort().join(',') || '(no match)'}`,
+  });
+}
+
 export async function cloudUpdate(table, match, changes, { timeoutMs = 6000 } = {}) {
   const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
   try {
-    let query = supabase.from(table).update(changes);
+    let query = supabase.from(table).update(changes, { count: 'exact' });
     Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
-    const { error } = await withTimeout(query, timeoutMs);
+    const { error, count } = await withTimeout(query, timeoutMs);
     if (error) throw error;
-    return { synced: true, queued: false };
+    noteIfNothingChanged(table, 'update', matchObj, count);
+    return { synced: true, queued: false, affected: count ?? null };
   } catch (err) {
     await queueWrite(table, 'update', { match: matchObj, changes }, formatError(err), undefined, err?.code || '');
     return { synced: false, queued: true, reason: formatError(err) };
@@ -319,11 +351,12 @@ export async function cloudUpdate(table, match, changes, { timeoutMs = 6000 } = 
 export async function cloudDelete(table, match, { timeoutMs = 6000 } = {}) {
   const matchObj = (typeof match === 'object' && match !== null) ? match : { id: match };
   try {
-    let query = supabase.from(table).delete();
+    let query = supabase.from(table).delete({ count: 'exact' });
     Object.entries(matchObj).forEach(([k, v]) => { query = query.eq(k, v); });
-    const { error } = await withTimeout(query, timeoutMs);
+    const { error, count } = await withTimeout(query, timeoutMs);
     if (error) throw error;
-    return { synced: true, queued: false };
+    noteIfNothingChanged(table, 'delete', matchObj, count);
+    return { synced: true, queued: false, affected: count ?? null };
   } catch (err) {
     await queueWrite(table, 'delete', matchObj, formatError(err), undefined, err?.code || '');
     return { synced: false, queued: true, reason: formatError(err) };

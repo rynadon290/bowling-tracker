@@ -36,28 +36,58 @@ async function readRaw() {
   } catch { return []; }
 }
 
+// Writes are serialised through this chain.
+//
+// recordError is read-modify-write against storage, and errors arrive in
+// bursts -- a failed delete and a failed update in the same tick, or a
+// render loop firing dozens. Run concurrently, the second read happens
+// before the first write lands and one entry is silently dropped. Which
+// is a poor quality in the thing whose entire job is not dropping
+// records of things going wrong.
+//
+// A promise chain rather than a lock: each call waits for the previous
+// one, order is preserved, and there is nothing to leave held if a write
+// throws.
+let writeChain = Promise.resolve();
+
 // Records one event. Deliberately never throws and never returns a
 // rejected promise: an error logger that can itself fail loudly turns a
 // small problem into a crash, and it is called from inside crash
 // handlers.
 export async function recordError(input) {
-  try {
-    if (typeof window === "undefined" || !window.storage) return;
-    const next = addEntry(await readRaw(), { ...input, build: buildId() }, Date.now());
-    await window.storage.set(ERROR_LOG_KEY, JSON.stringify(next));
-  } catch { /* nothing to do -- see above */ }
+  const run = async () => {
+    try {
+      if (typeof window === "undefined" || !window.storage) return;
+      const next = addEntry(await readRaw(), { ...input, build: buildId() }, Date.now());
+      await window.storage.set(ERROR_LOG_KEY, JSON.stringify(next));
+    } catch { /* nothing to do -- see above */ }
+  };
+  writeChain = writeChain.then(run, run);
+  return writeChain;
+}
+
+// Readers drain the write chain first.
+//
+// recordError is fire-and-forget at most call sites -- a failed write
+// should not make the caller wait on a log entry. That means an entry
+// can still be in flight when someone taps Copy diagnostics, and
+// reading without waiting would hand over a report missing the very
+// error that prompted it.
+async function settled() {
+  try { await writeChain; } catch { /* the chain never rejects, but be sure */ }
 }
 
 export async function readErrorLog() {
+  await settled();
   return readRaw();
 }
 
 export async function errorLogSummary() {
-  return summarise(await readRaw());
+  return summarise(await readErrorLog());
 }
 
 export async function errorLogText() {
-  return formatForCopy(await readRaw(), {
+  return formatForCopy(await readErrorLog(), {
     build: buildId(),
     generated: new Date().toISOString().replace("T", " ").slice(0, 19),
   });
