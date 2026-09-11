@@ -1,5 +1,5 @@
 import { C, S, F } from "./ui.jsx";
-import { casualLeaderboard, CASUAL_BADGES } from "./domain/casualBadges.js";
+import { casualLeaderboard } from "./domain/casualBadges.js";
 import ShareButton from "./ShareButton.jsx";
 
 // Everyone who's been on a Just Bowling scoresheet, ranked.
@@ -108,13 +108,9 @@ export default function CasualLeaderboard({ nights = [], me = "" }) {
         })}
       </div>
 
-      <div style={S.card}>
-        <div style={S.label}>Badges</div>
-        <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.5 }}>
-          There are {CASUAL_BADGES.length} to collect, and they're not all about bowling well —
-          some are about showing up, and one or two you'd rather not have.
-        </div>
-      </div>
+      {/* The teaser card that said "there are 22 to collect" and showed
+          none is gone -- the Badges tab shows all of them. Naming a
+          number with no way to see the list was the worst of both. */}
     </>
   );
 }

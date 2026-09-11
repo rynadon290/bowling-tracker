@@ -14,6 +14,7 @@ const Tour = lazyScreen("Tour", () => import("./Tour.jsx"));
 import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, needsLeagueSetup, availableTours } from "./domain/tour.js";
 import HelpView from "./HelpView.jsx";
 import CasualLeaderboard from "./CasualLeaderboard.jsx";
+const BadgeCollection = lazyScreen("BadgeCollection", () => import("./BadgeCollection.jsx"));
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
@@ -3830,7 +3831,8 @@ export default function BowlingTracker(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[teams,activeBowler]);
 
-  async function adoptScoresIntoTeam(teamId,leagueName){
+  async function adoptScoresIntoTeam(teamId,leagueName){
+
     if(!teamId||!leagueName||!activeBowler)return;
 
     const shotsToMove=scoresToAdopt(shots,activeBowler,leagueName);
@@ -3867,7 +3869,8 @@ export default function BowlingTracker(){
     }
   }
 
-  async function dismissTeamPrompt(){
+  async function dismissTeamPrompt(){
+
     setTeamPromptDismissed(true);
     try{await window.storage.set(TEAM_PROMPT_KEY,new Date().toISOString());}catch{}
   }
@@ -4346,6 +4349,14 @@ export default function BowlingTracker(){
   const navTabs=casualMode?[
     {id:"log",    label:"Bowl",    icon:"🎳"},
     {id:"social", label:"Standings", icon:"📊"},
+    // A third tab, and the only one about anything other than tonight.
+    //
+    // Two tabs -- log a score, see who won -- are both about the night in
+    // front of you, so nothing in casual mode ever showed that the app was
+    // keeping something. Round 7, finding 1: casual bowlers never learned
+    // it tracked anything. A collection that fills up is the reason a
+    // group who bowl four times a year open it again in March.
+    {id:"badges", label:"Badges",  icon:"🏅"},
   ]:[
     {id:"log",     label:"Bowl",    icon:"🎳"},
     {id:"history", label:"History", icon:"📖"},
@@ -5160,6 +5171,10 @@ export default function BowlingTracker(){
             because roster setup is part of setting up a league -- not a
             social activity. With one thing left here the tab switcher is
             just a row that does nothing. */}
+        {view==="badges"&&(
+          <BadgeCollection nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)} me={activeBowler}/>
+        )}
+
         {view==="social"&&!casualMode&&(
           <Friends onRequestsChanged={loadFriendRequests}/>
         )}
