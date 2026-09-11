@@ -52,6 +52,9 @@ export function tenthBall3Pins(f10b1,f10b2,f10b3){
 }
 
 export function nextState(savedShots, bowler, league, date, game, frame, ballNum){
+  // Guarded for TYPE, not just null. HANDOFF 4.4: `{}` and `[]` and a
+  // number all pass a truthiness check and then throw on .filter.
+  savedShots = Array.isArray(savedShots) ? savedShots : [];
   const g=parseInt(game),f=parseInt(frame);
 
   if(f<10){
@@ -113,6 +116,7 @@ export function nextState(savedShots, bowler, league, date, game, frame, ballNum
 }
 
 export function tenthFrameStatus(shots,bowler,league,date,game){
+  shots = Array.isArray(shots) ? shots : [];
   const f10shots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===game&&parseInt(s.frame)===10);
   const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
   if(!b1)return[1];
@@ -128,6 +132,7 @@ export function tenthFrameStatus(shots,bowler,league,date,game){
 }
 
 export function strictPartial(shots){
+  shots = Array.isArray(shots) ? shots : [];
   const byFrame={};
   for(let f=1;f<=9;f++) byFrame[f]=shots.find(s=>parseInt(s.frame)===f&&!s.ballNum)||null;
   const f10shots=shots.filter(s=>parseInt(s.frame)===10);
@@ -275,6 +280,7 @@ export function strictPartial(shots){
 // the 10th frame is left as its actual result rather than converted into
 // an unscoreable state.
 export function makeTheoreticalShots(shots,leftHanded,avgFirstBall){
+  shots = Array.isArray(shots) ? shots : [];
   const f10Shots=shots.filter(s=>parseInt(s.frame)===10);
   const f10b1=f10Shots.find(s=>!s.ballNum||s.ballNum===1);
   const f10HasLaterBalls=f10Shots.some(s=>s.ballNum===2||s.ballNum===3);
@@ -295,6 +301,9 @@ export function makeTheoreticalShots(shots,leftHanded,avgFirstBall){
 }
 
 export function frameQualityScore(s){
+  // 0 is the worst score, which is the right answer for a shot that
+  // is not a shot -- it sorts last rather than corrupting a ranking.
+  if(!s || typeof s !== "object" || Array.isArray(s)) return 0;
   if(s.result==="Strike")return 100;
   if(s.spareMade==="Yes"){
     const c=firstBallOf(s); // pins knocked on ball 1 -- fewer pins left standing = higher c
@@ -315,6 +324,7 @@ export function frameQualityScore(s){
 // single-ball 10th) or ball 2 was itself a strike. If ball 2 was a spare
 // conversion, ball 3 is a bonus ball on an already-cleared rack, not fresh.
 export function freshRackShots(dataset){
+  dataset = Array.isArray(dataset) ? dataset : [];
   const result=[];
   const groups={};
   dataset.forEach(s=>{
@@ -341,6 +351,7 @@ export function freshRackShots(dataset){
 // first logged game ever, or -- unusual once frames 1-9 are in -- this
 // game has no fresh-rack data yet).
 export function theoreticalFillBallValue(shots,bowler,league,date,game){
+  shots = Array.isArray(shots) ? shots : [];
   const bowlerShots=shots.filter(s=>s.bowler===bowler);
   const isThisGame=(s)=>s.league===league&&s.date===date&&s.game===String(game);
 

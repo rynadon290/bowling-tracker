@@ -69,6 +69,7 @@ export function shareTitle(arg) {
 // (a triangle in the accent), so a shared card and the icon on a phone
 // home screen are recognisably the same thing.
 export function drawArrowMark(ctx, x, y, size, color) {
+  if (!ctx || typeof ctx.beginPath !== "function") return;
   if (!ctx) return null;
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -80,8 +81,14 @@ export function drawArrowMark(ctx, x, y, size, color) {
   return true;
 }
 
-export function drawShareCard(ctx, { bowler, scores, league, date, colors, fonts, highlights }) {
-  if (!ctx) return null;
+// The second argument defaults to {}. Destructuring happens BEFORE the
+// body, so a guard inside never runs -- calling this with only a ctx
+// threw on the parameter list itself.
+export function drawShareCard(ctx, { bowler, scores, league, date, colors, fonts, highlights } = {}) {
+  // A canvas context or nothing. Checking for the METHOD rather than
+  // truthiness: any object passes a truthy test and then throws on
+  // the first draw call.
+  if (!ctx || typeof ctx.fillRect !== "function") return null;
   const W = 1080, H = 1080;
   const c = colors || {};
   const clean = (Array.isArray(scores) ? scores : []).filter(v => Number.isFinite(v));
@@ -250,7 +257,11 @@ export function sessionHighlights(arg) {
 //
 // So a trend gets its own card: the line itself, with high, low and
 // average, and no series total anywhere.
-export function drawTrendCard(ctx, { bowler, label, points, league, colors, fonts }) {
+export function drawTrendCard(ctx, { bowler, label, points, league, colors, fonts } = {}) {
+  // A canvas context or nothing. Checking for the METHOD rather than
+  // truthiness: any object passes a truthy test and then throws on
+  // the first draw call.
+  if (!ctx || typeof ctx.fillRect !== "function") return null;
   if (!ctx) return null;
   const W = 1080, H = 1080;
   const c = colors || {};
@@ -364,7 +375,11 @@ export function trendShareText(arg) {
 // Ranked by AVERAGE, matching CasualLeaderboard -- people bowl different
 // numbers of games, and the games count travels alongside so a
 // three-game average is not mistaken for a thirty-game one.
-export function drawStandingsCard(ctx, { rows, me, colors, fonts }) {
+export function drawStandingsCard(ctx, { rows, me, colors, fonts } = {}) {
+  // A canvas context or nothing. Checking for the METHOD rather than
+  // truthiness: any object passes a truthy test and then throws on
+  // the first draw call.
+  if (!ctx || typeof ctx.fillRect !== "function") return null;
   if (!ctx) return null;
   const W = 1080, H = 1080;
   const c = colors || {};

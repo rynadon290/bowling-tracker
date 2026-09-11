@@ -12,6 +12,7 @@ export function emptyShot(){
 }
 
 export function computeSessionStats(shotsForNight){
+  shotsForNight = Array.isArray(shotsForNight) ? shotsForNight : [];
   return{
     shotCount:shotsForNight.length, // every shot delivered, including 10th-frame bonus balls
     strikes:shotsForNight.filter(s=>s.result==="Strike").length,
@@ -31,6 +32,7 @@ export function computeSessionStats(shotsForNight){
 }
 
 export function findExistingShotSlot(shots,candidate){
+  shots = Array.isArray(shots) ? shots : [];
   return shots.find(s=>
     s.bowler===candidate.bowler&&s.league===candidate.league&&s.date===candidate.date&&
     s.game===candidate.game&&s.frame===candidate.frame&&
@@ -70,6 +72,7 @@ export function nextLeagueDate(fromDate, weekday) {
 // Same key as findExistingShotSlot uses, so this answers the question the
 // storage layer will actually ask.
 export function sessionExistsFor(sessions, bowler, league, date) {
+  sessions = Array.isArray(sessions) ? sessions : [];
   return (sessions || []).some(s =>
     s.bowler === bowler && s.league === league && s.date === date);
 }

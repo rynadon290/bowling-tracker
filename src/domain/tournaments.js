@@ -133,18 +133,31 @@ export function normalizeTournamentDay(raw, dayNumber = 1) {
 }
 
 // ── Game management ─────────────────────────────────────────────────────
+// Every updater below takes a tournament or a day and returns a new one.
+// Handed something that is not an object -- state before it loads, a
+// null from the cloud -- they used to throw on `.days` or `.games`.
+//
+// They now return the input UNTOUCHED. Not an invented empty
+// tournament: fabricating a shape here would hide the real problem
+// further downstream, where an empty tournament looks like a real one
+// the bowler deleted.
+function isRecord(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
+
 export function addGame(day) {
+  if (!isRecord(day)) return day;
   const games = day.games || [];
   return { ...day, games: [...games, emptyTournamentGame(games.length + 1)] };
 }
 
 export function removeGame(day, gameNumber) {
+  if (!isRecord(day)) return day;
   const remaining = (day.games || []).filter(g => g.gameNumber !== gameNumber);
   // Renumber so game numbers stay contiguous after a removal from the middle.
   return { ...day, games: remaining.map((g, i) => ({ ...g, gameNumber: i + 1 })) };
 }
 
 export function setGameField(day, gameNumber, field, value) {
+  if (!isRecord(day)) return day;
   return {
     ...day,
     games: (day.games || []).map(g => g.gameNumber === gameNumber ? { ...g, [field]: value } : g),
@@ -153,17 +166,20 @@ export function setGameField(day, gameNumber, field, value) {
 
 // ── Day management ──────────────────────────────────────────────────────
 export function addDay(tournament) {
+  if (!isRecord(tournament)) return tournament;
   const days = tournament.days || [];
   return { ...tournament, days: [...days, emptyTournamentDay(days.length + 1)] };
 }
 
 export function removeDay(tournament, dayNumber) {
+  if (!isRecord(tournament)) return tournament;
   const remaining = (tournament.days || []).filter(d => d.dayNumber !== dayNumber);
   const days = remaining.length ? remaining : [emptyTournamentDay(1)];
   return { ...tournament, days: days.map((d, i) => ({ ...d, dayNumber: i + 1 })) };
 }
 
 export function setDayField(tournament, dayNumber, field, value) {
+  if (!isRecord(tournament)) return tournament;
   return {
     ...tournament,
     days: (tournament.days || []).map(d => d.dayNumber === dayNumber ? { ...d, [field]: value } : d),
@@ -171,6 +187,7 @@ export function setDayField(tournament, dayNumber, field, value) {
 }
 
 export function updateDay(tournament, dayNumber, updater) {
+  if (!isRecord(tournament)) return tournament;
   return {
     ...tournament,
     days: (tournament.days || []).map(d => d.dayNumber === dayNumber ? updater(d) : d),

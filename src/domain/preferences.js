@@ -370,6 +370,7 @@ export function normalizePreferences(raw) {
 // Moves a card up or down by one position. Out-of-range moves are no-ops
 // rather than errors, so the UI can render the buttons unconditionally.
 export function moveStatsCard(prefs, cardId, direction) {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return prefs;
   const order = reconcileCardOrder(prefs.statsCardOrder);
   const from = order.indexOf(cardId);
   if (from === -1) return prefs;
@@ -381,6 +382,7 @@ export function moveStatsCard(prefs, cardId, direction) {
 }
 
 export function toggleStatsCardHidden(prefs, cardId) {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return prefs;
   const hidden = Array.isArray(prefs.hiddenStatsCards) ? prefs.hiddenStatsCards : [];
   const next = hidden.includes(cardId)
     ? hidden.filter(id => id !== cardId)
@@ -413,6 +415,7 @@ function isDefaultOrder(order) {
 }
 
 export function applyEnvironment(prefs, environment) {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return prefs;
   // Casual is scores-only by definition -- the point is to hide the depth.
   if (environment === "casual") {
     const safe = { ...prefs, environment: "casual", trackingMode: "game" };
@@ -452,10 +455,12 @@ export function applyEnvironment(prefs, environment) {
 }
 
 export function resetToEnvironmentDefaults(prefs) {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return prefs;
   return defaultPreferences(prefs.environment);
 }
 
 export function setTrackedField(prefs, field, value) {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return prefs;
   return { ...prefs, trackedFields: { ...prefs.trackedFields, [field]: value } };
 }
 

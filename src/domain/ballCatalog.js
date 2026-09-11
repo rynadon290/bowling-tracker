@@ -150,6 +150,7 @@ export function clearedSpecsAfterRejection(ballName) {
 // AND which they haven't already acknowledged. Drives the notice telling
 // them their specs were removed -- they keep the ball either way.
 export function rejectedBallsFor(bowlerBalls, entriesByKey, acknowledged) {
+  bowlerBalls = Array.isArray(bowlerBalls) ? bowlerBalls : [];
   const seen = new Set(acknowledged || []);
   return (bowlerBalls || []).filter(ball => {
     const key = ballKey(ball);
@@ -172,6 +173,7 @@ export function ballKey(name) {
 // Verified wins outright; otherwise the most-approved; ties break toward
 // the older entry, since it has had longer to be disputed.
 export function bestEntry(entries) {
+  entries = Array.isArray(entries) ? entries : [];
   const live = (entries || []).filter(e => catalogState(e) !== "rejected");
   if (!live.length) return null;
   return live.slice().sort((a, b) => {

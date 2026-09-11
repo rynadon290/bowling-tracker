@@ -180,6 +180,7 @@ export function setGoal(goals, typeId, target, note = "") {
 }
 
 export function removeGoal(goals, typeId) {
+  goals = Array.isArray(goals) ? goals : [];
   return (goals || []).filter(g => g.typeId !== typeId);
 }
 
@@ -250,6 +251,7 @@ export function goalProgress(goal, current, sample, leftHanded = false) {
 // All goals with their progress, ordered as GOAL_TYPES is so the list
 // doesn't reshuffle as values change.
 export function allGoalProgress(goals, measurements, leftHanded = false) {
+  goals = Array.isArray(goals) ? goals : [];
   const byType = new Map((goals || []).map(g => [g.typeId, g]));
   const out = [];
   for (const type of GOAL_TYPES) {

@@ -3,6 +3,8 @@
 // no roster recorded yet, falls back to whatever order the bowlers were
 // already in — no order info to sort by yet.
 export function lineupSort(bowlers,league,teamList=[]){
+  // Guarded for type, not just null: `{}` is truthy and not iterable.
+  bowlers = Array.isArray(bowlers) ? bowlers : [];
   const team=teamList.find(t=>t.league===league);
   const order=team?.members||[];
   return [...bowlers].sort((a,b)=>{
@@ -15,5 +17,6 @@ export function lineupSort(bowlers,league,teamList=[]){
 }
 
 export function renameLeagueInRecords(records,oldName,newName){
+  records = Array.isArray(records) ? records : [];
   return records.map(item=>item.league===oldName?{...item,league:newName}:item);
 }
