@@ -154,10 +154,31 @@ function checkFrame(frame: unknown, seen: Set<number>, repaired: { pins: number 
 
   let changed = false;
   const balls: any[] = [];
+  // Each delivery is numbered, once, in order.
+  //
+  // ballIndex was only range-checked, so a frame could arrive as
+  // [ball 1, ball 1] and pass -- two readings of the same delivery,
+  // or one delivery duplicated by a model that saw the same box
+  // twice. Downstream that becomes two shots for one throw, which
+  // inflates shot count, strike rate and spare percentage without
+  // ever looking wrong.
+  //
+  // Order matters too: [ball 2, ball 1] means the reading is
+  // scrambled, and a frame whose deliveries are out of sequence
+  // cannot be scored -- the second ball's pin count is derived from
+  // what the first left standing.
+  //
+  // Rejected rather than repaired. Renumbering guesses which
+  // reading was right, and a wrong guess is a wrong score filed
+  // silently; a rejected frame surfaces for confirmation.
+  const seenIndexes: number[] = [];
   for (const rawBall of f.balls) {
     if (!isObj(rawBall)) return null;
     const b = rawBall as any;
     if (!inRange(b.ballIndex, 1, maxBalls)) return null;
+    if (seenIndexes.includes(b.ballIndex)) return null;      // the same delivery twice
+    if (seenIndexes.length && b.ballIndex <= seenIndexes[seenIndexes.length - 1]) return null;  // out of order
+    seenIndexes.push(b.ballIndex);
     if (typeof b.isStrike !== "boolean") return null;
     if (!Array.isArray(b.pinsStanding) || b.pinsStanding.length > 10) return null;
 
