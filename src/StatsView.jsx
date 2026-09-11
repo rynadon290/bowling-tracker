@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState} from "react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { C, S, F, Chip, CompareBadge, StatLead, StatRow, StatRows } from "./ui.jsx";
 import { PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY, formatDate, STRIKE_DESCRIPTIONS, RELEASES, BALL_CHANGE_REASONS, strikeDescriptionsForHand, storedStrikeDescriptionFor } from "./constants.js";
@@ -10,8 +10,8 @@ import {
 import { lineupSort } from "./domain/leagues.js";
 import { totalMoney } from "./domain/money.js";
 import { isContainerLeague } from "./domain/leagueMembership.js";
-import { anyMoneyGameShown, visibleStatsCardOrder } from "./domain/preferences.js";
-import { visibleStatsCards, lockedStatsMessage } from "./domain/statsGating.js";
+import { anyMoneyGameShown, visibleStatsCardOrder, STATS_CARDS } from "./domain/preferences.js";
+import { visibleStatsCards, lockedStatsMessage, lockedStatsDetail } from "./domain/statsGating.js";
 
 export default function StatsView({
   centerStats,
@@ -33,6 +33,7 @@ export default function StatsView({
   theoreticalScoreForGame,
   viewedLeftHanded=false,
 }) {
+  const [showLocked, setShowLocked] = useState(false);
   // Practice and Just Bowling are containers, not teams -- nobody plays
   // FOR them, so "compare me to Practice" is a comparison against a
   // filing cabinet. Filtered once here rather than at each of the five
@@ -115,6 +116,12 @@ export default function StatsView({
   const lockedMessage = lockedStatsMessage(orderBeforeGating, {
     shotCount: shotDataCount, ballCount: ballDataCount,
   });
+  // Round 7, finding 4: four people asked "which 17?". Named on demand
+  // rather than in the line itself, which would turn a reassurance into a
+  // wall of text.
+  const lockedNames = lockedStatsDetail(orderBeforeGating,
+    { shotCount: shotDataCount, ballCount: ballDataCount },
+    id => (STATS_CARDS.find(c => c.id === id) || {}).label || id);
 
   return (
           <>
@@ -1328,6 +1335,26 @@ anyMoneyGameShown(preferences)&&statsBowler&&(()=>{
                   {lockedMessage && (
                     <div style={{backgroundColor:C.accent+"11",border:`1px solid ${C.accent}33`,borderRadius:"10px",padding:"10px 12px",marginBottom:"12px",fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
                       {lockedMessage}
+                      <button onClick={()=>setShowLocked(v=>!v)}
+                        style={{background:"none",border:"none",padding:0,marginLeft:"6px",cursor:"pointer",color:C.accent,fontSize:"12px"}}>
+                        {showLocked?"Hide":"Which ones?"}
+                      </button>
+                      {showLocked&&(
+                        <div style={{marginTop:"8px"}}>
+                          {lockedNames.shots.length>0&&(
+                            <div style={{marginBottom:"6px"}}>
+                              <div style={{fontWeight:600,color:C.text}}>Shot by shot</div>
+                              <div>{lockedNames.shots.join(" · ")}</div>
+                            </div>
+                          )}
+                          {lockedNames.balls.length>0&&(
+                            <div>
+                              <div style={{fontWeight:600,color:C.text}}>A ball noted per game</div>
+                              <div>{lockedNames.balls.join(" · ")}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   {renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}

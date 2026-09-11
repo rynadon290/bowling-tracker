@@ -552,13 +552,18 @@ export default function LogView({
                   Want these to count for your team?
                 </div>
                 <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5,marginBottom:"10px"}}>
-                  Your scores are saved and yours either way. Adding a team puts them on the
-                  team sheet too — standings, side pots and everyone's averages in one place.
-                  Everything you've already logged in this league joins automatically.
+                  {/* Round 7, finding 5: a new league bowler is JOINING a team
+                      someone else named, not creating one. Nine of fifty
+                      hesitated over whether they were about to make a
+                      duplicate of their real team. */}
+                  Your scores are saved and yours either way. Joining your team — or making
+                  one if it's not there yet — puts them on the team sheet as well: standings,
+                  side pots and everyone's averages in one place. Everything you've already
+                  logged in this league comes with you.
                 </div>
                 <div style={{display:"flex",gap:"8px"}}>
                   <button style={{...S.btn("primary"),flex:1,padding:"8px",fontSize:"12px"}}
-                    onClick={()=>setView("locker")}>Add my team</button>
+                    onClick={()=>setView("locker")}>Add or join my team</button>
                   <button style={{...S.btn(),flex:1,padding:"8px",fontSize:"12px"}}
                     onClick={onDismissTeamPrompt}>Not now</button>
                 </div>
@@ -1222,6 +1227,20 @@ export default function LogView({
                       data (true, and irrelevant until it happens), and
                       what noting a ball is for. Four sentences of
                       instruction above three number fields. */}
+                  {/* Round 7, finding 7.
+ 
+                      Removing the old four-sentence paragraph was right, but
+                      it was the only place explaining that noting a ball
+                      attributes the WHOLE game to it. Nobody could work out
+                      how to record a ball change mid-game, and the answer --
+                      shot-by-shot -- was nowhere on the screen.
+ 
+                      One line, and only when a ball can actually be chosen. */}
+                  {logBalls.length>0&&(
+                    <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
+                      A ball counts for the whole game. Switch to shot by shot to record a change mid-game.
+                    </div>
+                  )}
                   {/* Only shown in shot mode -- in scores-only mode there is
                       no derived score to protect, so a lock would be pure
                       friction. */}
