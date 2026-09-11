@@ -699,7 +699,7 @@ export default function TeamManagement({
                   their sessions and shots. */}
               <div style={S.label}>Or Add Someone Not Signed Up Yet</div>
               <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"8px"}}>
-                Reserves their spot on the roster now — you can start logging their scores under their name right away via Who's Bowling, no account needed yet. Email is optional: with one, they're linked automatically the moment they sign in with that exact address. Without one, you'll need to link them manually once they join.
+                Reserves their spot on the roster now — you can start logging their scores under their name right away via Who's Bowling, no account needed yet. Either way they claim the spot themselves and everything you've logged is already there: with their email, they're linked the moment they sign in with that exact address; with a code, you get one to text them and they enter it when they sign up.
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
                 <input
