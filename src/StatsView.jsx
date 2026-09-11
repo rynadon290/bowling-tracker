@@ -11,6 +11,7 @@ import { lineupSort } from "./domain/leagues.js";
 import { totalMoney } from "./domain/money.js";
 import { isContainerLeague } from "./domain/leagueMembership.js";
 import { anyMoneyGameShown, visibleStatsCardOrder } from "./domain/preferences.js";
+import { visibleStatsCards, lockedStatsMessage } from "./domain/statsGating.js";
 
 export default function StatsView({
   centerStats,
@@ -82,9 +83,29 @@ export default function StatsView({
   // Records stranded further down, when it's the other half of "how do we
   // stack up" and belongs immediately after the comparison.
   const promoted = ["headToHead", "teamRecords"];
-  const renderOrder = comparing
+  const orderBeforeGating = comparing
     ? ["viewing", ...promoted, ...baseOrder.filter(id => id !== "viewing" && !promoted.includes(id))]
     : baseOrder;
+
+  // Cards that cannot populate are not rendered at all.
+  //
+  // A league night logged as scores only filled a handful of cards and
+  // left the rest blank -- strike percentage, leaves, splits, frame
+  // position, none of which can come from a three-digit total. An empty
+  // card reads as the app being broken rather than as data not existing,
+  // and a run of them buries the ones that DO have something.
+  //
+  // Counted from the shots actually in view, so switching bowler or
+  // league re-evaluates: a teammate you only keep score for shows score
+  // cards, and your own shot-by-shot nights show everything.
+  const shotDataCount = shots.length;
+  const ballDataCount = shots.filter(sh => sh && sh.ball).length;
+  const renderOrder = visibleStatsCards(orderBeforeGating, {
+    shotCount: shotDataCount, ballCount: ballDataCount,
+  });
+  const lockedMessage = lockedStatsMessage(orderBeforeGating, {
+    shotCount: shotDataCount, ballCount: ballDataCount,
+  });
 
   return (
           <>
@@ -1289,7 +1310,19 @@ anyMoneyGameShown(preferences)&&statsBowler&&(()=>{
                   </div>
                   )
                 );
-                return (<>{renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}</>);
+                return (<>
+                  {/* Says what unlocks the rest, once -- at the top, not
+                      as a placeholder per missing card. Naming the action
+                      rather than the deficiency, and what it buys, since
+                      shot-by-shot is real extra effort at the lanes and
+                      should stay a choice. */}
+                  {lockedMessage && (
+                    <div style={{backgroundColor:C.accent+"11",border:`1px solid ${C.accent}33`,borderRadius:"10px",padding:"10px 12px",marginBottom:"12px",fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
+                      {lockedMessage}
+                    </div>
+                  )}
+                  {renderOrder.map(id => <Fragment key={id}>{byId[id]}</Fragment>)}
+                </>);
               })()
             )}
             <div style={{height:"32px"}}/>
