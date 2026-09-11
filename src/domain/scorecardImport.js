@@ -181,6 +181,9 @@ function convertTenthFrame(frame, base, warnings) {
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
 export function convertExtractedGameToShots(extractedGame, context) {
+  // Frames arrive from a model, so the list can contain nulls and
+  // stray values. One null threw on frame.frameNumber and took the
+  // whole import down with it.
   if (!extractedGame || typeof extractedGame !== "object" || Array.isArray(extractedGame)) return null;
   const base = {
     bowler: context.bowler, league: context.league, date: context.date,
@@ -192,7 +195,10 @@ export function convertExtractedGameToShots(extractedGame, context) {
 
   const shots = [];
   const warnings = [];
-  for (const frame of extractedGame.frames || []) {
+  // Nulls and stray values filtered out: the frames come from a model,
+  // and one null threw on frame.frameNumber, taking the whole import
+  // down rather than losing a single frame.
+  for (const frame of (Array.isArray(extractedGame.frames) ? extractedGame.frames : []).filter(f => f && typeof f === "object")) {
     if (frame.frameNumber === 10) {
       shots.push(...convertTenthFrame(frame, base, warnings));
     } else {
@@ -236,6 +242,23 @@ export function seriesFor(bowlerEntry) {
     };
   }
   return { series: computed, source: computed === null ? "none" : "computed", disagrees: false, computed };
+}
+
+// A game total that cannot exist did not happen.
+//
+// seriesFor already ignores anything outside 0-300 when adding a series
+// up, but the raw games kept the bad number -- so a misread "3000" still
+// reached the inbox and any per-game display. A vision model reading a
+// smudged monitor produces exactly this.
+//
+// Nulled rather than dropped: the GAME happened, its score was not
+// readable, and removing it would silently turn a three-game series into
+// a two-game one. A null shows as "not read" and can be corrected.
+function cleanGameTotal(g) {
+  if (!g || typeof g !== "object") return g;
+  const v = Number(g.totalScore);
+  if (Number.isFinite(v) && v >= 0 && v <= 300) return g;
+  return { ...g, totalScore: null };
 }
 
 export function normalizeExtraction(data) {
@@ -286,7 +309,7 @@ export function normalizeExtraction(data) {
       if (entry.seriesTotal == null && Number.isFinite(Number(g?.seriesTotal))) {
         entry.seriesTotal = Number(g.seriesTotal);
       }
-      entry.games.push(g);
+      entry.games.push(cleanGameTotal(g));
     });
 
     return [...byBowler.values()]
@@ -361,7 +384,7 @@ export function mergeColumnsByBowler(columns) {
         if (!existingHasFrames && incomingHasFrames) target.games[i] = g;
         continue;
       }
-      target.games.push(g);
+      target.games.push(cleanGameTotal(g));
       seen.add(g?.gameNumber);
     }
     target.games.sort((a, b) => (a?.gameNumber ?? 0) - (b?.gameNumber ?? 0));

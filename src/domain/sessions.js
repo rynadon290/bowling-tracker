@@ -32,11 +32,29 @@ export function computeSessionStats(shotsForNight){
 }
 
 export function findExistingShotSlot(shots,candidate){
-  shots = Array.isArray(shots) ? shots : [];
+  // Null elements too -- one bad row threw on s.bowler.
+  shots = (Array.isArray(shots) ? shots : []).filter(s => s && typeof s === "object");
+  const c = (candidate && typeof candidate === "object") ? candidate : {};
+
+  // A first ball is ball ONE whether it was stored as 1 or as null.
+  //
+  // This used to compare `(s.ballNum||null)`, which made null and 1
+  // different slots -- while the database's shots_identity_uniq index
+  // collapses them with COALESCE(ball_num, 1). The app would therefore
+  // decide a delivery was new, write it, and the database would refuse
+  // it as a duplicate. Since a 23505 is now correctly treated as
+  // "already saved" and dropped from the queue, the shot would vanish
+  // with nothing shown to the bowler.
+  //
+  // Both forms are already in the data -- 137 nulls against 15 ones on a
+  // real device -- and the scorer reads them as the same thing
+  // (`!s.ballNum || s.ballNum === 1`). This makes the third place agree.
+  const slot = x => (x === null || x === undefined || x === "" ? 1 : x);
+
   return shots.find(s=>
-    s.bowler===candidate.bowler&&s.league===candidate.league&&s.date===candidate.date&&
-    s.game===candidate.game&&s.frame===candidate.frame&&
-    (s.ballNum||null)===(candidate.ballNum||null)
+    s.bowler===c.bowler&&s.league===c.league&&s.date===c.date&&
+    s.game===c.game&&s.frame===c.frame&&
+    slot(s.ballNum)===slot(c.ballNum)
   );
 }
 
