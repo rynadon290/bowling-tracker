@@ -104,7 +104,45 @@ export default function Settings({
     // looking for; this is the one a lost bowler needs to SEE.
     walkthroughs: true,
   });
-  function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
+  // Walkthroughs is the one card that opens by default, so it is the one
+  // card whose CLOSED state has to be remembered. Every other card starts
+  // collapsed, and re-collapsing on return is what someone expects.
+  //
+  // Without this, closing it was undone by every visit to Settings --
+  // the app quietly overriding a choice the bowler had just made, which
+  // is a small thing that reads as the app not listening.
+  //
+  // Per user, like every other key, so one person collapsing it does not
+  // decide it for someone else signing in on the same phone.
+  const WALKTHROUGHS_KEY = "bowling-walkthroughs-collapsed-v1";
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const row = await window.storage?.get(WALKTHROUGHS_KEY);
+        // Only a stored collapse changes anything: absent means open,
+        // which is the default this card ships with.
+        if (!cancelled && row) setExpanded(e => ({ ...e, walkthroughs: false }));
+      } catch { /* storage unavailable -- leave it open */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function toggle(id) {
+    setExpanded(e => {
+      const next = { ...e, [id]: !e[id] };
+      if (id === "walkthroughs") {
+        // Store the collapse, remove it on re-open, so the key exists
+        // only while the preference differs from the default.
+        try {
+          if (next.walkthroughs) window.storage?.delete(WALKTHROUGHS_KEY);
+          else window.storage?.set(WALKTHROUGHS_KEY, new Date().toISOString());
+        } catch { /* nothing to do */ }
+      }
+      return next;
+    });
+  }
 
   const [editingLeague, setEditingLeague] = useState(null);
   const [leagueDraft, setLeagueDraft] = useState("");
