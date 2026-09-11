@@ -116,7 +116,7 @@ export function nextState(savedShots, bowler, league, date, game, frame, ballNum
 }
 
 export function tenthFrameStatus(shots,bowler,league,date,game){
-  shots = Array.isArray(shots) ? shots : [];
+  shots = (Array.isArray(shots) ? shots : []).filter(s => s && typeof s === "object");
   const f10shots=shots.filter(s=>s.bowler===bowler&&s.league===league&&s.date===date&&s.game===game&&parseInt(s.frame)===10);
   const b1=f10shots.find(s=>(!s.ballNum||s.ballNum===1));
   if(!b1)return[1];
@@ -132,7 +132,15 @@ export function tenthFrameStatus(shots,bowler,league,date,game){
 }
 
 export function strictPartial(shots){
-  shots = Array.isArray(shots) ? shots : [];
+  // Filtered for null ELEMENTS, not just a null array.
+  //
+  // Array.isArray() says the container is a list; it says nothing
+  // about what is in it. One null entry -- from a partial import, a
+  // half-written row, a merge that dropped something -- threw
+  // "Cannot read properties of null (reading 'frame')" and took the
+  // whole scoresheet down. frameScoresheet already guarded this way;
+  // these three did not.
+  shots = (Array.isArray(shots) ? shots : []).filter(s => s && typeof s === "object");
   const byFrame={};
   for(let f=1;f<=9;f++) byFrame[f]=shots.find(s=>parseInt(s.frame)===f&&!s.ballNum)||null;
   const f10shots=shots.filter(s=>parseInt(s.frame)===10);
@@ -280,7 +288,7 @@ export function strictPartial(shots){
 // the 10th frame is left as its actual result rather than converted into
 // an unscoreable state.
 export function makeTheoreticalShots(shots,leftHanded,avgFirstBall){
-  shots = Array.isArray(shots) ? shots : [];
+  shots = (Array.isArray(shots) ? shots : []).filter(s => s && typeof s === "object");
   const f10Shots=shots.filter(s=>parseInt(s.frame)===10);
   const f10b1=f10Shots.find(s=>!s.ballNum||s.ballNum===1);
   const f10HasLaterBalls=f10Shots.some(s=>s.ballNum===2||s.ballNum===3);
@@ -324,7 +332,7 @@ export function frameQualityScore(s){
 // single-ball 10th) or ball 2 was itself a strike. If ball 2 was a spare
 // conversion, ball 3 is a bonus ball on an already-cleared rack, not fresh.
 export function freshRackShots(dataset){
-  dataset = Array.isArray(dataset) ? dataset : [];
+  dataset = (Array.isArray(dataset) ? dataset : []).filter(s => s && typeof s === "object");
   const result=[];
   const groups={};
   dataset.forEach(s=>{
@@ -351,7 +359,7 @@ export function freshRackShots(dataset){
 // first logged game ever, or -- unusual once frames 1-9 are in -- this
 // game has no fresh-rack data yet).
 export function theoreticalFillBallValue(shots,bowler,league,date,game){
-  shots = Array.isArray(shots) ? shots : [];
+  shots = (Array.isArray(shots) ? shots : []).filter(s => s && typeof s === "object");
   const bowlerShots=shots.filter(s=>s.bowler===bowler);
   const isThisGame=(s)=>s.league===league&&s.date===date&&s.game===String(game);
 

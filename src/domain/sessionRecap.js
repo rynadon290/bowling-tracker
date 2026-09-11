@@ -78,7 +78,10 @@ export function sessionLines(manualScores, bowlers, league, date) {
 const NOTABLE_SWING = 25;
 
 export function awards(lines) {
-  lines = Array.isArray(lines) ? lines : [];
+  // Null ELEMENTS too. Array.isArray says the container is a list
+  // and nothing about its contents, and one null row -- from a
+  // partial import or a half-written record -- was enough to throw.
+  lines = (Array.isArray(lines) ? lines : []).filter(x => x && typeof x === "object");
   if (!lines || lines.length === 0) return [];
   const out = [];
   const multi = lines.length > 1;

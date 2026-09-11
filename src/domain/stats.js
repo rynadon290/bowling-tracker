@@ -113,7 +113,10 @@ export function seasonRecord(matches,league){
 // season's trend. Skips any match with nothing decided yet (no games and
 // no series result logged) rather than plotting a false 0/0 week.
 export function weeklyPointsData(matches,league){
-  matches = Array.isArray(matches) ? matches : [];
+  // Null ELEMENTS too. Array.isArray says the container is a list
+  // and nothing about its contents, and one null row -- from a
+  // partial import or a half-written record -- was enough to throw.
+  matches = (Array.isArray(matches) ? matches : []).filter(x => x && typeof x === "object");
   return matches
     .filter(m=>!league||m.league===league)
     .map(m=>{

@@ -225,7 +225,10 @@ export function splitName(key){
 // when a split has never been attempted. Only true splits count --
 // isSplit already applies the headpin-down and gap rules.
 export function splitConversionByType(shots){
-  shots = Array.isArray(shots) ? shots : [];
+  // Null ELEMENTS too. Array.isArray says the container is a list
+  // and nothing about its contents, and one null row -- from a
+  // partial import or a half-written record -- was enough to throw.
+  shots = (Array.isArray(shots) ? shots : []).filter(x => x && typeof x === "object");
   const byKey={};
   for(const s of (shots||[])){
     if(!isSplit(s))continue;

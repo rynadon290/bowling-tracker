@@ -136,6 +136,8 @@ export function achievementsFor(arg) {
 
 // A one-line summary for a share card.
 export function achievementHeadline(achievements = []) {
+  // Null elements, not just a null list -- one bad row threw.
+  achievements = (Array.isArray(achievements) ? achievements : []).filter(x => x && typeof x === "object");
   if (!Array.isArray(achievements) || !achievements.length) return "";
   const a = achievements[0];
   return `${a.emoji} ${a.title}`.trim();

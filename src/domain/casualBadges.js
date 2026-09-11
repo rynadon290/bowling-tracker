@@ -304,6 +304,8 @@ export function casualStatsFor(bowler, nights = []) {
 // numbers of games — the games count is shown so a 3-game average isn't
 // mistaken for a 30-game one.
 export function casualLeaderboard(nights = []) {
+  // Null elements, not just a null list -- one bad row threw.
+  nights = (Array.isArray(nights) ? nights : []).filter(x => x && typeof x === "object");
   const list = Array.isArray(nights) ? nights : [];
   const people = new Set();
   for (const n of list) for (const who of Object.keys(n.scoresByBowler || {})) people.add(who);
