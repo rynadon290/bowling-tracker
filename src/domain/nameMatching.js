@@ -97,6 +97,11 @@ export const AUTO_MATCH_SCORE = 0.85;
 // confirmation step exists to catch.
 export function matchBowler(scorecardName, roster, { columnIndex = null } = {}) {
   const ranked = (Array.isArray(roster) ? roster : [])
+    // Roster rows come from the cloud, so one without a bowler name is
+    // possible -- a half-written membership, a row mid-migration. The
+    // tie-breaking sort called localeCompare on it and threw, taking the
+    // whole scorecard match down rather than skipping one entry.
+    .filter(r => r && typeof r === "object" && typeof r.bowler === "string" && r.bowler)
     .map(r => {
       const { score, via } = bestNameScore(scorecardName, r.bowler, r.aliases);
       return {

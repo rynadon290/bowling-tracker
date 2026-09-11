@@ -35,7 +35,12 @@ function arr(v){ return Array.isArray(v) ? v : []; }
 // session on file for them (any league, any night).
 export function bowlerHighGame(sessions,bowler){
   let best=null;
-  arr(sessions).filter(s=>s.bowler===bowler).forEach(s=>s.scores.forEach((v,i)=>{
+  // A null session, or one whose scores never arrived, throws on
+  // s.bowler / s.scores. Both shapes come from the cloud and from a
+  // partial import, and this figure is shown on the profile -- so one
+  // bad row took the screen down.
+  arr(sessions).filter(s=>s&&typeof s==="object"&&s.bowler===bowler&&Array.isArray(s.scores))
+    .forEach(s=>s.scores.forEach((v,i)=>{
     if(best===null||v>best.value)best={value:v,date:s.date,league:s.league,game:i+1};
   }));
   return best;
@@ -44,7 +49,7 @@ export function bowlerHighGame(sessions,bowler){
 // The single highest 3-game series total this bowler has ever bowled.
 export function bowlerHighSeries(sessions,bowler){
   let best=null;
-  arr(sessions).filter(s=>s.bowler===bowler).forEach(s=>{
+  arr(sessions).filter(s=>s&&typeof s==="object"&&s.bowler===bowler).forEach(s=>{
     if(best===null||s.total>best.value)best={value:s.total,date:s.date,league:s.league};
   });
   return best;
