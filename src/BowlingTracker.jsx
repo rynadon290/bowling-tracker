@@ -505,7 +505,19 @@ export default function BowlingTracker(){
       window.alert(`Couldn't find "${leagueName}" in the cloud — this team was created on this device only and won't be visible to teammates. Try again once you're back online.`);
       return;
     }
-    const result=await cloudWrite("teams",{id,name:clean,league_id:leagueId,created_by:user?.id||null});
+    // created_by is OMITTED, not sent as null.
+    //
+    // The INSERT policy requires created_by = auth.uid(), and the column
+    // defaults to auth.uid() -- but a DEFAULT only applies to a column
+    // left out of the statement entirely. Sending an explicit null
+    // bypasses the default and fails the policy, which is exactly what
+    // broke team creation: `user?.id||null` resolved to null and the
+    // write was rejected with 42501.
+    //
+    // Letting the database fill it is also the more robust rule: it
+    // cannot be wrong, and it does not depend on `user` being in scope
+    // at every call site that ever creates a team.
+    const result=await cloudWrite("teams",{id,name:clean,league_id:leagueId});
     if(!result.synced){
       window.alert(`"${clean}" was created locally but couldn't reach the cloud yet (${result.reason||"unknown reason"}). It'll keep retrying in the background.`);
     }
@@ -1681,7 +1693,10 @@ export default function BowlingTracker(){
       }
 
       const id=crypto.randomUUID();
-      const result=await cloudWrite("leagues",{id,name,created_by:user?.id||null});
+      // Same reasoning as team creation above: omit created_by so the
+      // column DEFAULT auth.uid() fills it. An explicit null would fail
+      // the INSERT policy the same way.
+      const result=await cloudWrite("leagues",{id,name});
       if(result.synced){
         leagueIdsRef.current[name]=id;
         continue;
