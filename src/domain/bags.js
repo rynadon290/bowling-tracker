@@ -109,6 +109,21 @@ export function availableBalls(environment, ballsByBag, selectedBagId, allBalls,
 
 // Bags a given environment should offer. Practice gets none -- it isn't
 // bag-constrained -- and the UI shows every ball instead.
+// Plastic sorts to the END of any ball list.
+//
+// It is a spare ball -- the one reached for on a 10-pin, not the one a
+// game is bowled with -- so it belongs at the bottom of every picker.
+// Sitting alphabetically in the middle of an arsenal it read as an
+// equal choice, and in a dropdown it pushed the balls actually in play
+// further down the list.
+//
+// Order is otherwise preserved: the bag's own order is the bowler's.
+export function plasticLast(balls, plastic) {
+  const list = Array.isArray(balls) ? balls : [];
+  if (!plastic) return [...list];
+  return [...list.filter(b => b !== plastic), ...(list.includes(plastic) ? [plastic] : [])];
+}
+
 export function bagsForEnvironment(bags, environment) {
   const list = Array.isArray(bags) ? bags : [];
   if (environment === "tournament") return list.filter(b => b.bagType === "tournament");
