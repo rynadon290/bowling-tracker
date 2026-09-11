@@ -467,6 +467,9 @@ export function latestResponseAt(tasksByRelationship) {
 // The next occurrence of a weekday, from today. Returns null when the
 // bowler has no established night rather than guessing one.
 export function nextDateForWeekday(weekday, today = new Date()) {
+  // `today` defaults only when OMITTED. Passed a string or a null it
+  // threw on getFullYear -- and these run on every app open.
+  if (!(today instanceof Date) || Number.isNaN(today.getTime())) today = new Date();
   if (weekday === null || weekday === undefined) return null;
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const delta = (weekday - d.getDay() + 7) % 7;

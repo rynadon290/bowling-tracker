@@ -102,7 +102,9 @@ export function normalizeGuests(raw) {
 export function addGuest(guests, name) {
   const clean = (name || "").trim();
   if (!clean) return guests || [];
-  const existing = guests || [];
+  // Guest lists hold NAMES, and a non-string in there threw on
+  // toLowerCase during the duplicate check.
+  const existing = (Array.isArray(guests) ? guests : []).filter(g => typeof g === "string");
   // Case-insensitive so "Aaron" and "aaron" don't become two people whose
   // practice results can't be compared.
   if (existing.some(g => g.toLowerCase() === clean.toLowerCase())) return existing;

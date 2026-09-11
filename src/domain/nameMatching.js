@@ -182,6 +182,8 @@ export function matchScorecard(columns, roster) {
 // hint wrong -- so this reports the disagreement and lets the user
 // confirm, rather than trusting either source.
 export function rosterOrderCheck(matchedColumns, roster) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  matchedColumns = (Array.isArray(matchedColumns) ? matchedColumns : []).filter(x => x && typeof x === "object");
   const byBowler = new Map((Array.isArray(roster) ? roster : []).map(r => [r.bowler, r]));
   const rows = (Array.isArray(matchedColumns) ? matchedColumns : [])
     .filter(c => c.assigned)

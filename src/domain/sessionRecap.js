@@ -336,12 +336,16 @@ export function drillRecap(drills, bowler, date, leftHanded = false) {
 // Returns null when nobody else drilled, and lists shared targets
 // separately from ones only one person worked.
 export function drillComparison(drills, bowler, partners, date, leftHandedFor = noHandInfo) {
-  const mine = drillLines(drills, bowler, date, leftHandedFor(bowler));
+  // The default only applies when the argument is OMITTED. Passed null
+  // -- which is what an absent handedness map looks like -- it threw on
+  // the very first line.
+  const handOf = typeof leftHandedFor === "function" ? leftHandedFor : noHandInfo;
+  const mine = drillLines(drills, bowler, date, handOf(bowler));
   if (!mine.length) return null;
 
   const others = (Array.isArray(partners) ? partners : [])
     .filter(p => p && p !== bowler)
-    .map(p => ({ bowler: p, lines: drillLines(drills, p, date, leftHandedFor(p)) }))
+    .map(p => ({ bowler: p, lines: drillLines(drills, p, date, handOf(p)) }))
     .filter(x => x.lines.length);
   if (!others.length) return null;
 

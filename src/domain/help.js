@@ -357,6 +357,13 @@ export function searchHelp(query, entries = HELP) {
 
 // Entries grouped for browsing when nothing has been typed yet.
 export function helpByArea(entries = HELP) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  entries = (Array.isArray(entries) ? entries : []).filter(x => x && typeof x === "object");
   if (!Array.isArray(entries)) entries = HELP;
   const AREAS = [
     { view: "log", label: "Bowling" },

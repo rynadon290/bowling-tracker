@@ -165,6 +165,13 @@ export function conversionRate(drill) {
 // Trend for one target across drills, newest last, for "is my 10-pin
 // getting better". Only drills with enough attempts to mean something.
 export function targetHistory(drills, bowler, targetId, minAttempts = 10) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  drills = (Array.isArray(drills) ? drills : []).filter(x => x && typeof x === "object");
   return (Array.isArray(drills) ? drills : [])
     .filter(d => d.bowler === bowler && d.target === targetId && attempts(d) >= minAttempts)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -269,6 +276,13 @@ export function weeklyTargetHistory(drills, bowler, targetId, { customPins = nul
 // Deliberately conservative: needs at least three usable weeks, and calls
 // anything inside a few points "steady" rather than manufacturing a story.
 export function weeklyTrend(weeks) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  weeks = (Array.isArray(weeks) ? weeks : []).filter(x => x && typeof x === "object");
   const usable = (Array.isArray(weeks) ? weeks : []).filter(w => !w.thin);
   if (usable.length < 3) return { direction: "unknown", weeks: usable.length };
   const firstHalf = usable.slice(0, Math.floor(usable.length / 2));

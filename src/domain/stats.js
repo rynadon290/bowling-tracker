@@ -23,7 +23,17 @@ export function isCompetitiveSession(s) {
 // white screen rather than a caught error. `arr()` coerces anything that
 // isn't an array to an empty one -- corrupted or old-format persisted data
 // should degrade to "no stats yet", never to a crash.
-function arr(v){ return Array.isArray(v) ? v : []; }
+// Filters null ELEMENTS as well as a null list.
+//
+// Almost every function in this file starts with arr(sessions) or
+// arr(shots), so this one line covers fifteen of them. Array.isArray
+// only ever said the container was a list; a single null row from a
+// partial sync threw on s.bowler or s.league and took down whichever
+// stats card was asking.
+//
+// Records only -- every caller here passes a list of session or shot
+// objects, never a list of numbers.
+function arr(v){ return (Array.isArray(v) ? v : []).filter(x => x && typeof x === "object"); }
 
 // Pure stats/records functions, extracted from BowlingTracker.jsx so they're
 // independently testable — same pattern as scoring.js and splits.js. Each
@@ -169,7 +179,9 @@ export function teamGameTotalAvgAt(sessions,league,gameIdx){
 export function rAvg(sessions,bowler,league){
   const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)&&s.league===league);
   if(!ls.length)return null;
-  const all=ls.flatMap(s=>s.scores);
+  const all=ls.flatMap(s=>Array.isArray(s.scores)?s.scores:[])
+    .filter(v=>Number.isFinite(Number(v))).map(Number);
+  if(!all.length)return null;
   return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
 }
 
@@ -179,7 +191,12 @@ export function rAvg(sessions,bowler,league){
 // doesn't).
 export function cAvg(sessions,bowler,league){
   const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
-    &&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
+    &&(league?s.league===league:isCompetitiveSession(s)))
+    // Only real numbers. A session whose scores never arrived turned the
+    // average into NaN -- and NaN renders as a number on the profile,
+    // so it looks like a figure rather than an error.
+    .flatMap(s=>Array.isArray(s.scores)?s.scores:[])
+    .filter(v=>Number.isFinite(Number(v))).map(Number);
   if(!all.length)return null;
   return Math.round(all.reduce((a,b)=>a+b,0)/all.length);
 }
@@ -189,6 +206,13 @@ export function cAvg(sessions,bowler,league){
 // the raw (unrounded) average, and a 0-100% progress figure through the
 // current 5-pin band, for a progress-bar-style display.
 export function avgProgress(sessions,bowler,league){
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   const all=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
     &&(league?s.league===league:isCompetitiveSession(s))).flatMap(s=>s.scores);
   if(!all.length)return null;
@@ -306,6 +330,13 @@ export function hungCounts(shots,league){
 // hands in a later week, earlier weeks are never retroactively recomputed
 // against the new giant.
 export function beatHighBowlerStats(sessions,league){
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   const dates=[...new Set(arr(sessions).filter(s=>s.league===league).map(s=>s.date))].sort();
   const tally={};
   function ensure(b){if(!tally[b])tally[b]={won:0,total:0,weeksAsHigh:0};}

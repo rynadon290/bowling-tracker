@@ -25,6 +25,13 @@ function csvCell(v) {
 }
 
 export function sessionsToCsv(sessions, bowler) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   const rows = (Array.isArray(sessions) ? sessions : [])
     .filter(s => !bowler || s.bowler === bowler)
     .map(s => {
@@ -61,6 +68,13 @@ const SHOT_COLUMNS = [
 ];
 
 export function shotsToCsv(shots, bowler) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  shots = (Array.isArray(shots) ? shots : []).filter(x => x && typeof x === "object");
   const rows = (Array.isArray(shots) ? shots : [])
     .filter(s => !bowler || s.bowler === bowler)
     .map(s => [
@@ -77,6 +91,13 @@ export function shotsToCsv(shots, bowler) {
 // ── Season summary ──────────────────────────────────────────────────────
 // The numbers a bowler would actually put on a card and show someone.
 export function seasonSummary(sessions, shots, bowler, league) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   const mine = (Array.isArray(sessions) ? sessions : []).filter(s =>
     (!bowler || s.bowler === bowler) && (!league || s.league === league)
   );

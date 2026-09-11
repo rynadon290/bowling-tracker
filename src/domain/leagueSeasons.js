@@ -36,6 +36,8 @@ export function hasLeagueEnded(endDate, today) {
 // from whichever leagues the bowler is actually in, since that membership
 // lives elsewhere (teams) and this module doesn't need to know about it.
 export function endedLeagues(leaguesWithDates, today = new Date()) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  leaguesWithDates = (Array.isArray(leaguesWithDates) ? leaguesWithDates : []).filter(x => x && typeof x === "object");
   leaguesWithDates = Array.isArray(leaguesWithDates) ? leaguesWithDates : [];
   return (leaguesWithDates || [])
     .filter(l => hasLeagueEnded(l.endDate, today))
@@ -47,6 +49,8 @@ export function endedLeagues(leaguesWithDates, today = new Date()) {
 // asked about (accepted, overrode, or dismissed) -- so a season they've
 // already handled never re-prompts, but any later one still does.
 export function needsBookAverageUpdate(leaguesWithDates, bookAverageAsOf, today = new Date()) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  leaguesWithDates = (Array.isArray(leaguesWithDates) ? leaguesWithDates : []).filter(x => x && typeof x === "object");
   leaguesWithDates = Array.isArray(leaguesWithDates) ? leaguesWithDates : [];
   const ended = endedLeagues(leaguesWithDates, today);
   if (!ended.length) return { needed: false, league: null };

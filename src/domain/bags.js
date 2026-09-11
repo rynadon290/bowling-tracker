@@ -185,6 +185,9 @@ export function ballsByBagFor(membership, bowlerName, allBalls) {
 
 // Which bags a given ball is packed in, for showing on the ball itself.
 export function bagsForBall(membership, bowlerName, ball, bags) {
+  // Null elements, and a non-list argument, both handled: these
+  // lists come from the cloud and one bad row threw.
+  bags = (Array.isArray(bags) ? bags : []).filter(x => x && typeof x === "object");
   return (bags || []).filter(bag => isBallInBag(membership, bowlerName, ball, bag.id));
 }
 

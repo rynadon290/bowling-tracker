@@ -104,7 +104,9 @@ export function describeSpecs(specs) {
 // order, with anything unclassified collected at the end rather than
 // dropped -- a ball with no specs still has to be reachable.
 export function groupBalls(mode, balls, specsByBall, groups) {
-  const list = balls || [];
+  // Container only -- this holds ball NAMES, so filtering for objects
+  // would empty a perfectly good list.
+  const list = Array.isArray(balls) ? balls : [];
   if (mode === "none" || !mode) {
     return [{ key: "all", label: "All Balls", balls: list }];
   }

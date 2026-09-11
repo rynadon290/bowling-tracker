@@ -3,6 +3,9 @@
 // no roster recorded yet, falls back to whatever order the bowlers were
 // already in — no order info to sort by yet.
 export function lineupSort(bowlers,league,teamList=[]){
+  // Container only -- these hold strings or numbers, so filtering
+  // for objects would empty a perfectly good list.
+  teamList = Array.isArray(teamList) ? teamList : [];
   // Guarded for type, not just null: `{}` is truthy and not iterable.
   bowlers = Array.isArray(bowlers) ? bowlers : [];
   const team=teamList.find(t=>t.league===league);
@@ -17,6 +20,8 @@ export function lineupSort(bowlers,league,teamList=[]){
 }
 
 export function renameLeagueInRecords(records,oldName,newName){
+  // Null elements and non-list arguments: both arrive from the cloud.
+  records = (Array.isArray(records) ? records : []).filter(x => x && typeof x === "object");
   records = Array.isArray(records) ? records : [];
   return records.map(item=>item.league===oldName?{...item,league:newName}:item);
 }

@@ -180,6 +180,13 @@ export function setGoal(goals, typeId, target, note = "") {
 }
 
 export function removeGoal(goals, typeId) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  goals = (Array.isArray(goals) ? goals : []).filter(x => x && typeof x === "object");
   goals = Array.isArray(goals) ? goals : [];
   return (goals || []).filter(g => g.typeId !== typeId);
 }
@@ -251,6 +258,13 @@ export function goalProgress(goal, current, sample, leftHanded = false) {
 // All goals with their progress, ordered as GOAL_TYPES is so the list
 // doesn't reshuffle as values change.
 export function allGoalProgress(goals, measurements, leftHanded = false) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  goals = (Array.isArray(goals) ? goals : []).filter(x => x && typeof x === "object");
   goals = Array.isArray(goals) ? goals : [];
   const byType = new Map((goals || []).map(g => [g.typeId, g]));
   const out = [];

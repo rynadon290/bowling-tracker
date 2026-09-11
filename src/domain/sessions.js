@@ -12,6 +12,13 @@ export function emptyShot(){
 }
 
 export function computeSessionStats(shotsForNight){
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  shotsForNight = (Array.isArray(shotsForNight) ? shotsForNight : []).filter(x => x && typeof x === "object");
   shotsForNight = Array.isArray(shotsForNight) ? shotsForNight : [];
   return{
     shotCount:shotsForNight.length, // every shot delivered, including 10th-frame bonus balls
@@ -90,6 +97,13 @@ export function nextLeagueDate(fromDate, weekday) {
 // Same key as findExistingShotSlot uses, so this answers the question the
 // storage layer will actually ask.
 export function sessionExistsFor(sessions, bowler, league, date) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   sessions = Array.isArray(sessions) ? sessions : [];
   return (sessions || []).some(s =>
     s.bowler === bowler && s.league === league && s.date === date);
@@ -97,6 +111,13 @@ export function sessionExistsFor(sessions, bowler, league, date) {
 
 // A prebowl is valid when it lands on a date that isn't already taken.
 export function prebowlConflict(sessions, bowler, league, countsForDate, bowledOnDate) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   if (!countsForDate) return "Pick the date these games count for.";
   if (countsForDate === bowledOnDate) {
     return "That's today — prebowled games count for a future date.";

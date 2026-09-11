@@ -150,6 +150,8 @@ function rawAverage(sessions, bowler, league) {
 const MIN_GAMES_FOR_BOOK_AVERAGE = 21;
 
 export function suggestBookAverage(sessions, bowler) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   sessions = Array.isArray(sessions) ? sessions : [];
   const leagues = [...new Set(
     (sessions || []).filter(s => s.bowler === bowler && s.league).map(s => s.league)
@@ -226,6 +228,9 @@ export function addHomeCenter(profile, centerId) {
 // matching center (deleted, or centers not loaded yet) is dropped rather
 // than rendered as a raw uuid.
 export function resolveHomeCenters(profile, centers) {
+  // Container only -- these hold strings or numbers, so filtering
+  // for objects would empty a perfectly good list.
+  centers = Array.isArray(centers) ? centers : [];
   const byId = {};
   (centers || []).forEach(c => { byId[c.id] = c; });
   return (profile?.homeCenters || [])

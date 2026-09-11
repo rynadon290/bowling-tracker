@@ -81,7 +81,10 @@ export function canAnalyze(gameCount) {
 }
 
 export function gamesUntilAnalysis(gameCount) {
-  return Math.max(0, MIN_GAMES_FOR_ANALYSIS - (gameCount ?? 0));
+  // `?? 0` catches null and undefined and nothing else -- a string or a
+  // NaN produced "NaN more games to go".
+  const n = Number(gameCount);
+  return Math.max(0, MIN_GAMES_FOR_ANALYSIS - (Number.isFinite(n) ? n : 0));
 }
 
 // Builds the payload sent for analysis: only statistics that cleared their

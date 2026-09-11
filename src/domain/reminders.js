@@ -16,7 +16,13 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 // most common day. Returns null with too little data to be confident, so
 // the app never nags on a guessed day.
 export function inferLeagueDay(sessions, league, minSessions = 3) {
-  sessions = Array.isArray(sessions) ? sessions : [];
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  sessions = (Array.isArray(sessions) ? sessions : []).filter(x => x && typeof x === "object");
   const days = (sessions || [])
     .filter(s => s.league === league && s.date)
     .map(s => new Date(s.date + "T12:00:00").getDay())
@@ -24,7 +30,14 @@ export function inferLeagueDay(sessions, league, minSessions = 3) {
   if (days.length < minSessions) return null;
   const counts = {};
   days.forEach(d => { counts[d] = (counts[d] || 0) + 1; });
-  const [best, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  // Destructuring the first entry of an EMPTY object throws
+  // "undefined is not iterable". The length check above normally
+  // prevents it, but only when minSessions is a number -- and it is a
+  // parameter, so a caller getting the argument order wrong got a
+  // crash instead of a null.
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (!top) return null;
+  const [best, n] = top;
   // Needs a clear majority, not just a plurality -- a league that's split
   // across two nights shouldn't get a reminder for the wrong one.
   return n / days.length >= 0.6 ? Number(best) : null;

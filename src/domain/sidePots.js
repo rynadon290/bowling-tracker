@@ -79,10 +79,24 @@ export function addSidePot(pots, type = "Bracket") {
 }
 
 export function removeSidePot(pots, id) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  pots = (Array.isArray(pots) ? pots : []).filter(x => x && typeof x === "object");
   return (Array.isArray(pots) ? pots : []).filter(p => p.id !== id);
 }
 
 export function setSidePotField(pots, id, field, value) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  pots = (Array.isArray(pots) ? pots : []).filter(x => x && typeof x === "object");
   return (Array.isArray(pots) ? pots : []).map(p => (p.id === id ? { ...p, [field]: value } : p));
 }
 

@@ -174,6 +174,8 @@ export function ballKey(name) {
 // Verified wins outright; otherwise the most-approved; ties break toward
 // the older entry, since it has had longer to be disputed.
 export function bestEntry(entries) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  entries = (Array.isArray(entries) ? entries : []).filter(x => x && typeof x === "object");
   entries = Array.isArray(entries) ? entries : [];
   const live = (entries || []).filter(e => catalogState(e) !== "rejected");
   if (!live.length) return null;

@@ -59,6 +59,8 @@ export function isLeagueHidden(leagueName, hiddenIds, leagueIdsByName) {
 // Teams in a league that this bowler is actually on. Leaving is per-team,
 // so someone on two teams in the same league leaves them independently.
 export function teamsInLeague(leagueName, teams, bowlerName) {
+  // Null elements and non-list arguments: both arrive from the cloud.
+  teams = (Array.isArray(teams) ? teams : []).filter(x => x && typeof x === "object");
   return (teams || []).filter(t =>
     t.league === leagueName && (t.members || []).includes(bowlerName)
   );

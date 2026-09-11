@@ -59,6 +59,9 @@ export function weekdayOf(dateStr) {
 // same Tuesday is one Tuesday of evidence, not two. Without this a single
 // heavily-logged night could masquerade as a pattern.
 export function usualNights(sessions, bowler, today = new Date()) {
+  // `today` defaults only when OMITTED. Passed a string or a null it
+  // threw on getFullYear -- and these run on every app open.
+  if (!(today instanceof Date) || Number.isNaN(today.getTime())) today = new Date();
   const cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   cutoff.setDate(cutoff.getDate() - USUAL_NIGHT_LOOKBACK_DAYS);
 
@@ -128,6 +131,9 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 const MODE_NAMES = { league: "league", practice: "practice", tournament: "a tournament", casual: "just for fun" };
 
 export function describeUsualNights(sessions, bowler, today = new Date(), tournaments = []) {
+  // `today` defaults only when OMITTED. Passed a string or a null it
+  // threw on getFullYear -- and these run on every app open.
+  if (!(today instanceof Date) || Number.isNaN(today.getTime())) today = new Date();
   const usual = [...usualNights(sessions, bowler, today)].sort((a, b) => a - b);
   if (!usual.length) {
     return "Not enough history yet — you'll be asked once a day until a pattern shows up.";
@@ -177,6 +183,9 @@ export function environmentOfSession(s) {
 // tournament, guessing wrong is worse than asking. Counts distinct dates,
 // not sessions, for the same reason usualNights does.
 export function usualModeFor(sessions, tournaments, bowler, weekday, today = new Date()) {
+  // `today` defaults only when OMITTED. Passed a string or a null it
+  // threw on getFullYear -- and these run on every app open.
+  if (!(today instanceof Date) || Number.isNaN(today.getTime())) today = new Date();
   const cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   cutoff.setDate(cutoff.getDate() - USUAL_NIGHT_LOOKBACK_DAYS);
 
@@ -220,6 +229,9 @@ export function usualModeFor(sessions, tournaments, bowler, weekday, today = new
 // Everything the Bowl tab needs on open: is there a routine for today,
 // and if so what is it.
 export function todaysRoutine(sessions, tournaments, bowler, today = new Date()) {
+  // `today` defaults only when OMITTED. Passed a string or a null it
+  // threw on getFullYear -- and these run on every app open.
+  if (!(today instanceof Date) || Number.isNaN(today.getTime())) today = new Date();
   const weekday = today.getDay();
   const mode = usualModeFor(sessions, tournaments, bowler, weekday, today);
   return { weekday, mode, isUsual: usualNights(sessions, bowler, today).has(weekday) };

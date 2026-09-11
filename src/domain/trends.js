@@ -214,11 +214,22 @@ export function seriesFor(metricId, opts) {
 // nights, not days, and a six-week layoff shouldn't stretch the x-axis in
 // a way that flattens a real change.
 export function linearSlope(points) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  points = (Array.isArray(points) ? points : []).filter(x => x && typeof x === "object");
   const list = Array.isArray(points) ? points : [];
   const n = list.length;
   if (n < 2) return null;
   const xs = list.map((_, i) => i);
-  const ys = list.map(p => p.value);
+  // Only points with a real value. One missing value turned the whole
+  // slope into NaN, and a NaN slope renders as a trend arrow pointing
+  // nowhere rather than as 'not enough data'.
+  const ys = list.map(p => Number(p.value));
+  if (ys.some(v => !Number.isFinite(v))) return null;
   const mx = xs.reduce((a, b) => a + b, 0) / n;
   const my = ys.reduce((a, b) => a + b, 0) / n;
   let num = 0, den = 0;
@@ -353,6 +364,13 @@ export function allGamesSeries(sessions, bowler, league) {
 
 // Summary of a game-level series, for the share text and the header.
 export function allGamesSummary(points) {
+  // Null ELEMENTS, not just a null list.
+  //
+  // Array.isArray() says the container is a list and nothing about
+  // what is in it. A half-written row, a partial import, a merge that
+  // dropped something -- any of them puts a null in here, and the
+  // property access two lines down took a whole screen with it.
+  points = (Array.isArray(points) ? points : []).filter(x => x && typeof x === "object");
   const vals = (Array.isArray(points) ? points : []).map(p => p.value).filter(Number.isFinite);
   if (!vals.length) return null;
   const avg = vals.reduce((a, b) => a + b, 0) / vals.length;

@@ -91,6 +91,10 @@ export function findExistingCenter(candidate, centers) {
 // also means a league that hasn't set its center yet is simply excluded
 // rather than lumped into a fake "unknown" bucket.
 export function statsByCenter(sessions, leagues, centers, bowler) {
+  // Null elements, and a non-list argument, both handled: these
+  // lists come from the cloud and one bad row threw.
+  leagues = (Array.isArray(leagues) ? leagues : []).filter(x => x && typeof x === "object");
+  centers = (Array.isArray(centers) ? centers : []).filter(x => x && typeof x === "object");
   // Null ELEMENTS too. Array.isArray says the container is a list
   // and nothing about its contents, and one null row -- from a
   // partial import or a half-written record -- was enough to throw.
