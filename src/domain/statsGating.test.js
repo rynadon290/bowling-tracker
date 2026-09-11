@@ -97,8 +97,26 @@ describe('lockedStatsMessage', () => {
     expect(lockedStatsMessage(['seasonRecord'], { shotCount: 0 })).toBe(null);
   });
 
-  it('gets the singular right', () => {
-    expect(lockedStatsMessage(['byBall'], { ballCount: 0 })).toContain('1 more stat ');
+  it('agrees the verb with the count, not just the noun', () => {
+    expect(lockedStatsMessage(['byBall'], { ballCount: 0 })).toContain('1 stat unlocks');
+    expect(lockedStatsMessage(['splits', 'cleanFrames'], { shotCount: 0 })).toContain('2 stats unlock ');
+  });
+
+  // The two are INDEPENDENT choices. Joining them with "and" implied
+  // both were needed for all of them -- you can note which ball bowled a
+  // game without tracking a single frame, which is what the per-game
+  // ball dropdown is for.
+  it('states the two counts separately', () => {
+    const msg = lockedStatsMessage(['splits', 'cleanFrames', 'byBall'], { shotCount: 0, ballCount: 0 });
+    expect(msg).toContain('2 stats unlock if you track shot by shot');
+    expect(msg).toContain('1 stat unlocks if you note which ball');
+    expect(msg).toContain('Either on its own is fine');
+  });
+
+  // Tacked onto a single option it reads as an apology for a choice
+  // nobody was offered.
+  it('drops the "either" line when there is only one option', () => {
+    expect(lockedStatsMessage(['byBall'], { shotCount: 9, ballCount: 0 })).not.toContain('Either');
   });
 
   it('survives junk', () => {

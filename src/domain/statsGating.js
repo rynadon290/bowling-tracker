@@ -77,31 +77,48 @@ export function visibleStatsCards(cardIds, counts) {
 // showing, or nothing has been logged at all, in which case an empty
 // stats screen needs no explanation beyond its own empty state.
 //
-// The wording names the ACTION, not the deficiency: "track shot by shot"
-// rather than "you have no shot data". And it says what is gained, since
-// the cost is real -- shot-by-shot takes longer at the lanes, and it
-// should be a choice rather than a nag.
+// What to tell someone about the cards they are not seeing.
+//
+// Returns null when there is nothing to say -- either everything is
+// showing, or nothing has been logged at all, in which case an empty
+// stats screen needs no explanation beyond its own empty state.
+//
+// The two counts are stated SEPARATELY, not joined with "and".
+//
+// They are independent choices, and the earlier wording implied both
+// were needed for all of them: you can note which ball bowled a game
+// without tracking a single frame, which is exactly what the per-game
+// ball dropdown is for. Someone logging scores only might happily do
+// the ball and never the frames -- so tell them what each one buys and
+// let them pick.
+//
+// The wording names the ACTION rather than the deficiency -- "track shot
+// by shot" rather than "you have no shot data" -- and says what is
+// gained, since shot-by-shot is real extra effort at the lanes and
+// should stay a choice rather than a nag.
 export function lockedStatsMessage(cardIds, counts) {
-  const c = counts || {};
+  const c = (counts && typeof counts === "object" && !Array.isArray(counts)) ? counts : {};
   const shotCount = Number(c.shotCount) || 0;
   const ballCount = Number(c.ballCount) || 0;
   const ids = Array.isArray(cardIds) ? cardIds : [];
 
-  const hiddenShots = ids.filter(id => cardNeeds(id) === "shots").length && shotCount === 0
-    ? ids.filter(id => cardNeeds(id) === "shots").length : 0;
-  const hiddenBalls = ids.filter(id => cardNeeds(id) === "balls").length && ballCount === 0
-    ? ids.filter(id => cardNeeds(id) === "balls").length : 0;
+  const shotLocked = shotCount === 0 ? ids.filter(id => cardNeeds(id) === "shots").length : 0;
+  const ballLocked = ballCount === 0 ? ids.filter(id => cardNeeds(id) === "balls").length : 0;
+  if (!shotLocked && !ballLocked) return null;
 
-  if (!hiddenShots && !hiddenBalls) return null;
+  // "1 stat unlock" and "2 stats unlocks" are both wrong, so the verb
+  // agrees with the count as well as the noun.
+  const phrase = (n, how) =>
+    `${n} ${n === 1 ? "stat unlocks" : "stats unlock"} if you ${how}`;
 
-  const total = hiddenShots + hiddenBalls;
-  const plural = total === 1 ? "stat" : "stats";
+  const parts = [];
+  if (shotLocked) parts.push(phrase(shotLocked, "track shot by shot"));
+  if (ballLocked) parts.push(phrase(ballLocked, "note which ball bowled each game"));
 
-  if (hiddenShots && hiddenBalls) {
-    return `${total} more ${plural} unlock when you track shot by shot and note which ball you used each game.`;
-  }
-  if (hiddenShots) {
-    return `${total} more ${plural} unlock when you track shot by shot — strikes, spares, leaves and splits all come from individual shots.`;
-  }
-  return `${total} more ${plural} unlock when you note which ball you used each game.`;
+  // The reassurance only makes sense when there are two things to
+  // choose between. Tacked onto a single option it reads as an
+  // apology for a choice nobody was offered.
+  return parts.length > 1
+    ? `${parts.join(". ")}. Either on its own is fine.`
+    : `${parts[0]}.`;
 }
