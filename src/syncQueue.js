@@ -2,6 +2,7 @@ import { openDB } from 'idb';
 import { supabase } from './supabaseClient.js';
 export { classifySyncError, shouldSurfaceSyncIssue } from './domain/syncErrors.js';
 import { getActiveUserId, partitionQueue, ownedBy } from './domain/userScope.js';
+import { recordError } from './errorLogStore.js';
 
 // Every queued write records WHO queued it, and nothing is ever replayed
 // through a different person's session.
@@ -215,6 +216,10 @@ async function queueWrite(table, operation, payload, reason, onConflict, errorCo
   // tidy would be the worse trade -- but it will not flush on its own,
   // so it must not do that quietly.
   if (!userId) console.warn(`sync queue: ${operation} on ${table} queued with no signed-in user; it will not flush until claimed`);
+  // A queued write is a write that did not land. Recording it at the
+  // one point every failure passes through catches the whole class --
+  // RLS denials, timeouts, offline -- with the SQLSTATE that says which.
+  recordError({ kind: 'write-failed', where: `${table}.${operation}`, code: errorCode || '', message: reason || '' });
   await db.add(STORE_NAME, { table, operation, payload, reason, errorCode, onConflict, userId, createdAt: Date.now() });
   notifyListeners(await getPendingCount());
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C, S, Chip, CollapsibleCard } from "./ui.jsx";
 import { THEMES, DARK_THEME_IDS, LIGHT_THEME_IDS } from "./domain/themes.js";
 import { useAuth } from "./AuthProvider.jsx";
@@ -10,6 +10,7 @@ import { isContainerLeague, isLeagueHidden, teamsInLeague } from "./domain/leagu
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
+import { errorLogSummary, errorLogText, clearErrorLog } from "./errorLogStore.js";
 import {
   ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
@@ -86,6 +87,13 @@ export default function Settings({
   // once. Danger Zone and Backup default closed too, on top of their own
   // internal confirmation steps -- collapsing them is an extra deliberate
   // step before reaching something destructive or data-heavy.
+  // Diagnostics. Loaded once when Settings opens rather than kept live:
+  // this is a thing you go and look at, not a thing that should re-render
+  // the screen every time a write fails.
+  const [errLog, setErrLog] = useState({ distinct: 0, total: 0 });
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { errorLogSummary().then(setErrLog).catch(() => {}); }, []);
+
   const [expanded, setExpanded] = useState({
     session: true, look: false, trackingDetail: false,
     accessoryFields: false, moneyGames: false, statsLayout: false,
@@ -721,6 +729,47 @@ export default function Settings({
           ))}
         </div>
       )}
+
+      {/* Diagnostics.
+
+          Most of what has gone wrong in this app went wrong QUIETLY --
+          a delete that removed nothing, a note edit that did not save,
+          queued writes retrying forever against a policy that would
+          never accept them. None of those produced a message, so none
+          would ever have been reported. This is the record of them.
+
+          Messages are redacted before they are stored: Postgres puts
+          real values in its error text, and those values are other
+          people's names. See domain/errorLog.js. */}
+      <CollapsibleCard title="Diagnostics"
+        summary={errLog.distinct ? `${errLog.distinct} issue${errLog.distinct === 1 ? "" : "s"}` : "Nothing recorded"}
+        expanded={expanded.diagnostics} onToggle={() => toggle("diagnostics")}>
+        <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
+          {errLog.distinct
+            ? `${errLog.distinct} distinct issue${errLog.distinct === 1 ? "" : "s"} recorded, ${errLog.total} time${errLog.total === 1 ? "" : "s"} in total. Copy this and send it over — it names screens, tables and error codes, never your scores or anyone's name.`
+            : "Nothing has gone wrong that the app noticed. If something looks off anyway, that is worth knowing too."}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button style={{ ...S.btn(), flex: 1, padding: "9px", fontSize: "12px" }}
+            onClick={async () => {
+              const text = await errorLogText();
+              try { await navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); }
+              catch { window.alert(text); }
+            }}>
+            {copied ? "Copied" : "Copy diagnostics"}
+          </button>
+          {errLog.distinct > 0 && (
+            <button style={{ ...S.btn(), flex: 1, padding: "9px", fontSize: "12px" }}
+              onClick={async () => {
+                if (!window.confirm("Clear the recorded issues? This only affects the log — nothing else is touched.")) return;
+                await clearErrorLog();
+                setErrLog({ distinct: 0, total: 0 });
+              }}>
+              Clear
+            </button>
+          )}
+        </div>
+      </CollapsibleCard>
 
       {showCard("reset") && (
       <CollapsibleCard title="Reset settings" summary="Theme, fields, layout"

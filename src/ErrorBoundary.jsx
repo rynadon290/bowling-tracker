@@ -1,5 +1,6 @@
 import { Component } from "react";
 import { C, S } from "./ui.jsx";
+import { recordError } from "./errorLogStore.js";
 
 // A crash in any screen used to unmount the entire app, leaving a blank
 // white page with nothing on it — no message, no way back, and nothing
@@ -22,6 +23,14 @@ export default class ErrorBoundary extends Component {
     this.setState({ info });
     // Still log it, for anyone who does have a console.
     console.error("Screen crashed:", error, info?.componentStack);
+    // And to the error log, because a console nobody opens is not a
+    // record. The component stack names the screen; the message is
+    // redacted before it is stored.
+    recordError({
+      kind: "render",
+      where: (info?.componentStack || "").trim().split("\n")[0].trim().replace(/^at\s+/, "").slice(0, 60),
+      message: error?.message || String(error || ""),
+    });
   }
 
   render() {

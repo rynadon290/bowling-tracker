@@ -6,6 +6,7 @@
 // knowing. Installing the scoped adapter first makes BowlingTracker's
 // own installer a no-op and removes the question.
 import './scopedStorage.js';
+import { installErrorHandlers } from './errorLogStore.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import BowlingTracker from './BowlingTracker.jsx';
@@ -13,6 +14,10 @@ import { AuthProvider, useAuth } from './AuthProvider.jsx';
 import SignIn from './SignIn.jsx';
 import './styles.css';
 import { C } from './ui.jsx';
+
+// Before anything renders, so an error during the first paint is
+// caught too -- that is exactly when a stale chunk fails.
+installErrorHandlers();
 
 // Registered for installability, not for offline support -- see sw.js.
 // Guarded: some embedded/preview contexts don't expose the API at all.
