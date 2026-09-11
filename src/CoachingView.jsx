@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import { formatDate } from "./constants.js";
 import {
@@ -261,6 +261,21 @@ export default function CoachingView({
   const tasks = selected ? partitionTasks(tasksByRelationship?.[selected.relationshipId] || []) : null;
   const notes = selected ? (notesByRelationship?.[selected.relationshipId] || []) : [];
   const actingAsCoach = coachViewOn;
+
+  // Focus group Finding 6: 17 of 50 coaches tried to add a bowler from
+  // the roster and couldn't. The path existed -- "Connect with someone",
+  // in a section below -- but a coach looking at "Your bowlers" has no
+  // reason to scroll past it, and the toggle there defaults to "They
+  // coach me", which is the wrong direction for a coach. So the roster
+  // gets its own way in, and it sets the direction correctly.
+  const searchRef = useRef(null);
+  function startAddBowler() {
+    setRequestAsCoach(true);
+    const el = searchRef.current;
+    if (!el) return;
+    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* older browsers */ }
+    try { el.focus(); } catch { /* nothing to do */ }
+  }
   const leftHanded = selected ? !!leftHandedByUserId[selected.userId] : false;
 
   return (
@@ -271,6 +286,10 @@ export default function CoachingView({
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px" }}>
             Everyone at a glance — what they're working on, how far along, and when you next see them.
           </div>
+          <button onClick={startAddBowler}
+            style={{ ...S.btn(), width: "100%", padding: "8px", fontSize: "12px", marginBottom: "10px" }}>
+            + Add a bowler
+          </button>
           {roster.map(r => (
             <div key={r.bowler} style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
@@ -373,6 +392,27 @@ export default function CoachingView({
         </Section>
       )}
 
+      {/* The empty case, which was the actual dead end: the roster card
+          above only renders once there is someone on it, so a coach who
+          has just switched to "I'm coaching" saw no roster and no way to
+          start one. This says how the relationship begins -- the second
+          half of Finding 6's recommendation -- and offers the same way
+          in. */}
+      {isCoach && coachViewOn && roster.length === 0 && (
+        <div style={S.card}>
+          <div style={S.label}>Your bowlers</div>
+          <div style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5, marginBottom: "10px" }}>
+            Nobody yet. Search for a bowler by name and send a request — they accept
+            from their own phone, and once they do you'll see their sessions, set
+            tasks and track progress here.
+          </div>
+          <button onClick={startAddBowler}
+            style={{ ...S.btn("primary"), width: "100%", padding: "9px", fontSize: "12px" }}>
+            + Add a bowler
+          </button>
+        </div>
+      )}
+
       <Section
         title={coachViewOn ? "Your Bowlers" : "Your Coaches"}
         subtitle={list.length === 0 ? "Nobody connected yet." : undefined}>
@@ -396,7 +436,7 @@ export default function CoachingView({
             <Chip label="They coach me" selected={!requestAsCoach} onToggle={() => setRequestAsCoach(false)} />
             <Chip label="I coach them" selected={requestAsCoach} onToggle={() => setRequestAsCoach(true)} />
           </div>
-          <input style={{ ...S.input, fontSize: "12px", marginBottom: "6px" }}
+          <input ref={searchRef} style={{ ...S.input, fontSize: "12px", marginBottom: "6px" }}
             placeholder="Search by name…"
             value={searchTerm} onChange={e => { setSearchTerm(e.target.value); onSearch(e.target.value); }} />
           {searching && <div style={{ fontSize: "11px", color: C.textMuted }}>Searching…</div>}

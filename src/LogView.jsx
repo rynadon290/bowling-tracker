@@ -27,6 +27,9 @@ export default function LogView({
   // bests known" rather than crashing -- the optional chaining at
   // the use site already handles an empty object.
   profiles = {},
+  // Focus group Finding 3. Passed in rather than computed here so the
+  // decision stays in one pure, tested place and LogView only renders.
+  offerShotByShot = false, onTryShotByShot, onDismissShotByShot,
   shots, sessions, bowlers, footerHeight, footerRef, teams, leagues, startEdit, deleteShot,
   activeBowler, newBowlerName, setNewBowlerName, arsenals, newBallName, setNewBallName,
   form, setForm, editingId, saved, sessionSaved, sessionSaveMessage,
@@ -140,6 +143,40 @@ export default function LogView({
 
             {/* Everything below waits for the prompt to be answered. */}
             {!(!editingId&&showSessionStart)&&(<>
+
+            {/* Shot-by-shot, offered at the moment it means something.
+
+                Finding 3: of 50 established league bowlers, only 12 found
+                shot-by-shot -- and 11 of those 12 said it was why they'd
+                keep the app. The feature that converts serious users was
+                invisible to three quarters of them, because it is a
+                setting chosen at setup, before anyone has data it could
+                explain.
+
+                So it is offered here, after a few nights of scores-only,
+                where it can promise something concrete instead of
+                pitching a feature. Once, dismissible, and never again --
+                a prompt people learn to swipe away is worse than none.
+                The default does not move; round 5 showed shot-by-shot
+                bounces beginners. */}
+            {offerShotByShot&&!editingId&&(
+              <div style={{backgroundColor:C.accent+"11",border:`1px solid ${C.accent}44`,borderRadius:"10px",padding:"12px 14px",marginBottom:"12px"}}>
+                <div style={{fontSize:"14px",fontWeight:600,color:C.text,marginBottom:"4px"}}>
+                  Want to see which spares are costing you?
+                </div>
+                <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5,marginBottom:"10px"}}>
+                  You've logged a few nights as game scores. Tracking one game shot by shot
+                  turns those into spare conversion, carry and leave patterns. You can switch
+                  back whenever you like.
+                </div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button style={{...S.btn("primary"),flex:1,padding:"8px",fontSize:"12px"}}
+                    onClick={onTryShotByShot}>Try it for a game</button>
+                  <button style={{...S.btn(),flex:1,padding:"8px",fontSize:"12px"}}
+                    onClick={onDismissShotByShot}>No thanks</button>
+                </div>
+              </div>
+            )}
 
             {/* Edit banner */}
             {editingId&&(

@@ -20,6 +20,7 @@ import { supabase } from "./supabaseClient.js";
 import { classifySyncError, cloudRead, cloudReadDelta, cloudWrite, cloudUpdate, cloudDelete, getQueuedRecordsForTable, getPendingCount, onPendingCountChange, inspectPendingQueue, clearPendingQueue, discardQueuedTable, flushPendingQueue } from "./syncQueue.js";
 import { mergeDelta, nextCursor } from "./domain/deltaSync.js";
 import { normalizeSignupCode, isValidSignupCode } from "./domain/signupCodes.js";
+import { shouldOfferShotByShot } from "./domain/trackingPrompt.js";
 import { splitConversionByType, isSplit, isTenPinLeave, isCornerPinLeave, isSinglePinLeave, isWashout, isMakeableSpare } from "./domain/splits.js";
 import { maxPossibleScore,
   isStk, firstBallOf, secondBallOf, tenthBall3Available, tenthBall3Pins,
@@ -40,7 +41,7 @@ import { categorizeCoaching, taskFromRow, taskToRow, noteFromRow, noteToRow, com
 import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
   correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
   pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
-import { coachViewActive, setCoachView, applyEnvironment } from "./domain/preferences.js";
+import { coachViewActive, setCoachView, applyEnvironment, setTrackingMode } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
 import { ballKey, catalogState, bestEntry, rejectedBallsFor, clearedSpecsAfterRejection, canVote } from "./domain/ballCatalog.js";
@@ -126,6 +127,11 @@ const BOWLERS_KEY = "bowling-bowlers-v1";
 const ARSENALS_KEY = "bowling-arsenals-v1";
 const LAYOUTS_KEY = "bowling-ball-layouts-v1";
 const PROFILES_KEY = "bowling-bowler-profiles-v1";
+// Dismissal of the shot-by-shot offer. Device-level and permanent:
+// asked and answered. Scoped per user by the storage wrapper like
+// every other key, so one bowler saying no does not silence it for
+// another person signing in on the same phone.
+const SHOT_PROMPT_KEY = "bowling-shot-prompt-dismissed-v1";
 const TOURNAMENT_KEY = "bowling-active-tournament-v1";
 const TOURNAMENTS_KEY = "bowling-tournaments-v1";
 const BAGS_KEY = "bowling-bags-v1";
@@ -388,6 +394,7 @@ export default function BowlingTracker(){
   // delivery, home centers, notes. Team/league membership is deliberately
   // NOT stored here; it's derived from the roster so the two can't drift.
   const[profiles,setProfiles]=useState({});
+  const[shotPromptDismissed,setShotPromptDismissed]=useState(true); // assume dismissed until storage says otherwise, so it cannot flash on load
   // The tournament currently being entered. Kept as one working record
   // rather than a list -- you're filling in one tournament at a time, and
   // saving commits it to the cloud.
@@ -1240,6 +1247,8 @@ export default function BowlingTracker(){
           setProfiles(rebuiltProfiles);
           try{await window.storage.set(PROFILES_KEY,JSON.stringify(rebuiltProfiles));}catch{}
         }else{
+          const dismissed=await window.storage.get(SHOT_PROMPT_KEY);
+          setShotPromptDismissed(!!dismissed);
           const pr=await readCached(PROFILES_KEY,"object");
           if(pr)setProfiles(Object.fromEntries(Object.entries(pr).map(([k,v])=>[k,normalizeProfile(v,k)])));
         }
@@ -3762,6 +3771,25 @@ export default function BowlingTracker(){
   // have no league to pick, so sessionLeague is "" there and this never
   // matched -- meaning neither environment could ever find its own
   // session.
+  // Focus group Finding 3. The rule lives in domain/trackingPrompt.js so
+  // it is testable without a render; this only supplies today's inputs.
+  const offerShotByShot=shouldOfferShotByShot({
+    sessions,bowler:activeBowler,trackingMode:preferences.trackingMode,
+    environment:preferences.environment,dismissed:shotPromptDismissed,
+  });
+
+  async function dismissShotPrompt(){
+    setShotPromptDismissed(true);
+    try{await window.storage.set(SHOT_PROMPT_KEY,new Date().toISOString());}catch{}
+  }
+
+  // Accepting switches the mode AND dismisses, so someone who tries it and
+  // switches back is not asked a second time -- they have their answer.
+  async function tryShotByShot(){
+    await dismissShotPrompt();
+    updatePreferences(prev=>setTrackingMode(prev,"shot"));
+  }
+
   const curSession=[...sessions].reverse().find(s=>s.bowler===activeBowler&&s.league===effectiveSessionLeague&&s.date===sessionDate);
 
   // Money games need a session row to attach winnings to, and that row
@@ -5233,6 +5261,7 @@ export default function BowlingTracker(){
             form={form} setForm={setForm} editingId={editingId} saved={saved} sessionSaved={sessionSaved} sessionSaveMessage={sessionSaveMessage}
             sessionLeague={sessionLeague} setSessionLeague={setSessionLeague} effectiveSessionLeague={effectiveSessionLeague} sessionDate={sessionDate} setSessionDate={setSessionDate}
             startingLane={startingLane} setStartingLane={setStartingLane} setShowSummary={setShowSummary} expandedSections={expandedSections}
+            offerShotByShot={offerShotByShot} onTryShotByShot={tryShotByShot} onDismissShotByShot={dismissShotPrompt}
             ballNumLabel={ballNumLabel} curSession={curSession} currentLane={currentLane} firstBallPins={firstBallPins} g1score={g1score} g2score={g2score} g3score={g3score}
             hasLeave={hasLeave} inTenth={inTenth} isNoTap={isNoTap} isStrike={isStrike} needsSpareMade={needsSpareMade} sessionTotal={sessionTotal} showPinCount={showPinCount}
             standingPins={standingPins} tenthOptions={tenthOptions}
