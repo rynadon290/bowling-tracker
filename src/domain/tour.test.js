@@ -169,7 +169,11 @@ describe('needsLeagueSetup', () => {
   });
 
   it('is true with a league but no team in it', () => {
-    expect(needsLeagueSetup({ environment: 'league', leagues: L, teams: [] })).toBe(true);
+    // Changed deliberately: a league with no team is now READY to log
+    // scores. Requiring a team here was the wall 62% of new league
+    // bowlers hit, and 11 of 31 abandoned at. The team is asked for
+    // after a night, by domain/teamPrompt.js.
+    expect(needsLeagueSetup({ environment: 'league', leagues: L, teams: [] })).toBe(false);
   });
 
   it('is false once a team exists for a league', () => {

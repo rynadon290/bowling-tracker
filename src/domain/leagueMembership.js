@@ -28,7 +28,18 @@
 // very first practice session, would otherwise see "Practice" sitting in
 // the Vault alongside their real leagues.
 export function isContainerLeague(name) {
-  return name === "Practice" || name === "Just Bowling";
+  // "Casual" is the container's OLD name and still appears in data
+  // written before the rename. Leaving it out was harmless only
+  // while needsLeagueSetup also required a team -- that check caught
+  // the same case by accident. Removing the team requirement (Focus
+  // group Finding 2) made it bite immediately: a bowler whose only
+  // "league" was an old Casual container looked ready to log league
+  // scores with nowhere to file them.
+  //
+  // The stored key stays "Just Bowling" -- see CASUAL_SESSION_KEY in
+  // constants.js. This is about recognising both names, not renaming
+  // anything.
+  return name === "Practice" || name === "Just Bowling" || name === "Casual";
 }
 
 export function visibleLeagues(leagues, hiddenIds, leagueIdsByName) {

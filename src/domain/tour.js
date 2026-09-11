@@ -518,8 +518,19 @@ export function needsLeagueSetup(options) {
   // because the team check below catches the same case -- but it would
   // bite the moment a team were attached to it.
   const realLeagues = (leagues || []).filter(l => l && !isContainerLeague(l));
-  if (!realLeagues.length) return true;
-  return !(teams || []).some(t => t && t.league && realLeagues.includes(t.league));
+  // A LEAGUE is required; a team is not.
+  //
+  // This used to return true when a league existed but no team did, and
+  // LogView showed a setup card INSTEAD of the entry form. That was the
+  // wall in Focus group Finding 2: 62% of new league bowlers hit it, and
+  // 11 of 31 abandoned during team setup -- most at the roster screen,
+  // asked for teammates' email addresses they did not have.
+  //
+  // Scores are filed against a league, so a league is genuinely needed.
+  // A team is not: nothing about entering tonight's games depends on it.
+  // Asking for one is now a reminder AFTER a night is logged, not a gate
+  // before one -- see domain/teamPrompt.js.
+  return !realLeagues.length;
 }
 
 // Every tour available for replay from Settings.
