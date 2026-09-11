@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import { supabase } from './supabaseClient.js';
 export { classifySyncError, shouldSurfaceSyncIssue } from './domain/syncErrors.js';
+import { classifySyncError } from './domain/syncErrors.js';
 import { getActiveUserId, partitionQueue, ownedBy } from './domain/userScope.js';
 import { recordError } from './errorLogStore.js';
 
@@ -462,8 +463,31 @@ export async function flushPendingQueue() {
       // tracking existed (or whose failure reason has since changed) still
       // end up with something useful the next time someone inspects the
       // queue, without needing to discard and start over.
-      await db.put(STORE_NAME, { ...item, reason: formatError(err) });
-      break; // leave this item and everything after it queued; try again later
+      await db.put(STORE_NAME, { ...item, reason: formatError(err), errorCode: err?.code || item.errorCode || '' });
+
+      const cls = classifySyncError(err);
+      if (cls.kind === 'permanent') {
+        // A permanent failure will fail identically forever. syncErrors
+        // has said so since it was written -- "retrying forever just
+        // wedges the queue" -- but this loop broke on EVERY error, so one
+        // unsavable row blocked every write behind it indefinitely. A
+        // bowler's whole night sitting behind a duplicate from last week.
+        if (err?.code === '23505') {
+          // A unique violation means the row is ALREADY in the cloud.
+          // Keeping it queued is keeping a copy of something that
+          // arrived, so it goes -- nothing is lost by dropping it.
+          await db.delete(STORE_NAME, item.queueId);
+        }
+        // Anything else permanent stays queued and visible in the sync
+        // panel, where it can be discarded deliberately. It is skipped
+        // rather than dropped: a 42501 means the write never landed, and
+        // silently binning a bowler's game to keep the queue tidy would
+        // be the worse failure.
+        recordError({ kind: 'write-failed', where: `${item.table}.${item.operation}`, code: err?.code || '', message: 'permanent — skipped so it cannot wedge the queue' });
+        continue;
+      }
+
+      break; // transient: leave this item and everything after it queued, in order
     }
   }
   notifyListeners(await getPendingCount());
