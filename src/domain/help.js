@@ -30,16 +30,16 @@ export const HELP = [
   {
     id: "tracking-modes",
     view: "log",
-    title: "Shot by shot vs scores only",
+    title: "Frame tracking vs game tracking",
     keywords: ["tracking", "mode", "detail", "frames", "quick", "switch"],
-    body: "Shot by shot records every ball — pins left, ball used, release. That's what powers spare stats, the scoresheet and ball comparisons. Scores only takes three numbers a night. You can switch any time, and start a night one way and finish the other: unlock the score boxes to type totals even mid-game.",
+    body: "Frame tracking records every ball — pins left, ball used, release. That's what powers spare stats, the scoresheet and ball comparisons. Scores only takes three numbers a night. You can switch any time, and start a night one way and finish the other: unlock the score boxes to type totals even mid-game.",
   },
   {
     id: "scoresheet",
     view: "log",
     title: "The ten-frame scoresheet",
     keywords: ["frames", "scoresheet", "edit frame", "running score", "tap"],
-    body: "When logging shot by shot, the ten frames sit between the frame picker and the result buttons. It fills in as you bowl. Tap any frame to edit it. Tapping an empty frame while editing cancels the edit; tapping the next frame when your shot is complete saves it.",
+    body: "On frame tracking, the ten frames sit between the frame picker and the result buttons. It fills in as you bowl. Tap any frame to edit it. Tapping an empty frame while editing cancels the edit; tapping the next frame when your shot is complete saves it.",
   },
   {
     id: "delete-shot",
@@ -290,7 +290,7 @@ export const HELP = [
     view: "settings",
     title: "Appearance and settings",
     keywords: ["theme", "dark", "light", "colour", "color", "settings", "reset"],
-    body: "Change the theme in Settings, along with which stats cards you see, which money games are shown, and whether shot-by-shot fields like ball speed and rev rate appear.",
+    body: "Change the theme in Settings, along with which stats cards you see, which money games are shown, and whether frame tracking fields like ball speed and rev rate appear.",
   },
 ];
 
@@ -308,7 +308,7 @@ function norm(s) {
 // The entries that apply to a given mode.
 //
 // A Just Bowling user's docs should describe THEIR app. Returning
-// articles about league rosters, money games and shot-by-shot tracking
+// articles about league rosters, money games and frame tracking
 // to someone whose app has none of those is worse than returning
 // nothing: it implies they've lost features, or that the search is
 // broken.

@@ -104,21 +104,21 @@ describe('lockedStatsDetail', () => {
 describe('lockedStatsMessage', () => {
   const ids = ['seasonRecord', 'splits', 'cleanFrames', 'byBall'];
 
-  it('names shot tracking when only shot cards are hidden', () => {
+  it('names frame tracking when only frame cards are hidden', () => {
     const msg = lockedStatsMessage(ids, { shotCount: 0, ballCount: 5 });
-    expect(msg).toContain('shot by shot');
+    expect(msg).toContain('frame tracking');
     expect(msg).toContain('2');
   });
 
   it('names ball logging when only ball cards are hidden', () => {
     const msg = lockedStatsMessage(ids, { shotCount: 36, ballCount: 0 });
     expect(msg).toContain('ball');
-    expect(msg).not.toContain('shot by shot');
+    expect(msg).not.toContain('frame tracking');
   });
 
   it('mentions both when both are missing', () => {
     const msg = lockedStatsMessage(ids, { shotCount: 0, ballCount: 0 });
-    expect(msg).toContain('shot by shot');
+    expect(msg).toContain('frame tracking');
     expect(msg).toContain('ball');
   });
 
@@ -141,7 +141,7 @@ describe('lockedStatsMessage', () => {
   // ball dropdown is for.
   it('states the two counts separately', () => {
     const msg = lockedStatsMessage(['splits', 'cleanFrames', 'byBall'], { shotCount: 0, ballCount: 0 });
-    expect(msg).toContain('2 stats unlock if you track shot by shot');
+    expect(msg).toContain('2 stats unlock if you use frame tracking');
     expect(msg).toContain('1 stat unlocks if you note which ball');
     expect(msg).toContain('Either on its own is fine');
   });

@@ -27,14 +27,30 @@ export const TRACKED_FIELD_KEYS = ["surface", "line", "release", "miss", "ballSp
 // shot-by-shot, or the reverse.
 export const TRACKING_MODES = ["shot", "game"];
 
+// "Frame tracking" and "Game tracking".
+//
+// "Shot by shot" described the ACTION -- you log each delivery -- and
+// sat opposite "Game scores only", which described the DATA. Two halves
+// of one choice, named on different axes, so neither told you what the
+// other was. A bowler reading "Shot by shot" had to work out that the
+// alternative existed.
+//
+// Frame and game are the two units bowlers already think in, and naming
+// both the same way makes the choice legible in a glance.
+//
+// The stored values stay "shot" and "game" -- every session, preference
+// and cloud row is keyed by them, and renaming those would orphan the
+// lot for a label change.
 export const TRACKING_MODE_LABELS = {
-  shot: "Shot by shot",
-  game: "Game scores only",
+
+  shot: "Frame tracking",
+
+  game: "Game tracking",
 };
 
 export const TRACKING_MODE_DESCRIPTIONS = {
-  shot: "Log every delivery — unlocks leaves, spare conversion, and per-ball stats.",
-  game: "Just the final score for each game. Fast, and still tracks averages and trends.",
+  shot: "Every frame — leaves, spare conversion and how each ball carried.",
+  game: "The final score for each game. Fast, and still tracks averages and trends.",
 };
 
 // Stats cards the person can reorder or hide. Order here is the default
@@ -251,10 +267,22 @@ export const ENVIRONMENT_QUESTION_LABELS = {
 // away -- casual forces scores-only and removes four screens, and
 // nothing previously said so.
 export const ENVIRONMENT_DESCRIPTIONS = {
-  practice: "Enables drills and the detail fields.",
-  league: "Enables money games and the team roster.",
-  tournament: "Enables blocks and the cut line.",
-  casual: "Hides everything but scores and the standings.",
+  // Round 7, findings 1 and 2.
+  //
+  // These used to name parts of the APP -- "the detail fields", "the team
+  // roster". Bowlers in their first minute have never seen either, and
+  // only the experienced groups recognised them. These name parts of
+  // BOWLING instead, which everyone already knows.
+  //
+  // The casual line names the screens that go. "Hides everything but
+  // scores and the standings" reads as simplicity to exactly the people
+  // who pick it, and they never learn History, Stats, Improve and the
+  // Vault exist -- they never saw them. Naming them is the whole point of
+  // the sentence.
+  practice: "Drills, and space to record what you changed.",
+  league: "Your team, side pots and brackets.",
+  tournament: "Blocks, squads and the cut line.",
+  casual: "Scores and standings. History, Stats, Improve and the Vault stay hidden.",
 };
 
 // Whether the coach view is switched on. Only meaningful for someone whose

@@ -24,15 +24,15 @@ const ALL_STEPS = [
     title: "Two ways to track",
     // The choice that shapes everything downstream, so it's worth its
     // own step rather than a clause in the Bowl one. A bowler who
-    // doesn't understand this picks shot-by-shot, finds it slow, and
+    // doesn't understand this picks frame tracking, finds it slow, and
     // concludes the app is heavy going -- when scores-only was there
     // the whole time.
-    body: "Shot by shot records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only just takes your final score for each game: 213, 196, 203. You can switch any time, and even start a night one way and finish the other.",
+    body: "Frame tracking records every ball — which pins fell, which ball you threw — and that's what powers spare stats and the scoresheet. Scores only just takes your final score for each game: 213, 196, 203. You can switch any time, and even start a night one way and finish the other.",
   },
   {
     id: "shot-detail",
     tab: "log",
-    title: "What shot by shot captures",
+    title: "What frame tracking captures",
     body: "Every ball: which pins fell, which pins were left, and whether you made the spare. That's what separates 'I shot 180' from knowing you left six ten pins and made two of them. Add the ball you threw and it splits your stats by equipment too.",
     when: ({ trackingMode }) => trackingMode === "shot",
   },
@@ -234,7 +234,7 @@ const ALL_STEPS = [
     // Said plainly rather than discovered: someone who opens this on
     // night one and finds it empty concludes the feature is weak, when
     // it just hasn't got enough to work with yet.
-    footnote: "This needs about ten games of shot-by-shot logging before it can say anything even somewhat meaningful, so be patient — and the more you bowl, the more tailored to you and better it'll get. Scores from casual nights aren't included.",
+    footnote: "This needs about ten games of frame tracking logging before it can say anything even somewhat meaningful, so be patient — and the more you bowl, the more tailored to you and better it'll get. Scores from casual nights aren't included.",
   },
   {
     id: "arsenal",
@@ -320,12 +320,12 @@ export function generalSteps(preferences = {}) {
 
     // Deliberately NOT filtered by trackingMode.
     //
-    // New bowlers default to scores-only, and the shot-by-shot pages --
+    // New bowlers default to scores-only, and the frame tracking pages --
     // the scoresheet, and how to record a strike, spare and open frame --
     // are all gated on trackingMode === "shot". So the basics tour
     // silently dropped five of its thirteen pages for exactly the people
     // who most needed them: the step before had just told them
-    // shot-by-shot exists, and then the tour never showed it.
+    // frame tracking exists, and then the tour never showed it.
     //
     // The tour is teaching what the app CAN do, not narrating what it's
     // set to right now.
@@ -543,7 +543,7 @@ export function needsLeagueSetup(options) {
 export const TOUR_TRACKS = [
   { key: "general",    label: "The basics",    blurb: "Logging, scoring, stats — everyone gets this" },
   { key: "casual",     label: "Open bowling",  blurb: "Scores, who won, sharing it" },
-  { key: "practice",   label: "Practice",      blurb: "Drills, goals and shot-by-shot" },
+  { key: "practice",   label: "Practice",      blurb: "Drills, goals and frame tracking" },
   { key: "league",     label: "League",        blurb: "Leagues, teams, money games" },
   { key: "tournament", label: "Tournament",    blurb: "Squads, side pots and import" },
   { key: "coach",      label: "Coaching",      blurb: "Your bowlers, tasks and sessions", coachOnly: true },

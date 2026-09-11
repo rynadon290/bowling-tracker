@@ -133,7 +133,7 @@ export function lockedStatsMessage(cardIds, counts) {
     `${n} ${n === 1 ? "stat unlocks" : "stats unlock"} if you ${how}`;
 
   const parts = [];
-  if (shotLocked) parts.push(phrase(shotLocked, "track shot by shot"));
+  if (shotLocked) parts.push(phrase(shotLocked, "use frame tracking"));
   if (ballLocked) parts.push(phrase(ballLocked, "note which ball bowled each game"));
 
   // The reassurance only makes sense when there are two things to
