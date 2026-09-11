@@ -77,7 +77,7 @@ column,bowler_profiles,book_season,text
 column,bowler_profiles,bowler_name,text NOT NULL
 column,bowler_profiles,created_at,timestamp with time zone NOT NULL
 column,bowler_profiles,created_by,uuid
-column,bowler_profiles,home_centers,ARRAY NOT NULL
+column,bowler_profiles,home_centers,text[] NOT NULL
 column,bowler_profiles,id,uuid NOT NULL
 column,bowler_profiles,is_coach,boolean NOT NULL
 column,bowler_profiles,left_handed,boolean NOT NULL
@@ -150,10 +150,12 @@ column,imported_scores,bowler_name,text NOT NULL
 column,imported_scores,bowler_user_id,uuid
 column,imported_scores,corrected_by,uuid
 column,imported_scores,corrected_scores,jsonb
+column,imported_scores,corrected_shots,jsonb
 column,imported_scores,created_at,timestamp with time zone NOT NULL
 column,imported_scores,date,date NOT NULL
 column,imported_scores,id,uuid NOT NULL
 column,imported_scores,imported_scores,jsonb NOT NULL
+column,imported_scores,imported_shots,jsonb
 column,imported_scores,league_id,uuid
 column,imported_scores,note,text
 column,imported_scores,responded_at,timestamp with time zone
@@ -187,7 +189,7 @@ column,manual_scores,date,date NOT NULL
 column,manual_scores,game,integer NOT NULL
 column,manual_scores,id,uuid NOT NULL
 column,manual_scores,league_id,uuid
-column,manual_scores,score,integer NOT NULL
+column,manual_scores,score,integer
 column,manual_scores,surface,text
 column,manual_scores,updated_at,timestamp with time zone NOT NULL
 column,manual_scores,user_id,uuid
@@ -216,6 +218,7 @@ column,oil_patterns,volume_ml,numeric
 column,oil_patterns,year,integer
 column,pending_invites,accepted_at,timestamp with time zone
 column,pending_invites,accepted_user_id,uuid
+column,pending_invites,code_expires_at,timestamp with time zone
 column,pending_invites,created_at,timestamp with time zone NOT NULL
 column,pending_invites,created_by,uuid
 column,pending_invites,declined_at,timestamp with time zone
@@ -225,6 +228,7 @@ column,pending_invites,invited_name,text NOT NULL
 column,pending_invites,is_sub,boolean NOT NULL
 column,pending_invites,left_handed,boolean NOT NULL
 column,pending_invites,lineup_position,integer
+column,pending_invites,signup_code,text
 column,pending_invites,team_id,uuid NOT NULL
 column,profiles,created_at,timestamp with time zone NOT NULL
 column,profiles,display_name,text NOT NULL
@@ -234,19 +238,20 @@ column,sessions,balls_used,jsonb NOT NULL
 column,sessions,bowler_name,text NOT NULL
 column,sessions,created_at,timestamp with time zone NOT NULL
 column,sessions,date,date NOT NULL
-column,sessions,high_game_cost,ARRAY NOT NULL
-column,sessions,high_game_winnings,ARRAY NOT NULL
+column,sessions,high_game_cost,numeric[] NOT NULL
+column,sessions,high_game_winnings,numeric[] NOT NULL
 column,sessions,id,uuid NOT NULL
 column,sessions,jackpot_winnings,numeric NOT NULL
 column,sessions,league_id,uuid
 column,sessions,misses,jsonb NOT NULL
 column,sessions,poker_dollar,jsonb NOT NULL
-column,sessions,poker_dollar_cost,ARRAY NOT NULL
+column,sessions,poker_dollar_cost,numeric[] NOT NULL
 column,sessions,poker_quarter,jsonb NOT NULL
-column,sessions,poker_quarter_cost,ARRAY NOT NULL
+column,sessions,poker_quarter_cost,numeric[] NOT NULL
+column,sessions,prebowled_on,date
 column,sessions,releases,jsonb NOT NULL
 column,sessions,ringing_tens,integer NOT NULL
-column,sessions,scores,ARRAY NOT NULL
+column,sessions,scores,integer[] NOT NULL
 column,sessions,shot_count,integer NOT NULL
 column,sessions,single_pin_leaves,integer NOT NULL
 column,sessions,single_pin_spares,integer NOT NULL
@@ -279,6 +284,7 @@ column,shots,frame,integer NOT NULL
 column,shots,game,integer NOT NULL
 column,shots,heel_number,text
 column,shots,id,uuid NOT NULL
+column,shots,imported_from,uuid
 column,shots,lane,text
 column,shots,league_id,uuid
 column,shots,miss,jsonb NOT NULL
@@ -297,6 +303,11 @@ column,shots,target_arrows,text
 column,shots,team_id,uuid
 column,shots,updated_at,timestamp with time zone NOT NULL
 column,shots,user_id,uuid NOT NULL
+column,sync_tombstones,deleted_at,timestamp with time zone NOT NULL
+column,sync_tombstones,id,uuid NOT NULL
+column,sync_tombstones,row_id,uuid NOT NULL
+column,sync_tombstones,table_name,text NOT NULL
+column,sync_tombstones,user_id,uuid NOT NULL
 column,team_members,is_sub,boolean NOT NULL
 column,team_members,joined_at,timestamp with time zone NOT NULL
 column,team_members,left_handed,boolean NOT NULL
@@ -317,6 +328,8 @@ column,tournaments,id,uuid NOT NULL
 column,tournaments,match_play,jsonb NOT NULL
 column,tournaments,name,text NOT NULL
 column,tournaments,notes,text
+column,tournaments,placement,text
+column,tournaments,placement_note,text
 column,tournaments,side_pots,jsonb NOT NULL
 column,tournaments,updated_at,timestamp with time zone NOT NULL
 column,tournaments,user_id,uuid
@@ -324,330 +337,293 @@ column,tournaments,winnings,numeric
 column,user_preferences,preferences,jsonb NOT NULL
 column,user_preferences,updated_at,timestamp with time zone
 column,user_preferences,user_id,uuid NOT NULL
-constraint,api_usage,2200_18997_1_not_null,CHECK ()
-constraint,api_usage,2200_18997_2_not_null,CHECK ()
-constraint,api_usage,2200_18997_3_not_null,CHECK ()
-constraint,api_usage,2200_18997_4_not_null,CHECK ()
 constraint,api_usage,api_usage_pkey,PRIMARY KEY (id)
-constraint,api_usage,api_usage_user_id_fkey,FOREIGN KEY (user_id)
-constraint,arsenals,2200_18416_1_not_null,CHECK ()
-constraint,arsenals,2200_18416_2_not_null,CHECK ()
+constraint,api_usage,api_usage_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,arsenals,arsenal_pkey,PRIMARY KEY (id)
-constraint,arsenals,arsenals_core_type_check,CHECK ()
-constraint,arsenals,arsenals_coverstock_check,CHECK ()
-constraint,arsenals,arsenals_group_id_fkey,FOREIGN KEY (group_id)
-constraint,arsenals,arsenals_layout_system_check,CHECK ()
-constraint,bags,2200_18583_1_not_null,CHECK ()
-constraint,bags,2200_18583_3_not_null,CHECK ()
-constraint,bags,2200_18583_4_not_null,CHECK ()
-constraint,bags,2200_18583_5_not_null,CHECK ()
-constraint,bags,2200_18583_7_not_null,CHECK ()
-constraint,bags,2200_18583_8_not_null,CHECK ()
-constraint,bags,bags_bag_type_check,CHECK ()
-constraint,bags,bags_created_by_bowler_name_name_key,"UNIQUE (created_by,bowler_name,name)"
-constraint,bags,bags_created_by_fkey,FOREIGN KEY (created_by)
+constraint,arsenals,arsenals_core_type_check,"CHECK (((core_type IS NULL) OR (core_type = ANY (ARRAY['symmetric'::text, 'asymmetric'::text]))))"
+constraint,arsenals,arsenals_coverstock_check,"CHECK (((coverstock IS NULL) OR (coverstock = ANY (ARRAY['solid'::text, 'pearl'::text, 'hybrid'::text]))))"
+constraint,arsenals,arsenals_group_id_fkey,FOREIGN KEY (group_id) REFERENCES ball_groups(id) ON DELETE SET NULL
+constraint,arsenals,arsenals_layout_system_check,"CHECK (((layout_system IS NULL) OR (layout_system = ANY (ARRAY['dual_angle'::text, 'vls'::text, '2ls'::text]))))"
+constraint,bags,bags_bag_type_check,"CHECK ((bag_type = ANY (ARRAY['league'::text, 'tournament'::text])))"
+constraint,bags,bags_created_by_bowler_name_name_key,"UNIQUE (created_by, bowler_name, name)"
+constraint,bags,bags_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,bags,bags_pkey,PRIMARY KEY (id)
-constraint,ball_bags,2200_18613_1_not_null,CHECK ()
-constraint,ball_bags,2200_18613_3_not_null,CHECK ()
-constraint,ball_bags,2200_18613_4_not_null,CHECK ()
-constraint,ball_bags,2200_18613_5_not_null,CHECK ()
-constraint,ball_bags,2200_18613_6_not_null,CHECK ()
-constraint,ball_bags,ball_bags_bag_id_fkey,FOREIGN KEY (bag_id)
-constraint,ball_bags,ball_bags_created_by_bowler_name_ball_bag_id_key,"UNIQUE (created_by,bowler_name,ball,bag_id)"
-constraint,ball_bags,ball_bags_created_by_fkey,FOREIGN KEY (created_by)
+constraint,ball_bags,ball_bags_bag_id_fkey,FOREIGN KEY (bag_id) REFERENCES bags(id) ON DELETE CASCADE
+constraint,ball_bags,ball_bags_created_by_bowler_name_ball_bag_id_key,"UNIQUE (created_by, bowler_name, ball, bag_id)"
+constraint,ball_bags,ball_bags_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,ball_bags,ball_bags_pkey,PRIMARY KEY (id)
-constraint,ball_confirmations,2200_18689_1_not_null,CHECK ()
-constraint,ball_confirmations,2200_18689_2_not_null,CHECK ()
-constraint,ball_confirmations,2200_18689_4_not_null,CHECK ()
-constraint,ball_confirmations,2200_18689_5_not_null,CHECK ()
-constraint,ball_confirmations,ball_confirmations_confirmed_by_fkey,FOREIGN KEY (confirmed_by)
+constraint,ball_confirmations,ball_confirmations_confirmed_by_fkey,FOREIGN KEY (confirmed_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,ball_confirmations,ball_confirmations_pkey,PRIMARY KEY (id)
-constraint,ball_confirmations,ball_confirmations_submission_id_confirmed_by_key,"UNIQUE (submission_id,confirmed_by)"
-constraint,ball_confirmations,ball_confirmations_submission_id_fkey,FOREIGN KEY (submission_id)
-constraint,ball_confirmations,ball_confirmations_vote_check,CHECK ()
-constraint,ball_groups,2200_18641_1_not_null,CHECK ()
-constraint,ball_groups,2200_18641_3_not_null,CHECK ()
-constraint,ball_groups,2200_18641_4_not_null,CHECK ()
-constraint,ball_groups,2200_18641_5_not_null,CHECK ()
-constraint,ball_groups,2200_18641_6_not_null,CHECK ()
-constraint,ball_groups,ball_groups_created_by_bowler_name_name_key,"UNIQUE (created_by,bowler_name,name)"
-constraint,ball_groups,ball_groups_created_by_fkey,FOREIGN KEY (created_by)
+constraint,ball_confirmations,ball_confirmations_submission_id_confirmed_by_key,"UNIQUE (submission_id, confirmed_by)"
+constraint,ball_confirmations,ball_confirmations_submission_id_fkey,FOREIGN KEY (submission_id) REFERENCES ball_submissions(id) ON DELETE CASCADE
+constraint,ball_confirmations,ball_confirmations_vote_check,"CHECK ((vote = ANY (ARRAY['approve'::text, 'reject'::text])))"
+constraint,ball_groups,ball_groups_created_by_bowler_name_name_key,"UNIQUE (created_by, bowler_name, name)"
+constraint,ball_groups,ball_groups_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,ball_groups,ball_groups_pkey,PRIMARY KEY (id)
-constraint,ball_submissions,2200_18671_12_not_null,CHECK ()
-constraint,ball_submissions,2200_18671_13_not_null,CHECK ()
-constraint,ball_submissions,2200_18671_14_not_null,CHECK ()
-constraint,ball_submissions,2200_18671_1_not_null,CHECK ()
-constraint,ball_submissions,2200_18671_3_not_null,CHECK ()
-constraint,ball_submissions,2200_18671_4_not_null,CHECK ()
 constraint,ball_submissions,ball_submissions_pkey,PRIMARY KEY (id)
-constraint,ball_submissions,ball_submissions_submitted_by_ball_key_key,"UNIQUE (submitted_by,ball_key)"
-constraint,ball_submissions,ball_submissions_submitted_by_fkey,FOREIGN KEY (submitted_by)
-constraint,bowler_goals,2200_18824_1_not_null,CHECK ()
-constraint,bowler_goals,2200_18824_3_not_null,CHECK ()
-constraint,bowler_goals,2200_18824_4_not_null,CHECK ()
-constraint,bowler_goals,2200_18824_5_not_null,CHECK ()
-constraint,bowler_goals,2200_18824_6_not_null,CHECK ()
-constraint,bowler_goals,bowler_goals_created_by_bowler_name_key,"UNIQUE (created_by,bowler_name)"
-constraint,bowler_goals,bowler_goals_created_by_fkey,FOREIGN KEY (created_by)
+constraint,ball_submissions,ball_submissions_submitted_by_ball_key_key,"UNIQUE (submitted_by, ball_key)"
+constraint,ball_submissions,ball_submissions_submitted_by_fkey,FOREIGN KEY (submitted_by) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,bowler_goals,bowler_goals_created_by_bowler_name_key,"UNIQUE (created_by, bowler_name)"
+constraint,bowler_goals,bowler_goals_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,bowler_goals,bowler_goals_pkey,PRIMARY KEY (id)
-constraint,bowler_names,2200_18399_1_not_null,CHECK ()
-constraint,bowler_names,2200_18399_2_not_null,CHECK ()
-constraint,bowler_names,2200_18399_5_not_null,CHECK ()
 constraint,bowler_names,bowler_names_pkey,PRIMARY KEY (id)
-constraint,bowler_profiles,2200_18508_14_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_1_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_3_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_4_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_5_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_6_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_8_not_null,CHECK ()
-constraint,bowler_profiles,2200_18508_9_not_null,CHECK ()
-constraint,bowler_profiles,bowler_profiles_created_by_bowler_name_key,"UNIQUE (created_by,bowler_name)"
-constraint,bowler_profiles,bowler_profiles_created_by_fkey,FOREIGN KEY (created_by)
-constraint,bowler_profiles,bowler_profiles_owner_name_key,"UNIQUE (created_by,bowler_name)"
+constraint,bowler_profiles,bowler_profiles_created_by_bowler_name_key,"UNIQUE (created_by, bowler_name)"
+constraint,bowler_profiles,bowler_profiles_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,bowler_profiles,bowler_profiles_owner_name_key,"UNIQUE (created_by, bowler_name)"
 constraint,bowler_profiles,bowler_profiles_pkey,PRIMARY KEY (id)
-constraint,bowling_centers,2200_18727_12_not_null,CHECK ()
-constraint,bowling_centers,2200_18727_1_not_null,CHECK ()
-constraint,bowling_centers,2200_18727_3_not_null,CHECK ()
-constraint,bowling_centers,bowling_centers_created_by_fkey,FOREIGN KEY (created_by)
+constraint,bowling_centers,bowling_centers_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
 constraint,bowling_centers,bowling_centers_here_id_key,UNIQUE (here_id)
 constraint,bowling_centers,bowling_centers_pkey,PRIMARY KEY (id)
-constraint,coaching_notes,2200_18906_1_not_null,CHECK ()
-constraint,coaching_notes,2200_18906_2_not_null,CHECK ()
-constraint,coaching_notes,2200_18906_3_not_null,CHECK ()
-constraint,coaching_notes,2200_18906_4_not_null,CHECK ()
-constraint,coaching_notes,2200_18906_5_not_null,CHECK ()
-constraint,coaching_notes,coaching_notes_author_id_fkey,FOREIGN KEY (author_id)
+constraint,coaching_notes,coaching_notes_author_id_fkey,FOREIGN KEY (author_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,coaching_notes,coaching_notes_pkey,PRIMARY KEY (id)
-constraint,coaching_notes,coaching_notes_relationship_id_fkey,FOREIGN KEY (relationship_id)
-constraint,coaching_relationships,2200_18854_1_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_2_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_3_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_4_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_5_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_6_not_null,CHECK ()
-constraint,coaching_relationships,2200_18854_7_not_null,CHECK ()
-constraint,coaching_relationships,coaching_relationships_bowler_id_fkey,FOREIGN KEY (bowler_id)
-constraint,coaching_relationships,coaching_relationships_check,CHECK ()
-constraint,coaching_relationships,coaching_relationships_coach_id_bowler_id_key,"UNIQUE (coach_id,bowler_id)"
-constraint,coaching_relationships,coaching_relationships_coach_id_fkey,FOREIGN KEY (coach_id)
+constraint,coaching_notes,coaching_notes_relationship_id_fkey,FOREIGN KEY (relationship_id) REFERENCES coaching_relationships(id) ON DELETE CASCADE
+constraint,coaching_relationships,coaching_relationships_bowler_id_fkey,FOREIGN KEY (bowler_id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,coaching_relationships,coaching_relationships_check,CHECK ((coach_id <> bowler_id))
+constraint,coaching_relationships,coaching_relationships_coach_id_bowler_id_key,"UNIQUE (coach_id, bowler_id)"
+constraint,coaching_relationships,coaching_relationships_coach_id_fkey,FOREIGN KEY (coach_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,coaching_relationships,coaching_relationships_pkey,PRIMARY KEY (id)
-constraint,coaching_relationships,coaching_relationships_requested_by_fkey,FOREIGN KEY (requested_by)
-constraint,coaching_relationships,coaching_relationships_status_check,CHECK ()
-constraint,coaching_tasks,2200_18884_13_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_14_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_1_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_2_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_3_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_4_not_null,CHECK ()
-constraint,coaching_tasks,2200_18884_9_not_null,CHECK ()
-constraint,coaching_tasks,coaching_tasks_assigned_by_fkey,FOREIGN KEY (assigned_by)
+constraint,coaching_relationships,coaching_relationships_requested_by_fkey,FOREIGN KEY (requested_by) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,coaching_relationships,coaching_relationships_status_check,"CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text])))"
+constraint,coaching_tasks,coaching_tasks_assigned_by_fkey,FOREIGN KEY (assigned_by) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,coaching_tasks,coaching_tasks_pkey,PRIMARY KEY (id)
-constraint,coaching_tasks,coaching_tasks_relationship_id_fkey,FOREIGN KEY (relationship_id)
-constraint,coaching_tasks,coaching_tasks_status_check,CHECK ()
-constraint,drills,2200_18776_11_not_null,CHECK ()
-constraint,drills,2200_18776_1_not_null,CHECK ()
-constraint,drills,2200_18776_3_not_null,CHECK ()
-constraint,drills,2200_18776_4_not_null,CHECK ()
-constraint,drills,2200_18776_5_not_null,CHECK ()
-constraint,drills,2200_18776_8_not_null,CHECK ()
-constraint,drills,2200_18776_9_not_null,CHECK ()
+constraint,coaching_tasks,coaching_tasks_relationship_id_fkey,FOREIGN KEY (relationship_id) REFERENCES coaching_relationships(id) ON DELETE CASCADE
+constraint,coaching_tasks,coaching_tasks_status_check,"CHECK ((status = ANY (ARRAY['open'::text, 'completed'::text, 'attempted'::text])))"
 constraint,drills,drills_pkey,PRIMARY KEY (id)
-constraint,drills,drills_user_id_fkey,FOREIGN KEY (user_id)
-constraint,friendships,2200_17856_1_not_null,CHECK ()
-constraint,friendships,2200_17856_2_not_null,CHECK ()
-constraint,friendships,2200_17856_3_not_null,CHECK ()
-constraint,friendships,2200_17856_4_not_null,CHECK ()
-constraint,friendships,2200_17856_5_not_null,CHECK ()
-constraint,friendships,friendships_addressee_id_fkey,FOREIGN KEY (addressee_id)
-constraint,friendships,friendships_check,CHECK ()
+constraint,drills,drills_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,friendships,friendships_addressee_id_fkey,FOREIGN KEY (addressee_id) REFERENCES profiles(id) ON DELETE CASCADE
+constraint,friendships,friendships_check,CHECK ((requester_id <> addressee_id))
 constraint,friendships,friendships_pkey,PRIMARY KEY (id)
-constraint,friendships,friendships_requester_id_addressee_id_key,"UNIQUE (requester_id,addressee_id)"
-constraint,friendships,friendships_requester_id_fkey,FOREIGN KEY (requester_id)
-constraint,friendships,friendships_status_check,CHECK ()
-constraint,hidden_leagues,2200_18752_1_not_null,CHECK ()
-constraint,hidden_leagues,2200_18752_4_not_null,CHECK ()
-constraint,hidden_leagues,hidden_leagues_league_id_fkey,FOREIGN KEY (league_id)
+constraint,friendships,friendships_requester_id_addressee_id_key,"UNIQUE (requester_id, addressee_id)"
+constraint,friendships,friendships_requester_id_fkey,FOREIGN KEY (requester_id) REFERENCES profiles(id) ON DELETE CASCADE
+constraint,friendships,friendships_status_check,"CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text])))"
+constraint,hidden_leagues,hidden_leagues_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
 constraint,hidden_leagues,hidden_leagues_pkey,PRIMARY KEY (id)
-constraint,hidden_leagues,hidden_leagues_user_id_fkey,FOREIGN KEY (user_id)
-constraint,hidden_leagues,hidden_leagues_user_id_league_id_key,"UNIQUE (user_id,league_id)"
-constraint,imported_scores,2200_18950_10_not_null,CHECK ()
-constraint,imported_scores,2200_18950_14_not_null,CHECK ()
-constraint,imported_scores,2200_18950_15_not_null,CHECK ()
-constraint,imported_scores,2200_18950_1_not_null,CHECK ()
-constraint,imported_scores,2200_18950_3_not_null,CHECK ()
-constraint,imported_scores,2200_18950_4_not_null,CHECK ()
-constraint,imported_scores,2200_18950_7_not_null,CHECK ()
-constraint,imported_scores,2200_18950_8_not_null,CHECK ()
-constraint,imported_scores,imported_scores_bowler_user_id_fkey,FOREIGN KEY (bowler_user_id)
-constraint,imported_scores,imported_scores_corrected_by_fkey,FOREIGN KEY (corrected_by)
+constraint,hidden_leagues,hidden_leagues_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,hidden_leagues,hidden_leagues_user_id_league_id_key,"UNIQUE (user_id, league_id)"
+constraint,imported_scores,imported_scores_bowler_user_id_fkey,FOREIGN KEY (bowler_user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,imported_scores,imported_scores_corrected_by_fkey,FOREIGN KEY (corrected_by) REFERENCES auth.users(id) ON DELETE SET NULL
 constraint,imported_scores,imported_scores_pkey,PRIMARY KEY (id)
-constraint,imported_scores,imported_scores_status_check,CHECK ()
-constraint,imported_scores,imported_scores_uploaded_by_fkey,FOREIGN KEY (uploaded_by)
-constraint,lane_patterns,2200_18185_10_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_11_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_12_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_1_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_4_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_5_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_6_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_7_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_8_not_null,CHECK ()
-constraint,lane_patterns,2200_18185_9_not_null,CHECK ()
-constraint,lane_patterns,lane_patterns_league_id_fkey,FOREIGN KEY (league_id)
+constraint,imported_scores,imported_scores_status_check,"CHECK ((status = ANY (ARRAY['pending'::text, 'verified'::text, 'corrected'::text, 'rejected'::text])))"
+constraint,imported_scores,imported_scores_uploaded_by_fkey,FOREIGN KEY (uploaded_by) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,lane_patterns,lane_patterns_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
 constraint,lane_patterns,lane_patterns_pkey,PRIMARY KEY (id)
-constraint,lane_patterns,lane_patterns_team_id_date_lane_key,"UNIQUE (team_id,date,lane)"
-constraint,lane_patterns,lane_patterns_team_id_fkey,FOREIGN KEY (team_id)
-constraint,leagues,2200_17793_1_not_null,CHECK ()
-constraint,leagues,2200_17793_2_not_null,CHECK ()
-constraint,leagues,2200_17793_4_not_null,CHECK ()
-constraint,leagues,leagues_center_id_fkey,FOREIGN KEY (center_id)
-constraint,leagues,leagues_created_by_fkey,FOREIGN KEY (created_by)
+constraint,lane_patterns,lane_patterns_team_id_date_lane_key,"UNIQUE (team_id, date, lane)"
+constraint,lane_patterns,lane_patterns_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+constraint,leagues,leagues_center_id_fkey,FOREIGN KEY (center_id) REFERENCES bowling_centers(id) ON DELETE SET NULL
+constraint,leagues,leagues_created_by_fkey,FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL
 constraint,leagues,leagues_pkey,PRIMARY KEY (id)
-constraint,manual_scores,2200_18555_1_not_null,CHECK ()
-constraint,manual_scores,2200_18555_3_not_null,CHECK ()
-constraint,manual_scores,2200_18555_5_not_null,CHECK ()
-constraint,manual_scores,2200_18555_6_not_null,CHECK ()
-constraint,manual_scores,2200_18555_7_not_null,CHECK ()
-constraint,manual_scores,2200_18555_8_not_null,CHECK ()
-constraint,manual_scores,2200_18555_9_not_null,CHECK ()
-constraint,manual_scores,manual_scores_league_id_fkey,FOREIGN KEY (league_id)
+constraint,manual_scores,manual_scores_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
 constraint,manual_scores,manual_scores_pkey,PRIMARY KEY (id)
-constraint,manual_scores,manual_scores_slot_key,"UNIQUE (user_id,bowler_name,league_id,date,game)"
-constraint,manual_scores,manual_scores_user_id_bowler_name_league_id_date_game_key,"UNIQUE (user_id,bowler_name,league_id,date,game)"
-constraint,manual_scores,manual_scores_user_id_fkey,FOREIGN KEY (user_id)
-constraint,matches,2200_18154_10_not_null,CHECK ()
-constraint,matches,2200_18154_1_not_null,CHECK ()
-constraint,matches,2200_18154_4_not_null,CHECK ()
-constraint,matches,2200_18154_5_not_null,CHECK ()
-constraint,matches,2200_18154_7_not_null,CHECK ()
-constraint,matches,2200_18154_8_not_null,CHECK ()
-constraint,matches,2200_18154_9_not_null,CHECK ()
-constraint,matches,matches_league_id_fkey,FOREIGN KEY (league_id)
+constraint,manual_scores,manual_scores_slot_key,"UNIQUE (user_id, bowler_name, league_id, date, game)"
+constraint,manual_scores,manual_scores_user_id_bowler_name_league_id_date_game_key,"UNIQUE (user_id, bowler_name, league_id, date, game)"
+constraint,manual_scores,manual_scores_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+constraint,matches,matches_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
 constraint,matches,matches_pkey,PRIMARY KEY (id)
-constraint,matches,matches_team_id_date_key,"UNIQUE (team_id,date)"
-constraint,matches,matches_team_id_fkey,FOREIGN KEY (team_id)
-constraint,oil_patterns,2200_18800_12_not_null,CHECK ()
-constraint,oil_patterns,2200_18800_1_not_null,CHECK ()
-constraint,oil_patterns,2200_18800_2_not_null,CHECK ()
-constraint,oil_patterns,2200_18800_9_not_null,CHECK ()
-constraint,oil_patterns,oil_patterns_created_by_fkey,FOREIGN KEY (created_by)
+constraint,matches,matches_team_id_date_key,"UNIQUE (team_id, date)"
+constraint,matches,matches_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+constraint,oil_patterns,oil_patterns_created_by_fkey,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
 constraint,oil_patterns,oil_patterns_name_key,UNIQUE (name)
 constraint,oil_patterns,oil_patterns_pkey,PRIMARY KEY (id)
-constraint,pending_invites,2200_18123_10_not_null,CHECK ()
-constraint,pending_invites,2200_18123_11_not_null,CHECK ()
-constraint,pending_invites,2200_18123_1_not_null,CHECK ()
-constraint,pending_invites,2200_18123_2_not_null,CHECK ()
-constraint,pending_invites,2200_18123_3_not_null,CHECK ()
-constraint,pending_invites,2200_18123_7_not_null,CHECK ()
-constraint,pending_invites,pending_invites_accepted_user_id_fkey,FOREIGN KEY (accepted_user_id)
-constraint,pending_invites,pending_invites_created_by_fkey,FOREIGN KEY (created_by)
+constraint,pending_invites,pending_invites_accepted_user_id_fkey,FOREIGN KEY (accepted_user_id) REFERENCES profiles(id) ON DELETE SET NULL
+constraint,pending_invites,pending_invites_created_by_fkey,FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL
 constraint,pending_invites,pending_invites_pkey,PRIMARY KEY (id)
-constraint,pending_invites,pending_invites_team_id_fkey,FOREIGN KEY (team_id)
-constraint,pending_invites,pending_invites_team_id_invited_email_key,"UNIQUE (team_id,invited_email)"
-constraint,profiles,2200_17776_1_not_null,CHECK ()
-constraint,profiles,2200_17776_2_not_null,CHECK ()
-constraint,profiles,2200_17776_3_not_null,CHECK ()
-constraint,profiles,profiles_id_fkey,FOREIGN KEY (id)
+constraint,pending_invites,pending_invites_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+constraint,pending_invites,pending_invites_team_id_invited_email_key,"UNIQUE (team_id, invited_email)"
+constraint,profiles,profiles_id_fkey,FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,profiles,profiles_pkey,PRIMARY KEY (id)
-constraint,sessions,2200_18065_10_not_null,CHECK ()
-constraint,sessions,2200_18065_11_not_null,CHECK ()
-constraint,sessions,2200_18065_12_not_null,CHECK ()
-constraint,sessions,2200_18065_13_not_null,CHECK ()
-constraint,sessions,2200_18065_14_not_null,CHECK ()
-constraint,sessions,2200_18065_15_not_null,CHECK ()
-constraint,sessions,2200_18065_16_not_null,CHECK ()
-constraint,sessions,2200_18065_17_not_null,CHECK ()
-constraint,sessions,2200_18065_18_not_null,CHECK ()
-constraint,sessions,2200_18065_19_not_null,CHECK ()
-constraint,sessions,2200_18065_1_not_null,CHECK ()
-constraint,sessions,2200_18065_20_not_null,CHECK ()
-constraint,sessions,2200_18065_21_not_null,CHECK ()
-constraint,sessions,2200_18065_22_not_null,CHECK ()
-constraint,sessions,2200_18065_23_not_null,CHECK ()
-constraint,sessions,2200_18065_24_not_null,CHECK ()
-constraint,sessions,2200_18065_25_not_null,CHECK ()
-constraint,sessions,2200_18065_26_not_null,CHECK ()
-constraint,sessions,2200_18065_27_not_null,CHECK ()
-constraint,sessions,2200_18065_28_not_null,CHECK ()
-constraint,sessions,2200_18065_29_not_null,CHECK ()
-constraint,sessions,2200_18065_2_not_null,CHECK ()
-constraint,sessions,2200_18065_30_not_null,CHECK ()
-constraint,sessions,2200_18065_31_not_null,CHECK ()
-constraint,sessions,2200_18065_32_not_null,CHECK ()
-constraint,sessions,2200_18065_33_not_null,CHECK ()
-constraint,sessions,2200_18065_34_not_null,CHECK ()
-constraint,sessions,2200_18065_5_not_null,CHECK ()
-constraint,sessions,2200_18065_6_not_null,CHECK ()
-constraint,sessions,2200_18065_7_not_null,CHECK ()
-constraint,sessions,sessions_bowler_name_league_id_date_key,"UNIQUE (bowler_name,league_id,date)"
-constraint,sessions,sessions_league_id_fkey,FOREIGN KEY (league_id)
+constraint,sessions,sessions_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
 constraint,sessions,sessions_pkey,PRIMARY KEY (id)
-constraint,sessions,sessions_team_id_fkey,FOREIGN KEY (team_id)
-constraint,sessions,sessions_user_id_fkey,FOREIGN KEY (user_id)
-constraint,shots,2200_17887_14_not_null,CHECK ()
-constraint,shots,2200_17887_15_not_null,CHECK ()
-constraint,shots,2200_17887_16_not_null,CHECK ()
-constraint,shots,2200_17887_17_not_null,CHECK ()
-constraint,shots,2200_17887_18_not_null,CHECK ()
-constraint,shots,2200_17887_19_not_null,CHECK ()
-constraint,shots,2200_17887_1_not_null,CHECK ()
-constraint,shots,2200_17887_20_not_null,CHECK ()
-constraint,shots,2200_17887_21_not_null,CHECK ()
-constraint,shots,2200_17887_22_not_null,CHECK ()
-constraint,shots,2200_17887_23_not_null,CHECK ()
-constraint,shots,2200_17887_24_not_null,CHECK ()
-constraint,shots,2200_17887_25_not_null,CHECK ()
-constraint,shots,2200_17887_26_not_null,CHECK ()
-constraint,shots,2200_17887_27_not_null,CHECK ()
-constraint,shots,2200_17887_2_not_null,CHECK ()
-constraint,shots,2200_17887_5_not_null,CHECK ()
-constraint,shots,2200_17887_6_not_null,CHECK ()
-constraint,shots,2200_17887_7_not_null,CHECK ()
-constraint,shots,shots_league_id_fkey,FOREIGN KEY (league_id)
+constraint,sessions,sessions_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+constraint,sessions,sessions_user_id_bowler_name_league_id_date_key,"UNIQUE (user_id, bowler_name, league_id, date)"
+constraint,sessions,sessions_user_id_fkey,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+constraint,shots,shots_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE SET NULL
 constraint,shots,shots_pkey,PRIMARY KEY (id)
-constraint,shots,shots_team_id_fkey,FOREIGN KEY (team_id)
-constraint,shots,shots_user_id_fkey,FOREIGN KEY (user_id)
-constraint,team_members,2200_17834_1_not_null,CHECK ()
-constraint,team_members,2200_17834_2_not_null,CHECK ()
-constraint,team_members,2200_17834_4_not_null,CHECK ()
-constraint,team_members,2200_17834_5_not_null,CHECK ()
-constraint,team_members,2200_17834_6_not_null,CHECK ()
-constraint,team_members,team_members_pkey,"PRIMARY KEY (team_id,user_id)"
-constraint,team_members,team_members_team_id_fkey,FOREIGN KEY (team_id)
-constraint,team_members,team_members_user_id_fkey,FOREIGN KEY (user_id)
-constraint,teams,2200_17812_1_not_null,CHECK ()
-constraint,teams,2200_17812_2_not_null,CHECK ()
-constraint,teams,2200_17812_3_not_null,CHECK ()
-constraint,teams,2200_17812_5_not_null,CHECK ()
-constraint,teams,teams_created_by_fkey,FOREIGN KEY (created_by)
-constraint,teams,teams_league_id_fkey,FOREIGN KEY (league_id)
+constraint,shots,shots_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+constraint,shots,shots_user_id_fkey,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+constraint,sync_tombstones,sync_tombstones_pkey,PRIMARY KEY (id)
+constraint,team_members,team_members_pkey,"PRIMARY KEY (team_id, user_id)"
+constraint,team_members,team_members_team_id_fkey,FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+constraint,team_members,team_members_user_id_fkey,FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+constraint,teams,teams_created_by_fkey,FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL
+constraint,teams,teams_league_id_fkey,FOREIGN KEY (league_id) REFERENCES leagues(id) ON DELETE CASCADE
 constraint,teams,teams_pkey,PRIMARY KEY (id)
-constraint,tournaments,2200_18533_10_not_null,CHECK ()
-constraint,tournaments,2200_18533_11_not_null,CHECK ()
-constraint,tournaments,2200_18533_12_not_null,CHECK ()
-constraint,tournaments,2200_18533_13_not_null,CHECK ()
-constraint,tournaments,2200_18533_1_not_null,CHECK ()
-constraint,tournaments,2200_18533_3_not_null,CHECK ()
-constraint,tournaments,2200_18533_4_not_null,CHECK ()
-constraint,tournaments,2200_18533_6_not_null,CHECK ()
 constraint,tournaments,tournaments_pkey,PRIMARY KEY (id)
-constraint,tournaments,tournaments_user_id_fkey,FOREIGN KEY (user_id)
-constraint,user_preferences,2200_18485_1_not_null,CHECK ()
-constraint,user_preferences,2200_18485_2_not_null,CHECK ()
+constraint,tournaments,tournaments_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,user_preferences,user_preferences_pkey,PRIMARY KEY (user_id)
-constraint,user_preferences,user_preferences_user_id_fkey,FOREIGN KEY (user_id)
+constraint,user_preferences,user_preferences_user_id_fkey,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint,user_preferences,user_preferences_user_id_key,UNIQUE (user_id)
-function,accept_team_invite,invite_id uuid,security definer
-function,are_friends,other_user uuid,security definer
-function,check_api_rate_limit,"p_endpoint text, p_limit integer, p_window interval",security definer
-function,coached_bowler_handedness,,security definer
-function,handle_new_user,,security definer
-function,is_accepted_coach_of,target_bowler_id uuid,security definer
-function,is_league_member,check_league_id uuid,security definer
-function,is_team_member,check_team_id uuid,security definer
-function,prune_api_usage,,security definer
-function,teammate_bowler_profiles,,security definer
+policy,arsenals,teammates can view each other's arsenal entries,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = arsenals.created_by)))) :: check none :: to authenticated"
+policy,arsenals,users can add their own arsenal entries,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,arsenals,users can remove their own arsenal entries,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,arsenals,users can update their own arsenal entries,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,arsenals,users can view their own arsenal entries,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bags,teammates can view each other's bags,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bags.created_by)))) :: check none :: to authenticated"
+policy,bags,users can delete their own bags,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bags,users can insert their own bags,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bags,users can update their own bags,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bags,users can view their own bags,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_bags,teammates can view each other's ball bag assignments,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_bags.created_by)))) :: check none :: to authenticated"
+policy,ball_bags,users can delete their own ball bag assignments,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_bags,users can insert their own ball bag assignments,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_bags,users can update their own ball bag assignments,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_bags,users can view their own ball bag assignments,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_confirmations,anyone can read confirmations,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,ball_confirmations,users can change their own vote,UPDATE :: (confirmed_by = auth.uid()) :: check (confirmed_by = auth.uid()) :: to authenticated
+policy,ball_confirmations,users can confirm as themselves,INSERT :: no using :: check (confirmed_by = auth.uid()) :: to authenticated
+policy,ball_confirmations,users can withdraw their own confirmation,DELETE :: (confirmed_by = auth.uid()) :: check none :: to authenticated
+policy,ball_groups,teammates can view each other's ball groups,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_groups.created_by)))) :: check none :: to authenticated"
+policy,ball_groups,users can delete their own ball groups,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_groups,users can insert their own ball groups,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_groups,users can update their own ball groups,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,ball_groups,users can view their own ball groups,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,ball_submissions,anyone can read ball submissions,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,ball_submissions,users can delete only their own submission,DELETE :: (submitted_by = auth.uid()) :: check none :: to authenticated
+policy,ball_submissions,users can insert their own submission,INSERT :: no using :: check (submitted_by = auth.uid()) :: to authenticated
+policy,ball_submissions,users can update only their own submission,UPDATE :: (submitted_by = auth.uid()) :: check (submitted_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can delete their own bowler goals,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_goals,users can insert their own bowler goals,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can update their own bowler goals,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_goals,users can view their own bowler goals,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_names,teammates can view each other's bowler names,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bowler_names.created_by)))) :: check none :: to authenticated"
+policy,bowler_names,users can add their own bowler names,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_names,users can remove their own bowler names,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_names,users can update their own bowler names,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_names,users can view their own bowler names,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_profiles,users can delete their own bowler profiles,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowler_profiles,users can insert their own bowler profiles,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_profiles,users can update their own bowler profiles,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,bowler_profiles,users can view their own bowler profiles,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,bowling_centers,anyone can read bowling centers,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,bowling_centers,creators can correct their own hand-entered centers,UPDATE :: ((created_by = auth.uid()) AND (here_id IS NULL)) :: check ((created_by = auth.uid()) AND (here_id IS NULL)) :: to authenticated
+policy,bowling_centers,signed-in users can add centers,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
+policy,coaching_notes,authors can delete their own notes,DELETE :: (author_id = auth.uid()) :: check none :: to authenticated
+policy,coaching_notes,authors can edit their own notes,UPDATE :: (author_id = auth.uid()) :: check (author_id = auth.uid()) :: to authenticated
+policy,coaching_notes,both sides can view notes,"SELECT :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
+policy,coaching_notes,both sides can write notes,"INSERT :: no using :: check ((author_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))) :: to authenticated"
+policy,coaching_relationships,either side can end a coaching relationship,DELETE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
+policy,coaching_relationships,either side can update their coaching relationship,UPDATE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: to authenticated
+policy,coaching_relationships,either side can view their coaching relationship,SELECT :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid())) :: check none :: to authenticated
+policy,coaching_relationships,users can request a coaching relationship,INSERT :: no using :: check ((requested_by = auth.uid()) AND ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))) :: to authenticated
+policy,coaching_tasks,both sides can update tasks,"UPDATE :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: to authenticated"
+policy,coaching_tasks,both sides can view tasks,"SELECT :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid()))))) :: check none :: to authenticated"
+policy,coaching_tasks,the coach can assign tasks,"INSERT :: no using :: check ((assigned_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid()))))) :: to authenticated"
+policy,coaching_tasks,the coach can remove tasks,"DELETE :: (EXISTS ( SELECT 1
+   FROM coaching_relationships r
+  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid())))) :: check none :: to authenticated"
+policy,drills,users manage their own drills,ALL :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,friendships,either side can delete a friendship,DELETE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
+policy,friendships,either side can respond to or cancel a request,UPDATE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: to authenticated
+policy,friendships,users can send friend requests,INSERT :: no using :: check (requester_id = auth.uid()) :: to authenticated
+policy,friendships,users can view friendships they're part of,SELECT :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid())) :: check none :: to authenticated
+policy,hidden_leagues,users can hide leagues for themselves,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,hidden_leagues,users can unhide their own leagues,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,hidden_leagues,users can update their own hidden leagues,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,hidden_leagues,users can view their own hidden leagues,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,imported_scores,bowler or team can update imported scores,UPDATE :: ((bowler_user_id = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
+policy,imported_scores,team can view imported scores,SELECT :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id))) :: check none :: to authenticated
+policy,imported_scores,teammates can upload scores,INSERT :: no using :: check ((uploaded_by = auth.uid()) AND ((team_id IS NULL) OR is_team_member(team_id))) :: to authenticated
+policy,imported_scores,uploader can delete their upload,DELETE :: (uploaded_by = auth.uid()) :: check none :: to authenticated
+policy,lane_patterns,team members can delete their team's lane patterns,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,lane_patterns,team members can log lane patterns for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,lane_patterns,team members can update their team's lane patterns,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,lane_patterns,team members can view their team's lane patterns,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,leagues,league members or its creator can update it,UPDATE :: (is_league_member(id) OR (created_by = auth.uid())) :: check (is_league_member(id) OR (created_by = auth.uid())) :: to authenticated
+policy,leagues,leagues are viewable by any authenticated user,SELECT :: true :: check none :: to authenticated
+policy,leagues,users can create leagues as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,manual_scores,teammates can view each other's manual scores,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = manual_scores.user_id)))) :: check none :: to authenticated"
+policy,manual_scores,users can delete their own manual scores,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,manual_scores,users can insert their own manual scores,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,manual_scores,users can update their own manual scores,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,manual_scores,users can view their own manual scores,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,matches,team members can delete their team's matches,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,matches,team members can log matches for their team,INSERT :: no using :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,matches,team members can update their team's matches,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check ((team_id IS NOT NULL) AND is_team_member(team_id)) :: to authenticated
+policy,matches,team members can view their team's matches,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,oil_patterns,anyone can read oil patterns,SELECT :: (auth.uid() IS NOT NULL) :: check none :: to authenticated
+policy,oil_patterns,creators can correct their own unverified patterns,UPDATE :: ((created_by = auth.uid()) AND (verified = false)) :: check ((created_by = auth.uid()) AND (verified = false)) :: to authenticated
+policy,oil_patterns,signed-in users can add patterns,INSERT :: no using :: check (auth.uid() IS NOT NULL) :: to authenticated
+policy,pending_invites,invitees can answer their own invites,UPDATE :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: to authenticated
+policy,pending_invites,invitees can view their own invites,SELECT :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
+policy,pending_invites,team members can create invites for their teams,INSERT :: no using :: check is_team_member(team_id) :: to authenticated
+policy,pending_invites,team members can delete pending invites for their teams,DELETE :: is_team_member(team_id) :: check none :: to authenticated
+policy,pending_invites,team members can manually link a placeholder to any account,UPDATE :: (is_team_member(team_id) AND (accepted_at IS NULL)) :: check is_team_member(team_id) :: to authenticated
+policy,pending_invites,team members can view pending invites for their teams,SELECT :: is_team_member(team_id) :: check none :: to authenticated
+policy,pending_invites,users can claim invites addressed to their own email,UPDATE :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check (accepted_user_id = auth.uid()) :: to authenticated
+policy,pending_invites,users can view invites addressed to their own email,SELECT :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text))) :: check none :: to authenticated
+policy,profiles,profiles are viewable by any authenticated user,SELECT :: true :: check none :: to authenticated
+policy,profiles,users can insert their own profile,INSERT :: no using :: check (id = auth.uid()) :: to authenticated
+policy,profiles,users can update their own profile,UPDATE :: (id = auth.uid()) :: check (id = auth.uid()) :: to authenticated
+policy,sessions,coaches can view their bowler's sessions,SELECT :: is_accepted_coach_of(user_id) :: check none :: to authenticated
+policy,sessions,friends can view each other's sessions,SELECT :: are_friends(user_id) :: check none :: to authenticated
+policy,sessions,teammates can view each other's sessions,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,sessions,users can delete their own sessions,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,sessions,users can insert their own sessions,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,sessions,users can update their own sessions,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,sessions,users can view their own sessions,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,shots,coaches can view their bowler's shots,SELECT :: is_accepted_coach_of(user_id) :: check none :: to authenticated
+policy,shots,friends can view each other's shots,SELECT :: are_friends(user_id) :: check none :: to authenticated
+policy,shots,teammates can view each other's shots,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id)) :: check none :: to authenticated
+policy,shots,users can delete their own shots,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,shots,users can insert their own shots,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,shots,users can update their own shots,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,shots,users can view their own shots,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,sync_tombstones,user can read their own tombstones,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,team_members,team members can remove roster entries,DELETE :: is_team_member(team_id) :: check none :: to authenticated
+policy,team_members,team members can reorder their team's roster,UPDATE :: is_team_member(team_id) :: check is_team_member(team_id) :: to authenticated
+policy,team_members,team members can view their own roster,SELECT :: is_team_member(team_id) :: check none :: to authenticated
+policy,team_members,you can only add yourself to a roster,"INSERT :: no using :: check ((user_id = auth.uid()) AND ((EXISTS ( SELECT 1
+   FROM teams
+  WHERE ((teams.id = team_members.team_id) AND (teams.created_by = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM pending_invites
+  WHERE ((pending_invites.team_id = team_members.team_id) AND (lower(pending_invites.invited_email) = lower((auth.jwt() ->> 'email'::text))) AND (pending_invites.accepted_at IS NULL)))))) :: to authenticated"
+policy,teams,team creators can delete their team,DELETE :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,teams,team creators can rename their team,UPDATE :: (created_by = auth.uid()) :: check (created_by = auth.uid()) :: to authenticated
+policy,teams,team creators can view their team,SELECT :: (created_by = auth.uid()) :: check none :: to authenticated
+policy,teams,team members can delete their team,DELETE :: is_team_member(id) :: check none :: to authenticated
+policy,teams,team members can rename their team,UPDATE :: is_team_member(id) :: check is_team_member(id) :: to authenticated
+policy,teams,team members can view their team,SELECT :: is_team_member(id) :: check none :: to authenticated
+policy,teams,users can create teams as themselves,INSERT :: no using :: check (created_by = auth.uid()) :: to authenticated
+policy,tournaments,teammates can view each other's tournaments,"SELECT :: (EXISTS ( SELECT 1
+   FROM (team_members me
+     JOIN team_members them ON ((them.team_id = me.team_id)))
+  WHERE ((me.user_id = auth.uid()) AND (them.user_id = tournaments.user_id)))) :: check none :: to authenticated"
+policy,tournaments,users can delete their own tournaments,DELETE :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,tournaments,users can insert their own tournaments,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,tournaments,users can update their own tournaments,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,tournaments,users can view their own tournaments,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
+policy,user_preferences,users can insert their own preferences,INSERT :: no using :: check (user_id = auth.uid()) :: to authenticated
+policy,user_preferences,users can update their own preferences,UPDATE :: (user_id = auth.uid()) :: check (user_id = auth.uid()) :: to authenticated
+policy,user_preferences,users can view their own preferences,SELECT :: (user_id = auth.uid()) :: check none :: to authenticated
 index,api_usage,api_usage_lookup_idx,"CREATE INDEX api_usage_lookup_idx ON public.api_usage USING btree (user_id, endpoint, called_at DESC)"
 index,api_usage,api_usage_pkey,CREATE UNIQUE INDEX api_usage_pkey ON public.api_usage USING btree (id)
 index,arsenals,arsenal_pkey,CREATE UNIQUE INDEX arsenal_pkey ON public.arsenals USING btree (id)
@@ -713,19 +689,26 @@ index,oil_patterns,oil_patterns_name_key,CREATE UNIQUE INDEX oil_patterns_name_k
 index,oil_patterns,oil_patterns_pkey,CREATE UNIQUE INDEX oil_patterns_pkey ON public.oil_patterns USING btree (id)
 index,pending_invites,pending_invites_email_idx,CREATE INDEX pending_invites_email_idx ON public.pending_invites USING btree (invited_email)
 index,pending_invites,pending_invites_pkey,CREATE UNIQUE INDEX pending_invites_pkey ON public.pending_invites USING btree (id)
+index,pending_invites,pending_invites_signup_code_open_idx,CREATE UNIQUE INDEX pending_invites_signup_code_open_idx ON public.pending_invites USING btree (signup_code) WHERE ((signup_code IS NOT NULL) AND (accepted_at IS NULL))
 index,pending_invites,pending_invites_team_id_idx,CREATE INDEX pending_invites_team_id_idx ON public.pending_invites USING btree (team_id)
 index,pending_invites,pending_invites_team_id_invited_email_key,"CREATE UNIQUE INDEX pending_invites_team_id_invited_email_key ON public.pending_invites USING btree (team_id, invited_email)"
 index,profiles,profiles_pkey,CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)
 index,sessions,sessions_bowler_name_idx,CREATE INDEX sessions_bowler_name_idx ON public.sessions USING btree (bowler_name)
-index,sessions,sessions_bowler_name_league_id_date_key,"CREATE UNIQUE INDEX sessions_bowler_name_league_id_date_key ON public.sessions USING btree (bowler_name, league_id, date)"
+index,sessions,sessions_no_league_uniq,"CREATE UNIQUE INDEX sessions_no_league_uniq ON public.sessions USING btree (user_id, bowler_name, date) WHERE (league_id IS NULL)"
 index,sessions,sessions_pkey,CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 index,sessions,sessions_team_id_idx,CREATE INDEX sessions_team_id_idx ON public.sessions USING btree (team_id)
+index,sessions,sessions_user_id_bowler_name_league_id_date_key,"CREATE UNIQUE INDEX sessions_user_id_bowler_name_league_id_date_key ON public.sessions USING btree (user_id, bowler_name, league_id, date)"
 index,sessions,sessions_user_id_idx,CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id)
+index,sessions,sessions_user_updated_idx,"CREATE INDEX sessions_user_updated_idx ON public.sessions USING btree (user_id, updated_at)"
 index,shots,shots_bowler_name_idx,CREATE INDEX shots_bowler_name_idx ON public.shots USING btree (bowler_name)
+index,shots,shots_identity_uniq,"CREATE UNIQUE INDEX shots_identity_uniq ON public.shots USING btree (user_id, bowler_name, COALESCE(league_id, '00000000-0000-0000-0000-000000000000'::uuid), date, game, frame, COALESCE(ball_num, 1))"
 index,shots,shots_pkey,CREATE UNIQUE INDEX shots_pkey ON public.shots USING btree (id)
 index,shots,shots_team_id_idx,CREATE INDEX shots_team_id_idx ON public.shots USING btree (team_id)
 index,shots,shots_user_date_idx,"CREATE INDEX shots_user_date_idx ON public.shots USING btree (user_id, date)"
 index,shots,shots_user_id_idx,CREATE INDEX shots_user_id_idx ON public.shots USING btree (user_id)
+index,shots,shots_user_updated_idx,"CREATE INDEX shots_user_updated_idx ON public.shots USING btree (user_id, updated_at)"
+index,sync_tombstones,sync_tombstones_lookup_idx,"CREATE INDEX sync_tombstones_lookup_idx ON public.sync_tombstones USING btree (table_name, user_id, deleted_at)"
+index,sync_tombstones,sync_tombstones_pkey,CREATE UNIQUE INDEX sync_tombstones_pkey ON public.sync_tombstones USING btree (id)
 index,team_members,team_members_pkey,"CREATE UNIQUE INDEX team_members_pkey ON public.team_members USING btree (team_id, user_id)"
 index,team_members,team_members_user_id_idx,CREATE INDEX team_members_user_id_idx ON public.team_members USING btree (user_id)
 index,teams,teams_league_id_idx,CREATE INDEX teams_league_id_idx ON public.teams USING btree (league_id)
@@ -734,155 +717,6 @@ index,tournaments,tournaments_pkey,CREATE UNIQUE INDEX tournaments_pkey ON publi
 index,tournaments,tournaments_user_bowler_idx,"CREATE INDEX tournaments_user_bowler_idx ON public.tournaments USING btree (user_id, bowler_name)"
 index,user_preferences,user_preferences_pkey,CREATE UNIQUE INDEX user_preferences_pkey ON public.user_preferences USING btree (user_id)
 index,user_preferences,user_preferences_user_id_key,CREATE UNIQUE INDEX user_preferences_user_id_key ON public.user_preferences USING btree (user_id)
-policy,arsenals,authenticated users can view arsenals,SELECT :: true
-policy,arsenals,users can add their own arsenal entries,INSERT :: no using
-policy,arsenals,users can remove their own arsenal entries,DELETE :: (created_by = auth.uid())
-policy,arsenals,users can update their own arsenal entries,UPDATE :: (created_by = auth.uid())
-policy,bags,teammates can view each other's bags,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = bags.created_by))))"
-policy,bags,users can delete their own bags,DELETE :: (created_by = auth.uid())
-policy,bags,users can insert their own bags,INSERT :: no using
-policy,bags,users can update their own bags,UPDATE :: (created_by = auth.uid())
-policy,bags,users can view their own bags,SELECT :: (created_by = auth.uid())
-policy,ball_bags,teammates can view each other's ball bag assignments,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_bags.created_by))))"
-policy,ball_bags,users can delete their own ball bag assignments,DELETE :: (created_by = auth.uid())
-policy,ball_bags,users can insert their own ball bag assignments,INSERT :: no using
-policy,ball_bags,users can update their own ball bag assignments,UPDATE :: (created_by = auth.uid())
-policy,ball_bags,users can view their own ball bag assignments,SELECT :: (created_by = auth.uid())
-policy,ball_confirmations,anyone can read confirmations,SELECT :: (auth.uid() IS NOT NULL)
-policy,ball_confirmations,users can change their own vote,UPDATE :: (confirmed_by = auth.uid())
-policy,ball_confirmations,users can confirm as themselves,INSERT :: no using
-policy,ball_confirmations,users can withdraw their own confirmation,DELETE :: (confirmed_by = auth.uid())
-policy,ball_groups,teammates can view each other's ball groups,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = ball_groups.created_by))))"
-policy,ball_groups,users can delete their own ball groups,DELETE :: (created_by = auth.uid())
-policy,ball_groups,users can insert their own ball groups,INSERT :: no using
-policy,ball_groups,users can update their own ball groups,UPDATE :: (created_by = auth.uid())
-policy,ball_groups,users can view their own ball groups,SELECT :: (created_by = auth.uid())
-policy,ball_submissions,anyone can read ball submissions,SELECT :: (auth.uid() IS NOT NULL)
-policy,ball_submissions,users can delete only their own submission,DELETE :: (submitted_by = auth.uid())
-policy,ball_submissions,users can insert their own submission,INSERT :: no using
-policy,ball_submissions,users can update only their own submission,UPDATE :: (submitted_by = auth.uid())
-policy,bowler_goals,users can delete their own bowler goals,DELETE :: (created_by = auth.uid())
-policy,bowler_goals,users can insert their own bowler goals,INSERT :: no using
-policy,bowler_goals,users can update their own bowler goals,UPDATE :: (created_by = auth.uid())
-policy,bowler_goals,users can view their own bowler goals,SELECT :: (created_by = auth.uid())
-policy,bowler_names,authenticated users can view bowler names,SELECT :: true
-policy,bowler_names,users can add their own bowler names,INSERT :: no using
-policy,bowler_names,users can remove their own bowler names,DELETE :: (created_by = auth.uid())
-policy,bowler_names,users can update their own bowler names,UPDATE :: (created_by = auth.uid())
-policy,bowler_profiles,users can delete their own bowler profiles,DELETE :: (created_by = auth.uid())
-policy,bowler_profiles,users can insert their own bowler profiles,INSERT :: no using
-policy,bowler_profiles,users can update their own bowler profiles,UPDATE :: (created_by = auth.uid())
-policy,bowler_profiles,users can view their own bowler profiles,SELECT :: (created_by = auth.uid())
-policy,bowling_centers,anyone can read bowling centers,SELECT :: (auth.uid() IS NOT NULL)
-policy,bowling_centers,creators can correct their own hand-entered centers,UPDATE :: ((created_by = auth.uid()) AND (here_id IS NULL))
-policy,bowling_centers,signed-in users can add centers,INSERT :: no using
-policy,coaching_notes,authors can delete their own notes,DELETE :: (author_id = auth.uid())
-policy,coaching_notes,both sides can view notes,"SELECT :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_notes.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
-policy,coaching_notes,both sides can write notes,INSERT :: no using
-policy,coaching_relationships,either side can end a coaching relationship,DELETE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
-policy,coaching_relationships,either side can update their coaching relationship,UPDATE :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
-policy,coaching_relationships,either side can view their coaching relationship,SELECT :: ((coach_id = auth.uid()) OR (bowler_id = auth.uid()))
-policy,coaching_relationships,users can request a coaching relationship,INSERT :: no using
-policy,coaching_tasks,both sides can update tasks,"UPDATE :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
-policy,coaching_tasks,both sides can view tasks,"SELECT :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND ((r.coach_id = auth.uid()) OR (r.bowler_id = auth.uid())))))"
-policy,coaching_tasks,the coach can assign tasks,INSERT :: no using
-policy,coaching_tasks,the coach can remove tasks,"DELETE :: (EXISTS ( SELECT 1
-   FROM coaching_relationships r
-  WHERE ((r.id = coaching_tasks.relationship_id) AND (r.status = 'accepted'::text) AND (r.coach_id = auth.uid()))))"
-policy,drills,users manage their own drills,ALL :: (user_id = auth.uid())
-policy,friendships,either side can delete a friendship,DELETE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
-policy,friendships,either side can respond to or cancel a request,UPDATE :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
-policy,friendships,users can send friend requests,INSERT :: no using
-policy,friendships,users can view friendships they're part of,SELECT :: ((requester_id = auth.uid()) OR (addressee_id = auth.uid()))
-policy,hidden_leagues,users can hide leagues for themselves,INSERT :: no using
-policy,hidden_leagues,users can unhide their own leagues,DELETE :: (user_id = auth.uid())
-policy,hidden_leagues,users can update their own hidden leagues,UPDATE :: (user_id = auth.uid())
-policy,hidden_leagues,users can view their own hidden leagues,SELECT :: (user_id = auth.uid())
-policy,imported_scores,team can update imported scores,UPDATE :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id)))
-policy,imported_scores,team can view imported scores,SELECT :: ((bowler_user_id = auth.uid()) OR (uploaded_by = auth.uid()) OR ((team_id IS NOT NULL) AND is_team_member(team_id)))
-policy,imported_scores,teammates can upload scores,INSERT :: no using
-policy,imported_scores,uploader can delete their upload,DELETE :: (uploaded_by = auth.uid())
-policy,lane_patterns,team members can delete their team's lane patterns,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,lane_patterns,team members can log lane patterns for their team,INSERT :: no using
-policy,lane_patterns,team members can update their team's lane patterns,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,lane_patterns,team members can view their team's lane patterns,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,leagues,authenticated users can create leagues,INSERT :: no using
-policy,leagues,league members can rename their league,UPDATE :: is_league_member(id)
-policy,leagues,leagues are viewable by any authenticated user,SELECT :: true
-policy,manual_scores,teammates can view each other's manual scores,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = manual_scores.user_id))))"
-policy,manual_scores,users can delete their own manual scores,DELETE :: (user_id = auth.uid())
-policy,manual_scores,users can insert their own manual scores,INSERT :: no using
-policy,manual_scores,users can update their own manual scores,UPDATE :: (user_id = auth.uid())
-policy,manual_scores,users can view their own manual scores,SELECT :: (user_id = auth.uid())
-policy,matches,team members can delete their team's matches,DELETE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,matches,team members can log matches for their team,INSERT :: no using
-policy,matches,team members can update their team's matches,UPDATE :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,matches,team members can view their team's matches,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,oil_patterns,anyone can read oil patterns,SELECT :: (auth.uid() IS NOT NULL)
-policy,oil_patterns,creators can correct their own unverified patterns,UPDATE :: ((created_by = auth.uid()) AND (verified = false))
-policy,oil_patterns,signed-in users can add patterns,INSERT :: no using
-policy,pending_invites,invitees can answer their own invites,UPDATE :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text)))
-policy,pending_invites,invitees can view their own invites,SELECT :: (lower(invited_email) = lower((auth.jwt() ->> 'email'::text)))
-policy,pending_invites,team members can create invites for their teams,INSERT :: no using
-policy,pending_invites,team members can delete pending invites for their teams,DELETE :: is_team_member(team_id)
-policy,pending_invites,team members can manually link a placeholder to any account,UPDATE :: (is_team_member(team_id) AND (accepted_at IS NULL))
-policy,pending_invites,team members can view pending invites for their teams,SELECT :: is_team_member(team_id)
-policy,pending_invites,users can claim invites addressed to their own email,UPDATE :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text)))
-policy,pending_invites,users can view invites addressed to their own email,SELECT :: ((accepted_at IS NULL) AND (invited_email = (auth.jwt() ->> 'email'::text)))
-policy,profiles,profiles are viewable by any authenticated user,SELECT :: true
-policy,profiles,users can insert their own profile,INSERT :: no using
-policy,profiles,users can update their own profile,UPDATE :: (id = auth.uid())
-policy,sessions,coaches can view their bowler's sessions,SELECT :: is_accepted_coach_of(user_id)
-policy,sessions,friends can view each other's sessions,SELECT :: are_friends(user_id)
-policy,sessions,teammates can view each other's sessions,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,sessions,users can delete their own sessions,DELETE :: (user_id = auth.uid())
-policy,sessions,users can insert their own sessions,INSERT :: no using
-policy,sessions,users can update their own sessions,UPDATE :: (user_id = auth.uid())
-policy,sessions,users can view their own sessions,SELECT :: (user_id = auth.uid())
-policy,shots,coaches can view their bowler's shots,SELECT :: is_accepted_coach_of(user_id)
-policy,shots,friends can view each other's shots,SELECT :: are_friends(user_id)
-policy,shots,teammates can view each other's shots,SELECT :: ((team_id IS NOT NULL) AND is_team_member(team_id))
-policy,shots,users can delete their own shots,DELETE :: (user_id = auth.uid())
-policy,shots,users can insert their own shots,INSERT :: no using
-policy,shots,users can update their own shots,UPDATE :: (user_id = auth.uid())
-policy,shots,users can view their own shots,SELECT :: (user_id = auth.uid())
-policy,team_members,"team members can add rosters, creators can bootstrap, invitees ",INSERT :: no using
-policy,team_members,team members can remove roster entries,DELETE :: is_team_member(team_id)
-policy,team_members,team members can reorder the lineup,UPDATE :: is_team_member(team_id)
-policy,team_members,team members can reorder their team's roster,UPDATE :: is_team_member(team_id)
-policy,team_members,team rosters are viewable by any authenticated user,SELECT :: true
-policy,teams,authenticated users can create teams,INSERT :: no using
-policy,teams,team members can rename their team,UPDATE :: is_team_member(id)
-policy,teams,teams are viewable by any authenticated user,SELECT :: true
-policy,tournaments,teammates can view each other's tournaments,"SELECT :: (EXISTS ( SELECT 1
-   FROM (team_members me
-     JOIN team_members them ON ((them.team_id = me.team_id)))
-  WHERE ((me.user_id = auth.uid()) AND (them.user_id = tournaments.user_id))))"
-policy,tournaments,users can delete their own tournaments,DELETE :: (user_id = auth.uid())
-policy,tournaments,users can insert their own tournaments,INSERT :: no using
-policy,tournaments,users can update their own tournaments,UPDATE :: (user_id = auth.uid())
-policy,tournaments,users can view their own tournaments,SELECT :: (user_id = auth.uid())
-policy,user_preferences,users can insert their own preferences,INSERT :: no using
-policy,user_preferences,users can update their own preferences,UPDATE :: (user_id = auth.uid())
-policy,user_preferences,users can view their own preferences,SELECT :: (user_id = auth.uid())
 rls,api_usage,enabled,
 rls,arsenals,enabled,
 rls,bags,enabled,
@@ -910,7 +744,22 @@ rls,pending_invites,enabled,
 rls,profiles,enabled,
 rls,sessions,enabled,
 rls,shots,enabled,
+rls,sync_tombstones,enabled,
 rls,team_members,enabled,
 rls,teams,enabled,
 rls,tournaments,enabled,
 rls,user_preferences,enabled,
+function,accept_team_invite,invite_id uuid,security definer
+function,are_friends,other_user uuid,security definer
+function,check_api_rate_limit,"p_endpoint text, p_limit integer, p_window interval",security definer
+function,claim_signup_code,code text,security definer
+function,coached_bowler_handedness,,security definer
+function,handle_new_user,,security definer
+function,is_accepted_coach_of,target_bowler_id uuid,security definer
+function,is_league_member,check_league_id uuid,security definer
+function,is_team_member,check_team_id uuid,security definer
+function,prune_api_usage,,security definer
+function,prune_sync_tombstones,,security definer
+function,record_tombstone,,security definer
+function,set_updated_at,,security invoker
+function,teammate_bowler_profiles,,security definer
