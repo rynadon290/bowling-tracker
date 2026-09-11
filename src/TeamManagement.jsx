@@ -283,7 +283,10 @@ export default function TeamManagement({
       });
     }
 
-    const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id"));
+    // created_by so a team you made can show YOU on its roster even
+    // when the membership row has not landed -- see the fallback where
+    // members are assembled below.
+    const teamsRes = await cloudRead("teams", q => q.select("id,name,league_id,created_by"));
     const membersRes = await cloudRead("team_members", q => q.select("team_id,user_id,lineup_position,left_handed,is_sub,profiles(display_name)"));
     // Selecting signup_code fails outright if migration_signup_codes.sql
     // hasn't been run -- and a failed select here blanks the whole Vault.
@@ -320,13 +323,32 @@ export default function TeamManagement({
         });
       });
 
-      setTeams(teamsRes.data.map(t => ({
-        id: t.id,
-        name: t.name,
-        league: leagueNameById[t.league_id] || "",
-        members: membersByTeam[t.id] || [],
-        pendingInvites: invitesByTeam[t.id] || [],
-      })));
+      setTeams(teamsRes.data.map(t => {
+        const loaded = membersByTeam[t.id] || [];
+        // A team you created always shows YOU on its roster.
+        //
+        // The membership row is written right after the team, but it can
+        // fail or be queued -- and it did, on a real device: 42501 on
+        // team_members.upsert, fourteen times, from writes queued before
+        // a policy fix. The result was a team you had just made reporting
+        // "0 bowlers", which reads as though creating it had not worked.
+        //
+        // Derived from created_by rather than invented: if the database
+        // says you made this team, you are on it. The real row still
+        // arrives and simply replaces this.
+        const iMadeIt = !!user?.id && t.created_by === user.id;
+        const meMissing = iMadeIt && !loaded.some(m => m.userId === user.id);
+        const members = meMissing
+          ? [{ userId: user.id, displayName: displayName || "You", lineupPosition: 0, leftHanded: false, isSub: false }, ...loaded]
+          : loaded;
+        return {
+          id: t.id,
+          name: t.name,
+          league: leagueNameById[t.league_id] || "",
+          members,
+          pendingInvites: invitesByTeam[t.id] || [],
+        };
+      }));
     }
     setLoading(false);
   }

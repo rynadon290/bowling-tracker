@@ -68,8 +68,8 @@ export default function Settings({
       // Walkthroughs stay: a casual bowler is the most likely to want to
       // rewatch one, and it used to ride on the "reset" id -- so cutting
       // Reset silently cut the tours too.
-      ? ["session", "look", "walkthroughs", "backup", "dangerZone"]
-      : ["session", "look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "walkthroughs", "reset", "dangerZone"],
+      ? ["session", "look", "walkthroughs", "diagnostics", "backup", "dangerZone"]
+      : ["session", "look", "trackingDetail", "accessoryFields", "moneyGames", "statsLayout", "backup", "walkthroughs", "diagnostics", "reset", "dangerZone"],
   };
   const allowed = mode === "leagues" ? cardsFor.leagues : (mode === "settings" ? cardsFor.settings : null);
   const showCard = id => !allowed || allowed.includes(id);
@@ -818,6 +818,7 @@ export default function Settings({
           Messages are redacted before they are stored: Postgres puts
           real values in its error text, and those values are other
           people's names. See domain/errorLog.js. */}
+      {showCard("diagnostics") && (
       <CollapsibleCard title="Diagnostics"
         summary={errLog.distinct ? `${errLog.distinct} issue${errLog.distinct === 1 ? "" : "s"}` : "Nothing recorded"}
         expanded={expanded.diagnostics} onToggle={() => toggle("diagnostics")}>
@@ -847,6 +848,7 @@ export default function Settings({
           )}
         </div>
       </CollapsibleCard>
+      )}
 
       {showCard("reset") && (
       <CollapsibleCard title="Reset settings" summary="Theme, fields, layout"
