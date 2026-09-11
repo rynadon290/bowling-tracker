@@ -58,10 +58,26 @@ jobs:
         run: npm test
 
       - name: Data-flow audit
-        run: node scripts/audit_dataflow.mjs
+        # Runs from wherever the file lives -- these moved to scripts/
+        # partway through and two builds failed on the path rather than
+        # on anything the audit found. Fails loudly if it is in neither
+        # place, so a missing audit can never look like a passing one.
+        run: |
+          if   [ -f scripts/audit_dataflow.mjs ]; then node scripts/audit_dataflow.mjs
+          elif [ -f audit_dataflow.mjs ];         then node audit_dataflow.mjs
+          else echo "audit_dataflow.mjs not found in scripts/ or the repo root"; exit 1
+          fi
 
       - name: Schema audit
-        run: node scripts/audit_live_schema.mjs
+        # Runs from wherever the file lives -- these moved to scripts/
+        # partway through and two builds failed on the path rather than
+        # on anything the audit found. Fails loudly if it is in neither
+        # place, so a missing audit can never look like a passing one.
+        run: |
+          if   [ -f scripts/audit_live_schema.mjs ]; then node scripts/audit_live_schema.mjs
+          elif [ -f audit_live_schema.mjs ];         then node audit_live_schema.mjs
+          else echo "audit_live_schema.mjs not found in scripts/ or the repo root"; exit 1
+          fi
 
       - name: Build
         run: npm run build
