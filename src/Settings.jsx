@@ -10,18 +10,13 @@ import { isContainerLeague, isLeagueHidden, teamsInLeague } from "./domain/leagu
 import { sessionsToCsv, shotsToCsv, seasonSummary, summaryToText } from "./domain/seasonExport.js";
 import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/reminders.js";
 import { localDateString } from "./constants.js";
-import { ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
+import {
+  ENVIRONMENT_LABELS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
   resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
 
-const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
-const ENVIRONMENT_DESCRIPTIONS = {
-  practice: "More detail, no scoring pressure. Every accessory field is on by default.",
-  league: "Fast, simple logging. Accessory fields off, money games front and center.",
-  tournament: "Same simple logging as League, but money-game tracking is hidden.",
-};
 const FIELD_LABELS = { surface: "Ball Surface", line: "Line (Board & Arrows)", release: "Release", miss: "Miss Direction", ballSpeed: "Ball Speed", shoes: "Shoes (Heel & Sole)", revRate: "Rev Rate (estimate)", axisRotation: "Axis Rotation (estimate)" };
 const CARD_LABEL_BY_ID = Object.fromEntries(MOVABLE_STATS_CARDS.map(c => [c.id, c.label]));
 

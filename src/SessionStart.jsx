@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  ENVIRONMENTS, TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
+  ENVIRONMENTS, ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS,
+  TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
 
-const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
-const ENVIRONMENT_DESCRIPTIONS = {
-  practice: "Working on your game. Every detail field on by default.",
-  league: "Your regular night. Fast logging, money games ready.",
-  tournament: "Squad play. Variable games, lane pairs, and cut lines.",
-  casual: "With friends or the kids. Just the scores, nothing else.",
-};
 
 // Asked once per day rather than once ever: what you're bowling changes
 // night to night, and someone who bowls league Tuesday and a tournament
@@ -87,7 +81,7 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
           : "Two quick questions and the app sets itself up for tonight."}
       </div>
 
-      <div style={S.label}>Where are you bowling?</div>
+      <div style={S.label}>What are you bowling today?</div>
       <div style={S.chips}>
         {ENVIRONMENTS.map(env => (
           <Chip key={env} label={ENVIRONMENT_LABELS[env]}

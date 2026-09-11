@@ -1,19 +1,13 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  ENVIRONMENTS, TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
+  ENVIRONMENTS, ENVIRONMENT_QUESTION_LABELS, ENVIRONMENT_DESCRIPTIONS,
+  TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
 import { APP_NAME } from "./constants.js";
 import { resolveHomeCenters } from "./domain/profiles.js";
 
-const ENVIRONMENT_LABELS = { practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling" };
-const ENVIRONMENT_DESCRIPTIONS = {
-  practice: "Working on your game. Every detail field on by default.",
-  league: "Your regular night. Fast logging, money games ready.",
-  tournament: "Squad play. Variable games, lane pairs, and cut lines.",
-  casual: "With friends or the kids. Just the scores, nothing else.",
-};
 
 // The full-screen first launch.
 //
@@ -218,7 +212,7 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
         {step === 2 && (
           <>
             <div style={{ fontSize: "19px", fontWeight: 600, color: C.text, marginBottom: "6px" }}>
-              What are you bowling?
+              What are you bowling today?
             </div>
             <div style={{ fontSize: "13px", color: C.textMuted, marginBottom: "18px" }}>
               This sets sensible defaults. You can change it any time — and it won't keep asking on your regular bowling nights.
@@ -236,7 +230,7 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                       WebkitTapHighlightColor: "transparent",
                     }}>
                     <div style={{ fontSize: "15px", fontWeight: 600, color: selected ? C.accent : C.text, marginBottom: "2px" }}>
-                      {ENVIRONMENT_LABELS[env]}
+                      {ENVIRONMENT_QUESTION_LABELS[env]}
                     </div>
                     <div style={{ fontSize: "12px", color: C.textMuted }}>
                       {ENVIRONMENT_DESCRIPTIONS[env]}
