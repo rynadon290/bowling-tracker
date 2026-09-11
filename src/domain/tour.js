@@ -542,7 +542,7 @@ export function needsLeagueSetup(options) {
 // before their first one.
 export const TOUR_TRACKS = [
   { key: "general",    label: "The basics",    blurb: "Logging, scoring, stats — everyone gets this" },
-  { key: "casual",     label: "Just bowling",  blurb: "Scores, who won, sharing it" },
+  { key: "casual",     label: "Open bowling",  blurb: "Scores, who won, sharing it" },
   { key: "practice",   label: "Practice",      blurb: "Drills, goals and shot-by-shot" },
   { key: "league",     label: "League",        blurb: "Leagues, teams, money games" },
   { key: "tournament", label: "Tournament",    blurb: "Squads, side pots and import" },
