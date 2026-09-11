@@ -8,10 +8,11 @@ import fs from 'fs';
 
 const FILE = 'schema-snapshot.csv';
 if (!fs.existsSync(FILE)) {
-  console.log(`No ${FILE}. Run audit_schema.sql in Supabase, export CSV, save it here.`);
-  console.log('Until then, schema audits are reading migration files and can only see');
-  console.log('what this repo created -- not what the dashboard did.');
-  process.exit(0);
+  console.log(`No ${FILE}. Run audit_schema.sql in Supabase, export the CSV, save it here.`);
+  console.log('FAILING rather than passing: an audit that cannot see the database');
+  console.log('has not checked anything, and reporting success for that is how a');
+  console.log('checker ends up trusted while covering nothing.');
+  process.exit(1);
 }
 
 const rows = [];
@@ -122,5 +123,27 @@ if (shared.length) {
   shared.forEach(x => console.log(`   ${x}`));
   console.log();
 }
-if (!findings.length) console.log('No findings.');
-else { console.log(`${findings.length} finding(s):`); findings.forEach(f => console.log(`   ${f}`)); }
+// Exits non-zero on a finding, so CI can actually stop on one.
+//
+// This ran as a CI step and always exited 0 -- it printed its findings
+// and the build went green regardless. A step that cannot fail is
+// decoration: it looks like coverage, and the first time it matters
+// nobody notices.
+//
+// A finding here is narrow and serious: RLS switched off on a table, or
+// a globally-unique constraint on a NAME column (which is how one
+// bowler naming a league stops every other bowler using that name).
+// Neither is a style preference; both are worth a red build.
+//
+// Note what is deliberately NOT a finding: tables that exist in the
+// database but in no migration. That is real and worth fixing, but it is
+// a backlog of 30, and failing on it would mean CI is red until that
+// work is done -- at which point the gate gets removed rather than the
+// problem fixed.
+if (!findings.length) {
+  console.log('No findings.');
+  process.exit(0);
+}
+console.log(`${findings.length} finding(s):`);
+findings.forEach(f => console.log(`   ${f}`));
+process.exit(1);
