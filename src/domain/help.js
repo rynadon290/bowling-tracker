@@ -209,7 +209,7 @@ export const HELP = [
     title: "Standings",
     keywords: ["standings", "leaderboard", "friends", "who won", "ranking",
                "casual", "just bowling", "badges", "average", "who's best"],
-    body: "Everyone you've added to a Just Bowling scoresheet turns up in the Standings, ordered by average, with how many games they've bowled, their best single game, and the badges they've earned. It builds up over time, so the more nights you log the more there is to argue about.",
+    body: "Everyone you've added to an Open bowling scoresheet turns up in the Standings, ordered by average, with how many games they've bowled, their best single game, and the badges they've earned. It builds up over time, so the more nights you log the more there is to argue about.",
   },
   {
     id: "everything-gone",
@@ -221,7 +221,7 @@ export const HELP = [
     title: "Where did everything go?",
     keywords: ["missing", "gone", "disappeared", "where is", "no stats", "no history",
                "tabs missing", "lost", "wrong mode", "went back", "help"],
-    body: "If you picked Just Bowling, the app hides everything that mode doesn't use — History, Stats, Improve and the Vault. Nothing is deleted; it's all still there. Go to the Bowl tab, find the card at the top showing what you're bowling, tap Change, and pick Practice, League or Tournament. Everything comes straight back.",
+    body: "If you picked Open bowling, the app hides everything that mode doesn't use — History, Stats, Improve and the Vault. Nothing is deleted; it's all still there. Go to the Bowl tab, find the card at the top showing what you're bowling, tap Change, and pick Practice, League or Tournament. Everything comes straight back.",
   },
   {
     id: "casual-scores",

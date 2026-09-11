@@ -223,8 +223,14 @@ function presetFor(environment) {
 // today?", where a phrase reads better than a noun -- "A league night"
 // is an occasion, "League" is an identity, and people were answering the
 // second question when the app meant the first.
+// The casual label reads "Open bowling", but the STORED key stays
+// "Just Bowling" -- CASUAL_SESSION_KEY in constants.js builds league
+// names written to the database ("Just Bowling\u00b7<userId>"), and
+// isContainerLeague matches the literal. Renaming that constant would
+// orphan every casual session ever logged. Display and storage are
+// deliberately different here; do not reconcile them.
 export const ENVIRONMENT_LABELS = {
-  practice: "Practice", league: "League", tournament: "Tournament", casual: "Just Bowling",
+  practice: "Practice", league: "League", tournament: "Tournament", casual: "Open bowling",
 };
 
 export const ENVIRONMENT_QUESTION_LABELS = {
