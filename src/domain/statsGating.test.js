@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  cardNeeds, cardHasData, visibleStatsCards, lockedStatsMessage,
+  cardNeeds, cardHasData, visibleStatsCards, lockedStatsMessage, lockedStatsDetail,
 } from './statsGating.js';
 
 describe('cardNeeds', () => {
@@ -65,6 +65,39 @@ describe('visibleStatsCards', () => {
     for (const junk of [null, undefined, 'x', 42, {}]) {
       expect(visibleStatsCards(junk, {})).toEqual([]);
     }
+  });
+});
+
+describe('lockedStatsDetail', () => {
+  const ids = ['seasonRecord', 'splits', 'cleanFrames', 'byBall'];
+  const labels = { splits: 'Splits', cleanFrames: 'Clean Frames', byBall: 'By Ball' };
+  const labelFor = id => labels[id] || id;
+
+  it('names the locked stats, grouped by what unlocks them', () => {
+    const d = lockedStatsDetail(ids, { shotCount: 0, ballCount: 0 }, labelFor);
+    expect(d.shots).toEqual(['Clean Frames', 'Splits']);
+    expect(d.balls).toEqual(['By Ball']);
+  });
+
+  it('lists nothing for a group that is already unlocked', () => {
+    const d = lockedStatsDetail(ids, { shotCount: 36, ballCount: 0 }, labelFor);
+    expect(d.shots).toEqual([]);
+    expect(d.balls).toEqual(['By Ball']);
+  });
+
+  // A stat that works from scores alone is never "locked" -- listing it
+  // would suggest tracking more would reveal something that is already
+  // on screen.
+  it('never lists a score-based card', () => {
+    const d = lockedStatsDetail(ids, { shotCount: 0, ballCount: 0 }, labelFor);
+    expect([...d.shots, ...d.balls]).not.toContain('seasonRecord');
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}]) {
+      expect(() => lockedStatsDetail(junk, junk, junk)).not.toThrow();
+    }
+    expect(lockedStatsDetail(null, null, null)).toEqual({ shots: [], balls: [] });
   });
 });
 

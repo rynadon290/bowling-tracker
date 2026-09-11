@@ -96,6 +96,27 @@ export function visibleStatsCards(cardIds, counts) {
 // by shot" rather than "you have no shot data" -- and says what is
 // gained, since shot-by-shot is real extra effort at the lanes and
 // should stay a choice rather than a nag.
+// Which stats are locked, by name.
+//
+// Round 7, finding 4: four people asked "which 17?". The number is
+// concrete enough to be interesting and vague enough to be annoying.
+//
+// Returns the card LABELS, grouped by what would unlock them, so the
+// answer can be shown on demand rather than crowding the line itself.
+export function lockedStatsDetail(cardIds, counts, labelFor) {
+  const c = (counts && typeof counts === "object" && !Array.isArray(counts)) ? counts : {};
+  const ids = Array.isArray(cardIds) ? cardIds : [];
+  const label = typeof labelFor === "function" ? labelFor : (id) => id;
+  const name = (id) => String(label(id) || id);
+
+  return {
+    shots: Number(c.shotCount) > 0 ? []
+      : ids.filter(id => cardNeeds(id) === "shots").map(name).sort(),
+    balls: Number(c.ballCount) > 0 ? []
+      : ids.filter(id => cardNeeds(id) === "balls").map(name).sort(),
+  };
+}
+
 export function lockedStatsMessage(cardIds, counts) {
   const c = (counts && typeof counts === "object" && !Array.isArray(counts)) ? counts : {};
   const shotCount = Number(c.shotCount) || 0;
