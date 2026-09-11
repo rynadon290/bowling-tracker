@@ -181,6 +181,9 @@ function convertTenthFrame(frame, base, warnings) {
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
 export function convertExtractedGameToShots(extractedGame, context) {
+  // Without a context there is no bowler, league or date to file these
+  // shots under, so there is nothing to return but an empty list.
+  if (!context || typeof context !== "object") return [];
   // Frames arrive from a model, so the list can contain nulls and
   // stray values. One null threw on frame.frameNumber and took the
   // whole import down with it.
@@ -355,6 +358,8 @@ export function detailLevel(entry) {
 // they were MATCHED to (not by the printed name, which may differ
 // between shots) folds them back into one.
 export function mergeColumnsByBowler(columns) {
+  // Columns come from a vision model, so the list can hold nulls.
+  columns = (Array.isArray(columns) ? columns : []).filter(x => x && typeof x === "object");
   const merged = [];
   const byBowler = new Map();
 

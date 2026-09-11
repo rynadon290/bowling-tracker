@@ -89,6 +89,11 @@ export function describeLeaveImpact(team, leagueName, teams, bowlerName) {
 }
 
 export function leaveConfirmationText(impact) {
+  // Normally built by describeLeaveImpact, which always fills these in.
+  // Defaulted anyway: this is the text of a confirm dialog for leaving a
+  // team, and it should never be the thing that throws.
+  impact = (impact && typeof impact === "object") ? impact : {};
+  impact = { otherTeamsInLeague: [], remainingMembers: [], ...impact };
   if (!impact || typeof impact !== "object" || Array.isArray(impact)) return "";
   const lines = [`Leave ${impact.teamName}?`];
   if (impact.losesLeague) {

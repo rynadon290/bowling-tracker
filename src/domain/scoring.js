@@ -54,7 +54,7 @@ export function tenthBall3Pins(f10b1,f10b2,f10b3){
 export function nextState(savedShots, bowler, league, date, game, frame, ballNum){
   // Guarded for TYPE, not just null. HANDOFF 4.4: `{}` and `[]` and a
   // number all pass a truthiness check and then throw on .filter.
-  savedShots = Array.isArray(savedShots) ? savedShots : [];
+  savedShots = (Array.isArray(savedShots) ? savedShots : []).filter(x => x && typeof x === "object");
   const g=parseInt(game),f=parseInt(frame);
 
   if(f<10){

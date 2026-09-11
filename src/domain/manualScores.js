@@ -101,7 +101,7 @@ export function manualScoreToRow(bowler, leagueId, date, game, score, userId, eq
 }
 
 export function manualScoresFromRows(rows, leagueNameById) {
-  rows = Array.isArray(rows) ? rows : [];
+  rows = (Array.isArray(rows) ? rows : []).filter(x => x && typeof x === "object");
   const out = {};
   for (const row of rows || []) {
     const leagueName = leagueNameById?.[row.league_id] || "";
@@ -112,7 +112,8 @@ export function manualScoresFromRows(rows, leagueNameById) {
 
 // The equipment half of the same rows, keyed identically.
 export function gameEquipmentFromRows(rows, leagueNameById) {
-  rows = Array.isArray(rows) ? rows : [];
+  // Rows come straight from a cloud read, where a null is possible.
+  rows = (Array.isArray(rows) ? rows : []).filter(x => x && typeof x === "object");
   const out = {};
   for (const row of rows || []) {
     if (!row.ball && !row.surface) continue;

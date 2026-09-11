@@ -92,6 +92,9 @@ export function reminderToIcs(reminder, centerName) {
   const fmt = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
   const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
 
+  // A reminder with no league cannot produce a calendar invite. Null,
+  // rather than an invite titled " bowling" or a thrown error.
+  if (!reminder || typeof reminder.league !== "string" || !reminder.league) return null;
   const title = `${reminder.league.replace(" House Shot", "")} bowling`;
   const location = centerName ? `\nLOCATION:${centerName.replace(/[,;]/g, "\\$&")}` : "";
 

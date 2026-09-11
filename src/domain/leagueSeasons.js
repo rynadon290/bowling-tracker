@@ -25,7 +25,11 @@ export function hasLeagueEnded(endDate, today) {
   // unknown one, and saying "ended" would hide a league from its bowler.
   if (Number.isNaN(new Date(endDate).getTime())) return false;
   if (!endDate) return false;
-  const todayStr = (today instanceof Date ? today : new Date(today)).toISOString().slice(0, 10);
+  // `today` is a parameter, so it can be anything. An unparseable value
+  // threw "Invalid time value" on toISOString -- and a season-end check
+  // failing loudly is worse than treating an unknown today as now.
+  const t = today instanceof Date ? today : new Date(today);
+  const todayStr = (Number.isNaN(t.getTime()) ? new Date() : t).toISOString().slice(0, 10);
   return endDate <= todayStr;
 }
 

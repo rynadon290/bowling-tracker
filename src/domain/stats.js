@@ -135,6 +135,9 @@ export function weeklyPointsData(matches,league){
   return matches
     .filter(m=>!league||m.league===league)
     .map(m=>{
+      // A match row whose games never arrived has nothing to count --
+      // skipped rather than throwing and taking the card down.
+      if(!Array.isArray(m.games))return null;
       const pointsAvailable=m.games.filter(v=>v!==null).length+(m.series!==null?1:0);
       if(!pointsAvailable)return null;
       const pointsWon=m.games.filter(v=>v===true).length+(m.series===true?1:0);
@@ -150,7 +153,10 @@ export function weeklyPointsData(matches,league){
 export function gameAvg(sessions,bowler,gameIdx,league){
   const ls=arr(sessions).filter(s=>(bowler?s.bowler===bowler:true)
     &&(league?s.league===league:isCompetitiveSession(s)));
-  const vals=ls.map(s=>s.scores[gameIdx]).filter(v=>v!=null);
+  // A session whose scores never arrived has no [gameIdx] to read, and
+  // a non-numeric entry would make the average NaN.
+  const vals=ls.map(s=>Array.isArray(s.scores)?s.scores[gameIdx]:null)
+    .filter(v=>v!=null&&Number.isFinite(Number(v))).map(Number);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
