@@ -279,6 +279,17 @@ export async function cloudWrite(table, record, { timeoutMs = 6000, onConflict }
     if (error) throw error;
     return { synced: true, queued: false };
   } catch (err) {
+    // A unique violation means the row is ALREADY in the cloud under this
+    // key. Queueing it would queue a copy of something that arrived --
+    // the flush would send it, get 23505 again, and drop it. That is a
+    // round trip and a spurious "not synced" for data that is safe.
+    //
+    // Newly reachable: shots only gained a logical identity in step 35,
+    // so re-importing the same scorecard now returns 23505 where it used
+    // to create a second row.
+    if (err?.code === '23505') {
+      return { synced: true, queued: false, duplicate: true };
+    }
     await queueWrite(table, 'upsert', record, formatError(err), onConflict, err?.code || '');
     return { synced: false, queued: true, reason: formatError(err) };
   }
