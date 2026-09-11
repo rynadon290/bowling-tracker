@@ -63,10 +63,15 @@ export default function BagManager({
   activeBowler, bags, balls, ballBags, ballLayouts,
   saveBag, deleteBag, toggleBallBag,
 }) {
+  balls = Array.isArray(balls) ? balls : [];
+  // Bags arrive from the cloud; an absent list is an empty one.
+  bags = Array.isArray(bags) ? bags : [];
   const [editing, setEditing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const bowlerBags = bags.filter(b => b.bowlerName === activeBowler);
+  // Bags arrive from the cloud, so the list can be absent or hold a
+  // null row; b.bowlerName threw on both.
+  const bowlerBags = (Array.isArray(bags) ? bags : []).filter(b => b && typeof b === "object" && b.bowlerName === activeBowler);
   const ballsByBag = ballsByBagFor(ballBags, activeBowler, balls);
   const loose = unassignedBalls(balls, ballsByBag);
 
@@ -99,7 +104,8 @@ export default function BagManager({
       )}
 
       {bowlerBags.map(bag => {
-        const inBag = ballsByBag[bag.id] || [];
+        // ballsByBag itself can be absent, not just the entry in it.
+        const inBag = (ballsByBag && ballsByBag[bag.id]) || [];
         const capacity = bagCapacity(bag);
         const full = capacity !== null && inBag.length >= capacity;
         return (

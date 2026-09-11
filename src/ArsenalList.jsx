@@ -126,6 +126,9 @@ export default function ArsenalList({
   ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
+  // Normalised once, here, rather than at each of the four read sites.
+  // An arsenal that has not loaded yet is an empty one.
+  balls = Array.isArray(balls) ? balls : [];
   const [openBall, setOpenBall] = useState(null);
   const [openTab, setOpenTab] = useState("specs");
   const [confirmRemove, setConfirmRemove] = useState(null);
@@ -133,6 +136,7 @@ export default function ArsenalList({
 
   const groups = (ballGroups || []).filter(g => g.bowlerName === activeBowler);
   const specsByBall = {};
+  // An arsenal that has not loaded is an empty one, not a crash.
   balls.forEach(b => { specsByBall[b] = normalizeBallSpecs(ballSpecs?.[`${activeBowler}|${b}`]); });
 
   if (!balls.length) {

@@ -11,6 +11,11 @@ import {
 // approach between shots, so everything is oversized and the rate is
 // always visible without scrolling.
 export default function DrillSession({ drill, onChange, onSave, saved, balls, drills, bowler, onStartAnother, sessionDate, leftHanded = false }) {
+  //  is the session in progress. It is normally always present,
+  // but a drill session interrupted mid-write can leave it absent --
+  // and drill.target threw on the first line, so the screen showed the
+  // error boundary rather than an empty drill.
+  drill = (drill && typeof drill === "object") ? drill : {};
   const [lastTap, setLastTap] = useState(null);
   const rate = conversionRate(drill);
   const n = attempts(drill);

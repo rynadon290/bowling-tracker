@@ -163,7 +163,8 @@ export default function ImportScorecard({
   // Which team's scorecard this is. The team, not the league: a league
   // can hold several teams, and it's the team's roster that the card's
   // columns get mapped to. The league comes along with it.
-  const teamsForImport=(teams||[]).filter(t=>t.league);
+  // A null team row threw on t.league.
+  const teamsForImport=(Array.isArray(teams)?teams:[]).filter(t=>t&&typeof t==="object"&&t.league);
   const initialTeam=(presetLeague
     ?teamsForImport.find(t=>t.league===presetLeague)
     :null)||teamsForImport[0]||null;
@@ -186,7 +187,7 @@ export default function ImportScorecard({
   const contextLeague=
     importKind==="practice"?(presetLeague||PRACTICE_SESSION_KEY)
     :importKind==="tournament"?(selectedTournament?.name||"")
-    :(contextTeam?.league||presetLeague||leagues[0]||"");
+    :(contextTeam?.league||presetLeague||(Array.isArray(leagues)?leagues[0]:"")||"");
 
   // Whose card this is is NOT asked up front. Every column gets mapped to
   // a bowler in the review step anyway, so asking first was asking the
@@ -196,7 +197,7 @@ export default function ImportScorecard({
   // "Mine" is therefore derived: the signed-in bowler, used only to
   // decide which mapped column files to this account rather than being
   // sent to a teammate.
-  const contextBowler=presetBowler||activeBowler||bowlers[0]||"";
+  const contextBowler=presetBowler||activeBowler||(Array.isArray(bowlers)?bowlers[0]:"")||"";
   const[contextDate,setContextDate]=useState(localDateString());
   const[images,setImages]=useState([]); // [{base64, mimeType, previewUrl}]
   const[error,setError]=useState(null);

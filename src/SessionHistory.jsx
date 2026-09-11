@@ -16,7 +16,14 @@ export default function SessionHistory({ sessions, bowlers, leagues, teams = [],
   // on behalf of teammates, which aren't yours to browse or act on from
   // your own history screen -- hiding the bowler filter without scoping
   // the data would have left theirs mixed into the list.
-  const mine = sessions.filter(s => !displayName || s.bowler === displayName);
+  // Null rows filtered before anything reads a field off them.
+  //
+  // A partial sync or an interrupted write leaves a null in this list,
+  // and s.bowler threw -- which shows the error boundary instead of a
+  // bowler's history. The domain layer was hardened against exactly this
+  // shape; the components read the arrays themselves and were not.
+  const rows = (Array.isArray(sessions) ? sessions : []).filter(s => s && typeof s === "object");
+  const mine = rows.filter(s => !displayName || s.bowler === displayName);
   const filtered = mine
     .filter(s => (!statsLeague || s.league === statsLeague));
   const ordered = [...filtered].reverse();
@@ -33,7 +40,10 @@ export default function SessionHistory({ sessions, bowlers, leagues, teams = [],
   // One option per league the bowler has sessions in, labelled with the
   // team's name when a team exists for it. Falls back to the league name
   // so a league without a team is still filterable rather than vanishing.
-  const teamOptions = (leagues || []).map(l => {
+  // League names are strings; a null in the list reached String(l) fine
+  // but a null TEAM did not, and a session with no league threw on
+  // s.league.replace below.
+  const teamOptions = (Array.isArray(leagues) ? leagues : []).filter(l => l != null).map(l => {
     const team = (teams || []).find(t => t.league === l);
     return { league: l, name: team?.name || String(l).replace(" House Shot", "") };
   });
@@ -85,12 +95,15 @@ export default function SessionHistory({ sessions, bowlers, leagues, teams = [],
               <div key={s.id} style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: "10px", marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 600 }}>
-                    {!statsBowler && s.bowler ? `${s.bowler} · ` : ""}{s.league.replace(" House Shot", "")}
+                    {!statsBowler && s.bowler ? `${s.bowler} · ` : ""}{String(s.league||"").replace(" House Shot", "")}
                   </span>
                   <span style={{ fontSize: "11px", color: C.textMuted }}>{formatDate(s.date)}</span>
                 </div>
                 <div style={{ display: "flex", gap: "6px", marginBottom: "4px" }}>
-                  {s.scores.map((sc, i) => <span key={i} style={{ fontSize: "13px", fontWeight: 600 }}>{sc}</span>)}
+                  {/* A session whose scores never arrived: the row still
+                      shows, with no game boxes, rather than blanking the
+                      screen. */}
+                  {(Array.isArray(s.scores)?s.scores:[]).map((sc, i) => <span key={i} style={{ fontSize: "13px", fontWeight: 600 }}>{sc}</span>)}
                   <span style={{ fontSize: "13px", color: C.textMuted }}>·</span>
                   <span style={{ fontSize: "13px", fontWeight: 700, color: C.accent }}>{s.total}</span>
                 </div>

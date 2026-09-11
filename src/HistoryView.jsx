@@ -31,7 +31,9 @@ export default function HistoryView({
         {(teams||[]).length>0&&(
           <>
             <div style={S.chips}>
-              {(teams||[]).map(t=>(
+              {/* Null team rows filtered: t.name threw and took the
+                  whole history screen with it. */}
+              {(Array.isArray(teams)?teams:[]).filter(t=>t&&typeof t==="object").map(t=>(
                 <Chip key={t.id} label={t.name}
                   selected={filterBall==="__"+t.id} onToggle={()=>setFilterBall(filterBall==="__"+t.id?"":"__"+t.id)}/>
               ))}
@@ -39,7 +41,7 @@ export default function HistoryView({
           </>
         )}
         <div style={S.row}>
-          <select style={S.sel} value={filterBall.startsWith("__")?"":filterBall} onChange={e=>setFilterBall(e.target.value)}>
+          <select style={S.sel} value={String(filterBall||"").startsWith("__")?"":(filterBall||"")} onChange={e=>setFilterBall(e.target.value)}>
             <option value="">All Balls</option>
             {ballUniverse(filterBowler).map(b=><option key={b}>{b}</option>)}
           </select>
@@ -64,7 +66,8 @@ export default function HistoryView({
         </div>
       )}
 
-      {[...filtered].reverse().map(shot=>(
+      {/* And null shot rows -- shot.ball threw on startsWith. */}
+      {[...filtered].filter(shot=>shot&&typeof shot==="object").reverse().map(shot=>(
         <div key={shot.id} style={S.shotCard}>
           <div style={S.dot(shot.result)}>{resultSym(shot._displayResult||shot.result)}</div>
           <div style={{flex:1,minWidth:0}}>
