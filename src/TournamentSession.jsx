@@ -289,9 +289,15 @@ function DayBlock({ tournament, day, onChange, canRemoveDay, onRemoveDay, multiD
 
       <div style={S.label}>Cut Line</div>
       <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
-        The total to beat. Above the line is good.
+        {/* Focus group Finding 5: 9 of 50 stalled here because the cut
+            is usually not announced until after qualifying. Leaving it
+            blank already worked -- nothing said so, and an empty
+            numeric field on a setup screen reads as something you are
+            required to know. Not labelled "optional", which implies it
+            does not matter; it does, just not yet. */}
+        The total to beat. Above the line is good. Enter it when it is posted — or now, if you already know it.
       </div>
-      <input style={S.input} type="number" inputMode="numeric" placeholder="Posted cut total"
+      <input style={S.input} type="number" inputMode="numeric" placeholder="Add it when it’s posted"
         value={day.cutLine} onChange={e => update({ ...day, cutLine: e.target.value })} />
 
       {margin !== null && (
