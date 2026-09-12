@@ -180,6 +180,56 @@ function convertTenthFrame(frame, base, warnings) {
 // everything" reminder. The review UI should surface these prominently,
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
+// Does the series total match the games under it?
+//
+// NOT wired to a UI warning: seriesFor already computes this and the
+// column list already shows "Printed series is X but the games add to
+// Y". Two warnings for one problem is worse than one. Kept and tested
+// because it is the reusable form -- seriesFor is bound to the column
+// shape, and this takes any {seriesTotal, games}.
+//
+// The same cross-check as scoreDisagreement, one level up: a scorecard
+// prints a series total AND the games it is made of, so those are two
+// readings that must agree. A mismatch means a game was misread, or one
+// was missed entirely off the edge of the photo -- which is the common
+// case, and the one a bowler would otherwise not notice until their
+// average moved.
+//
+// Only checked when every game has a score. A partial card legitimately
+// sums to less than its series, and flagging that would be noise.
+export function seriesDisagreement(entry) {
+  const e = (entry && typeof entry === "object") ? entry : {};
+  const reported = Number(e.seriesTotal);
+  if (!Number.isFinite(reported)) return null;
+
+  const games = Array.isArray(e.games) ? e.games : [];
+  if (!games.length) return null;
+
+  const scores = games.map(g => Number(g?.totalScore));
+  if (scores.some(v => !Number.isFinite(v))) return null;   // partial card
+
+  const summed = scores.reduce((a, b) => a + b, 0);
+  if (summed === reported) return null;
+
+  return {
+    reported,
+    summed,
+    difference: Math.abs(reported - summed),
+    gameCount: games.length,
+    // A gap close to one game's worth of pins usually means a game is
+    // missing rather than misread.
+    likelyMissingGame: Math.abs(reported - summed) >= 80,
+  };
+}
+
+export function seriesDisagreementNote(d) {
+  if (!d || typeof d !== "object") return "";
+  const tail = d.likelyMissingGame
+    ? `so a game may be missing from the photo`
+    : `so one of the game scores was probably misread`;
+  return `The series says ${d.reported} but the ${d.gameCount} games add up to ${d.summed} — ${tail}. Check before saving.`;
+}
+
 // Does the frame data actually score to the reported total?
 //
 // The single strongest accuracy check available for an import, and the
