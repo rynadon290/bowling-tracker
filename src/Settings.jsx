@@ -12,7 +12,7 @@ import { inferLeagueDay, dayName, reminderSpec, reminderToIcs } from "./domain/r
 import { localDateString } from "./constants.js";
 import { errorLogSummary, errorLogText, clearErrorLog } from "./errorLogStore.js";
 import {
-  ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
+  ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENT_BEST_FOR, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
   TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODE_LABELS,
   resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
@@ -347,7 +347,7 @@ export default function Settings({
             all, so the only place explaining what a mode does was the
             screen you see once. */}
         <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "-6px", marginBottom: "12px", lineHeight: 1.4 }}>
-          {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
+          Best for: {ENVIRONMENT_BEST_FOR[preferences.environment]}. {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
         </div>
 
         {/* Casual has no tracking choice: it's scores-only by

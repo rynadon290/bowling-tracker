@@ -142,7 +142,7 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
                   {have && (history[b.id]?.lastDate || history[b.id]?.count > 1) && (
                     <div style={{ fontSize: "11px", color: C.accent, marginTop: "2px" }}>
                       {history[b.id].count > 1 ? `${history[b.id].count} times` : "Earned"}
-                      {history[b.id].lastDate ? ` \u00b7 ${prettyDate(history[b.id].lastDate)}` : ""}
+                      {history[b.id].lastDate ? ` · ${prettyDate(history[b.id].lastDate)}` : ""}
                     </div>
                   )}
                 </div>
@@ -167,7 +167,7 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
           <div style={S.label}>Someone sent you your badges?</div>
           <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
             Paste the code from their message and your nights come across. Doing it twice is
-            harmless \u2014 nothing doubles up.
+            harmless — nothing doubles up.
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0, fontSize: "12px" }}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  ENVIRONMENTS, ENVIRONMENT_QUESTION_LABELS, ENVIRONMENT_DESCRIPTIONS,
+  ENVIRONMENTS, ENVIRONMENT_QUESTION_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENT_BEST_FOR,
   TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
@@ -232,7 +232,10 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                     <div style={{ fontSize: "15px", fontWeight: 600, color: selected ? C.accent : C.text, marginBottom: "2px" }}>
                       {ENVIRONMENT_QUESTION_LABELS[env]}
                     </div>
-                    <div style={{ fontSize: "12px", color: C.textMuted }}>
+                    <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "3px" }}>
+                      Best for: {ENVIRONMENT_BEST_FOR[env]}
+                    </div>
+                    <div style={{ fontSize: "11px", color: C.textMuted }}>
                       {ENVIRONMENT_DESCRIPTIONS[env]}
                     </div>
                   </button>

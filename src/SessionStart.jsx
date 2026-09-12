@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  ENVIRONMENTS, ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS,
+  ENVIRONMENTS, ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENT_BEST_FOR,
   TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
@@ -117,7 +117,7 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
       </div>
       {envChosen && (
         <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "4px", marginBottom: "12px" }}>
-          {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
+          Best for: {ENVIRONMENT_BEST_FOR[preferences.environment]}. {ENVIRONMENT_DESCRIPTIONS[preferences.environment]}
         </div>
       )}
 
