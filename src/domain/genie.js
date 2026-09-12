@@ -138,7 +138,6 @@ export function buildGenieContext(summary) {
   add("Split conversion percentage", s.splitPct);
   add("Open frames per game", s.opensPerGame);
   add("Most-used ball", s.topBall);
-  add("Recent trend", s.trend);
   add("Leagues", s.leagues);
   add("Handedness", s.handedness);
 
