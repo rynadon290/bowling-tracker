@@ -3926,7 +3926,12 @@ export default function BowlingTracker(){
     }
     const today=localDateString();
     setGenieAsked(prev=>[...prev,{date:today}]);
-    return{text:data.text};
+    // The gated payload goes back with the answer so the guard can check
+    // whether Brooklyn discussed anything the analysis would withhold.
+    // Same withheld list, same standard -- she cannot claim what the
+    // Improve tab refuses to.
+    return{text:data.text,payload:buildAnalysisPayload(insightStats)};
+
   }
 
   // What the genie is told. Computed stats, never raw history -- see
@@ -5552,8 +5557,25 @@ export default function BowlingTracker(){
               setView(item.view);
             }}/>
             <ImportedScoresInbox
+
               records={importedScores}
+
               bowler={activeBowler}
+
+              // This bowler's own scores, so the card can say where the
+              // photo disagrees with what they typed. Manual entry still
+              // wins by default -- this only makes the disagreement
+              // visible instead of resolving it in silence.
+              myScores={(() => {
+                const out = {};
+                for (const x of sessions) {
+                  if (!x || x.bowler !== activeBowler || !Array.isArray(x.scores)) continue;
+                  const key = `${x.league ?? ""}|${x.date ?? ""}`;
+                  out[key] = out[key] || {};
+                  x.scores.forEach((v, i) => { if (v != null) out[key][String(i + 1)] = v; });
+                }
+                return out;
+              })()}
               onApprove={approveImportedScores}
               onReject={rejectImportedScores}
               onCorrectTeammate={correctTeammateScores}

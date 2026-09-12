@@ -3,6 +3,7 @@ import { C, S } from "./ui.jsx";
 import { formatDate } from "./constants.js";
 import {
   effectiveScores, isConfirmed, describeStatus, pendingFor, needingReentry,
+  importConflicts, importConflictNote,
 } from "./domain/importVerification.js";
 
 // Scores someone else imported from a scorecard photo, waiting on this
@@ -25,11 +26,18 @@ function ScoreRow({ label, scores, muted }) {
   );
 }
 
-function PendingCard({ record, onApprove, onReject }) {
+function PendingCard({ record, onApprove, onReject, myScoresByGame }) {
   const [correcting, setCorrecting] = useState(false);
   const [draft, setDraft] = useState((record.importedScores || []).map(v => (v == null ? "" : String(v))));
 
   const scores = effectiveScores(record) || [];
+  // Where the photo disagrees with what this bowler already typed.
+  //
+  // Silence is right when they agree -- the photo just confirms it. When
+  // they differ, one is wrong and only the bowler can say which: a photo
+  // can be misread, and so can a phone keypad at the end of a long
+  // night. Their entry is still kept by default.
+  const conflicts = importConflicts(record, myScoresByGame);
 
   return (
     <div style={{ padding: "12px", marginBottom: "10px", backgroundColor: C.surface, borderRadius: "8px", border: `1px solid ${C.spare}44` }}>
@@ -39,7 +47,11 @@ function PendingCard({ record, onApprove, onReject }) {
       <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px" }}>
         Imported from a teammate's scorecard photo. These are already counting — confirming just marks them checked.
       </div>
-
+      {conflicts.length > 0 && (
+        <div style={{ fontSize: "11px", color: C.miss, lineHeight: 1.5, marginBottom: "8px" }}>
+          ⚠️ {importConflictNote(conflicts)}
+        </div>
+      )}
       <ScoreRow label="Scores read" scores={scores} />
 
       {/* Frames come with the photo when the scorecard showed them, but
@@ -159,7 +171,13 @@ export function TeamInviteCard({ invite, onAccept, onDecline, busy }) {
 
 export default function ImportedScoresInbox({
   records, bowler, onApprove, onReject, onCorrectTeammate, canCorrect,
+
   teamInvites = [], onAcceptInvite, onDeclineInvite, inviteBusyId,
+
+  // What this bowler has already logged, keyed "league|date" -> { game:
+  // score }. Used to spot where the photo disagrees with them.
+  myScores = {},
+
 }) {
   const [correctingId, setCorrectingId] = useState(null);
   const [draft, setDraft] = useState([]);
@@ -194,7 +212,8 @@ export default function ImportedScoresInbox({
             {mine.length} night{mine.length === 1 ? "" : "s"} imported by a teammate.
           </div>
           {mine.map(r => (
-            <PendingCard key={r.id} record={r} onApprove={onApprove} onReject={onReject} />
+            <PendingCard key={r.id} record={r} onApprove={onApprove} onReject={onReject}
+              myScoresByGame={myScores[`${r.league ?? ""}|${r.date ?? ""}`] || {}} />
           ))}
         </div>
       )}
