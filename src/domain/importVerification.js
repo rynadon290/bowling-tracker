@@ -216,6 +216,66 @@ export function describeStatus(record) {
 }
 
 // Records awaiting a given bowler's response.
+// Where an import and what the bowler already logged disagree.
+//
+// Manual entry wins by default, and should: the bowler was standing
+// there. But "manual wins" applied blindly is wrong in one direction and
+// silent in the other.
+//
+//   Same number   -> nothing to say. The photo confirms what they typed.
+//   Different     -> one of them is wrong and only they know which. A
+//                    photo can be misread; so can a phone keypad at the
+//                    end of a long night.
+//   Nothing yet   -> the import just writes.
+//
+// Today the import silently skips any game the bowler already has, so a
+// disagreement is resolved in favour of the manual entry and never
+// mentioned. That is the right default and the wrong amount of silence:
+// if the photo says 195 and they typed 180, they would want to know.
+export function importConflicts(record, existingScoresByGame) {
+  const r = (record && typeof record === "object") ? record : {};
+  const existing = (existingScoresByGame && typeof existingScoresByGame === "object")
+    ? existingScoresByGame : {};
+
+  const imported = Array.isArray(r.correctedScores) && r.correctedScores.length
+    ? r.correctedScores
+    : (Array.isArray(r.importedScores) ? r.importedScores : []);
+
+  const conflicts = [];
+  imported.forEach((value, i) => {
+    const game = String(i + 1);
+    const mine = existing[game];
+    if (mine === null || mine === undefined || mine === "") return;   // nothing logged
+    const a = Number(mine), b = Number(value);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+    if (a === b) return;                                               // they agree
+    conflicts.push({ game, yours: a, imported: b });
+  });
+  return conflicts;
+}
+
+// What to say about them. Names both numbers, because the bowler is the
+// only one who can settle it and a vague warning gives them nothing to
+// settle it with.
+export function importConflictNote(conflicts) {
+  // Objects only. Array.isArray says the container is a list and nothing
+  // about what is in it -- [null] reached c.game and threw. Caught by the
+  // fuzz and the damaged-record sweep, both of which pass arrays
+  // containing junk; my own junk test passed junk AS the array and not
+  // IN it, which is the same blind spot that has cost this codebase a
+  // dozen crashes and which I named two tasks ago and repeated anyway.
+  const list = (Array.isArray(conflicts) ? conflicts : [])
+    .filter(c => c && typeof c === "object");
+  if (!list.length) return "";
+
+  if (list.length === 1) {
+    const c = list[0];
+    return `Game ${c.game}: you logged ${c.yours}, the photo reads ${c.imported}. Yours is kept unless you change it.`;
+  }
+  const games = list.map(c => `game ${c.game} (${c.yours} vs ${c.imported})`).join(", ");
+  return `These disagree with what you logged — ${games}. Yours are kept unless you change them.`;
+}
+
 // Two bowlers photographing the same monitor.
 //
 // The common case on a league night: Ryan photographs the scores and

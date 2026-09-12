@@ -3,7 +3,7 @@ import {
   emptyImportRecord, normalizeImportRecord, effectiveScores, isConfirmed,
   approve, reject, canCorrect, correctAsTeammate, laterSessionEnded,
   describeStatus, pendingFor, needingReentry,
-  dedupePending, pendingAlreadyLogged,
+  dedupePending, pendingAlreadyLogged, importConflicts, importConflictNote,
   isValidGameScore,
   invalidScoreIndexes,
 } from './importVerification.js';
@@ -239,5 +239,56 @@ describe('two bowlers photographing the same monitor', () => {
       expect(() => pendingAlreadyLogged(junk, junk, junk)).not.toThrow();
     }
     expect(dedupePending(null, 'Dave', null)).toEqual([]);
+  });
+});
+
+describe('when an import disagrees with what you typed', () => {
+  // Manual entry wins by default and should -- the bowler was standing
+  // there. But applied blindly that is silent in the wrong direction: if
+  // the photo says 195 and they typed 180, they would want to know.
+  const rec = { bowler: 'Ryan', league: 'Tue', date: '2026-09-11', importedScores: [180, 195, 200] };
+
+  it('says nothing when the photo agrees', () => {
+    expect(importConflicts(rec, { 1: 180, 2: 195, 3: 200 })).toEqual([]);
+  });
+
+  it('says nothing when there is nothing logged to compare', () => {
+    expect(importConflicts(rec, {})).toEqual([]);
+  });
+
+  it('reports only the games that differ', () => {
+    const c = importConflicts(rec, { 1: 180, 2: 180, 3: 200 });
+    expect(c).toEqual([{ game: '2', yours: 180, imported: 195 }]);
+  });
+
+  // The bowler is the only one who can settle it, and a vague warning
+  // gives them nothing to settle it with.
+  it('names both numbers', () => {
+    const note = importConflictNote(importConflicts(rec, { 2: 180 }));
+    expect(note).toContain('180');
+    expect(note).toContain('195');
+  });
+
+  it('makes clear their entry is the one that stands', () => {
+    expect(importConflictNote([{ game: '2', yours: 180, imported: 195 }]))
+      .toContain('kept');
+  });
+
+  // A correction the bowler already made replaces what was read.
+  it('compares against corrected scores when they exist', () => {
+    const corrected = { ...rec, correctedScores: [180, 180, 200] };
+    expect(importConflicts(corrected, { 2: 180 })).toEqual([]);
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, [], {}]) {
+      expect(() => importConflicts(junk, junk)).not.toThrow();
+      expect(() => importConflictNote(junk)).not.toThrow();
+    }
+    for (const junk of [[null], [undefined], [{}], [42], [null, { game: '2', yours: 1, imported: 2 }]]) {
+      expect(() => importConflictNote(junk)).not.toThrow();
+    }
+    expect(importConflicts(null, null)).toEqual([]);
+    expect(importConflictNote(null)).toBe('');
   });
 });
