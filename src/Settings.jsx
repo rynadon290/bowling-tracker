@@ -370,13 +370,13 @@ export default function Settings({
           </>
         )}
 
-        {preferences.environment === "casual" && (
-          <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.5 }}>
-            Open bowling keeps things to game scores, and hides History, Stats, Improve
-            and the Vault. Switch to another mode above and they all come back — nothing
-            is deleted.
-          </div>
-        )}
+        {/* The extra Open bowling paragraph is gone.
+
+            ENVIRONMENT_DESCRIPTIONS.casual already says the views are
+            hidden rather than deleted, directly above this. Two sentences
+            making the same promise read as a warning being laboured --
+            and this one still named "the Vault", a tab that no longer
+            exists, which is what a second copy of a fact does. */}
       </CollapsibleCard>
       )}
 
