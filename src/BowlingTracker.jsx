@@ -4039,7 +4039,23 @@ export default function BowlingTracker(){
           .map(([b,v])=>`${b} ${Math.round((v.x/v.n)*100)}% over ${v.n}`);
         return rows.join("; ")||null;
       })(),
+      drillRates:(()=>{
+        const by={};
+        for(const d of drills.filter(x=>x&&x.bowler===activeBowler)){
+          const key=d.target==="custom"?(d.customTarget||"custom"):d.target;
+          if(!key)continue;
+          (by[key]=by[key]||{made:0,att:0});
+          by[key].made+=Number(d.made)||0;
+          by[key].att+=(Number(d.made)||0)+(Number(d.missed)||0);
+        }
+        // Same 25-attempt bar the analysis uses, so Brooklyn cannot quote
+        // a rate the Improve tab would refuse to claim.
+        const rows=Object.entries(by).filter(([,v])=>v.att>=25)
+          .map(([t,v])=>`${t} ${Math.round((v.made/v.att)*100)}% over ${v.att}`);
+        return rows.join("; ")||null;
+      })(),
       centerAverages:(()=>{
+
         const by={};
         for(const x of mine){
           if(!x.center||!Array.isArray(x.scores))continue;
@@ -4381,7 +4397,41 @@ export default function BowlingTracker(){
       splitRate:firstBalls.length?Math.round((splits/firstBalls.length)*100):null,
       sessionCount:mySessions.length,
       recentAverages:mySessions.slice(-8).map(s=>s.average).filter(v=>typeof v==="number"),
+      // Facts, not rates, so ungated -- the same reasoning as handedness.
+      // bookAverage especially: the analysis could compute a strike rate
+      // but not say whether the bowler is above or below their book,
+      // which is the frame a league bowler judges everything else by.
+      average:(()=>{
+        const v=mySessions.flatMap(x=>Array.isArray(x.scores)?x.scores:[])
+          .filter(n=>Number.isFinite(Number(n))).map(Number);
+        return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;
+      })(),
+      bookAverage:normalizeProfile(profiles[who],who).bookAverage??null,
+      highGame:bowlerHighGame(sessions,who)?.value??null,
+      highSeries:bowlerHighSeries(sessions,who)?.value??null,
+      gamesLogged:gameCount,
+      nightsLogged:new Set(mySessions.map(x=>x.date)).size||null,
+
+      // Drills. buildAnalysisPayload has gated these at 25 attempts since
+      // it was written -- the consumer was complete and nothing ever fed
+      // it, so the practice group's richest data reached neither the
+      // analysis nor Brooklyn.
+      drills:(()=>{
+        const by={};
+        for(const d of drills.filter(x=>x&&x.bowler===who)){
+          const key=d.target==="custom"?(d.customTarget||"custom"):d.target;
+          if(!key)continue;
+          (by[key]=by[key]||{made:0,att:0});
+          by[key].made+=Number(d.made)||0;
+          by[key].att+=(Number(d.made)||0)+(Number(d.missed)||0);
+        }
+        return Object.entries(by).map(([label,v])=>({
+          label,attempts:v.att,rate:v.att?Math.round((v.made/v.att)*100):null,
+        }));
+      })(),
+
       // Fed to buildAnalysisPayload, which gates each one on its own
+
       // threshold -- so these appear in the analysis as the sample for
       // each becomes real, not all at once.
       handedness:preferences.leftHanded?"left-handed":"right-handed",
