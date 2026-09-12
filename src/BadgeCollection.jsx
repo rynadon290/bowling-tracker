@@ -31,6 +31,13 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
   // recently 18 Sept" is a record.
   const history = badgeHistory(me, nights);
 
+  // All / earned / still to get.
+  //
+  // "All" stays the default because the unearned ones are the point --
+  // a collection you can see the gaps in. The filter is for the two
+  // other questions people actually ask: what have I got, and what is
+  // left.
+  const [filter, setFilter] = useState("all");
   const [code, setCode] = useState("");
   const [result, setResult] = useState("");
 
@@ -89,9 +96,26 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
       </div>
 
       <div style={S.card}>
-        <div style={S.label}>The collection</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+          <div style={S.label}>The collection</div>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {[["all", "All"], ["earned", `Earned ${got}`], ["locked", `Left ${total - got}`]].map(([key, label]) => (
+              <button key={key} onClick={() => setFilter(key)}
+                style={{
+                  background: filter === key ? C.accent + "22" : "none",
+                  border: `1px solid ${filter === key ? C.accent + "55" : C.border}`,
+                  borderRadius: "999px", padding: "3px 10px", cursor: "pointer",
+                  fontSize: "11px", fontWeight: filter === key ? 600 : 500,
+                  color: filter === key ? C.accent : C.textMuted,
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "8px" }}>
-          {CASUAL_BADGES.map(b => {
+          {CASUAL_BADGES.filter(b => filter === "all"
+            || (filter === "earned") === earnedIds.has(b.id)).map(b => {
             const have = earnedIds.has(b.id);
             return (
               <div key={b.id} style={{
@@ -125,6 +149,16 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
               </div>
             );
           })}
+          {filter === "earned" && got === 0 && (
+            <div style={{ fontSize: "12px", color: C.textMuted, padding: "12px 10px" }}>
+              None yet. Bowl a night with the group and the first one is yours.
+            </div>
+          )}
+          {filter === "locked" && got === total && (
+            <div style={{ fontSize: "12px", color: C.textMuted, padding: "12px 10px" }}>
+              Nothing left. You have all of them.
+            </div>
+          )}
         </div>
       </div>
 

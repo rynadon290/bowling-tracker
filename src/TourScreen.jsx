@@ -282,7 +282,7 @@ const SCREENS = {
         <div style={label}>How much detail?</div>
         <Spot style={{ marginBottom: "8px" }}>
           <div style={{ ...S.input, padding: "8px 9px", borderColor: C.accent }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: C.accent }}>Shot by shot</div>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: C.accent }}>Frame tracking</div>
             <div style={muted}>Every ball · pins, ball, release</div>
           </div>
         </Spot>
@@ -890,7 +890,7 @@ const SCREENS = {
           </div>
           <div style={{ ...muted, marginTop: "8px" }}>Tracking tonight</div>
           <div style={{ display: "flex", gap: "5px", marginTop: "4px" }}>
-            <span style={chip(true)}>Shot by shot</span>
+            <span style={chip(true)}>Frame tracking</span>
             <span style={chip(false)}>Scores only</span>
           </div>
         </div>
@@ -939,7 +939,7 @@ const SCREENS = {
       <div style={card}>
         <div style={label}>Tracking tonight</div>
         <div style={{ display: "flex", gap: "5px", marginBottom: "8px" }}>
-          <span style={chip(false)}>Shot by shot</span>
+          <span style={chip(false)}>Frame tracking</span>
           <span style={chip(true)}>Scores only</span>
         </div>
         <div style={{ ...muted, lineHeight: 1.4 }}>
@@ -950,7 +950,7 @@ const SCREENS = {
         <div style={{ ...card, marginBottom: 0 }}>
           <div style={label}>Your league nights</div>
           <div style={{ display: "flex", gap: "5px" }}>
-            <span style={chip(true)}>Shot by shot</span>
+            <span style={chip(true)}>Frame tracking</span>
             <span style={chip(false)}>Scores only</span>
           </div>
           <div style={{ ...muted, marginTop: "6px" }}>Unchanged</div>

@@ -1343,7 +1343,7 @@ anyMoneyGameShown(preferences)&&statsBowler&&(()=>{
                         <div style={{marginTop:"8px"}}>
                           {lockedNames.shots.length>0&&(
                             <div style={{marginBottom:"6px"}}>
-                              <div style={{fontWeight:600,color:C.text}}>Shot by shot</div>
+                              <div style={{fontWeight:600,color:C.text}}>Frame tracking</div>
                               <div>{lockedNames.shots.join(" · ")}</div>
                             </div>
                           )}

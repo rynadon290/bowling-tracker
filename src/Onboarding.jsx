@@ -258,7 +258,7 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
               How much do you want to track?
             </div>
             <div style={{ fontSize: "13px", color: C.textMuted, marginBottom: "18px" }}>
-              Shot-by-shot unlocks the detailed stats. Game scores only is faster and you can switch whenever you like.
+              Frame tracking unlocks the detailed stats. Game tracking is faster, and you can switch whenever you like.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
               {TRACKING_MODES.map(mode => {

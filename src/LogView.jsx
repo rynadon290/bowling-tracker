@@ -169,7 +169,7 @@ export default function LogView({
                   Want to see which spares are costing you?
                 </div>
                 <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5,marginBottom:"10px"}}>
-                  You've logged a few nights as game scores. Tracking one game shot by shot
+                  You've logged a few nights on game tracking. Tracking one game frame by frame
                   turns those into spare conversion, carry and leave patterns. You can switch
                   back whenever you like.
                 </div>
@@ -228,7 +228,7 @@ export default function LogView({
                   <>
                     <div style={{fontSize:"12px",color:C.textMuted,margin:"10px 0 6px"}}>Tracking tonight</div>
                     <div style={S.chips}>
-                      <Chip label="Shot by shot" selected={preferences.trackingMode==="shot"}
+                      <Chip label="Frame tracking" selected={preferences.trackingMode==="shot"}
                         onToggle={()=>setPracticeTracking("shot")}/>
                       <Chip label="Scores only" selected={preferences.trackingMode==="game"}
                         onToggle={()=>setPracticeTracking("game")}/>
@@ -522,7 +522,7 @@ export default function LogView({
                 {/* The Vault, which is where the Leagues card lives -- it
                     is <Settings mode="leagues"> rendered under view
                     "locker", not the Settings screen. */}
-                <button style={S.btn("primary")} onClick={()=>setView("locker")}>
+                <button style={S.btn("primary")} onClick={()=>setView("teams")}>
                   Add my league
                 </button>
                 {onReplayTour&&(
@@ -563,7 +563,7 @@ export default function LogView({
                 </div>
                 <div style={{display:"flex",gap:"8px"}}>
                   <button style={{...S.btn("primary"),flex:1,padding:"8px",fontSize:"12px"}}
-                    onClick={()=>setView("locker")}>Add or join my team</button>
+                    onClick={()=>setView("teams")}>Add or join my team</button>
                   <button style={{...S.btn(),flex:1,padding:"8px",fontSize:"12px"}}
                     onClick={onDismissTeamPrompt}>Not now</button>
                 </div>
@@ -1238,7 +1238,7 @@ export default function LogView({
                       One line, and only when a ball can actually be chosen. */}
                   {logBalls.length>0&&(
                     <div style={{fontSize:"11px",color:C.textMuted,marginBottom:"10px",lineHeight:1.5}}>
-                      A ball counts for the whole game. Switch to shot by shot to record a change mid-game.
+                      A ball counts for the whole game. Switch to frame tracking to record a ball change mid-game.
                     </div>
                   )}
                   {/* Only shown in shot mode -- in scores-only mode there is

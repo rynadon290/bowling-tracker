@@ -4402,22 +4402,29 @@ export default function BowlingTracker(){
   // scoresheet, which is the only other thing a casual bowler wants.
   const casualMode=preferences.environment==="casual";
   const navTabs=casualMode?[
+    // Badges first, Bowl in the middle, Standings last.
+    //
+    // Bowl is the thing you reach for mid-game, and the middle of a
+    // bottom bar is the easiest place to hit one-handed while holding a
+    // ball. Badges lead because they are the reason to open the app on a
+    // day you are not bowling.
+    {id:"badges", label:"Badges",  icon:"🏅"},
     {id:"log",    label:"Bowl",    icon:"🎳"},
     {id:"social", label:"Standings", icon:"📊"},
-    // A third tab, and the only one about anything other than tonight.
-    //
-    // Two tabs -- log a score, see who won -- are both about the night in
-    // front of you, so nothing in casual mode ever showed that the app was
-    // keeping something. Round 7, finding 1: casual bowlers never learned
-    // it tracked anything. A collection that fills up is the reason a
-    // group who bowl four times a year open it again in March.
-    {id:"badges", label:"Badges",  icon:"🏅"},
   ]:[
     {id:"log",     label:"Bowl",    icon:"🎳"},
     {id:"history", label:"History", icon:"📖"},
     {id:"data",    label:"Stats",   icon:"📈"},
     {id:"insights",label:"Improve", icon:"🎯"},
-    {id:"locker",  label:"Vault",   icon:"🔒"}, // internal id stays "locker" -- plumbing, not shown
+    // Split in two. "Vault" held equipment AND leagues, and was the one
+    // tab name that was not plain bowling -- Bowl, History, Stats and
+    // Improve need no explanation and it did. Two tabs that say what they
+    // hold beat one that says nothing.
+    //
+    // Measured at 360px: six labels fit without wrapping, ~59px each,
+    // well above the 44px touch minimum.
+    {id:"locker",  label:"Gear",    icon:"🎒"}, // internal id stays "locker" -- plumbing, not shown
+    {id:"teams",   label:"Teams",   icon:"👥"},
   ];
   // Icons go inline beside the title until the nav genuinely needs the
   // width. Five was the count that pushed "Social" off a phone screen and
@@ -5313,7 +5320,7 @@ export default function BowlingTracker(){
             open Compare To, find nobody there, and the fix is right
             beside it. */}
 
-        {view==="locker"&&(
+        {view==="teams"&&(
           <Settings
             mode="leagues"
             onCreateTeam={createTeamForLeague} onAddLeague={addLeague}
@@ -5349,7 +5356,7 @@ export default function BowlingTracker(){
             
             Friends stays where it is: adding a friend is a different task
             from managing a roster, and it isn't part of league setup. */}
-        {view==="locker"&&(
+        {view==="teams"&&(
           <TeamManagement
             // activeLeagues, not the raw list: Practice and Just Bowling
             // are containers, and offering to add a team to one is

@@ -13,7 +13,7 @@ import { localDateString } from "./constants.js";
 import { errorLogSummary, errorLogText, clearErrorLog } from "./errorLogStore.js";
 import {
   ENVIRONMENT_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENTS, applyEnvironment, setTrackingMode, MONEY_GAMES, MONEY_GAME_LABELS, isMoneyGameShown, setMoneyGameHidden, setTheme,
-  TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS,
+  TRACKED_FIELD_KEYS, MOVABLE_STATS_CARDS, TRACKING_MODE_LABELS,
   resetToEnvironmentDefaults, setTrackedField,
   moveStatsCard, toggleStatsCardHidden, reconcileCardOrder,
 } from "./domain/preferences.js";
@@ -327,7 +327,7 @@ export default function Settings({
       {showCard("session") && (
       <CollapsibleCard title="What you're bowling"
         summary={`${ENVIRONMENT_LABELS[preferences.environment] || "League"}${
-          preferences.environment === "casual" ? "" : ` · ${preferences.trackingMode === "shot" ? "Shot by shot" : "Scores only"}`}`}
+          preferences.environment === "casual" ? "" : ` · ${TRACKING_MODE_LABELS[preferences.trackingMode] || ""}`}`}
         expanded={expanded.session} onToggle={() => toggle("session")}>
         <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "10px", lineHeight: 1.5 }}>
           You can also change these at the top of the Bowl tab. Each mode shows
@@ -357,7 +357,7 @@ export default function Settings({
           <>
             <div style={S.label}>Tracking style</div>
             <div style={S.chips}>
-              <Chip label="Shot by shot" selected={preferences.trackingMode === "shot"}
+              <Chip label="Frame tracking" selected={preferences.trackingMode === "shot"}
                 onToggle={() => apply(prev => setTrackingMode(prev, "shot"))} />
               <Chip label="Scores only" selected={preferences.trackingMode === "game"}
                 onToggle={() => apply(prev => setTrackingMode(prev, "game"))} />

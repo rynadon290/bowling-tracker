@@ -209,7 +209,7 @@ export default function TrendsView({
 
         {noShotData ? (
           <div style={{ fontSize: "12px", color: C.textMuted, textAlign: "center", padding: "24px 0" }}>
-            This one needs shot-by-shot data. You're tracking game scores only, so there's nothing to plot here yet.
+            This one needs frame tracking. You're on game tracking, so there's nothing to plot here yet.
           </div>
         ) : points.length < 2 ? (
           <div style={{ fontSize: "12px", color: C.textMuted, textAlign: "center", padding: "24px 0" }}>

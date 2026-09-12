@@ -748,7 +748,7 @@ export default function ImportScorecard({
                       {c.scorecardName||`Column ${i+1}`}
                     </div>
                     <div style={{fontSize:"10px",color:C.textMuted}}>
-                      {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"shot by shot":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
+                      {c.games.length} game{c.games.length===1?"":"s"} · {detail==="shots"?"frame tracking":detail==="scores"?"scores only":detail==="mixed"?"mixed":"no detail"}
                       {c.series!=null&&<> · {c.series} series</>}
                       {c.mergedFrom>1&&<> · combined from {c.mergedFrom} images</>}
                     </div>
