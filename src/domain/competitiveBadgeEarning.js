@@ -23,7 +23,18 @@ import { isSplit } from "./splits.js";
 const HONOR_GAME = 300;
 const HONOR_SERIES = 800;
 
-const num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+// Number(null) is 0, and 0 is finite -- so the obvious version of
+// this returned 0 for null and every `!== null` guard downstream
+// passed. A first night with no history "beat" a previous high of
+// 0 and cleared an average of 0, awarding New high game, New high
+// series and Heater to a bowler who had never bowled before.
+//
+// Null, undefined and empty string are absent, not zero.
+const num = v => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 const list = v => (Array.isArray(v) ? v : []).filter(x => x && typeof x === "object");
 
 // ── One night, one mode ─────────────────────────────────────────────────

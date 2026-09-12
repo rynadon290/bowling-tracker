@@ -59,6 +59,38 @@ describe('league nights', () => {
   });
 });
 
+// A bowler's very first night has nothing to beat.
+//
+// Number(null) is 0 and 0 is finite, so a num() helper built the obvious
+// way returned 0 for "no previous high" -- and the first night then beat
+// a high game of 0, cleared an average of 0, and awarded New high game,
+// New high series and Heater to someone who had never bowled before.
+describe('a first night with no history', () => {
+  const noHistory = {
+    average: null, bookAverage: null,
+    previousHighGame: null, previousHighSeries: null,
+  };
+
+  it('awards no personal-best badge', () => {
+    const got = badgesFromLeagueNight({ scores: [180, 190, 200] }, noHistory);
+    expect(got).not.toContain('new-high-game');
+    expect(got).not.toContain('new-high-series');
+  });
+
+  it('awards no average-relative badge', () => {
+    const got = badgesFromLeagueNight({ scores: [200, 200, 200] }, noHistory);
+    expect(got).not.toContain('heater');
+    expect(got).not.toContain('in-the-pocket');
+    expect(got).not.toContain('cold-start-warm-finish');
+    expect(got).not.toContain('book-buster');
+  });
+
+  // An honor score needs no history to be real.
+  it('still awards a 300', () => {
+    expect(badgesFromLeagueNight({ scores: [300, 180, 180] }, noHistory)).toContain('perfect-game');
+  });
+});
+
 describe('practice earns drill badges and nothing else', () => {
   // The evaluator never looks at a score, which is what makes the rule
   // structural rather than a filter someone can forget to apply.
