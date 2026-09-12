@@ -194,6 +194,30 @@ function checkFrame(frame: unknown, seen: Set<number>, repaired: { pins: number 
     // contradiction in the reading, not a rare event.
     if (b.isStrike && pins.length > 0) return null;
 
+    // Pins cannot come back up.
+    //
+    // Within a frame, whatever stands after ball 2 must be a SUBSET of
+    // what stood after ball 1 -- you cannot knock a pin down and have it
+    // return, and you cannot finish with more pins up than you started
+    // with. Two frames misread as one produces exactly this, and every
+    // check above passes it: each ball is individually legal, the
+    // indexes are ordered, no pin repeats within a ball.
+    //
+    // Exempt in the 10th after a strike or a spare, where the rack
+    // genuinely resets.
+    if (balls.length) {
+      const prev = balls[balls.length - 1] as any;
+      const prevPins: string[] = Array.isArray(prev.pinsStanding) ? prev.pinsStanding : [];
+      const rackReset = f.frameNumber === 10
+        && (prev.isStrike === true || prevPins.length === 0);
+      if (!rackReset) {
+        if (pins.length > prevPins.length) return null;
+        for (const pin of pins) {
+          if (!prevPins.includes(pin)) return null;   // was already down
+        }
+      }
+    }
+
     balls.push(changed ? { ...b, pinsStanding: pins } : b);
   }
 
