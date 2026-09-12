@@ -66,6 +66,7 @@ function normalisePin(p: unknown): string | null {
 export function validateExtraction(parsed: unknown) {
   const dropped = { games: 0, frames: 0 };
   const nulled = { totalScore: 0, seriesTotal: 0, lineupPosition: 0, bowlerName: 0, ballUsed: 0 };
+  const seenGameNumbers = new Set<unknown>();
   const repaired = { pins: 0 };
 
   const rawGames = isObj(parsed) && Array.isArray((parsed as any).games) ? (parsed as any).games : [];
@@ -118,9 +119,24 @@ export function validateExtraction(parsed: unknown) {
           seen.add(verdict.frameNumber);
           keep.push(verdict);
         }
+        // Frames need NOT be contiguous.
+        //
+        // I added a rule requiring 1,2,3... with no gaps, and it was
+        // wrong: the prompt tells Gemini to include only frames it can
+        // actually see, so a cropped or partly-legible photo giving
+        // frames 3, 4 and 7 is a correct reading, not a damaged one.
+        // Truncating to the leading run threw away real data.
         game.frames = keep;
       }
     }
+
+    // The same game number twice is a misread, not two games.
+    //
+    // Usually a column read once as itself and once as its neighbour.
+    // Neither copy can be trusted over the other, so the later one goes
+    // -- the first is more often the correctly-aligned read.
+    if (seenGameNumbers.has(game.gameNumber)) { dropped.games++; continue; }
+    seenGameNumbers.add(game.gameNumber);
 
     games.push(game);
   }
@@ -193,6 +209,14 @@ function checkFrame(frame: unknown, seen: Set<number>, repaired: { pins: number 
     // A strike means every pin went down. Pins standing after one is a
     // contradiction in the reading, not a rare event.
     if (b.isStrike && pins.length > 0) return null;
+
+    // A strike ENDS the frame, outside the 10th.
+    //
+    // Frames 1-9 allow two balls, so a strike followed by a second ball
+    // passed every other check -- and it is not a thing that can happen.
+    // It usually means the next frame's first ball was folded into this
+    // one, which then shifts every frame after it.
+    if (b.isStrike && f.frameNumber !== 10 && f.balls.length > 1) return null;
 
     // Pins cannot come back up.
     //
