@@ -210,5 +210,11 @@ export function buildGenieContext(summary) {
   add("Strike rate by ball", s.ballRates);
   add("Average by centre", s.centerAverages);
 
+  // Drill conversion. The practice group's richest data, and it reached
+  // neither Brooklyn nor the analysis until now -- so a bowler who had
+  // thrown 200 ten pins in practice could ask about their ten pin and be
+  // answered from league shots alone.
+  add("Drill conversion", s.drillRates);
+
   return lines.join("\n");
 }

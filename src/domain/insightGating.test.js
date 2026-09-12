@@ -232,3 +232,43 @@ describe('the analysis grows with the sample', () => {
     expect(w.shortBy).toBe(20);
   });
 });
+
+describe('baselines and drills', () => {
+  // An average IS the sample -- there is no threshold at which "you
+  // average 189" becomes true.
+  it('never gates the baselines', () => {
+    const p = buildAnalysisPayload({
+      average: 189, bookAverage: 186, highGame: 279, highSeries: 721,
+      gamesLogged: 432, nightsLogged: 144, firstBalls: 1,
+    });
+    for (const k of ['average', 'bookAverage', 'highGame', 'highSeries', 'gamesLogged', 'nightsLogged']) {
+      expect(p.included[k]).toBeDefined();
+    }
+  });
+
+  it('leaves a baseline out entirely when it is not known', () => {
+    const p = buildAnalysisPayload({ average: 189 });
+    expect(p.included.average).toBeDefined();
+    expect(p.included.bookAverage).toBeUndefined();
+  });
+
+  // The consumer was written and gated at 25 attempts, and nothing ever
+  // fed it -- so the practice group's richest data reached neither the
+  // analysis nor the genie.
+  it('reports a drill target with enough attempts', () => {
+    const p = buildAnalysisPayload({ drills: [{ label: '10pin', attempts: 120, rate: 78 }] });
+    expect(p.included.drills).toEqual([{ target: '10pin', conversion: 78, sampleSize: 120 }]);
+  });
+
+  it('withholds a thin drill target and says how short it is', () => {
+    const p = buildAnalysisPayload({ drills: [{ label: '7pin', attempts: 8, rate: 50 }] });
+    expect(p.included.drills).toBeUndefined();
+    expect(p.withheld.find(w => w.key === 'drill:7pin').shortBy).toBe(17);
+  });
+
+  it('survives junk drills', () => {
+    for (const junk of [null, undefined, 'x', 42, [null]]) {
+      expect(() => buildAnalysisPayload({ drills: junk })).not.toThrow();
+    }
+  });
+});

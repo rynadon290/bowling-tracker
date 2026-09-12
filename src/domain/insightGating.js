@@ -159,6 +159,17 @@ export function buildAnalysisPayload(stats) {
   // pin" was about the wrong side of the lane.
   if (stats?.handedness) included.handedness = { value: stats.handedness, sampleSize: null };
 
+  // Baselines: facts rather than rates, so ungated for the same reason.
+  //
+  // An average IS the sample -- there is no threshold at which "you
+  // average 189" becomes true. Withholding these left the analysis able
+  // to compute a strike rate while unable to say whether the bowler was
+  // having a good season.
+  for (const key of ["average", "bookAverage", "highGame", "highSeries", "gamesLogged", "nightsLogged"]) {
+    const v = stats?.[key];
+    if (v !== null && v !== undefined) included[key] = { value: v, sampleSize: null };
+  }
+
   const balls = (stats?.balls || [])
     .filter(b => meetsThreshold("ballComparison", b.firstBalls))
     .map(b => ({
@@ -190,10 +201,15 @@ export function buildAnalysisPayload(stats) {
   // ── Drills ────────────────────────────────────────────────────────────
   // The practice group generates the most drill data and clears the shot
   // gates fastest, yet drills were never sent for analysis at all.
-  const drills = (stats?.drills || [])
+  // `|| []` only catches a MISSING value. A string or a number is truthy
+  // and reaches .filter, which is not a function on either -- the same
+  // shape of assumption that has bitten this codebase repeatedly.
+  const drillRows = (Array.isArray(stats?.drills) ? stats.drills : [])
+    .filter(d => d && typeof d === "object");
+  const drills = drillRows
     .filter(d => meetsThreshold("drillTarget", d.attempts))
     .map(d => ({ target: d.label, conversion: d.rate, sampleSize: d.attempts }));
-  (stats?.drills || [])
+  drillRows
     .filter(d => !meetsThreshold("drillTarget", d.attempts))
     .forEach(d => withheld.push({
       key: `drill:${d.label}`,
