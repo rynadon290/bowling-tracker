@@ -15,6 +15,10 @@ import { tourSteps, tourToOffer, markTourSeen, hasSeenTour, pendingModeTour, nee
 import HelpView from "./HelpView.jsx";
 import CasualLeaderboard from "./CasualLeaderboard.jsx";
 const BadgeCollection = lazyScreen("BadgeCollection", () => import("./BadgeCollection.jsx"));
+
+// Not lazy: the lamp is on every screen, so it is never the thing being
+// waited for -- and a floating button that pops in late looks broken.
+import BowlingGenie from "./BowlingGenie.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import GoalsPanel from "./GoalsPanel.jsx";
 import ImportedScoresInbox, { InboxList } from "./ImportedScoresInbox.jsx";
@@ -59,6 +63,7 @@ import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, rem
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
 import { decodeShare } from "./domain/badgeShare.js";
 import { allCompetitiveBadges } from "./domain/badgeContext.js";
+import { buildGenieContext } from "./domain/genie.js";
 import { COMPETITIVE_BADGES, whereEarnable } from "./domain/competitiveBadges.js";
 import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
@@ -412,6 +417,11 @@ export default function BowlingTracker(){
 
   // A payload from a shared link, waiting for the Badges tab to mount.
   const[pendingBadgeImport,setPendingBadgeImport]=useState(null);
+
+  // Questions asked, for the UI count only. The Edge Function keeps the
+  // authoritative tally -- this resets if storage is cleared, which is
+  // exactly why it cannot be the limit.
+  const[genieAsked,setGenieAsked]=useState([]);
   // The tournament currently being entered. Kept as one working record
   // rather than a list -- you're filling in one tournament at a time, and
   // saving commits it to the cloud.
@@ -3905,7 +3915,70 @@ export default function BowlingTracker(){
     setPendingBadgeImport(payload);
   },[]);
 
+  async function askGenie(question){
+    const summary=statsSummaryForGenie();
+    const{data,error}=await supabase.functions.invoke("bowling-genie",{
+      body:{question,context:buildGenieContext(summary)},
+    });
+    if(error||!data?.text){
+      // Not recorded: a failure must not spend a wish.
+      throw new Error(data?.error||error?.message||"no answer");
+    }
+    const today=localDateString();
+    setGenieAsked(prev=>[...prev,{date:today}]);
+    return{text:data.text};
+  }
+
+  // What the genie is told. Computed stats, never raw history -- see
+  // domain/genie.js for why that is the whole cost story.
+  function statsSummaryForGenie(){
+    const mine=sessions.filter(s=>s&&s.bowler===activeBowler);
+    const scores=mine.flatMap(s=>Array.isArray(s.scores)?s.scores:[]).filter(v=>Number.isFinite(Number(v))).map(Number);
+    const hg=bowlerHighGame(sessions,activeBowler);
+    const hs=bowlerHighSeries(sessions,activeBowler);
+
+    // The shot-level figures come from shotBreakdown, the same function
+    // the coaching screen uses -- rather than a second implementation
+    // that could disagree with what the bowler sees on Stats.
+    //
+    // The dataflow audit caught this: buildGenieContext read thirteen
+    // fields and this supplied five, so the genie was answering from an
+    // average and a handedness. The spare and split numbers -- the whole
+    // reason to ask it anything -- were never sent.
+    const myShots=shots.filter(s=>s&&s.bowler===activeBowler);
+    const bd=shotBreakdown(myShots,{
+      isSplit,isSinglePinLeave,isCornerPinLeave,leftHanded:!!preferences.leftHanded,
+    });
+
+    // Most-used ball, by shots thrown with it.
+    const ballCounts={};
+    for(const s of myShots) if(s.ball) ballCounts[s.ball]=(ballCounts[s.ball]||0)+1;
+    const topBall=Object.entries(ballCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+
+    const pctOrNull=v=>(v===null||v===undefined?null:`${v}%`);
+
+    return{
+      average:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null,
+      highGame:hg?.value??null,
+      highSeries:hs?.value??null,
+      gamesLogged:scores.length,
+      strikePct:pctOrNull(bd.strikeRate),
+      sparePct:pctOrNull(bd.spareRate),
+      singlePinPct:pctOrNull(bd.singlePinRate),
+      splitPct:pctOrNull(bd.splitRate),
+      // Frames that were neither a strike nor a spare, per game.
+      opensPerGame:(bd.frames&&scores.length)
+        ?Math.round(((bd.frames-(bd.strikeSample*(bd.strikeRate||0)/100)-(bd.spareSample*(bd.spareRate||0)/100))/scores.length)*10)/10
+        :null,
+      topBall,
+      leagues:[...new Set(mine.map(s=>s.league).filter(Boolean))].join(", ")||null,
+      handedness:preferences.leftHanded?"left-handed":"right-handed",
+    };
+  }
+
+
   async function importCasualNights(merged){
+
 
     if(!Array.isArray(merged)||!activeBowler)return;
     let updated=manualScoresRef.current;
@@ -5624,6 +5697,16 @@ export default function BowlingTracker(){
       </Suspense>
         </ErrorBoundary>
       </div>
+
+      {/* The genie floats over every screen, including casual -- a bowler
+          out with friends can still ask why they keep leaving the 10.
+
+          Hidden during onboarding: a lamp offering three wishes before
+          there is any history to ask about is a worse first impression
+          than no lamp. */}
+      {onboarded&&(
+        <BowlingGenie asked={genieAsked} today={localDateString()} onAsk={askGenie}/>
+      )}
 
       {/* Bottom nav. At the bottom because the top of a phone is out of
           thumb reach and this app is used standing up holding a ball.
