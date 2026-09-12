@@ -72,7 +72,7 @@ describe('practice is drills only', () => {
   });
 
   it('cannot earn anything needing a team', () => {
-    for (const id of ['carried-it', 'held-the-line', 'team-high-game', 'executioner', 'full-roster']) {
+    for (const id of ['carried-it', 'held-the-line', 'team-high-game', 'executioner']) {
       expect(canEarnIn(id, PRACTICE)).toBe(false);
     }
   });

@@ -34,7 +34,7 @@ export const REPEATABLE = new Set([
   "new-high-game", "new-high-series", "book-buster", "in-the-pocket",
   "heater", "cold-start-warm-finish", "clean", "sharp-shooter",
   "carried-it", "held-the-line", "team-high-game", "team-high-series",
-  "full-roster", "cashed", "perfect-game", "eight-hundred",
+  "cashed", "perfect-game", "eight-hundred",
   "made-the-cut", "top-five", "won-it", "ramping-up", "strong-finish",
   "cashed-side-pot", "squeaked-in",
   "two-sided", "midnight-oil",
@@ -48,8 +48,6 @@ export const COMPETITIVE_BADGES = [
   // sets from one map.
   { id: "league-first-night", emoji: "\u{1F3B3}", name: "First night",
     blurb: "Bowled your first league night.", modes: [LEAGUE] },
-  { id: "ironman", emoji: "\u{1F9BE}", name: "Ironman",
-    blurb: "Didn't miss a scheduled night all season.", modes: [LEAGUE] },
   { id: "old-guard", emoji: "\u{1F3DB}\uFE0F", name: "Old guard",
     blurb: "Three full seasons in the same league.", modes: [LEAGUE] },
   { id: "sub-covered", emoji: "\u{1F9E9}", name: "Sub covered",
@@ -87,8 +85,6 @@ export const COMPETITIVE_BADGES = [
     blurb: "Set your team's high game for the night.", modes: [LEAGUE] },
   { id: "team-high-series", emoji: "\u{1F3C6}", name: "Team high series",
     blurb: "Set your team's high series for the night.", modes: [LEAGUE] },
-  { id: "full-roster", emoji: "\u{1F9F1}", name: "Full roster",
-    blurb: "Every regular bowler on your team showed up.", modes: [LEAGUE] },
   { id: "executioner", emoji: "\u2694\uFE0F", name: "Executioner",
     blurb: "Helped hang a teammate 30 times.", modes: [LEAGUE] },
 

@@ -61,7 +61,6 @@ export function leagueNightContext(night, priorNights, extras) {
     teamGameDifference: num(e.teamGameDifference),
     setTeamHighGame: !!e.setTeamHighGame,
     setTeamHighSeries: !!e.setTeamHighSeries,
-    fullRoster: !!e.fullRoster,
     moneyWonTonight: num(e.moneyWonTonight),
   };
 }

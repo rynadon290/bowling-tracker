@@ -107,7 +107,6 @@ export function badgesFromLeagueNight(night, context) {
   }
   if (c.setTeamHighGame) out.add("team-high-game");
   if (c.setTeamHighSeries) out.add("team-high-series");
-  if (c.fullRoster) out.add("full-roster");
 
   // Money won tonight.
   if (num(c.moneyWonTonight) !== null && num(c.moneyWonTonight) > 0) out.add("cashed");
@@ -195,7 +194,6 @@ export function seasonBadges(context) {
   const out = new Set();
 
   if (num(c.leagueNights) !== null && num(c.leagueNights) >= 1) out.add("league-first-night");
-  if (c.noMissedNights && num(c.leagueNights) !== null && num(c.leagueNights) >= 1) out.add("ironman");
   if (num(c.seasonsCompleted) !== null && num(c.seasonsCompleted) >= 3) out.add("old-guard");
   if (c.bowledAsSub) out.add("sub-covered");
   if (num(c.currentAverage) !== null && num(c.lastSeasonBook) !== null
