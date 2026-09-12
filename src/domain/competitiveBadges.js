@@ -36,7 +36,7 @@ export const REPEATABLE = new Set([
   "carried-it", "held-the-line", "team-high-game", "team-high-series",
   "full-roster", "cashed", "perfect-game", "eight-hundred",
   "made-the-cut", "top-five", "won-it", "ramping-up", "strong-finish",
-  "cashed-side-pot", "four-figure-day", "squeaked-in",
+  "cashed-side-pot", "squeaked-in",
   "two-sided", "midnight-oil",
 ]);
 
@@ -138,8 +138,6 @@ export const COMPETITIVE_BADGES = [
     modes: [TOURNAMENT] },
   { id: "cashed-side-pot", emoji: "\u{1F3B0}", name: "Cashed a side pot",
     blurb: "Won a side pot at an event.", modes: [TOURNAMENT] },
-  { id: "four-figure-day", emoji: "\u{1F9EE}", name: "Four-figure day",
-    blurb: "800 or more across a day's block.", modes: [TOURNAMENT] },
   { id: "squeaked-in", emoji: "\u{1F6EC}", name: "Squeaked in",
     blurb: "Made the cut by 10 pins or fewer.", modes: [TOURNAMENT] },
 

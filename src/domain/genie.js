@@ -1,0 +1,146 @@
+// The bowling genie: what counts as a question, and how many are left.
+//
+// Three questions a day, and the genie only answers about bowling.
+//
+// THE CLASSIFIER IS DELIBERATELY PERMISSIVE.
+//
+// A wrongly-refused question costs the bowler a third of their day. A
+// wrongly-allowed one costs about half a cent. Those are not the same
+// mistake, so this catches only the obviously-off and lets everything
+// ambiguous through to Gemini, which can actually judge intent.
+//
+// An allowlist of bowling words would be worse than useless here. "Why
+// does that keep happening?", "what should I change?", "am I getting
+// better?" are all plainly bowling questions to a genie holding your
+// history, and not one of them contains a bowling word.
+//
+// WHAT COUNTS AGAINST THE THREE:
+//
+//   Gemini answers            -> counts. You got your answer.
+//   Gemini refuses in character -> counts. It read the question and
+//                                 made a judgement; that is a wish spent.
+//   This classifier blocks    -> does NOT count. Nothing was spent, and
+//                                 the user may just be phrasing something
+//                                 oddly. Burning a wish on a regex being
+//                                 wrong is what they would remember.
+
+export const DAILY_QUESTIONS = 3;
+
+// Obvious other domains. Each one is a thing people genuinely ask an
+// assistant, and none of them is a bowling question by any reading.
+const OTHER_DOMAINS = [
+  /\b(recipe|cook|bake|ingredient)\b/i,
+  /\b(weather|forecast|temperature outside)\b/i,
+  /\b(stock|crypto|bitcoin|invest|portfolio)\b/i,
+  /\b(symptom|diagnos|prescription|medication|dosage)\b/i,
+  /\b(president|election|senator|political party|vote for)\b/i,
+  /\b(homework|essay|thesis|assignment)\b/i,
+  /\b(translate|in spanish|in french|in german)\b/i,
+  /\b(directions to|how do i get to|nearest gas)\b/i,
+  /\bwrite (me )?(a|an|my) (poem|song|story|essay|email|letter|code)\b/i,
+  /\b(javascript|python|sql|regex|function that)\b/i,
+];
+
+// Attempts to make the genie something else entirely. Not a bowling
+// question, and not worth a paid call.
+const NOT_A_QUESTION = [
+  /\b(ignore|disregard) (all |your |the )?(previous |prior |above )?(instructions|rules|prompt)/i,
+  /\byou are (now|actually) (a|an)\b/i,
+  /\bpretend (you are|to be)\b/i,
+  /\bsystem prompt\b/i,
+];
+
+// Is this worth spending a call on?
+//
+// Returns { ok } when it should go to Gemini, or { ok: false, reason }
+// when the genie should decline for free.
+export function classifyQuestion(text) {
+  const q = typeof text === "string" ? text.trim() : "";
+
+  if (!q) return { ok: false, reason: "empty" };
+  // One word is never a question worth a paid call, and is usually a
+  // mis-tap.
+  if (q.split(/\s+/).length < 2) return { ok: false, reason: "too-short" };
+  if (q.length > 500) return { ok: false, reason: "too-long" };
+
+  for (const re of NOT_A_QUESTION) if (re.test(q)) return { ok: false, reason: "off-topic" };
+  for (const re of OTHER_DOMAINS) if (re.test(q)) return { ok: false, reason: "off-topic" };
+
+  return { ok: true };
+}
+
+// What the genie says when it declines for free. In character, and clear
+// that it cost nothing -- otherwise people assume it did.
+export function refusalMessage(reason) {
+  switch (reason) {
+    case "empty":
+    case "too-short":
+      return "Ask me something. I've got your whole history in here.";
+    case "too-long":
+      return "That's a lot. Try asking me one thing.";
+    default:
+      return "I only know bowling. That one's free — ask me something else.";
+  }
+}
+
+// ── The daily budget ────────────────────────────────────────────────────
+//
+// Counted per calendar day in the bowler's own timezone, because "today"
+// means their today. The authoritative count is server-side; this mirrors
+// it so the UI can show what is left without a round trip.
+
+export function questionsUsedToday(asked, today) {
+  const day = typeof today === "string" && today ? today : "";
+  return (Array.isArray(asked) ? asked : [])
+    .filter(a => a && typeof a === "object" && a.date === day && a.counted !== false)
+    .length;
+}
+
+export function questionsLeftToday(asked, today) {
+  return Math.max(0, DAILY_QUESTIONS - questionsUsedToday(asked, today));
+}
+
+export function canAskToday(asked, today) {
+  return questionsLeftToday(asked, today) > 0;
+}
+
+// "2 wishes left today" / "Back tomorrow".
+export function budgetLabel(asked, today) {
+  const left = questionsLeftToday(asked, today);
+  if (left === 0) return "Back tomorrow";
+  return `${left} ${left === 1 ? "wish" : "wishes"} left today`;
+}
+
+// ── What Gemini is told ─────────────────────────────────────────────────
+
+// The genie sees a SUMMARY, not the raw history.
+//
+// Three seasons of real data is about 2.26MB -- roughly 600k tokens, and
+// about $0.45 per question at Flash rates. The same question answered
+// from a few thousand tokens of computed stats costs under a cent, and
+// the answer is better: the model reasons about figures rather than
+// counting rows.
+export function buildGenieContext(summary) {
+  const s = (summary && typeof summary === "object") ? summary : {};
+  const lines = [];
+  const add = (label, value) => {
+    if (value === null || value === undefined || value === "") return;
+    lines.push(`${label}: ${value}`);
+  };
+
+  add("Average", s.average);
+  add("High game", s.highGame);
+  add("High series", s.highSeries);
+  add("Games logged", s.gamesLogged);
+  add("Strike percentage", s.strikePct);
+  add("Spare percentage", s.sparePct);
+  add("Single-pin spare percentage", s.singlePinPct);
+  add("Split conversion percentage", s.splitPct);
+  add("Open frames per game", s.opensPerGame);
+  add("Most-used ball", s.topBall);
+  add("Recent trend", s.trend);
+  add("Leagues", s.leagues);
+  add("Handedness", s.handedness);
+
+  return lines.join("\n");
+}

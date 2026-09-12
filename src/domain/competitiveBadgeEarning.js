@@ -55,8 +55,16 @@ export function badgesFromLeagueNight(night, context) {
   const series = scores.reduce((a, b) => a + b, 0);
 
   // Honor scores. League and tournament only -- never practice.
+  //
+  // A 300 is a 300 whatever the format -- one game, twelve strikes.
+  //
+  // An 800 is specifically a THREE-GAME SERIES. This summed however many
+  // games were logged, so a longer set adding up to 800 would have
+  // claimed an honor score that never happened. Exactly three, or it is
+  // not a series.
   if (scores.some(v => v >= HONOR_GAME)) out.add("perfect-game");
-  if (series >= HONOR_SERIES) out.add("eight-hundred");
+  if (scores.length === 3 && series >= HONOR_SERIES) out.add("eight-hundred");
+
 
   // Scaled to the bowler, never a flat threshold.
   if (num(c.previousHighGame) !== null && Math.max(...scores) > num(c.previousHighGame)) out.add("new-high-game");
@@ -116,8 +124,11 @@ export function badgesFromTournamentDay(day, context) {
   if (scores.length) {
     if (scores.some(v => v >= HONOR_GAME)) out.add("perfect-game");
     const total = scores.reduce((a, b) => a + b, 0);
-    if (total >= HONOR_SERIES) out.add("eight-hundred");
-    if (total >= 800) out.add("four-figure-day");
+    // Only when the block IS a three-game set. A six-game day totalling
+    // 800 is not an 800 series, and calling it one would be wrong in
+    // front of anyone who knows what the honor score means.
+    if (scores.length === 3 && total >= HONOR_SERIES) out.add("eight-hundred");
+
 
     // Ramping up: EVERY step rises. Three flat games and one big one is
     // Strong finish, not a ramp -- they are different achievements and

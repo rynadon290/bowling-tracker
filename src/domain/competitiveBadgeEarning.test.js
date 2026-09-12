@@ -14,8 +14,22 @@ describe('league nights', () => {
     expect(badgesFromLeagueNight({ scores: [300, 190, 180] }, ctx)).toContain('perfect-game');
   });
 
-  it('awards an 800 series', () => {
+  it('awards an 800 series for a three-game set', () => {
     expect(badgesFromLeagueNight({ scores: [270, 270, 270] }, ctx)).toContain('eight-hundred');
+  });
+
+  // An 800 is a THREE-GAME series specifically. This summed however many
+  // games were logged, so a longer set adding to 800 claimed an honor
+  // score that never happened.
+  it('does not award an 800 for a longer set that happens to total 800', () => {
+    expect(badgesFromLeagueNight({ scores: [160, 160, 160, 160, 160] }, ctx))
+      .not.toContain('eight-hundred');
+  });
+
+  // A 300 is a 300 whatever the format.
+  it('awards a 300 regardless of how many games were bowled', () => {
+    expect(badgesFromLeagueNight({ scores: [300] }, ctx)).toContain('perfect-game');
+    expect(badgesFromLeagueNight({ scores: [180, 300, 190, 210, 200] }, ctx)).toContain('perfect-game');
   });
 
   // 299 and 798 are superb and are NOT honor scores. Calling them one
