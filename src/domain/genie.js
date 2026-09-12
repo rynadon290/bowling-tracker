@@ -128,7 +128,20 @@ export function buildGenieContext(summary) {
     lines.push(`${label}: ${value}`);
   };
 
+  // The bowler's own name and their team's.
+  //
+  // Their own name is their own data, and they invoked this themselves.
+  // A team name is a team, not a person. Neither is another
+  // individual's record, which is the line the team aggregates below
+  // are drawn to respect.
+  //
+  // Worth the tokens: a genie that can say "you and the Alley Cats" is
+  // answering a bowler, and one that says "the user" is filling in a
+  // form.
+  add("Bowler", s.bowlerName);
+  add("Team", s.teamName);
   add("Average", s.average);
+
   add("High game", s.highGame);
   add("High series", s.highSeries);
   add("Games logged", s.gamesLogged);
