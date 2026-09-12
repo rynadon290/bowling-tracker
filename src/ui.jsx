@@ -239,3 +239,36 @@ export function StatRow({ label, value, sub, fill = null, color, badge, last = f
 export function StatRows({ children }) {
   return <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "8px" }}>{children}</div>;
 }
+
+// The standing disclaimer for anything an AI produced.
+//
+// One component, used everywhere, so the wording cannot drift and no AI
+// feature can quietly ship without one.
+//
+// InsightsView already had a good disclaimer of its own and keeps it --
+// it is longer and more specific than this, and it earns the space
+// because a coaching analysis invites more trust than a one-line answer.
+// Scorecard import, centre lookup and the genie had nothing.
+//
+// Deliberately short. A paragraph of hedging gets skipped; one line
+// under the output gets read. It says the two things that actually
+// matter: a machine wrote it, and it can be wrong about your bowling
+// specifically.
+// `verb` because not every AI surface WRITES something. The scorecard
+// import READS a photo; saying it was "written by AI" is just wrong, and
+// swapping only the subject produced "This card was read by AI, so it was
+// written by AI".
+// `check` too, because the right way to verify differs by surface. A
+// coaching answer is checked against what you saw on the lane; a list of
+// bowling centres is not, and telling someone to do that is nonsense
+// dressed as caution.
+export function AiNote({ what = "This", verb = "written", check = "check it against what you saw on the lane", style: extra }) {
+  return (
+    <div style={{
+      fontSize: "10.5px", color: C.textMuted, lineHeight: 1.5,
+      marginTop: "8px", opacity: 0.85, ...extra,
+    }}>
+      {what} was {verb} by AI. It can be confidently wrong — {check}.
+    </div>
+  );
+}
