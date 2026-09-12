@@ -225,7 +225,21 @@ export function competitiveBadgeHistory(nights, evaluate, seasonIds) {
 
   for (const night of ordered) {
     let earned = [];
-    try { earned = fn(night) || []; } catch { earned = []; }
+    // A throwing evaluator must not take the whole collection down, but
+    // it must not be invisible either.
+    //
+    // This swallowed the error silently, and an undefined variable in
+    // the caller's evaluator therefore looked exactly like "no badges
+    // earned" -- four team badges were dead for a whole build and every
+    // test still passed. Logged now, so the next one is findable.
+    try {
+      earned = fn(night) || [];
+    } catch (e) {
+      earned = [];
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("badge evaluator threw for", night?.date, String(e));
+      }
+    }
     for (const id of earned) {
       if (!out[id]) continue;
       if (REPEATABLE.has(id)) {

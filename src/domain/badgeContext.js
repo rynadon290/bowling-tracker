@@ -79,6 +79,14 @@ export function competitiveBadges(args) {
   const bowler = typeof a.bowler === "string" ? a.bowler : "";
   const league = typeof a.league === "string" ? a.league : "";
   const profile = a.profile;
+  const leagueDates = a.leagueDates;
+
+  const teams = Array.isArray(a.teams) ? a.teams : [];
+  // Every bowler's sessions, for the team comparisons. Falls back to
+  // `sessions` when not supplied separately -- on one device that is
+  // the same list.
+  const allSessions = Array.isArray(a.allSessions) && a.allSessions.length
+    ? a.allSessions : sessions;
   const nights = myNights(sessions, bowler, league);
 
   // Match records keyed the way getMatch looks them up.
@@ -91,11 +99,42 @@ export function competitiveBadges(args) {
     try { return sessionMoney(s)?.gross ?? null; } catch { return null; }
   };
 
+  // Everyone who bowled a given night in this league, whoever logged
+  // them. Team badges compare the bowler against the rest of their team,
+  // so they need the whole night rather than just this bowler's row.
+  const teamNight = date => rows(allSessions)
+    .filter(n => String(n.date) === String(date)
+      && (!league || n.league === league)
+      && Array.isArray(n.scores) && n.scores.length);
+
   const evaluate = night => {
     const prior = nights.filter(n => String(n.date) < String(night.date));
+    const others = teamNight(night.date).filter(n => n.bowler !== bowler);
+    const myScores = (Array.isArray(night.scores) ? night.scores : [])
+      .map(num).filter(v => v !== null);
+    const mySeries = myScores.reduce((a, b) => a + b, 0);
+    const best = arr => arr.length ? Math.max(...arr) : null;
+
+    // Team high game and series for the night. Only claimed when there
+    // WAS a team -- setting the high on your own is not an achievement.
+    const otherGames = others.flatMap(n =>
+      (Array.isArray(n.scores) ? n.scores : []).map(num).filter(v => v !== null));
+    const otherSeries = others.map(n =>
+      (Array.isArray(n.scores) ? n.scores : []).map(num).filter(v => v !== null)
+        .reduce((a, b) => a + b, 0));
+
     const ctx = leagueNightContext(night, prior, {
       bookAverage: profile?.bookAverage,
       moneyWonTonight: moneyFor(night.date),
+      setTeamHighGame: others.length > 0 && best(myScores) !== null
+        && best(myScores) > (best(otherGames) ?? -1),
+      setTeamHighSeries: others.length > 0 && mySeries > (best(otherSeries) ?? -1),
+      // "Carried it": your score was the difference. Measured as beating
+      // the team's average for the night by a clear margin, which is the
+      // closest honest reading of "the difference" from scores alone.
+      teamGameDifference: others.length > 0 && otherSeries.length
+        ? mySeries - (otherSeries.reduce((a, b) => a + b, 0) / otherSeries.length)
+        : null,
     });
     return badgesFromLeagueNight({
       ...night,
@@ -113,8 +152,36 @@ export function competitiveBadges(args) {
     try { return hangAssistCounts(shots, league)[bowler] ?? 0; } catch { return 0; }
   })();
 
+  // Seasons completed in this bowler's leagues.
+  //
+  // A season counts once its end date has passed AND the bowler bowled
+  // in it -- a league they joined late and a league they never bowled
+  // both fail that, correctly. Derived from the league's own dates
+  // rather than a season counter nobody maintains.
+  const seasonsCompleted = (() => {
+    const dates = (leagueDates && typeof leagueDates === "object") ? leagueDates : {};
+    const today = new Date().toISOString().slice(0, 10);
+    let count = 0;
+    for (const [name, range] of Object.entries(dates)) {
+      const end = range?.endDate;
+      if (!end || String(end) > today) continue;              // still running
+      const start = range?.startDate || "";
+      const bowledIn = nights.some(n =>
+        n.league === name && String(n.date) >= String(start) && String(n.date) <= String(end));
+      if (bowledIn) count++;
+    }
+    return count;
+  })();
+
   const season = seasonBadges({
     leagueNights: nights.length,
+    seasonsCompleted,
+    // Marked as a sub on any team. team_members.is_sub is already loaded
+    // by TeamManagement into members[].isSub, so this is a direct read
+    // rather than the schema change it looked like from the column name.
+    bowledAsSub: teams.some(t => t && Array.isArray(t.members)
+      && t.members.some(mem => mem && mem.isSub
+        && (mem.name === bowler || mem.displayName === bowler))),
     lifetimeMoneyWon: lifetimeMoney,
     hangAssists: assists,
     currentAverage: (() => {

@@ -247,3 +247,47 @@ describe('survives junk', () => {
     }
   });
 });
+
+describe('the six badges that had no data feeding them', () => {
+  // All six were defined, tested and permanently locked -- nothing set
+  // the context flags they read, so they were grey squares that could
+  // never light up. Every one of them had its data available already.
+  it('awards the team highs only when there was a team', () => {
+    const alone = badgesFromLeagueNight({ scores: [250, 240, 230] },
+      { setTeamHighGame: false, setTeamHighSeries: false });
+    expect(alone).not.toContain('team-high-game');
+    expect(alone).not.toContain('team-high-series');
+
+    const withTeam = badgesFromLeagueNight({ scores: [250, 240, 230] },
+      { setTeamHighGame: true, setTeamHighSeries: true });
+    expect(withTeam).toContain('team-high-game');
+    expect(withTeam).toContain('team-high-series');
+  });
+
+  it('awards carried it only on a win where you were above the team', () => {
+    const won = { games: [true, true, false] };
+    expect(badgesFromLeagueNight({ scores: [250], match: won }, { teamGameDifference: 120 }))
+      .toContain('carried-it');
+    // Won, but you were not the difference.
+    expect(badgesFromLeagueNight({ scores: [150], match: won }, { teamGameDifference: -40 }))
+      .not.toContain('carried-it');
+    // Above the team, but the team lost.
+    expect(badgesFromLeagueNight({ scores: [250], match: { games: [false, false, false] } },
+      { teamGameDifference: 120 })).not.toContain('carried-it');
+  });
+
+  it('awards held the line for a good night in a loss', () => {
+    const lost = { games: [false, false, false] };
+    expect(badgesFromLeagueNight({ scores: [210, 205, 200], match: lost }, { average: 190 }))
+      .toContain('held-the-line');
+    expect(badgesFromLeagueNight({ scores: [150, 160, 155], match: lost }, { average: 190 }))
+      .not.toContain('held-the-line');
+  });
+
+  it('awards sub covered and old guard from their own flags', () => {
+    expect(seasonBadges({ bowledAsSub: true })).toContain('sub-covered');
+    expect(seasonBadges({ bowledAsSub: false })).not.toContain('sub-covered');
+    expect(seasonBadges({ seasonsCompleted: 3 })).toContain('old-guard');
+    expect(seasonBadges({ seasonsCompleted: 2 })).not.toContain('old-guard');
+  });
+});
