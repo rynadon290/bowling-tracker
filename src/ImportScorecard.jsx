@@ -4,6 +4,7 @@ import { formatDate, RESULTS, localDateString, PRACTICE_SESSION_KEY } from "./co
 import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
+import { findExistingShotSlot } from "./domain/sessions.js";
 import { isValidGameScore, invalidScoreIndexes } from "./domain/importVerification.js";
 import { supabase } from "./supabaseClient.js";
 
@@ -490,11 +491,36 @@ export default function ImportScorecard({
     );
     if(conflictGames.length&&!window.confirm(
       `Shots already exist for Game ${conflictGames.map(c=>c.gameNumber).join(", ")} on ${contextDate}. `+
-      `Importing will ADD to what's already there, not replace it -- which could double-count that game. Continue anyway?`
+      `Frames you already have will be skipped, so nothing gets double-counted. Anything new on this card still comes in. Continue?`
     ))return;
 
     setStep("saving");
-    const newShots=games.flatMap(g=>g.shots.map(s=>({...s,id:crypto.randomUUID()})));
+    // Frames that already exist are SKIPPED, not appended.
+    //
+    // Every import minted fresh ids and appended, so re-importing a card
+    // put twenty shots in local state for a ten-frame game. The database
+    // rejected the second copy as a duplicate (shots_identity_uniq) and
+    // the queue correctly dropped it -- so local held 20 and the cloud
+    // held 10.
+    //
+    // The scoresheet was fine either way; it reads one shot per frame.
+    // The stats were not: they aggregate every shot, so strike and spare
+    // percentages double-counted the game until a fresh device synced
+    // from the cloud and showed different numbers.
+    //
+    // Skipping rather than replacing, to match what the database does
+    // with the same rows. findExistingShotSlot uses the same identity the
+    // index does, COALESCEd ball_num included.
+    const candidates=games.flatMap(g=>g.shots.map(s=>({...s,id:crypto.randomUUID()})));
+    const newShots=[];
+    let skipped=0;
+    for(const s of candidates){
+      // Checked against what is already saved AND what this import has
+      // added so far, so a card listing the same frame twice cannot slip
+      // through either.
+      if(findExistingShotSlot([...shots,...newShots],s)){skipped++;continue;}
+      newShots.push(s);
+    }
     if(newShots.length)await saveShots([...shots,...newShots]);
 
     // Games that came in as totals only are saved as manual scores, which
