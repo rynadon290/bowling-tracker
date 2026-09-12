@@ -175,3 +175,33 @@ describe('makeEntry', () => {
     expect(makeEntry({ kind: 'nonsense' }).kind).toBe('unhandled');
   });
 });
+
+describe('import problems are their own kinds', () => {
+  // The import path catches its own errors and shows a message, so none
+  // of it reaches the global handlers -- the log was blind to every
+  // import problem since it was built.
+  it('keeps each import kind rather than flattening to unhandled', () => {
+    for (const kind of ['import-failed', 'import-empty', 'import-quality', 'import-score-mismatch']) {
+      const log = addEntry([], { kind, where: 'x', message: 'm' }, 1);
+      expect(log[0].kind).toBe(kind);
+    }
+  });
+
+  // They answer different questions: the reader breaking, a photo it
+  // could not use, a photo it half-used, and a reading that contradicts
+  // itself. Lumping them hides which is actually happening.
+  it('still falls back for a kind nobody registered', () => {
+    expect(addEntry([], { kind: 'made-up', where: 'x', message: 'm' }, 1)[0].kind).toBe('unhandled');
+  });
+
+  // Redaction strips values, and these messages ARE numbers -- a
+  // mismatch entry with the figures stripped would say nothing.
+  it('leaves the figures readable', () => {
+    const log = addEntry([], {
+      kind: 'import-score-mismatch', where: 'x',
+      message: 'card says 189, frames score 176',
+    }, 1);
+    expect(log[0].message).toContain('189');
+    expect(log[0].message).toContain('176');
+  });
+});

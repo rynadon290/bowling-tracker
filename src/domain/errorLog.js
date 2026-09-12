@@ -16,7 +16,21 @@
 // filling the quota and breaking the writes it was meant to diagnose.
 export const MAX_ENTRIES = 50;
 
-export const KINDS = ["crash", "render", "write-failed", "write-noop", "unhandled"];
+// A closed list, so an entry cannot arrive with a kind nobody can
+// filter on. Anything unrecognised becomes "unhandled" -- which is why
+// the import kinds below had to be added here, not just used: without
+// this line every import problem was silently filed as a generic
+// unhandled error and became impossible to pick out.
+//
+// The import kinds are separated because they answer different
+// questions. "failed" is the reader breaking; "empty" is a photo it
+// could not use; "quality" is a photo it half-used; "score-mismatch" is
+// a reading that contradicts itself. Lumping them together would hide
+// which of those is actually happening to people.
+export const KINDS = [
+  "crash", "render", "write-failed", "write-noop", "unhandled",
+  "import-failed", "import-empty", "import-quality", "import-score-mismatch",
+];
 
 // ── Redaction ───────────────────────────────────────────────────────────
 //
