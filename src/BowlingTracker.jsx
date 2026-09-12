@@ -5543,7 +5543,7 @@ export default function BowlingTracker(){
           <BadgeCollection
             badges={COMPETITIVE_BADGES}
             history={allCompetitiveBadges({
-              sessions,shots,matches,drills,
+              sessions,shots,matches,drills,teams,leagueDates,
               bowler:activeBowler,
               // NO league filter. A collection is lifetime, not tonight.
               //
