@@ -12,7 +12,7 @@
 // because two places that can accept a coaching invitation is two places
 // that can disagree about whether it was accepted.
 
-import { pendingFor, needingReentry, canCorrect } from "./importVerification.js";
+import { pendingFor, dedupePending, needingReentry, canCorrect } from "./importVerification.js";
 import { categorizeCoaching, partitionTasks } from "./coaching.js";
 
 // Ordered by how much the bowler is blocked by it. Requests from other
@@ -79,7 +79,19 @@ export function buildInbox(options) {
   }
 
   // ── Scores imported from a teammate's photo ──
-  const pendingScores = pendingFor(importedScores, bowler);
+  // Deduped against what this bowler already logged themselves.
+  //
+  // Two teammates photographing the same monitor both import, and each
+  // submits the other's column. Without this the bowler is asked to
+  // confirm a night they entered themselves, and a third teammate whose
+  // column both of them read gets asked about the same night twice.
+  //
+  // Their own sessions are the check: if the night is already there,
+  // there is nothing to confirm.
+  const mySessions = (Array.isArray(sessions) ? sessions : [])
+    .filter(x => x && typeof x === "object" && x.bowler === bowler);
+  const pendingScores = dedupePending(importedScores, bowler, mySessions);
+
   if (pendingScores.length) {
     items.push({
       id: "imported-scores",

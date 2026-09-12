@@ -3,6 +3,7 @@ import {
   emptyImportRecord, normalizeImportRecord, effectiveScores, isConfirmed,
   approve, reject, canCorrect, correctAsTeammate, laterSessionEnded,
   describeStatus, pendingFor, needingReentry,
+  dedupePending, pendingAlreadyLogged,
   isValidGameScore,
   invalidScoreIndexes,
 } from './importVerification.js';
@@ -177,5 +178,66 @@ describe('invalidScoreIndexes', () => {
 
   it('treats a blank game as fine, not as an error to fix', () => {
     expect(invalidScoreIndexes([200, '', 180])).toEqual([]);
+  });
+});
+
+describe('two bowlers photographing the same monitor', () => {
+  // The common league-night case: Ryan photographs the scores and
+  // imports, submitting Dave's column. Dave, standing next to him,
+  // photographs the same monitor and imports too -- saving his own games
+  // directly. Dave is then asked to confirm scores he entered himself.
+  const rec = (bowler, date, id) => ({
+    id, bowler, league: 'Tue', date, importedScores: [180, 190, 200], status: 'pending',
+  });
+
+  it('drops a night the bowler already logged themselves', () => {
+    const records = [rec('Dave', '2026-09-11', 'a')];
+    const logged = [{ bowler: 'Dave', league: 'Tue', date: '2026-09-11' }];
+    expect(dedupePending(records, 'Dave', logged)).toEqual([]);
+  });
+
+  // Two teammates both reading a third teammate's column submits the
+  // same night twice. Asking twice is worse than asking once.
+  it('collapses the same night submitted by two people', () => {
+    const records = [rec('Dave', '2026-09-11', 'a'), rec('Dave', '2026-09-11', 'b')];
+    expect(dedupePending(records, 'Dave', [])).toHaveLength(1);
+  });
+
+  it('keeps a night they genuinely have not logged', () => {
+    const records = [rec('Dave', '2026-09-11', 'a')];
+    const logged = [{ bowler: 'Dave', league: 'Tue', date: '2026-09-18' }];
+    expect(dedupePending(records, 'Dave', logged)).toHaveLength(1);
+  });
+
+  it('keeps two different nights', () => {
+    const records = [rec('Dave', '2026-09-11', 'a'), rec('Dave', '2026-09-18', 'b')];
+    expect(dedupePending(records, 'Dave', [])).toHaveLength(2);
+  });
+
+  // A different league on the same date is a different night.
+  it('does not collapse across leagues', () => {
+    const records = [rec('Dave', '2026-09-11', 'a'), { ...rec('Dave', '2026-09-11', 'b'), league: 'Thu' }];
+    expect(dedupePending(records, 'Dave', [])).toHaveLength(2);
+  });
+
+  it('never returns another bowler’s records', () => {
+    const records = [rec('Dave', '2026-09-11', 'a'), rec('Ryan', '2026-09-11', 'b')];
+    expect(dedupePending(records, 'Dave', []).every(r => r.bowler === 'Dave')).toBe(true);
+  });
+
+  // Dropped is not the same as resolved -- these are still pending rows
+  // and something has to mark them, or they sit forever.
+  it('reports separately which ones were already logged', () => {
+    const records = [rec('Dave', '2026-09-11', 'a'), rec('Dave', '2026-09-18', 'b')];
+    const logged = [{ bowler: 'Dave', league: 'Tue', date: '2026-09-11' }];
+    expect(pendingAlreadyLogged(records, 'Dave', logged).map(r => r.id)).toEqual(['a']);
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}, [null]]) {
+      expect(() => dedupePending(junk, junk, junk)).not.toThrow();
+      expect(() => pendingAlreadyLogged(junk, junk, junk)).not.toThrow();
+    }
+    expect(dedupePending(null, 'Dave', null)).toEqual([]);
   });
 });

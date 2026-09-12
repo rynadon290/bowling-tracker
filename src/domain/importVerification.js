@@ -216,6 +216,64 @@ export function describeStatus(record) {
 }
 
 // Records awaiting a given bowler's response.
+// Two bowlers photographing the same monitor.
+//
+// The common case on a league night: Ryan photographs the scores and
+// imports, submitting Dave's column for Dave to confirm. Dave, standing
+// next to him, photographs the same monitor and imports too -- saving
+// his own games directly.
+//
+// Dave now has an inbox item asking him to confirm scores he entered
+// himself, and Ryan has one from Dave. Both are noise, and the shots
+// and manual scores underneath are already protected by
+// shots_identity_uniq and by keyed overwrite, so nothing is duplicated
+// in the data -- only in the asking.
+//
+// Worse, if both submitted for the same third teammate, that teammate
+// gets the same night twice.
+//
+// So: drop what the bowler already has, and collapse duplicates of one
+// night down to one.
+export function dedupePending(records, bowler, alreadyLogged) {
+  const mine = pendingFor(records, bowler);
+  if (!mine.length) return [];
+
+  // Nights the bowler already has of their own. A Set of "league|date".
+  const have = new Set(
+    (Array.isArray(alreadyLogged) ? alreadyLogged : [])
+      .filter(s => s && typeof s === "object")
+      .map(s => `${s.league ?? ""}|${s.date ?? ""}`),
+  );
+
+  const seen = new Set();
+  const out = [];
+  for (const r of mine) {
+    const key = `${r.league ?? ""}|${r.date ?? ""}`;
+    // Already logged it themselves -- there is nothing to confirm.
+    if (have.has(key)) continue;
+    // Two teammates submitted the same night. The first stands; a second
+    // copy asks the same question twice.
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
+// The ones dropped because the bowler already had them.
+//
+// Not silently discarded: they are still real records with a pending
+// status, and something has to mark them resolved or they sit forever.
+export function pendingAlreadyLogged(records, bowler, alreadyLogged) {
+  const mine = pendingFor(records, bowler);
+  const have = new Set(
+    (Array.isArray(alreadyLogged) ? alreadyLogged : [])
+      .filter(s => s && typeof s === "object")
+      .map(s => `${s.league ?? ""}|${s.date ?? ""}`),
+  );
+  return mine.filter(r => have.has(`${r.league ?? ""}|${r.date ?? ""}`));
+}
+
 export function pendingFor(records, bowler) {
   return (Array.isArray(records) ? records : [])
     .map(normalizeImportRecord)
