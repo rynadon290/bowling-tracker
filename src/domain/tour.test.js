@@ -23,7 +23,8 @@ describe('tourSteps by environment', () => {
   // said "stats" when the id is "data"; an unknown view hits the guard in
   // BowlingTracker and silently bounces to Bowl.
   it('only names tabs that exist in the nav', () => {
-    const NAV = ['log', 'history', 'data', 'insights', 'locker', 'coaching', 'social'];
+    // 'teams' added when the Vault split into Gear ('locker') and Teams.
+    const NAV = ['log', 'history', 'data', 'insights', 'locker', 'teams', 'coaching', 'social'];
     for (const prefs of [league, casual, practice, tournament]) {
       for (const s of tourSteps(prefs)) if (s.tab) expect(NAV).toContain(s.tab);
     }

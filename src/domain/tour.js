@@ -246,17 +246,24 @@ const ALL_STEPS = [
   },
   {
     id: "vault",
-    tab: "locker",
-    title: "Vault",
+    tab: "teams",
+    title: "Teams",
     // League only. A tournament bowler sets their event up on the Bowl
-    // tab, not in the Vault, and their gear is covered by the arsenal
-    // step in the general tour.
+    // tab, not here, and their gear is covered by the arsenal step in
+    // the general tour.
+    //
+    // Was one step pointing at "Vault" for leagues, teams AND the ball
+    // arsenal, which is three things across two tabs since the split.
+    // The id stays "vault" -- it is stored against toursSeen, and
+    // renaming it would make a bowler who has already seen this step see
+    // it again as if it were new.
     envs: ["league"],
-    body: "Your leagues, teams and ball arsenal live here. Add a league, then add your team right underneath.",
+    body: "Your leagues and teams live here. Add a league, then add your team right underneath.",
   },
   {
     id: "roster",
-    tab: "locker",
+    // Roster editing moved to the Teams tab with the split.
+    tab: "teams",
     title: "Adding your teammates",
     envs: ["league"],
     body: "Add each teammate with their name and email — that works whether or not they've signed up yet. When they do sign up with that email, the invite is waiting for them, and accepting it connects them to everything you've already logged under their name. Don't have someone's email? Tick the box and you'll get a short code to text them; they enter it when they sign up and land on the same spot.",

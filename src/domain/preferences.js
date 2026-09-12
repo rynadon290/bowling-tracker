@@ -266,23 +266,44 @@ export const ENVIRONMENT_QUESTION_LABELS = {
 // "hides" is the only signal that one of these four takes something
 // away -- casual forces scores-only and removes four screens, and
 // nothing previously said so.
+// Two lines: who it is for, then what it does to the app.
+//
+// One line was doing two jobs and neither well. "Best for" answers the
+// question a first-timer actually has -- which of these matches tonight
+// -- and the second line says what changes, which is the part that
+// keeps a choice from being a surprise later.
+//
+// Three "Opens" and one "Hides" is the same deliberate asymmetry as
+// before: Open bowling is the only one that removes something, and the
+// mismatched verb is what makes someone read that line rather than skim
+// past it.
+//
+// "Vault" is gone from the casual line -- it was split into Gear and
+// Teams, and the sentence would have named a tab that no longer exists.
+export const ENVIRONMENT_BEST_FOR = {
+
+  practice: "working on one thing",
+
+  league: "bowling for the team",
+
+  tournament: "making the cut",
+
+  casual: "keeping score and nothing else",
+
+};
+
+
+
 export const ENVIRONMENT_DESCRIPTIONS = {
-  // Round 7, findings 1 and 2.
-  //
-  // These used to name parts of the APP -- "the detail fields", "the team
-  // roster". Bowlers in their first minute have never seen either, and
-  // only the experienced groups recognised them. These name parts of
-  // BOWLING instead, which everyone already knows.
-  //
-  // The casual line names the screens that go. "Hides everything but
-  // scores and the standings" reads as simplicity to exactly the people
-  // who pick it, and they never learn History, Stats, Improve and the
-  // Vault exist -- they never saw them. Naming them is the whole point of
-  // the sentence.
-  practice: "Drills, and space to record what you changed.",
-  league: "Your team, side pots and brackets.",
-  tournament: "Blocks, squads and the cut line.",
-  casual: "Scores and standings. History, Stats, Improve and the Vault stay hidden.",
+
+  practice: "Opens drills, frame tracking and every detail field.",
+
+  league: "Opens your team, side pots, brackets and standings.",
+
+  tournament: "Opens blocks, squads, side pots and the cut line.",
+
+  casual: "Hides History, Stats, Improve and Gear. Just the scoresheet and standings.",
+
 };
 
 // Whether the coach view is switched on. Only meaningful for someone whose
