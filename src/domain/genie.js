@@ -137,9 +137,36 @@ export function buildGenieContext(summary) {
   add("Single-pin spare percentage", s.singlePinPct);
   add("Split conversion percentage", s.splitPct);
   add("Open frames per game", s.opensPerGame);
+  add("Corner pin spare percentage", s.cornerPinPct);
   add("Most-used ball", s.topBall);
+  add("Balls in the bag", s.arsenal);
   add("Leagues", s.leagues);
   add("Handedness", s.handedness);
+  add("Best game by position in the set", s.byPosition);
+  add("Times left hung by teammates", s.timesHung);
+  add("Times helped hang a teammate", s.hangAssists);
+
+  // TEAM AGGREGATES ONLY. No teammate is named and no individual
+  // average leaves the device.
+  //
+  // A team's high game is a fact about a team you are on. Maggie's
+  // average is Maggie's, and sending it to Google so the genie can
+  // answer someone else's question is a different thing entirely --
+  // even though it would make the answers slightly better.
+  add("Team high game", s.teamHighGame);
+  add("Team high series", s.teamHighSeries);
+  add("Team average game total", s.teamGameAvg);
+  add("Team points won this season", s.teamPoints);
+  add("Team record", s.teamRecord);
+
+  // Trend and consistency: what the numbers are DOING, not just what
+  // they are. A genie told only an average can say what you bowl; told
+  // the direction, it can say whether that is going anywhere.
+  add("Average over the last five nights", s.recentAverage);
+  add("Score spread, lower is steadier", s.scoreConsistency);
+  add("Book average", s.bookAverage);
+  add("Nights logged", s.nightsLogged);
+  add("Most common leave", s.commonLeave);
 
   return lines.join("\n");
 }
