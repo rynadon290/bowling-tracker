@@ -4021,6 +4021,39 @@ export default function BowlingTracker(){
         }
         return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
       })(),
+      tenPinPct:(()=>{
+        const att=myShots.filter(x=>x.result==="Weak 10"||x.result==="Ringing 10");
+        if(!att.length)return null;
+        return Math.round((att.filter(x=>x.spareMade==="Yes").length/att.length)*100)+"%";
+      })(),
+      // Everything the analysis gets, so Brooklyn is never working from
+      // less than the Improve tab already has.
+      ballRates:(()=>{
+        const by={};
+        for(const sh of myShots){
+          if(!sh.ball||(sh.ballNum&&sh.ballNum!==1))continue;
+          (by[sh.ball]=by[sh.ball]||{n:0,x:0}).n++;
+          if(sh.result==="Strike")by[sh.ball].x++;
+        }
+        const rows=Object.entries(by).filter(([,v])=>v.n>=25)
+          .map(([b,v])=>`${b} ${Math.round((v.x/v.n)*100)}% over ${v.n}`);
+        return rows.join("; ")||null;
+      })(),
+      centerAverages:(()=>{
+        const by={};
+        for(const x of mine){
+          if(!x.center||!Array.isArray(x.scores))continue;
+          const v=x.scores.filter(n=>Number.isFinite(Number(n))).map(Number);
+          if(!v.length)continue;
+          (by[x.center]=by[x.center]||{n:0,t:0});
+          by[x.center].n+=v.length;
+          by[x.center].t+=v.reduce((a,b)=>a+b,0);
+        }
+        const rows=Object.entries(by).filter(([,v])=>v.n>=9)
+          .map(([c,v])=>`${c} ${Math.round(v.t/v.n)} over ${v.n}`);
+        return rows.join("; ")||null;
+      })(),
+
       teamRecord:(()=>{
 
         const r=seasonRecord(sessions,"");
@@ -4303,6 +4336,13 @@ export default function BowlingTracker(){
     // no matter what the bowler actually left. Everywhere else in the app
     // calls isSplit(shot) correctly, which is why Stats showed the true 9%.
     const splits=firstBalls.filter(isSplit).length;
+    // Grouped leaves, for the two spare rates the analysis was missing.
+    // Corner pin is hand-aware: for a lefty it is the 7, not the 10.
+    const singlePinAtt=mine.filter(s=>isSinglePinLeave(s)&&s.spareMade!=="");
+    const singlePinMade=singlePinAtt.filter(s=>s.spareMade==="Yes").length;
+    const cornerPinAtt=mine.filter(s=>isCornerPinLeave(s,!!preferences.leftHanded)&&s.spareMade!=="");
+    const cornerPinMade=cornerPinAtt.filter(s=>s.spareMade==="Yes").length;
+
     const mySessions=sessions.filter(s=>!who||s.bowler===who);
     const gameCount=mySessions.reduce((n,s)=>n+(s.scores?.length||0),0);
 
@@ -4341,7 +4381,34 @@ export default function BowlingTracker(){
       splitRate:firstBalls.length?Math.round((splits/firstBalls.length)*100):null,
       sessionCount:mySessions.length,
       recentAverages:mySessions.slice(-8).map(s=>s.average).filter(v=>typeof v==="number"),
+      // Fed to buildAnalysisPayload, which gates each one on its own
+      // threshold -- so these appear in the analysis as the sample for
+      // each becomes real, not all at once.
+      handedness:preferences.leftHanded?"left-handed":"right-handed",
+      singlePinAttempts:singlePinAtt.length,
+      singlePinRate:singlePinAtt.length?Math.round((singlePinMade/singlePinAtt.length)*100):null,
+      cornerPinAttempts:cornerPinAtt.length,
+      cornerPinRate:cornerPinAtt.length?Math.round((cornerPinMade/cornerPinAtt.length)*100):null,
+      frameCount:firstBalls.length,
+      openFramesPerGame:(firstBalls.length&&gameCount)
+        ?Math.round((firstBalls.filter(x=>x.result!=="Strike"&&x.spareMade!=="Yes").length/gameCount)*10)/10
+        :null,
+      completeSets:mySessions.filter(x=>Array.isArray(x.scores)&&x.scores.length>=3).length,
+      averageByPosition:(()=>{
+        const pos=gamePositionAverages(sessions,who);
+        return (pos&&pos.length)?pos.map(v=>Math.round(v)):null;
+      })(),
+      scoreSpread:(()=>{const c=scoreConsistency(sessions,who,"");return c?Math.round(c):null;})(),
+      mostCommonLeave:(()=>{
+        const counts={};
+        for(const sh of mine){
+          const l=Array.isArray(sh.otherLeave)?sh.otherLeave.join("-"):null;
+          if(l)counts[l]=(counts[l]||0)+1;
+        }
+        return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+      })(),
       balls:ballRows,
+
       centers:centerStats.map(c=>({name:c.center.name,average:c.average,games:c.games})),
       // Drills, patterns, and score-only statistics: data the app already
       // had and Insights was ignoring. Each is gated on its own sample in
@@ -4529,6 +4596,15 @@ export default function BowlingTracker(){
   //
   // Friends replaces them: the leaderboard of everyone who's been on a
   // scoresheet, which is the only other thing a casual bowler wants.
+  // Anything at all worth asking about: a logged score, a shot, or a
+  // drill. Checked across every bowler on the device rather than just
+  // the active one -- a scorekeeper whose own name has no games yet
+  // still has plenty for Brooklyn to work with.
+  const hasAnythingLogged=
+    sessions.some(x=>x&&Array.isArray(x.scores)&&x.scores.some(v=>v!=null))
+    ||shots.length>0
+    ||drills.length>0;
+
   const casualMode=preferences.environment==="casual";
   const navTabs=casualMode?[
     // Badges first, Bowl in the middle, Standings last.
@@ -5755,12 +5831,21 @@ export default function BowlingTracker(){
       {/* The genie floats over every screen, including casual -- a bowler
           out with friends can still ask why they keep leaving the 10.
 
-          Hidden during onboarding: a lamp offering three wishes before
-          there is any history to ask about is a worse first impression
-          than no lamp. */}
-      {onboarded&&(
+          Hidden until there is something to ask ABOUT.
+
+          A genie with no data answers every question with a variation of
+          "you haven't logged anything yet", which is worse than no genie:
+          the bowler spends a wish finding out there was nothing to spend
+          it on, and the feature's first impression is an empty shrug.
+
+          One logged game is the bar -- not a good sample, but enough that
+          an answer is about them rather than about nothing. Brooklyn is
+          told to say when a sample is thin, so a thin answer is honest
+          rather than hollow. */}
+      {onboarded&&hasAnythingLogged&&(
         <BowlingGenie asked={genieAsked} today={localDateString()} onAsk={askGenie}/>
       )}
+
 
       {/* Bottom nav. At the bottom because the top of a phone is out of
           thumb reach and this app is used standing up holding a ball.
