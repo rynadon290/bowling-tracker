@@ -81,7 +81,13 @@ export default function BowlingGenie({
     } catch (e) {
       // A failed call should not silently eat a wish either -- the
       // server only counts what it actually answered.
-      setAnswer({ text: `Couldn't reach ${GENIE_NAME}. That one's still yours.`, failed: true });
+      // Deliberately does not promise the wish was refunded.
+      //
+      // The server records the attempt before calling Gemini, so a
+      // failure HAS spent one of the three. Saying "that one's still
+      // yours" and then showing two left would be a small lie the bowler
+      // would notice. See the note in the Edge Function.
+      setAnswer({ text: `Couldn't reach ${GENIE_NAME}. Try again in a moment.`, failed: true });
     } finally {
       setThinking(false);
     }
