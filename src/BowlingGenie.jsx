@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { C, S, AiNote } from "./ui.jsx";
+import { reviewAiOutput, overreachNote } from "./domain/aiGuard.js";
 import {
   classifyQuestion, refusalMessage, questionsLeftToday, canAskToday,
   budgetLabel, DAILY_QUESTIONS, GENIE_NAME,
@@ -69,7 +70,13 @@ export default function BowlingGenie({
     setAnswer(null);
     try {
       const reply = await onAsk?.(q);
-      setAnswer(reply || { text: `${GENIE_NAME} went quiet. Try again in a moment.` });
+      // Checked against what she was actually sent, the same way the
+      // analysis is. A genie discussing a statistic the app withholds is
+      // the fastest way to lose a bowler's trust in both.
+      const checked = reply?.text ? reviewAiOutput(reply.text, reply.payload) : null;
+      setAnswer(checked
+        ? { ...reply, overreached: checked.overreached, citedWithheld: checked.citedWithheld }
+        : (reply || { text: `${GENIE_NAME} went quiet. Try again in a moment.` }));
       setQuestion("");
     } catch (e) {
       // A failed call should not silently eat a wish either -- the
@@ -172,7 +179,13 @@ export default function BowlingGenie({
           position: "fixed", left: "12px", right: "12px",
           bottom: "calc(144px + env(safe-area-inset-bottom, 0px))",
           backgroundColor: C.card, borderRadius: "14px",
-          border: `1px solid ${C.border}`,
+          // Accent, not the neutral border every other card uses.
+          //
+          // The panel floats over a working screen rather than dimming
+          // it, so it has to separate itself from whatever is behind --
+          // and a 1px neutral line against a card background does not.
+          // The accent also ties it to the lamp that opened it.
+          border: `1.5px solid ${C.accent}`,
           boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
           padding: "14px", zIndex: 200, maxWidth: "460px", margin: "0 auto",
         }}>
@@ -226,6 +239,11 @@ export default function BowlingGenie({
               </div>
               {/* Only on a real answer. A connection failure is not an AI
                   claim about your bowling and does not need caveating. */}
+              {answer.overreached && (
+                <div style={{ fontSize: "11px", color: C.miss, lineHeight: 1.5, marginTop: "8px" }}>
+                  {overreachNote(answer.citedWithheld)}
+                </div>
+              )}
               {!answer.failed && <AiNote what="That" />}
             </div>
           )}
