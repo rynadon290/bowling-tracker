@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { C, S, Chip, PinDeck, CollapsibleCard, resultSym } from "./ui.jsx";
+import { C, S, Chip, PinDeck, CollapsibleCard, resultSym, AiNote } from "./ui.jsx";
 import { formatDate, RESULTS, localDateString, PRACTICE_SESSION_KEY } from "./constants.js";
-import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler } from "./domain/scorecardImport.js";
+import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler, scoreDisagreement, scoreDisagreementNote } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
 import { findExistingShotSlot } from "./domain/sessions.js";
@@ -93,6 +93,10 @@ function ShotEditor({shot,onChange}){
 // eyes-on before saving, not just an easy-to-miss footnote.
 function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpanded}){
   const score=game.scoreOnly?game.totalScore:strictPartial(game.shots);
+  // Two independent readings of the same card: the total the model read,
+  // and what its own frames actually score to. A verified engine can say
+  // whether they agree, and a disagreement means one is definitely wrong.
+  const disagreement=game.scoreOnly?null:scoreDisagreement(game,score);
   return(
     <div style={S.card}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
@@ -123,6 +127,11 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
             </div>
           )}
         </>
+      )}
+      {disagreement&&(
+        <div style={{fontSize:"11px",color:C.miss,lineHeight:1.5,marginBottom:"8px"}}>
+          ⚠️ {scoreDisagreementNote(disagreement)}
+        </div>
       )}
       {game.warnings.length>0&&(
         <div style={{backgroundColor:C.spare+"22",border:`1px solid ${C.spare}44`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",fontSize:"12px",color:C.spare}}>
@@ -847,6 +856,9 @@ export default function ImportScorecard({
                     : "review each frame below, tap any of them to correct it, then save."
             }
           </div>
+          {/* The reading itself is AI. The instruction above says to check
+              it; this says why that matters. */}
+          <AiNote what="This scorecard" verb="read" check="check the numbers against the card before saving" />
           {games.map((g,idx)=>(
             <GameReview key={g.gameNumber} game={g}
               onUpdateShot={(shotIdx,updated)=>updateShot(idx,shotIdx,updated)}
