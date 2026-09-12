@@ -202,6 +202,13 @@ export function buildGenieContext(summary) {
   add("Book average", s.bookAverage);
   add("Nights logged", s.nightsLogged);
   add("Most common leave", s.commonLeave);
+  add("Ten pin conversion", s.tenPinPct);
+
+  // Per-ball and per-centre, which the analysis had and Brooklyn did
+  // not. "Your Zen carries better than the Phaze on this house" is the
+  // kind of answer a bowler actually wants, and it needs both.
+  add("Strike rate by ball", s.ballRates);
+  add("Average by centre", s.centerAverages);
 
   return lines.join("\n");
 }

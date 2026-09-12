@@ -179,3 +179,56 @@ describe('drills and patterns reach the analysis', () => {
     expect(p.included.patterns[0].name).toBe('House Shot');
   });
 });
+
+describe('the analysis grows with the sample', () => {
+  // A bowler with 400 games used to get exactly the same four metrics as
+  // one with 40. Each new metric gates on its own threshold, so the
+  // analysis says more as more of it becomes true.
+  const thin = {
+    firstBalls: 30, strikeRate: 52, spareAttempts: 12, spareConversion: 60,
+    singlePinAttempts: 5, singlePinRate: 80, sessionCount: 2,
+    handedness: 'right-handed',
+  };
+  const rich = {
+    firstBalls: 900, strikeRate: 54, spareAttempts: 400, spareConversion: 61,
+    tenPinAttempts: 120, tenPinRate: 62, splitRate: 18,
+    singlePinAttempts: 200, singlePinRate: 78,
+    cornerPinAttempts: 120, cornerPinRate: 62,
+    frameCount: 900, openFramesPerGame: 1.8,
+    completeSets: 140, averageByPosition: [192, 188, 186],
+    scoreSpread: 24, sessionCount: 144, mostCommonLeave: 'p7',
+    handedness: 'left-handed',
+  };
+
+  it('claims almost nothing from a thin sample', () => {
+    const p = buildAnalysisPayload(thin);
+    expect(p.included.singlePinRate).toBeUndefined();
+    expect(p.included.strikeRate).toBeUndefined();
+  });
+
+  it('reports each metric once its own threshold is met', () => {
+    const p = buildAnalysisPayload(rich);
+    for (const k of ['singlePinRate', 'cornerPinRate', 'openFramesPerGame',
+                     'averageByPosition', 'scoreSpread', 'mostCommonLeave']) {
+      expect(p.included[k]).toBeDefined();
+    }
+  });
+
+  // Handedness is context, not a claim. Without it the analysis reasons
+  // about ten-pin conversion without knowing whether the ten pin is even
+  // this bowler's corner -- for a lefty it is the seven.
+  it('always includes handedness, at any sample size', () => {
+    expect(buildAnalysisPayload(thin).included.handedness.value).toBe('right-handed');
+    expect(buildAnalysisPayload(rich).included.handedness.value).toBe('left-handed');
+  });
+
+  it('never gates handedness by sample', () => {
+    expect(buildAnalysisPayload({ handedness: 'left-handed' }).included.handedness).toBeDefined();
+  });
+
+  it('says how far short a withheld metric is', () => {
+    const p = buildAnalysisPayload(thin);
+    const w = p.withheld.find(x => x.key === 'singlePinRate');
+    expect(w.shortBy).toBe(20);
+  });
+});

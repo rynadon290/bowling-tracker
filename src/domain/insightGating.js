@@ -48,6 +48,35 @@ export const SAMPLE_THRESHOLDS = {
   // Lower than centerAverage: a pattern is a sharper variable than a
   // building, and a bowler sees far fewer games on any single one.
   patternGames: 6,
+
+  // ── Added so the analysis can grow as the data does ──────────────────
+  //
+  // Every one of these was already computed for the genie and withheld
+  // from the analysis, which meant a bowler with 400 games got the same
+  // twelve metrics as one with 40. These let it say more as more of them
+  // become true, rather than all-or-nothing.
+  //
+  // Each needs a threshold or it undermines the point of this table. The
+  // numbers below follow the existing scales: shots for shot metrics,
+  // nights for score metrics.
+
+  // Single-pin and corner-pin conversion. Same bar as any specific leave
+  // -- they ARE specific leaves, grouped.
+  singlePinSpares: 25,
+  cornerPinSpares: 25,
+  // Open frames per game. Needs enough frames to be a rate rather than a
+  // run of luck; 90 frames is roughly nine games.
+  openFrameRate: 90,
+  // Average by position in the set (game 1 vs 2 vs 3). Nine full sets
+  // before a fade is a pattern rather than three bad third games.
+  positionFade: 9,
+  // Spread of scores. Same bar as any trend over time -- it is a claim
+  // about how a bowler varies, which needs sessions, not shots.
+  scoreSpread: 8,
+  // The most common leave. Low bar: this is an observation, not a claim
+  // about a rate, and 20 first balls is enough for "you leave this a lot"
+  // to be worth saying.
+  commonLeave: 20,
 };
 
 // Score-only thresholds live in domain/scoreInsights.js, next to the
@@ -110,8 +139,26 @@ export function buildAnalysisPayload(stats) {
   consider("tenPinRate", "specificLeave", stats?.tenPinRate, stats?.tenPinAttempts);
   consider("splitRate", "specificLeave", stats?.splitRate, stats?.firstBalls);
 
+  // Each of these gates itself, so the analysis grows as the data does
+  // rather than arriving all at once. A bowler with 400 games used to
+  // get exactly the same four metrics as one with 40.
+  consider("singlePinRate", "singlePinSpares", stats?.singlePinRate, stats?.singlePinAttempts);
+  consider("cornerPinRate", "cornerPinSpares", stats?.cornerPinRate, stats?.cornerPinAttempts);
+  consider("openFramesPerGame", "openFrameRate", stats?.openFramesPerGame, stats?.frameCount);
+  consider("averageByPosition", "positionFade", stats?.averageByPosition, stats?.completeSets);
+  consider("scoreSpread", "scoreSpread", stats?.scoreSpread, stats?.sessionCount);
+  consider("mostCommonLeave", "commonLeave", stats?.mostCommonLeave, stats?.firstBalls);
+
   // Balls each clear the bar individually. One ball with enough shots is
   // still worth reporting on its own; comparison needs at least two.
+  // Handedness is CONTEXT, not a claim, so it is never gated.
+  //
+  // Without it the analysis reasoned about ten-pin conversion without
+  // knowing whether the ten pin is even this bowler's corner. For a
+  // lefty it is the seven, and every conclusion drawn about "the corner
+  // pin" was about the wrong side of the lane.
+  if (stats?.handedness) included.handedness = { value: stats.handedness, sampleSize: null };
+
   const balls = (stats?.balls || [])
     .filter(b => meetsThreshold("ballComparison", b.firstBalls))
     .map(b => ({
