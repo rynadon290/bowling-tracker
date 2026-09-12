@@ -4412,18 +4412,23 @@ export default function BowlingTracker(){
     {id:"log",    label:"Bowl",    icon:"🎳"},
     {id:"social", label:"Standings", icon:"📊"},
   ]:[
-    {id:"log",     label:"Bowl",    icon:"🎳"},
+    // Gear and Teams flank the row -- the two setup tabs, least visited,
+    // at the edges. Between them: look back (History, Stats), do it
+    // (Bowl, visually raised -- see navBtn/renderTab), look at what you
+    // earned (Badges), then what's next (Improve).
+    //
+    // Measured at 360px: seven labels fit without wrapping, ~51px each,
+    // above the 44px touch minimum.
+    {id:"locker",  label:"Gear",    icon:"🎒"}, // internal id stays "locker" -- plumbing, not shown
     {id:"history", label:"History", icon:"📖"},
     {id:"data",    label:"Stats",   icon:"📈"},
+    {id:"log",     label:"Bowl",    icon:"🎳"},
+    // Placeholder screen. The real league/tournament/practice badge set
+    // (the 38-badge merged module) is designed but not yet built --
+    // wiring it in is separate work. This tab exists now so the nav
+    // order is correct today rather than needing another reshuffle later.
+    {id:"badges",  label:"Badges",  icon:"🏅"},
     {id:"insights",label:"Improve", icon:"🎯"},
-    // Split in two. "Vault" held equipment AND leagues, and was the one
-    // tab name that was not plain bowling -- Bowl, History, Stats and
-    // Improve need no explanation and it did. Two tabs that say what they
-    // hold beat one that says nothing.
-    //
-    // Measured at 360px: six labels fit without wrapping, ~59px each,
-    // well above the 44px touch minimum.
-    {id:"locker",  label:"Gear",    icon:"🎒"}, // internal id stays "locker" -- plumbing, not shown
     {id:"teams",   label:"Teams",   icon:"👥"},
   ];
   // Icons go inline beside the title until the nav genuinely needs the
@@ -5233,6 +5238,13 @@ export default function BowlingTracker(){
             because roster setup is part of setting up a league -- not a
             social activity. With one thing left here the tab switcher is
             just a row that does nothing. */}
+        {/* Shared by BOTH the casual tab and the new full-mode tab -- same
+            view id, same component. In league/practice/tournament this
+            still shows CASUAL badges against casual nights, which is
+            wrong data on a real screen rather than a crash. The 38-badge
+            merged module (league/practice/tournament, agreed and iconed
+            but not yet wired) is what replaces this for non-casual modes
+            -- tracked as separate work, not done in this pass. */}
         {view==="badges"&&(
           <BadgeCollection nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)} me={activeBowler}
             onImportNights={importCasualNights}
@@ -5603,10 +5615,23 @@ export default function BowlingTracker(){
           const badge=
             t.id==="insights"?((newInsights.length>0&&view!=="insights"?1:0)+(coachViewOn?unreadResponseCount:0)):
             0;
+          // Bowl gets a distinct treatment, not just the active-tab color --
+          // a bigger icon inside a soft accent wash, so it reads as THE
+          // action of the bar rather than one destination among seven,
+          // whether or not it happens to be the current view.
+          const isBowl=t.id==="log";
           return(
             <button key={t.id} onClick={()=>setView(t.id)} aria-label={t.label}
-              style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",padding:"5px 0",position:"relative",color:on?C.accent:C.textMuted,fontFamily:F.body,fontSize:"10.5px",fontWeight:on?600:500,WebkitTapHighlightColor:"transparent"}}>
-              <span style={{fontSize:"17px",lineHeight:1}} aria-hidden="true">{t.icon}</span>
+              style={{
+                flex:1,background:isBowl?C.accent+"15":"none",border:"none",cursor:"pointer",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:isBowl?"4px":"3px",
+                padding:isBowl?"5px 0":"5px 0",margin:isBowl?"0 1px":0,
+                borderRadius:isBowl?"10px":0,position:"relative",
+                color:on?C.accent:C.textMuted,fontFamily:F.body,
+                fontSize:isBowl?"11px":"10.5px",fontWeight:(on||isBowl)?600:500,
+                WebkitTapHighlightColor:"transparent",
+              }}>
+              <span style={{fontSize:isBowl?"23px":"17px",lineHeight:1}} aria-hidden="true">{t.icon}</span>
               {t.label}
               {badge>0&&(
                 <span style={{position:"absolute",top:"2px",right:"calc(50% - 20px)",minWidth:"14px",height:"14px",borderRadius:"7px",backgroundColor:C.miss,color:"#fff",fontSize:"9px",fontWeight:700,lineHeight:"14px",textAlign:"center",padding:"0 3px"}}>{badge}</span>
