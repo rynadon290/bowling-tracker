@@ -272,8 +272,16 @@ Deno.serve(async (req) => {
       JSON.stringify(included, null, 2),
     ].join("\n");
 
+    // Same timeout as the genie, for the same reason: a hung call leaves
+    // the bowler watching a spinner with no idea whether anything is
+    // happening. Longer here -- an analysis is several observations
+    // rather than one short answer.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+
     const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
+      signal: controller.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
@@ -287,6 +295,8 @@ Deno.serve(async (req) => {
         },
       }),
     });
+
+    clearTimeout(timer);
 
     if (!res.ok) {
       const detail = await res.text();
