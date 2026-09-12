@@ -2,7 +2,7 @@ import { useState } from "react";
 import { C, S, AiNote } from "./ui.jsx";
 import {
   classifyQuestion, refusalMessage, questionsLeftToday, canAskToday,
-  budgetLabel, DAILY_QUESTIONS,
+  budgetLabel, DAILY_QUESTIONS, GENIE_NAME,
 } from "./domain/genie.js";
 
 // The bowling genie.
@@ -69,12 +69,12 @@ export default function BowlingGenie({
     setAnswer(null);
     try {
       const reply = await onAsk?.(q);
-      setAnswer(reply || { text: "The lamp went quiet. Try again in a moment." });
+      setAnswer(reply || { text: `${GENIE_NAME} went quiet. Try again in a moment.` });
       setQuestion("");
     } catch (e) {
       // A failed call should not silently eat a wish either -- the
       // server only counts what it actually answered.
-      setAnswer({ text: "Couldn't reach the lamp. That one's still yours.", failed: true });
+      setAnswer({ text: `Couldn't reach ${GENIE_NAME}. That one's still yours.`, failed: true });
     } finally {
       setThinking(false);
     }
@@ -86,7 +86,7 @@ export default function BowlingGenie({
           home indicator. */}
       <button
         onClick={() => setOpen(v => !v)}
-        aria-label="Ask the bowling genie"
+        aria-label={`Ask ${GENIE_NAME}, the bowling genie`}
         style={{
           position: "fixed",
           right: "16px",
@@ -177,20 +177,20 @@ export default function BowlingGenie({
           padding: "14px", zIndex: 200, maxWidth: "460px", margin: "0 auto",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <div style={{ fontSize: "14px", fontWeight: 600, color: C.text }}>Bowling genie</div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: C.text }}>{GENIE_NAME}</div>
             <div style={{ fontSize: "11px", color: C.textMuted }}>{budgetLabel(asked, today)}</div>
           </div>
 
           {!canAsk && !answer && (
             <div style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>
-              You've used all {DAILY_QUESTIONS} today. The lamp recharges tomorrow.
+              You've used all {DAILY_QUESTIONS} today. {GENIE_NAME} is back tomorrow.
             </div>
           )}
 
           {canAsk && (
             <>
               <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "8px", lineHeight: 1.5 }}>
-                Ask about your own bowling — it can see your scores, spares, splits and which balls
+                Ask about your own bowling — {GENIE_NAME} can see your scores, spares, splits and which balls
                 you've been throwing.
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
