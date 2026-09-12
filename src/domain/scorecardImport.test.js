@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { convertExtractedGameToShots,
   normalizeExtraction,
-  detailLevel,
-} from './scorecardImport.js';
+  detailLevel, scoreDisagreement, scoreDisagreementNote } from './scorecardImport.js';
 import { strictPartial } from './scoring.js';
 
 const context = { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', teamId: 't1', game: 1 };
@@ -357,5 +356,57 @@ describe('team scorecards', () => {
   it('is safe with nothing extracted', () => {
     expect(normalizeExtraction(null)).toEqual([]);
     expect(normalizeExtraction({})).toEqual([]);
+  });
+});
+
+describe('the frames must score to the reported total', () => {
+  // Two independent readings of one card: the total the model read, and
+  // what its own frames add up to. A scoring engine verified against
+  // 3,000 games can say whether they agree, and a disagreement means one
+  // of them is definitely wrong.
+  const withFrames = total => ({ totalScore: total, frames: [{ frameNumber: 1 }] });
+
+  it('says nothing when they agree', () => {
+    expect(scoreDisagreement(withFrames(176), 176)).toBe(null);
+  });
+
+  it('reports a disagreement with both numbers', () => {
+    const d = scoreDisagreement(withFrames(189), 176);
+    expect(d.reported).toBe(189);
+    expect(d.computed).toBe(176);
+    expect(d.difference).toBe(13);
+  });
+
+  // A total is one number read once; frames are twenty-odd readings. A
+  // big gap usually means a frame went astray, a small one that the
+  // total was misread.
+  it('leans toward the total for a small gap and the frames for a big one', () => {
+    expect(scoreDisagreement(withFrames(189), 176).likely).toBe('total');
+    expect(scoreDisagreement(withFrames(250), 176).likely).toBe('frames');
+  });
+
+  // Bowling scores are integers from exact rules. "Close enough" is not
+  // a thing -- one pin off means a frame was misread.
+  it('has no tolerance', () => {
+    expect(scoreDisagreement(withFrames(177), 176)).not.toBe(null);
+  });
+
+  it('has nothing to compare on a score-only card', () => {
+    expect(scoreDisagreement({ totalScore: 189, frames: [] }, 176)).toBe(null);
+    expect(scoreDisagreement({ totalScore: 189 }, 176)).toBe(null);
+  });
+
+  it('names both numbers in the note, so the bowler can judge', () => {
+    const note = scoreDisagreementNote(scoreDisagreement(withFrames(189), 176));
+    expect(note).toContain('189');
+    expect(note).toContain('176');
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}, []]) {
+      expect(() => scoreDisagreement(junk, junk)).not.toThrow();
+      expect(() => scoreDisagreementNote(junk)).not.toThrow();
+      expect(scoreDisagreement(junk, junk)).toBe(null);
+    }
   });
 });

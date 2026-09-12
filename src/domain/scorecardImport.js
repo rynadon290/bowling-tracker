@@ -180,6 +180,53 @@ function convertTenthFrame(frame, base, warnings) {
 // everything" reminder. The review UI should surface these prominently,
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
+// Does the frame data actually score to the reported total?
+//
+// The single strongest accuracy check available for an import, and the
+// one nothing was doing. The model reports a total AND the frames; those
+// are two independent readings of the same card, and a scoring engine
+// verified against 3,000 games can say whether they agree.
+//
+// When they disagree one of them is wrong, with certainty rather than
+// suspicion -- and the bowler is the only one who can say which. So this
+// reports the disagreement rather than picking a side: silently
+// preferring the computed score would overwrite a correctly-read total
+// with a total derived from misread frames.
+//
+// A tolerance of 0 is deliberate. Bowling scores are integers produced
+// by exact rules; "close enough" is not a thing, and a one-pin gap means
+// a frame was misread.
+export function scoreDisagreement(game, computedScore) {
+  const g = (game && typeof game === "object") ? game : {};
+  const reported = Number(g.totalScore);
+  const computed = Number(computedScore);
+
+  if (!Number.isFinite(reported) || !Number.isFinite(computed)) return null;
+  // Frames-only or score-only cards have nothing to compare.
+  if (!Array.isArray(g.frames) || !g.frames.length) return null;
+  if (reported === computed) return null;
+
+  return {
+    reported,
+    computed,
+    difference: Math.abs(reported - computed),
+    // Which is more likely wrong, stated as a lean rather than a verdict.
+    // A total is one number read once; frames are twenty-odd readings,
+    // so a big gap usually means a frame went astray and a small one
+    // often means the total was misread.
+    likely: Math.abs(reported - computed) > 20 ? "frames" : "total",
+  };
+}
+
+// What to tell the bowler about it.
+export function scoreDisagreementNote(d) {
+  if (!d || typeof d !== "object") return "";
+  const where = d.likely === "frames"
+    ? "so a frame was probably misread"
+    : "so the total was probably misread";
+  return `The card says ${d.reported} but the frames add up to ${d.computed} — ${where}. Check before saving.`;
+}
+
 export function convertExtractedGameToShots(extractedGame, context) {
   // Without a context there is no bowler, league or date to file these
   // shots under, so there is nothing to return but an empty list.
