@@ -135,8 +135,25 @@ export default function BadgeCollection({
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "8px" }}>
-          {CASUAL_BADGES.filter(b => filter === "all"
-            || (filter === "earned") === earnedIds.has(b.id)).map(b => {
+          {/* allBadges, NOT CASUAL_BADGES.
+
+              This line kept iterating the casual pool no matter what was
+              injected, so league and tournament bowlers saw Wooden spoon
+              and One fifty while the 40 competitive badges never rendered
+              at all. The header counted the right pool and the grid drew
+              the wrong one. */}
+          {allBadges
+            .filter(b => filter === "all" || (filter === "earned") === earnedIds.has(b.id))
+            .slice()
+            .sort((a, b2) => {
+              // Earned first in the unfiltered view -- the definition
+              // order is thematic, which reads badly once you have a
+              // dozen scattered through forty.
+              if (filter !== "all") return 0;
+              const ea = earnedIds.has(a.id), eb = earnedIds.has(b2.id);
+              return ea === eb ? 0 : (ea ? -1 : 1);
+            })
+            .map(b => {
             const have = earnedIds.has(b.id);
             return (
               <div key={b.id} style={{

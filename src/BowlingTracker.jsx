@@ -4410,9 +4410,9 @@ export default function BowlingTracker(){
     // bottom bar is the easiest place to hit one-handed while holding a
     // ball. Badges lead because they are the reason to open the app on a
     // day you are not bowling.
-    {id:"badges", label:"Badges",  icon:"🏅"},
-    {id:"log",    label:"Bowl",    icon:"🎳"},
     {id:"social", label:"Standings", icon:"📊"},
+    {id:"log",    label:"Bowl",    icon:"🎳"},
+    {id:"badges", label:"Badges",  icon:"🏅"},
   ]:[
     // Gear and Teams flank the row -- the two setup tabs, least visited,
     // at the edges. Between them: look back (History, Stats), do it
