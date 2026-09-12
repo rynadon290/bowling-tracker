@@ -180,6 +180,61 @@ function convertTenthFrame(frame, base, warnings) {
 // everything" reminder. The review UI should surface these prominently,
 // not as an easy-to-miss aside, since they cover cases confirmed
 // unreliable to extract correctly, not just generic caution.
+// How well did the reading actually go?
+//
+// The Edge Function validates every extraction and counts what it had to
+// throw away -- frames that were impossible, scores out of range, pins it
+// had to repair. It returns those counts and the client discarded them.
+//
+// So a photo that produced ten frames and a photo that produced ten
+// frames after eight were dropped as unreadable looked identical to the
+// bowler. They would save the second one, wonder later why their spare
+// percentage moved, and have no way to connect it to a blurry photo from
+// three weeks ago.
+//
+// Silent degradation is the same failure as an AI answering confidently
+// from a thin sample: the output looks fine and the bowler has no way to
+// know it isn't.
+export function extractionQuality(validation) {
+  const v = (validation && typeof validation === "object") ? validation : {};
+  const dropped = (v.dropped && typeof v.dropped === "object") ? v.dropped : {};
+  const nulled = (v.nulled && typeof v.nulled === "object") ? v.nulled : {};
+  const repaired = (v.repaired && typeof v.repaired === "object") ? v.repaired : {};
+
+  const n = x => { const k = Number(x); return Number.isFinite(k) && k > 0 ? k : 0; };
+
+  const droppedFrames = n(dropped.frames);
+  const droppedGames = n(dropped.games);
+  const nulledScores = n(nulled.totalScore) + n(nulled.seriesTotal);
+  const repairedPins = n(repaired.pins);
+
+  const problems = droppedFrames + droppedGames + nulledScores;
+  if (!problems && !repairedPins) return null;
+
+  return {
+    droppedFrames, droppedGames, nulledScores, repairedPins,
+    // Repaired pins are a tidy-up, not a loss -- a pin named "7 pin"
+    // instead of "7" is the same pin. Only losses count as a concern.
+    concerning: problems > 0,
+  };
+}
+
+// What to tell them, in the order that matters to a bowler: what was
+// lost, then what to do about it.
+export function extractionQualityNote(q) {
+  if (!q || typeof q !== "object") return "";
+  const bits = [];
+  if (q.droppedGames) bits.push(`${q.droppedGames} game${q.droppedGames === 1 ? "" : "s"}`);
+  if (q.droppedFrames) bits.push(`${q.droppedFrames} frame${q.droppedFrames === 1 ? "" : "s"}`);
+  if (q.nulledScores) bits.push(`${q.nulledScores} score${q.nulledScores === 1 ? "" : "s"}`);
+  if (!bits.length) return "";
+
+  const list = bits.length === 1
+    ? bits[0]
+    : `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}`;
+  return `${list} couldn't be read and were left out. A clearer photo would get more — what's below is still safe to save.`;
+}
+
 // Does the series total match the games under it?
 //
 // NOT wired to a UI warning: seriesFor already computes this and the

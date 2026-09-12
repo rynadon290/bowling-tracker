@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { convertExtractedGameToShots,
   normalizeExtraction,
-  detailLevel, scoreDisagreement, scoreDisagreementNote } from './scorecardImport.js';
+  detailLevel, scoreDisagreement, scoreDisagreementNote,
+  extractionQuality, extractionQualityNote } from './scorecardImport.js';
 import { strictPartial } from './scoring.js';
 
 const context = { bowler: 'Ryan', league: 'Thursday House Shot', date: '2026-09-03', teamId: 't1', game: 1 };
@@ -408,5 +409,55 @@ describe('the frames must score to the reported total', () => {
       expect(() => scoreDisagreementNote(junk)).not.toThrow();
       expect(scoreDisagreement(junk, junk)).toBe(null);
     }
+  });
+});
+
+describe('telling the bowler how the reading went', () => {
+  // A photo that produced ten frames and one that produced ten after
+  // eight were dropped looked identical. They would save the second,
+  // wonder later why their spare percentage moved, and never connect it
+  // to a blurry photo from three weeks ago.
+  it('says nothing when the read was clean', () => {
+    expect(extractionQuality({ dropped: { frames: 0, games: 0 }, nulled: {}, repaired: { pins: 0 } }))
+      .toBe(null);
+  });
+
+  it('counts what was lost', () => {
+    const q = extractionQuality({ dropped: { frames: 8, games: 1 }, nulled: { totalScore: 2 }, repaired: {} });
+    expect(q.droppedFrames).toBe(8);
+    expect(q.droppedGames).toBe(1);
+    expect(q.nulledScores).toBe(2);
+    expect(q.concerning).toBe(true);
+  });
+
+  // A pin named "7 pin" instead of "7" is the same pin. Repairs are a
+  // tidy-up, not a loss, and warning about them would be noise.
+  it('does not treat repaired pins as a concern', () => {
+    const q = extractionQuality({ dropped: {}, nulled: {}, repaired: { pins: 4 } });
+    expect(q.concerning).toBe(false);
+    expect(extractionQualityNote(q)).toBe('');
+  });
+
+  it('reads naturally with one loss and with several', () => {
+    expect(extractionQualityNote(extractionQuality({ dropped: { frames: 1 } })))
+      .toContain('1 frame ');
+    expect(extractionQualityNote(extractionQuality({ dropped: { frames: 8, games: 1 }, nulled: { totalScore: 2 } })))
+      .toContain('1 game, 8 frames and 2 scores');
+  });
+
+  // The note has to end somewhere useful: what is on screen is still
+  // worth saving, and that is the thing they need to hear.
+  it('says the rest is still safe to save', () => {
+    expect(extractionQualityNote(extractionQuality({ dropped: { frames: 3 } })))
+      .toContain('safe to save');
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, [], { dropped: 'nope' }]) {
+      expect(() => extractionQuality(junk)).not.toThrow();
+      expect(() => extractionQualityNote(junk)).not.toThrow();
+    }
+    expect(extractionQuality(null)).toBe(null);
+    expect(extractionQualityNote(null)).toBe('');
   });
 });
