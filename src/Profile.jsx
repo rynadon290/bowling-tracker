@@ -60,7 +60,11 @@ export default function Profile({
   const [expanded, setExpanded] = useState({
     whoseProfile: true, identity: true,
     aliases: false, coaching: true, bookAverage: false, homeCenters: false, teamsLeagues: false,
-    arsenal: false, bags: false, notes: false,
+    // Arsenal and bags open by default: on the Gear tab they ARE the
+    // tab, and a screen whose only two cards are both shut looks empty.
+    // Elsewhere in Profile they do not render at all, so this costs
+    // nothing there.
+    arsenal: true, bags: true, notes: false,
   });
   function toggle(id) { setExpanded(e => ({ ...e, [id]: !e[id] })); }
   // `only` lets the same component serve two tabs: Gear renders just the
