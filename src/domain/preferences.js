@@ -283,13 +283,13 @@ export const ENVIRONMENT_REASSURANCE =
 // it, not a feature list and not a tagline.
 export const ENVIRONMENT_DESCRIPTIONS = {
 
-  practice: "For working on your game on your own. Drills, frame tracking and every detail field are available, and practice scores stay out of your league averages.",
+  practice: "For working on your game. Drills, frame tracking and every detail field are available, and practice scores stay out of your league averages.",
 
-  league: "For your weekly team night. Your team roster and standings are available, along with the money games — quarter, dollar, high game and 3-6-9.",
+  league: "For your weekly team night. Your team roster and standings are available, along with money games.",
 
-  tournament: "For squad play. Blocks, squads, side pots, brackets, match play and the cut line are all available.",
+  tournament: "For higher-stakes competition. Blocks, squads, side pots, brackets, match play and the cut line are all available.",
 
-  casual: "For a night out. You get the scoresheet, standings and badges — History, Stats, Improve and Gear stay hidden to keep it quick. Nothing is deleted, and switching back brings it all straight in.",
+  casual: "For a fun activity. You get the scoresheet, standings and badges — all other views are hidden, not deleted, to keep it quick and simple.",
 
 };
 
