@@ -50,7 +50,7 @@ import { drillLines } from "./domain/sessionRecap.js";
 import { categorizeCoaching, taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
 import { normalizeImportRecord, effectiveScores, approve as approveImport, reject as rejectImport,
   correctAsTeammate, canCorrect as canCorrectImportRecord, isConfirmed,
-  pendingFor as pendingForImport, needingReentry as needingImportReentry } from "./domain/importVerification.js";
+  pendingFor as pendingForImport, needingReentry as needingImportReentry, shouldSupersede, supersede } from "./domain/importVerification.js";
 import { coachViewActive, setCoachView, applyEnvironment, setTrackingMode } from "./domain/preferences.js";
 import { emptyBag, normalizeBag, bagToRow, bagFromRow, availableBalls, bagsForEnvironment, plasticLast, bagHasRoom, toggleBallInBag, removeBagMemberships, ballsByBagFor, membershipKey } from "./domain/bags.js";
 import { DEFAULT_BALL_GROUPS, emptyBallSpecs, normalizeBallSpecs, specsToRow, specsFromRow, groupToRow, groupFromRow } from "./domain/ballSpecs.js";
@@ -2557,6 +2557,33 @@ export default function BowlingTracker(){
   // Only the bowler's OWN approval does this. Nothing is written until
   // they say the numbers are right, which is the whole point of the
   // pending state.
+  // Nights the bowler already logged themselves, settled without asking.
+  //
+  // A pending row nags OTHER teammates once a session passes -- so
+  // hiding it from this bowler's inbox only moved the noise. Superseded
+  // means "nothing to confirm", which is true, without claiming anyone
+  // verified it.
+  //
+  // Only when the numbers agree; a disagreement stays pending so the
+  // conflict warning can do its job.
+  useEffect(()=>{
+    if(!activeBowler||!importedScores.length)return;
+    const byNight={};
+    for(const x of sessions){
+      if(!x||x.bowler!==activeBowler||!Array.isArray(x.scores))continue;
+      const key=`${x.league??""}|${x.date??""}`;
+      byNight[key]=byNight[key]||{};
+      x.scores.forEach((v,i)=>{if(v!=null)byNight[key][String(i+1)]=v;});
+    }
+    for(const r of importedScores){
+      if(!r||r.bowler!==activeBowler)continue;
+      const mine=byNight[`${r.league??""}|${r.date??""}`];
+      if(!mine)continue;
+      if(shouldSupersede(r,mine))replaceImportRecord(supersede(r));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[importedScores,sessions,activeBowler]);
+
   async function approveImportedScores(record){
     const approved=approveImport(record);
     replaceImportRecord(approved);
