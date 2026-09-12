@@ -5474,7 +5474,7 @@ export default function BowlingTracker(){
             ballSpecs={ballSpecs} setBallSpec={setBallSpec} ballGroups={ballGroups} seedDefaultGroups={seedDefaultGroups}
             catalogEntries={catalogEntries} catalogAck={catalogAck} userId={user?.id} publishBallSpecs={publishBallSpecs} voteOnEntry={voteOnEntry} acknowledgeRejection={acknowledgeRejection}
             showSessionStart={showSessionStart} dismissSessionStart={dismissSessionStart}
-            sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={()=>{
+            sessionEnvChosen={sessionEnvChosen} onSessionEnvChosen={(chosenEnv)=>{
               setSessionEnvChosen(true);
               // First time in this environment? Walk them through it.
               // Coach mode has its own tour, offered when coach mode is
@@ -5488,7 +5488,12 @@ export default function BowlingTracker(){
               //
               // The mode-specific tour arrives later as an inbox task, so
               // signup stays short.
-              const firstTour=preferences.environment==="casual"?"casual":"general";
+              // The env the bowler just PICKED, not the one in state.
+              // preferences updates on the next render, so reading it
+              // here gave the previous mode -- switching from Open
+              // bowling to Practice started the Open bowling tour.
+              const env=chosenEnv||preferences.environment;
+              const firstTour=env==="casual"?"casual":"general";
               if(onboarded&&!hasSeenTour(toursSeen,firstTour))startTour(firstTour);
             }}
             routineNote={routine.mode&&!showSessionStart?`Your usual ${DAY_NAMES_SHORT[routine.weekday]}`:""}

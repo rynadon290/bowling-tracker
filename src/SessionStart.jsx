@@ -101,7 +101,14 @@ export default function SessionStart({ preferences, onApply, onDismiss, envChose
             selected={envChosen && preferences.environment === env}
             onToggle={() => {
               onApply(prev => applyEnvironment(prev, env));
-              onEnvChosen();
+              // The chosen env is PASSED, not read back.
+              //
+              // onApply schedules a state change; React applies it on the
+              // next render, so preferences.environment is still the OLD
+              // value when this runs. The caller used it to pick which
+              // tour to start -- so switching from Open bowling to
+              // Practice started the Open bowling tour.
+              onEnvChosen(env);
               // Just Bowling has no second question, so choosing it
               // finishes the flow outright.
               if (env === "casual") { if (collapsed) setOpen(false); else onDismiss(); }
