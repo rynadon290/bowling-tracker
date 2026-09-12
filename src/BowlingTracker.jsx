@@ -44,7 +44,7 @@ import { profileFromRow, profileToRow, emptyProfile, normalizeProfile, resolveHa
 import { emptyTournament, normalizeTournament, tournamentToRow, tournamentFromRow } from "./domain/tournaments.js";
 import { todaysRoutine, shouldShowLaunchPrompt } from "./domain/launchPrompt.js";
 import { normalizeGoals, goalsToRow, goalsFromRow, measurementsFor } from "./domain/goals.js";
-import { scoreStats } from "./domain/scoreInsights.js";
+import { scoreStats, gamePositionAverages } from "./domain/scoreInsights.js";
 import { buildAnalysisPayload, unlockSignature, statLabel } from "./domain/insightGating.js";
 import { drillLines } from "./domain/sessionRecap.js";
 import { categorizeCoaching, taskFromRow, taskToRow, noteFromRow, noteToRow, completeTask, recordAttempt, reopenTask, normalizeTask, bowlerSnapshot, shotBreakdown, respondedSince, latestResponseAt } from "./domain/coaching.js";
@@ -66,7 +66,7 @@ import { allCompetitiveBadges } from "./domain/badgeContext.js";
 import { buildGenieContext } from "./domain/genie.js";
 import { COMPETITIVE_BADGES, whereEarnable } from "./domain/competitiveBadges.js";
 import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
+import { bowlerHighGame, bowlerHighSeries, hangAssistCounts, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
 import { C, S, F, Chip, applyTheme } from "./ui.jsx";
 import { PLASTIC_BALL, DEFAULT_ARSENAL, MISSES, DEFAULT_LEAGUES, localDateString, APP_NAME, PRACTICE_SESSION_KEY, CASUAL_SESSION_KEY , practiceLeagueCloudName, casualLeagueCloudName, practiceLeagueDisplayName, isPracticeLeagueName, isCasualLeagueName } from "./constants.js";
@@ -3970,11 +3970,55 @@ export default function BowlingTracker(){
       opensPerGame:(bd.frames&&scores.length)
         ?Math.round(((bd.frames-(bd.strikeSample*(bd.strikeRate||0)/100)-(bd.spareSample*(bd.spareRate||0)/100))/scores.length)*10)/10
         :null,
+      cornerPinPct:pctOrNull(bd.cornerPinRate),
       topBall,
+      arsenal:(arsenals?.[activeBowler]||[]).join(", ")||null,
       leagues:[...new Set(mine.map(s=>s.league).filter(Boolean))].join(", ")||null,
       handedness:preferences.leftHanded?"left-handed":"right-handed",
+      byPosition:(()=>{
+        const pos=gamePositionAverages(sessions,activeBowler);
+        if(!pos||!pos.length)return null;
+        return pos.map((v,i)=>`game ${i+1}: ${Math.round(v)}`).join(", ");
+      })(),
+      timesHung:hungCounts(shots,"")[activeBowler]??null,
+      hangAssists:hangAssistCounts(shots,"")[activeBowler]??null,
+
+      // Team AGGREGATES only -- no teammate named, no individual average
+      // sent. See domain/genie.js for why that line is drawn here.
+      teamHighGame:teamHighGame(sessions,"")?.value??null,
+      teamHighSeries:teamHighSeries(sessions,"")?.value??null,
+      teamGameAvg:(()=>{const v=teamGameTotalAvg(sessions,"");return v?Math.round(v):null;})(),
+      teamPoints:(()=>{
+        const w=weeklyPointsData(matches,"");
+        if(!Array.isArray(w)||!w.length)return null;
+        const won=w.reduce((a,x)=>a+(x?.pointsWon||0),0);
+        const avail=w.reduce((a,x)=>a+(x?.pointsAvailable||0),0);
+        return avail?`${won} of ${avail}`:null;
+      })(),
+      recentAverage:(()=>{
+        const recent=[...mine].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);
+        const v=recent.flatMap(x=>Array.isArray(x.scores)?x.scores:[]).filter(n=>Number.isFinite(Number(n))).map(Number);
+        return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;
+      })(),
+      scoreConsistency:(()=>{const c=scoreConsistency(sessions,activeBowler,"");return c?Math.round(c):null;})(),
+      bookAverage:normalizeProfile(profiles[activeBowler],activeBowler).bookAverage??null,
+      nightsLogged:new Set(mine.map(x=>x.date)).size||null,
+      commonLeave:(()=>{
+        const counts={};
+        for(const sh of myShots){
+          const l=Array.isArray(sh.otherLeave)?sh.otherLeave.join("-"):null;
+          if(l)counts[l]=(counts[l]||0)+1;
+        }
+        return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0]||null;
+      })(),
+      teamRecord:(()=>{
+
+        const r=seasonRecord(sessions,"");
+        return r?`${r.wins||0}-${r.losses||0}`:null;
+      })(),
     };
   }
+
 
 
   async function importCasualNights(merged){

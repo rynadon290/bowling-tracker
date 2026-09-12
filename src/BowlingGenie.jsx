@@ -21,9 +21,27 @@ import {
 // Nothing was spent and the classifier might simply be wrong about an
 // oddly-phrased question. Burning a wish on a regex misfire is exactly
 // what someone would remember about this feature.
+// Two shades derived from the theme accent.
+//
+// accentDark / accentLight are not theme tokens -- referencing them fell
+// back to flat accent on every path, which flattens the lamp into a
+// silhouette and loses the taper and the foot entirely. Mixed here so
+// the shading follows whatever accent the bowler's theme uses.
+function shade(hex, amount) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const mix = (c) => Math.max(0, Math.min(255, Math.round(c + 255 * amount)));
+  const r = mix((n >> 16) & 255), g = mix((n >> 8) & 255), b = mix(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 export default function BowlingGenie({
   asked = [], today = "", onAsk, disabled = false,
 }) {
+  const lampMid = C.accent;
+  const lampDark = shade(C.accent, -0.22);
+  const lampLight = shade(C.accent, 0.18);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [thinking, setThinking] = useState(false);
@@ -77,12 +95,38 @@ export default function BowlingGenie({
           backgroundColor: C.card,
           border: `1px solid ${C.accent}55`,
           boxShadow: "0 4px 14px rgba(0,0,0,0.28)",
-          fontSize: "26px", lineHeight: 1, cursor: "pointer",
+          lineHeight: 1, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 200, WebkitTapHighlightColor: "transparent",
           opacity: canAsk ? 1 : 0.55,
         }}>
-        <span aria-hidden="true">{"\u{1FA94}"}</span>
+        {/* Drawn, not an emoji.
+
+            The nearest emoji is a diya -- an oil lamp of entirely the
+            wrong shape -- and Unicode has no Aladdin lamp. Drawing it
+            also means it looks the same on every phone rather than
+            whatever that OS decided a lamp should be.
+
+            Two details that took several passes and are easy to undo by
+            accident:
+
+            The spout sweeps UP from the belly. Drooping below it, which
+            is the obvious way to draw a spout, loses the silhouette
+            entirely.
+
+            The handle is a CLOSED loop, joined to the body at the
+            shoulder and again at the waist. A detached curve beside a
+            tapered body reads as a person with an arm out. */}
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+          <ellipse cx="16.6" cy="27" rx="4.2" ry="1.1" fill={C.accent} opacity="0.75"/>
+          <path d="M15.1 24.4h3l.6 2.2h-4.2z" fill={C.accent} opacity="0.75"/>
+          <path d="M23.4 16.4c2.9.6 4.8 2.2 4.8 4.1 0 2-2.1 3.5-5 3.8l-.5-1.8c1.9-.2 3.3-1 3.3-2 0-.9-1.1-1.7-2.9-2.1z" fill={C.accent}/>
+          <path d="M9.6 19c0-2.5 3.2-4.1 7-4.1s7 1.6 7 4.1c0 2.2-1.4 3.9-3.1 5-1 .6-1.9.8-3.9.8s-2.9-.2-3.9-.8c-1.7-1.1-3.1-2.8-3.1-5z" fill={C.accent}/>
+          <path d="M9.8 18.3C7.1 17 3.9 14.3 2.3 11.2c.8 3.5 3.4 6.6 6.4 8.4z" fill={C.accent}/>
+          <path d="M13.2 14.8c0-1.9 1.5-3 3.4-3s3.4 1.1 3.4 3z" fill={C.accent} opacity="0.85"/>
+          <circle cx="16.6" cy="10.6" r="1.5" fill={C.accent} opacity="0.75"/>
+        </svg>
+
         {/* How many are left, without opening it. */}
         {left > 0 && left < DAILY_QUESTIONS && (
           <span style={{
