@@ -325,6 +325,34 @@ export function hungCounts(shots,league){
   return counts;
 }
 
+// The other half of hungCounts: who did the hanging.
+//
+// hungCounts credits the bowler left needing a spare. This credits
+// everyone ELSE in that same frame -- the ones who struck while their
+// teammate didn't. Same grouping (league+date+game+frame, first-ball
+// shots only), so a frame counted as a hang by one function is counted
+// by the same rule in the other; they cannot disagree about which
+// frames qualify.
+export function hangAssistCounts(shots,league){
+  const groups={};
+  arr(shots).filter(s=>(!league||s.league===league)&&(!s.ballNum||s.ballNum===1)).forEach(s=>{
+    const key=`${s.league}|${s.date}|${s.game}|${s.frame}`;
+    (groups[key]=groups[key]||[]).push(s);
+  });
+  const counts={};
+  Object.values(groups).forEach(group=>{
+    if(group.length<2)return;
+    const nonStrikers=group.filter(s=>s.result!=="Strike");
+    if(nonStrikers.length!==1)return;
+    // Everyone who DID strike in this frame gets credit -- there can be
+    // several, if three or more bowled the same frame together.
+    group.filter(s=>s.result==="Strike").forEach(s=>{
+      counts[s.bowler]=(counts[s.bowler]||0)+1;
+    });
+  });
+  return counts;
+}
+
 // "Beat the high average bowler" -- the giant for a given week is whoever
 // has the highest cumulative average using ONLY data from strictly BEFORE
 // that week (never that week's own results) -- the giant is crowned before

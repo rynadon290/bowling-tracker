@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults, pinsForNextSession,
+import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, hangAssistCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets, threeSixNineResults, pinsForNextSession,
   isCompetitiveSession,
 } from './stats.js';
 
@@ -647,5 +647,57 @@ describe('seasonRecord with no league', () => {
     const r = seasonRecord([{ league: 'A', games: [true, null, null], series: null }], 'A');
     expect(r.gameWins).toBe(1);
     expect(r.gameLosses).toBe(0);
+  });
+});
+
+describe('hangAssistCounts', () => {
+  const strike = (bowler, frame, game=1, date='2026-09-11') =>
+    ({ league: 'L', date, game, frame, bowler, result: 'Strike' });
+  const open = (bowler, frame, game=1, date='2026-09-11') =>
+    ({ league: 'L', date, game, frame, bowler, result: 'Other Leave', pinCount: '8' });
+
+  it('credits everyone who struck when one bowler alone did not', () => {
+    const shots = [strike('Ryan', 1), strike('Dave', 1), open('Sam', 1)];
+    expect(hangAssistCounts(shots, 'L')).toEqual({ Ryan: 1, Dave: 1 });
+  });
+
+  // The victim never appears in their own assist count -- they are the
+  // one non-striker, not one of the strikers being credited.
+  it('never credits the bowler who was hung', () => {
+    const shots = [strike('Ryan', 1), open('Sam', 1)];
+    expect(hangAssistCounts(shots, 'L').Sam).toBeUndefined();
+  });
+
+  it('gives no credit when everyone strikes', () => {
+    const shots = [strike('Ryan', 1), strike('Dave', 1)];
+    expect(hangAssistCounts(shots, 'L')).toEqual({});
+  });
+
+  it('gives no credit when two or more are left needing a spare', () => {
+    const shots = [strike('Ryan', 1), open('Dave', 1), open('Sam', 1)];
+    expect(hangAssistCounts(shots, 'L')).toEqual({});
+  });
+
+  it('is exactly the mirror of hungCounts for the same frame', () => {
+    const shots = [strike('Ryan', 1), strike('Dave', 1), open('Sam', 1)];
+    const hung = hungCounts(shots, 'L');
+    const assists = hangAssistCounts(shots, 'L');
+    expect(Object.keys(hung)).toEqual(['Sam']);
+    expect(Object.keys(assists).sort()).toEqual(['Dave', 'Ryan']);
+  });
+
+  it('accumulates across many frames and nights', () => {
+    const shots = [
+      strike('Ryan', 1, 1, '2026-09-04'), strike('Dave', 1, 1, '2026-09-04'), open('Sam', 1, 1, '2026-09-04'),
+      strike('Ryan', 5, 2, '2026-09-11'), strike('Dave', 5, 2, '2026-09-11'), open('Sam', 5, 2, '2026-09-11'),
+    ];
+    expect(hangAssistCounts(shots, 'L')).toEqual({ Ryan: 2, Dave: 2 });
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}, [null], [{}]]) {
+      expect(() => hangAssistCounts(junk, 'L')).not.toThrow();
+    }
+    expect(hangAssistCounts(null, 'L')).toEqual({});
   });
 });
