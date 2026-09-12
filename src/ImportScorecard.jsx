@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C, S, Chip, PinDeck, CollapsibleCard, resultSym, AiNote } from "./ui.jsx";
 import { formatDate, RESULTS, localDateString, PRACTICE_SESSION_KEY } from "./constants.js";
-import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler, scoreDisagreement, scoreDisagreementNote } from "./domain/scorecardImport.js";
+import { convertExtractedGameToShots, normalizeExtraction, detailLevel, mergeColumnsByBowler, scoreDisagreement, scoreDisagreementNote, extractionQuality, extractionQualityNote } from "./domain/scorecardImport.js";
 import { matchScorecard, rosterOrderCheck } from "./domain/nameMatching.js";
 import { strictPartial } from "./domain/scoring.js";
 import { findExistingShotSlot } from "./domain/sessions.js";
 import { isValidGameScore, invalidScoreIndexes } from "./domain/importVerification.js";
 import { supabase } from "./supabaseClient.js";
+import { recordError } from "./errorLogStore.js";
 
 // A short, human-readable summary of a single shot, for the collapsed row
 // -- e.g. "Strike", "9-spare", "7-2 open". Mirrors how a bowler would say
@@ -97,6 +98,20 @@ function GameReview({game,onUpdateShot,onUpdateScore,expandedFrames,onToggleExpa
   // and what its own frames actually score to. A verified engine can say
   // whether they agree, and a disagreement means one is definitely wrong.
   const disagreement=game.scoreOnly?null:scoreDisagreement(game,score);
+  // A card whose frames do not add up to its printed total is the single
+  // clearest sign the reading went wrong. Recorded so the rate of it is
+  // visible, rather than only ever seen by whoever happened to be
+  // looking at that one card.
+  useEffect(()=>{
+    if(!disagreement)return;
+    recordError({
+      kind:"import-score-mismatch",
+      where:"ImportScorecard.review",
+      message:`card says ${disagreement.reported}, frames score ${disagreement.computed}`,
+      detail:{difference:disagreement.difference,likely:disagreement.likely},
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[disagreement?.reported,disagreement?.computed]);
   return(
     <div style={S.card}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
@@ -211,6 +226,7 @@ export default function ImportScorecard({
   const[contextDate,setContextDate]=useState(localDateString());
   const[images,setImages]=useState([]); // [{base64, mimeType, previewUrl}]
   const[error,setError]=useState(null);
+  const[quality,setQuality]=useState(null);
   const[games,setGames]=useState([]); // [{gameNumber, ballUsed, shots, warnings}]
   const[expandedByGame,setExpandedByGame]=useState([]); // [Set(frameKey), ...] parallel to games
   // Team cards: one entry per bowler column, plus who each maps to.
@@ -434,11 +450,40 @@ export default function ImportScorecard({
       // Column mapping. Runs for every card, not just team ones -- a
       // single-bowler card is just a one-column team card, and going
       // through the same path means one code path to get right.
+      // What the validator had to throw away. The Edge Function has
+      // always returned this and the client always discarded it -- so a
+      // photo that read cleanly and one that lost eight frames looked
+      // identical to the bowler.
+      const q=extractionQuality(data?.validation);
+      setQuality(q);
+      // Recorded even though nothing threw.
+      //
+      // The import path catches its own errors and shows a message, so
+      // none of this reaches the global handlers -- the error log has
+      // been blind to every import problem since it was built. A poor
+      // reading is not a crash, but it is exactly what someone would
+      // want to see when a bowler says their stats look wrong.
+      //
+      // Counts only. No image, no scores, no bowler names.
+      if(q&&q.concerning){
+        recordError({
+          kind:"import-quality",
+          where:"ImportScorecard.extract",
+          message:`dropped ${q.droppedGames} games, ${q.droppedFrames} frames, ${q.nulledScores} scores`,
+          detail:{images:images.length,requestId:data?.validation?.requestId||null},
+        });
+      }
       const cols=normalizeExtraction(data);
       if(!cols.length||cols.every(c=>!c.games.length)){
+        recordError({kind:"import-empty",where:"ImportScorecard.extract",
+          message:"no columns or no games in the extraction",
+          detail:{images:images.length,requestId:data?.validation?.requestId||null}});
         throw new Error("No games could be read from the image(s). Try a clearer screenshot.");
       }
       if(cols.every(c=>c.games.every(g=>!(Array.isArray(g.frames)&&g.frames.length)&&g.totalScore==null))){
+        recordError({kind:"import-empty",where:"ImportScorecard.extract",
+          message:"games found but no scores or frames on any of them",
+          detail:{images:images.length,requestId:data?.validation?.requestId||null}});
         throw new Error("Found games but couldn't read any scores or frame detail. Try a clearer screenshot.");
       }
       const team=teams.find(t=>t.id===teamId);
@@ -472,6 +517,17 @@ export default function ImportScorecard({
 
       setStep("columns");
     }catch(e){
+      // Every import failure ends here, and until now every one of them
+      // ended here silently -- the bowler saw a message and nothing was
+      // written down. The message itself is the most useful thing to
+      // record: it already distinguishes a busy model from a bad image
+      // from a network drop.
+      recordError({
+        kind:"import-failed",
+        where:"ImportScorecard.extract",
+        message:String(e?.message||e||"unknown"),
+        detail:{images:images.length},
+      });
       setError(e.message||"Something went wrong during extraction.");
       setStep("setup");
     }
@@ -859,6 +915,14 @@ export default function ImportScorecard({
           {/* The reading itself is AI. The instruction above says to check
               it; this says why that matters. */}
           <AiNote what="This scorecard" verb="read" check="check the numbers against the card before saving" />
+          {quality&&quality.concerning&&(
+            <div style={{...S.card,backgroundColor:C.surface,marginBottom:"10px"}}>
+              <div style={{fontSize:"12px",color:C.textMuted,lineHeight:1.5}}>
+                ⚠️ {extractionQualityNote(quality)}
+              </div>
+            </div>
+          )}
+
           {games.map((g,idx)=>(
             <GameReview key={g.gameNumber} game={g}
               onUpdateShot={(shotIdx,updated)=>updateShot(idx,shotIdx,updated)}
