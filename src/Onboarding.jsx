@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { C, S, Chip } from "./ui.jsx";
 import {
-  ENVIRONMENTS, ENVIRONMENT_QUESTION_LABELS, ENVIRONMENT_DESCRIPTIONS, ENVIRONMENT_BEST_FOR,
+  ENVIRONMENTS, ENVIRONMENT_QUESTION_LABELS, ENVIRONMENT_REASSURANCE,
   TRACKING_MODES, TRACKING_MODE_LABELS, TRACKING_MODE_DESCRIPTIONS,
   applyEnvironment, setTrackingMode,
 } from "./domain/preferences.js";
@@ -229,15 +229,10 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                       backgroundColor: selected ? C.accentDim : C.card,
                       WebkitTapHighlightColor: "transparent",
                     }}>
-                    <div style={{ fontSize: "15px", fontWeight: 600, color: selected ? C.accent : C.text, marginBottom: "2px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: 600, color: selected ? C.accent : C.text }}>
                       {ENVIRONMENT_QUESTION_LABELS[env]}
                     </div>
-                    <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "3px" }}>
-                      Best for: {ENVIRONMENT_BEST_FOR[env]}
-                    </div>
-                    <div style={{ fontSize: "11px", color: C.textMuted }}>
-                      {ENVIRONMENT_DESCRIPTIONS[env]}
-                    </div>
+
                   </button>
                 );
               })}
@@ -248,8 +243,18 @@ export default function Onboarding({ preferences, onApply, onFinish, profile, on
                 the options, and it does not say WHERE. The reassurance has
                 to sit under the choice, at the moment of committing to one,
                 and name the place. */}
-            <div style={{ fontSize: "12px", color: C.textMuted, marginBottom: "16px" }}>
-              You can change this any time on the Bowl tab.
+            {/* The four options carry NO descriptions now -- this line does
+                the job all four used to.
+
+                Sixty words asking a first-timer to compare features they
+                have never seen, to make a choice that is not final. The
+                thing they need is that last part, said once. */}
+            <div style={{
+              fontSize: "12px", color: C.textMuted, lineHeight: 1.5,
+              backgroundColor: C.accent + "11", border: `1px solid ${C.accent}22`,
+              borderRadius: "10px", padding: "10px 12px", marginBottom: "16px",
+            }}>
+              {ENVIRONMENT_REASSURANCE}
             </div>
             <button style={S.btn("primary")} onClick={() => setStep(3)}>Next</button>
           </>
