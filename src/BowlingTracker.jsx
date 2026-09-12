@@ -5259,7 +5259,15 @@ export default function BowlingTracker(){
             badges={COMPETITIVE_BADGES}
             history={allCompetitiveBadges({
               sessions,shots,matches,drills,
-              bowler:activeBowler,league:sessionLeague,
+              bowler:activeBowler,
+              // NO league filter. A collection is lifetime, not tonight.
+              //
+              // This passed sessionLeague -- the league selected for the
+              // session in progress. On the Badges tab that is usually
+              // empty or some other league, so every one of the bowler's
+              // nights was filtered out and nothing could ever show as
+              // earned. Badges span every league you have ever bowled.
+              league:"",
               profile:normalizeProfile(profiles[activeBowler],activeBowler),
             })}
             lockedNote={whereEarnable}
