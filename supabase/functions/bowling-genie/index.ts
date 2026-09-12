@@ -139,6 +139,22 @@ Deno.serve(async (req: Request) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "Sign in first." }, cors, 401);
 
+  // KNOWN GAP, stated rather than hidden.
+  //
+  // check_api_rate_limit both checks and RECORDS, and it runs here --
+  // before Gemini is called. So a question that then fails with a 502 or
+  // a timeout has already spent one of the three, while the client says
+  // "That one's still yours."
+  //
+  // Checking after the call instead would be worse: it would let a
+  // bowler fire unlimited questions as long as each one failed, which is
+  // exactly the shape of abuse a cap exists to stop.
+  //
+  // Fixing it properly means a refund path -- record the attempt, then
+  // release it when the call fails -- which needs a DB function that
+  // does not exist yet. Until then the cap errs toward charging for a
+  // failure, which is the safe direction, and the failure messages
+  // deliberately do not promise otherwise beyond the current session.
   if (!(await withinDailyLimit(req, user.id))) {
     return json({ error: "You've used all three today. The lamp recharges tomorrow.", limited: true }, cors, 429);
   }
@@ -156,8 +172,18 @@ Deno.serve(async (req: Request) => {
   if (question.length > 500) return json({ error: "That's a lot. Try asking me one thing." }, cors, 400);
 
   try {
+    // A timeout, because a hung call is worse than a failed one.
+    //
+    // Without this the request sits until Supabase's own limit kills it,
+    // and the bowler watches a spinner with no idea whether their
+    // question went anywhere. 25 seconds is generous for a 200-token
+    // answer and short enough that giving up feels deliberate.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+
     const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
+      signal: controller.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -175,22 +201,29 @@ Deno.serve(async (req: Request) => {
       }),
     });
 
+    clearTimeout(timer);
+
     if (!res.ok) {
       const detail = await res.text();
       // Logged, not returned: upstream errors can name models, quotas and
       // keys, and none of that belongs in a client response.
       console.error("gemini call failed:", res.status, detail.slice(0, 500));
-      return json({ error: "The lamp went quiet. That one's still yours." }, cors, 502);
+      return json({ error: "The lamp went quiet. Try again in a moment." }, cors, 502);
     }
 
     const data = await res.json();
     const text = (data?.candidates?.[0]?.content?.parts || [])
       .map((p: { text?: string }) => p?.text || "").join("").trim();
 
-    if (!text) return json({ error: "The lamp went quiet. That one's still yours." }, cors, 502);
+    if (!text) return json({ error: "The lamp went quiet. Try again in a moment." }, cors, 502);
     return json({ text }, cors);
   } catch (e) {
-    console.error("genie threw:", String(e));
-    return json({ error: "The lamp went quiet. That one's still yours." }, cors, 502);
+    const aborted = e instanceof Error && e.name === "AbortError";
+    console.error(aborted ? "genie timed out after 25s" : "genie threw:", String(e));
+    return json({
+      error: aborted
+        ? "Brooklyn took too long to answer. Try again."
+        : "The lamp went quiet. Try again in a moment.",
+    }, cors, 502);
   }
 });
