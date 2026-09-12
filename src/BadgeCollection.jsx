@@ -22,14 +22,24 @@ import { decodeShare, nightsFromPayload, mergeSharedNights, describeImport } fro
 // "beat someone averaging 30 more than you" is a plan for Friday. Hiding
 // them would make each one a surprise, which sounds nicer and gives a
 // casual bowler nothing to aim at.
-export default function BadgeCollection({ nights = [], me = "", onImportNights, pendingImport, onPendingImportDone }) {
-  const stats = casualStatsFor(me, nights);
-  const earned = badgesFor(stats);
-  const earnedIds = new Set(earned.map(b => b.id));
+export default function BadgeCollection({
+  nights = [], me = "", onImportNights, pendingImport, onPendingImportDone,
+  // Injected by competitive modes. Left undefined, the component works
+  // out casual badges from nights itself -- so the casual tab is
+  // unchanged and the competitive one supplies its own pool.
+  badges: injectedBadges, history: injectedHistory, lockedNote,
+}) {
+  const usingInjected = Array.isArray(injectedBadges) && !!injectedHistory;
+  const allBadges = usingInjected ? injectedBadges : CASUAL_BADGES;
+
+  const stats = usingInjected ? null : casualStatsFor(me, nights);
+  const earnedIds = usingInjected
+    ? new Set(Object.values(injectedHistory).filter(r => r && r.count).map(r => r.id))
+    : new Set(badgesFor(stats).map(b => b.id));
   // How many times, and when last -- worked out by replaying the nights
   // in order. A chip saying "Two hundred" is a fact; "3 times, most
   // recently 18 Sept" is a record.
-  const history = badgeHistory(me, nights);
+  const history = usingInjected ? injectedHistory : badgeHistory(me, nights);
 
   // All / earned / still to get.
   //
@@ -65,8 +75,8 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
     setCode("");
   }
 
-  const total = CASUAL_BADGES.length;
-  const got = earned.length;
+  const total = allBadges.length;
+  const got = earnedIds.size;
 
   return (
     <>
@@ -88,10 +98,21 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
 
         <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "10px", lineHeight: 1.5 }}>
           {got === 0
-            ? "Bowl a night with the group and the first one is yours."
+            ? (usingInjected
+                ? "Bowl a league night, a tournament or a practice session to start."
+                : "Bowl a night with the group and the first one is yours.")
             : got === total
-              ? "Every one of them. Including the ones nobody wants."
-              : "Not all of them are about bowling well — some are about showing up, and one or two you'd rather not have."}
+              ? (usingInjected
+                  ? "Every one of them."
+                  : "Every one of them. Including the ones nobody wants.")
+              : (usingInjected
+                  /* The competitive set has no self-deprecating badges --
+                     no wooden spoon, no gutter night. Against people you
+                     are seriously competing with those read as mockery,
+                     so the line that sells them casually would be wrong
+                     here. */
+                  ? "Some come from one good night, some take a season."
+                  : "Not all of them are about bowling well — some are about showing up, and one or two you'd rather not have.")}
         </div>
       </div>
 
@@ -139,6 +160,14 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
                   <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: 1.45 }}>
                     {b.blurb}
                   </div>
+                  {/* Where a locked badge CAN be earned. Without this a
+                      practice-only badge is just a grey square to a league
+                      bowler, with no way to find out why. */}
+                  {!have && lockedNote && lockedNote(b.id) && (
+                    <div style={{ fontSize: "10.5px", color: C.textMuted, marginTop: "2px", opacity: 0.8 }}>
+                      {lockedNote(b.id)}
+                    </div>
+                  )}
                   {have && (history[b.id]?.lastDate || history[b.id]?.count > 1) && (
                     <div style={{ fontSize: "11px", color: C.accent, marginTop: "2px" }}>
                       {history[b.id].count > 1 ? `${history[b.id].count} times` : "Earned"}
@@ -151,7 +180,7 @@ export default function BadgeCollection({ nights = [], me = "", onImportNights, 
           })}
           {filter === "earned" && got === 0 && (
             <div style={{ fontSize: "12px", color: C.textMuted, padding: "12px 10px" }}>
-              None yet. Bowl a night with the group and the first one is yours.
+              {usingInjected ? "None yet." : "None yet. Bowl a night with the group and the first one is yours."}
             </div>
           )}
           {filter === "locked" && got === total && (

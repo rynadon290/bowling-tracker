@@ -58,6 +58,8 @@ import { emptyDrill, normalizeDrill, drillToRow, drillFromRow } from "./domain/d
 import { scorekeepingOptions, allowsOtherBowlers, normalizeGuests, addGuest, removeGuest } from "./domain/scorekeeping.js";
 import { visibleLeagues, isLeagueHidden, teamsInLeague, describeLeaveImpact, leaveConfirmationText } from "./domain/leagueMembership.js";
 import { decodeShare } from "./domain/badgeShare.js";
+import { allCompetitiveBadges } from "./domain/badgeContext.js";
+import { COMPETITIVE_BADGES, whereEarnable } from "./domain/competitiveBadges.js";
 import { casualNightsFrom, setGameEquipment as setGameEquipmentIn, gameEquipmentFromRows, getGameEquipment, defaultPracticeBall, setManualScore as setManualScoreIn, getManualScore, resolveGameScore, normalizeManualScores, manualScoreToRow, manualScoresFromRows, isManualNight } from "./domain/manualScores.js";
 import { bowlerHighGame, bowlerHighSeries, teamDateGroups, teamHighGame, teamHighSeries, seasonRecord, weeklyPointsData, gameAvg, teamGameTotalAvg, teamGameTotalAvgAt, rAvg, cAvg, avgProgress, cumulativeAvgBeforeDate, hungCounts, beatHighBowlerStats, scoreValues, scoreConsistency, histogramBuckets } from "./domain/stats.js";
 import { lineupSort, renameLeagueInRecords } from "./domain/leagues.js";
@@ -5238,18 +5240,31 @@ export default function BowlingTracker(){
             because roster setup is part of setting up a league -- not a
             social activity. With one thing left here the tab switcher is
             just a row that does nothing. */}
-        {/* Shared by BOTH the casual tab and the new full-mode tab -- same
-            view id, same component. In league/practice/tournament this
-            still shows CASUAL badges against casual nights, which is
-            wrong data on a real screen rather than a crash. The 38-badge
-            merged module (league/practice/tournament, agreed and iconed
-            but not yet wired) is what replaces this for non-casual modes
-            -- tracked as separate work, not done in this pass. */}
-        {view==="badges"&&(
+        {/* Two pools, one screen.
+
+            Casual keeps its own badges -- its thresholds were tuned for
+            people who bowl a few times a year and read as trivial or
+            mocking against a real average. Competitive modes get the
+            league/tournament/practice set instead.
+
+            Sharing and importing are casual-only: they exist because one
+            phone keeps score for a group of friends, which is not how a
+            league night works. */}
+        {view==="badges"&&(casualMode?(
           <BadgeCollection nights={casualNightsFrom(manualScores,CASUAL_SESSION_KEY)} me={activeBowler}
             onImportNights={importCasualNights}
             pendingImport={pendingBadgeImport} onPendingImportDone={()=>setPendingBadgeImport(null)}/>
-        )}
+        ):(
+          <BadgeCollection
+            badges={COMPETITIVE_BADGES}
+            history={allCompetitiveBadges({
+              sessions,shots,matches,drills,
+              bowler:activeBowler,league:sessionLeague,
+              profile:normalizeProfile(profiles[activeBowler],activeBowler),
+            })}
+            lockedNote={whereEarnable}
+            me={activeBowler}/>
+        ))}
 
         {view==="social"&&!casualMode&&(
           <Friends onRequestsChanged={loadFriendRequests}/>
@@ -5623,7 +5638,12 @@ export default function BowlingTracker(){
           return(
             <button key={t.id} onClick={()=>setView(t.id)} aria-label={t.label}
               style={{
-                flex:1,background:isBowl?C.accent+"15":"none",border:"none",cursor:"pointer",
+                // "15" hex alpha is ~8% opacity -- against the nav
+                // background that read as barely there. "40" (~25%) plus
+                // a visible border is what actually holds up as contrast
+                // rather than a tint, in both light and dark surfaces.
+                flex:1,background:isBowl?C.accent+"40":"none",
+                border:isBowl?`1px solid ${C.accent}66`:"none",cursor:"pointer",
                 display:"flex",flexDirection:"column",alignItems:"center",gap:isBowl?"4px":"3px",
                 padding:isBowl?"5px 0":"5px 0",margin:isBowl?"0 1px":0,
                 borderRadius:isBowl?"10px":0,position:"relative",
