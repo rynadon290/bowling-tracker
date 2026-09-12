@@ -25,7 +25,17 @@
 //     skin in the game, and only once the bowler has had a full session
 //     to speak up.
 
-export const IMPORT_STATUSES = ["pending", "verified", "corrected", "rejected"];
+// A closed list: anything unrecognised normalises back to "pending".
+//
+// So "superseded" had to be registered here, not merely used -- without
+// this line every superseded record silently reverted to pending on the
+// next read, and the nag it exists to stop would have come straight
+// back. Same trap as the error-log kinds.
+//
+// NOTE: imported_scores.status has a CHECK constraint in the database
+// listing the first four. Writing "superseded" without widening that
+// constraint will be REJECTED -- see sql/step42.
+export const IMPORT_STATUSES = ["pending", "verified", "corrected", "rejected", "superseded"];
 
 // What a status means for whether the numbers count.
 //
@@ -212,6 +222,11 @@ export function describeStatus(record) {
       : "Corrected by the bowler.";
   }
   if (r.status === "rejected") return "Rejected — these scores need to be entered again.";
+  // Without this a superseded record falls through to "not yet
+  // confirmed", which is the opposite of what happened: the bowler had
+  // already logged the night themselves, which is stronger confirmation
+  // than tapping a button.
+  if (r.status === SUPERSEDED) return "Already logged by the bowler — nothing to confirm.";
   return "From an imported scorecard, not yet confirmed.";
 }
 
@@ -274,6 +289,49 @@ export function importConflictNote(conflicts) {
   }
   const games = list.map(c => `game ${c.game} (${c.yours} vs ${c.imported})`).join(", ");
   return `These disagree with what you logged — ${games}. Yours are kept unless you change them.`;
+}
+
+// Marking a record as superseded, and deciding whether it should be.
+//
+// A pending row is not inert. Once a session passes, buildInbox shows
+// OTHER teammates "1 teammate score unconfirmed -- nobody confirmed
+// these and a session has since finished." So a night the bowler logged
+// themselves, correctly, eventually nags whoever imported it.
+//
+// Hiding it from the bowler's own inbox (dedupePending) moved that noise
+// rather than removing it.
+//
+// WHY A NEW STATUS RATHER THAN "verified".
+//
+// Verified should keep meaning a person looked and said yes. This did
+// not happen -- nobody confirmed anything, the question simply stopped
+// being worth asking. Recording that as verification would make the
+// status lie about how the data was checked.
+//
+// ONLY WHEN THE NUMBERS AGREE.
+//
+// If the photo read 195 and the bowler typed 180, that is exactly the
+// case worth surfacing, and filing it away would bury the one thing the
+// import knew that the bowler did not. A disagreement stays pending so
+// the conflict warning can do its job.
+export const SUPERSEDED = "superseded";
+
+export function shouldSupersede(record, myScoresByGame) {
+  const r = (record && typeof record === "object") ? record : {};
+  if (r.status !== "pending") return false;
+
+  const mine = (myScoresByGame && typeof myScoresByGame === "object") ? myScoresByGame : {};
+  const games = Object.keys(mine).filter(k => mine[k] !== null && mine[k] !== undefined && mine[k] !== "");
+  // Nothing of their own for this night -- the question still stands.
+  if (!games.length) return false;
+
+  // Any disagreement and it stays pending.
+  return importConflicts(r, mine).length === 0;
+}
+
+export function supersede(record) {
+  const r = normalizeImportRecord(record);
+  return { ...r, status: SUPERSEDED, respondedAt: new Date().toISOString() };
 }
 
 // Two bowlers photographing the same monitor.

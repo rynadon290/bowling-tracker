@@ -4,6 +4,7 @@ import {
   approve, reject, canCorrect, correctAsTeammate, laterSessionEnded,
   describeStatus, pendingFor, needingReentry,
   dedupePending, pendingAlreadyLogged, importConflicts, importConflictNote,
+  shouldSupersede, supersede, SUPERSEDED, IMPORT_STATUSES,
   isValidGameScore,
   invalidScoreIndexes,
 } from './importVerification.js';
@@ -290,5 +291,56 @@ describe('when an import disagrees with what you typed', () => {
     }
     expect(importConflicts(null, null)).toEqual([]);
     expect(importConflictNote(null)).toBe('');
+  });
+});
+
+describe('settling a night the bowler already logged', () => {
+  // A pending row is not inert: once a session passes, other teammates
+  // are told "1 teammate score unconfirmed". Hiding it from this
+  // bowler's inbox only moved the noise onto whoever imported it.
+  const rec = { bowler: 'Dave', league: 'Tue', date: '2026-09-11', importedScores: [180, 190, 200], status: 'pending' };
+
+  it('supersedes when the numbers agree', () => {
+    expect(shouldSupersede(rec, { 1: 180, 2: 190, 3: 200 })).toBe(true);
+  });
+
+  // The one case where the import knows something the bowler does not.
+  // Filing it away would bury it.
+  it('leaves a disagreement pending', () => {
+    expect(shouldSupersede(rec, { 1: 180, 2: 175, 3: 200 })).toBe(false);
+  });
+
+  it('does nothing when the bowler has logged nothing', () => {
+    expect(shouldSupersede(rec, {})).toBe(false);
+  });
+
+  it('does nothing to a record that is already settled', () => {
+    expect(shouldSupersede({ ...rec, status: 'verified' }, { 1: 180, 2: 190, 3: 200 })).toBe(false);
+  });
+
+  // Registered in the closed list, or every superseded record silently
+  // reverts to pending on the next read and the nag comes back.
+  it('survives normalisation', () => {
+    expect(IMPORT_STATUSES).toContain(SUPERSEDED);
+    expect(supersede(rec).status).toBe(SUPERSEDED);
+  });
+
+  it('stops counting as pending', () => {
+    expect(pendingFor([supersede(rec)], 'Dave')).toEqual([]);
+  });
+
+  // Verified must keep meaning a person looked and said yes. Nobody did.
+  it('does not describe itself as confirmed by anyone', () => {
+    const d = describeStatus(supersede(rec));
+    expect(d).not.toContain('Confirmed by the bowler');
+    expect(d).toContain('Already logged');
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, undefined, 'x', 42, {}, []]) {
+      expect(() => shouldSupersede(junk, junk)).not.toThrow();
+      expect(() => supersede(junk)).not.toThrow();
+    }
+    expect(shouldSupersede(null, null)).toBe(false);
   });
 });
