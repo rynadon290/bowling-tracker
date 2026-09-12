@@ -71,16 +71,38 @@ export function classifyQuestion(text) {
 
 // What the genie says when it declines for free. In character, and clear
 // that it cost nothing -- otherwise people assume it did.
+// The genie has a name, and uses it.
+//
+// Brooklyn is a crossover strike -- the ball comes in on the wrong side
+// and works anyway. It is also a real name, which is the point: a genie
+// that says "Brooklyn only knows bowling" is a character, and one that
+// says "I only know bowling" is a validation message.
+//
+// Exported so the panel, the refusals and the Edge Function's system
+// prompt all read from one place. Three copies of a name is how a
+// character ends up called two different things on the same screen.
+export const GENIE_NAME = "Brooklyn";
+
 export function refusalMessage(reason) {
+
   switch (reason) {
+
     case "empty":
+
     case "too-short":
-      return "Ask me something. I've got your whole history in here.";
+
+      return `Ask ${GENIE_NAME} something. She's got your whole history in here.`;
+
     case "too-long":
-      return "That's a lot. Try asking me one thing.";
+
+      return `That's a lot. Try asking ${GENIE_NAME} one thing.`;
+
     default:
-      return "I only know bowling. That one's free — ask me something else.";
+
+      return `${GENIE_NAME} only knows bowling. That one's free — ask her something else.`;
+
   }
+
 }
 
 // ── The daily budget ────────────────────────────────────────────────────

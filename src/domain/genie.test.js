@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyQuestion, refusalMessage, questionsUsedToday, questionsLeftToday,
-  canAskToday, budgetLabel, buildGenieContext, DAILY_QUESTIONS,
+  canAskToday, budgetLabel, buildGenieContext, DAILY_QUESTIONS, GENIE_NAME,
 } from './genie.js';
 
 describe('the classifier lets bowling through', () => {
@@ -79,6 +79,20 @@ describe('refusals say they were free', () => {
     for (const r of ['empty', 'too-short', 'too-long', 'off-topic', 'anything']) {
       expect(refusalMessage(r)).toBeTruthy();
     }
+  });
+});
+
+describe('the genie has a name', () => {
+  // One exported constant, so the panel, the refusals and the Edge
+  // Function's system prompt cannot drift into calling her two things.
+  it('uses its name in every refusal', () => {
+    for (const r of ['empty', 'too-short', 'too-long', 'off-topic']) {
+      expect(refusalMessage(r)).toContain(GENIE_NAME);
+    }
+  });
+
+  it('is Brooklyn', () => {
+    expect(GENIE_NAME).toBe('Brooklyn');
   });
 });
 
