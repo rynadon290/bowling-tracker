@@ -123,7 +123,7 @@ function LayoutEditor({ layout, onChange }) {
 // ball itself deletes it", which is easy to do by accident on a phone.
 export default function ArsenalList({
   activeBowler, balls, ballLayouts, setBallLayout, removeBall,
-  ballSpecs, setBallSpec, ballGroups, seedDefaultGroups,
+  ballSpecs, setBallSpec, ballGroups, seedDefaultGroups, saveBallGroup, deleteBallGroup,
   catalogEntries, catalogAck, userId, publishBallSpecs, voteOnEntry, acknowledgeRejection,
 }) {
   // Normalised once, here, rather than at each of the four read sites.
@@ -133,6 +133,7 @@ export default function ArsenalList({
   const [openTab, setOpenTab] = useState("specs");
   const [confirmRemove, setConfirmRemove] = useState(null);
   const [groupMode, setGroupMode] = useState("none");
+  const [newGroupName, setNewGroupName] = useState("");
 
   const groups = (ballGroups || []).filter(g => g.bowlerName === activeBowler);
   const specsByBall = {};
@@ -248,6 +249,45 @@ export default function ArsenalList({
             ))}
           </div>
         </>
+      )}
+
+      {/* The groups themselves.
+
+          "My groups" seeded six defaults and then offered no way to see
+          them, rename one, add one or delete one -- the handlers were
+          passed all the way down and never rendered. And the only place a
+          ball's group could be set was inside that ball's spec editor,
+          which nothing pointed at. So the mode looked like a feature with
+          the middle missing. */}
+      {groupMode === "group" && saveBallGroup && (
+        <div style={{ ...S.card, backgroundColor: C.surface, padding: "10px 12px", marginBottom: "12px" }}>
+          <div style={{ ...S.label, marginBottom: "6px" }}>Your groups</div>
+          {groups.map(g => (
+            <div key={g.id} style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "6px" }}>
+              <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0, fontSize: "12px", padding: "6px 8px" }}
+                value={g.name}
+                onChange={e => saveBallGroup({ ...g, name: e.target.value })} />
+              <button style={{ ...S.btn(), width: "auto", padding: "6px 10px", fontSize: "11px" }}
+                onClick={() => { if (window.confirm(`Delete "${g.name}"? Its balls become ungrouped.`)) deleteBallGroup?.(g.id); }}>
+                Delete
+              </button>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+            <input style={{ ...S.input, flex: 1, minWidth: 0, marginBottom: 0, fontSize: "12px", padding: "6px 8px" }}
+              value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && newGroupName.trim()) { saveBallGroup({ name: newGroupName.trim(), sortOrder: groups.length }); setNewGroupName(""); } }}
+              placeholder="New group, e.g. Dry lanes" />
+            <button style={{ ...S.btn("primary"), width: "auto", padding: "6px 12px", fontSize: "11px" }}
+              disabled={!newGroupName.trim()}
+              onClick={() => { saveBallGroup({ name: newGroupName.trim(), sortOrder: groups.length }); setNewGroupName(""); }}>
+              Add
+            </button>
+          </div>
+          <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "8px", lineHeight: 1.5 }}>
+            To put a ball in a group, open the ball and pick the group under its specs.
+          </div>
+        </div>
       )}
 
       {sections.map(section => (

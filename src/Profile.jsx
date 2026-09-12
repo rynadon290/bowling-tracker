@@ -404,6 +404,7 @@ export default function Profile({
           setBallSpec={setBallSpec}
           ballGroups={ballGroups || []}
           seedDefaultGroups={seedDefaultGroups}
+          saveBallGroup={saveBallGroup} deleteBallGroup={deleteBallGroup}
           catalogEntries={catalogEntries || {}}
           catalogAck={catalogAck || []}
           userId={userId}
