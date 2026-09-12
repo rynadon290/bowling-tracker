@@ -139,6 +139,34 @@ export default function BowlingGenie({
         )}
       </button>
 
+      {/* Tapping anywhere else closes it.
+
+          An invisible full-screen layer BEHIND the panel and above
+          everything else. Without it the only way out was the lamp
+          again, which is not where anyone looks to dismiss something --
+          and taps meant for the panel's surroundings were landing on
+          whatever screen was underneath.
+
+          Below the panel and the lamp in z-order (199 against 200) so
+          both stay clickable; the lamp keeps working as a toggle. */}
+      {/* A backdrop, so tapping anywhere else closes the panel.
+
+          Without one the only way out was the lamp itself, which is not
+          where anyone looks to dismiss something. It also stops a tap
+          meant for "close" landing on whatever screen is behind the
+          panel and doing something unintended.
+
+          Transparent rather than dimmed: this is a small panel over a
+          working screen, not a modal, and darkening everything would
+          overstate it. */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+          style={{ position: "fixed", inset: 0, zIndex: 199 }}
+        />
+      )}
+
       {open && (
         <div style={{
           position: "fixed", left: "12px", right: "12px",
