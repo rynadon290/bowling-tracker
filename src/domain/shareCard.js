@@ -397,7 +397,10 @@ export function drawStandingsCard(ctx, { rows, me, colors, fonts } = {}) {
   ctx.textBaseline = "top";
   ctx.fillStyle = c.textMuted || "#9A8F80";
   ctx.font = `500 34px ${fonts?.body || "system-ui, sans-serif"}`;
-  ctx.fillText("Just Bowling", 80, 84);
+  // The DISPLAY name. CASUAL_SESSION_KEY is still "Just Bowling" because
+  // it is a stored league key, but nobody should read that on a card they
+  // post to a group chat.
+  ctx.fillText("Open bowling", 80, 84);
 
   ctx.fillStyle = c.text || "#F4F0E6";
   ctx.font = `700 60px ${fonts?.display || fonts?.body || "system-ui, sans-serif"}`;

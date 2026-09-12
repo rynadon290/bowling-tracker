@@ -253,7 +253,7 @@ export const ENVIRONMENT_QUESTION_LABELS = {
   practice: "A practice session",
   league: "A league night",
   tournament: "A tournament",
-  casual: "A game or two out",
+  casual: "Open bowling",
 };
 
 // Each says what the choice DOES, not what sort of person picks it.
@@ -266,43 +266,30 @@ export const ENVIRONMENT_QUESTION_LABELS = {
 // "hides" is the only signal that one of these four takes something
 // away -- casual forces scores-only and removes four screens, and
 // nothing previously said so.
-// Two lines: who it is for, then what it does to the app.
+// The onboarding screen shows the four LABELS and nothing else.
 //
-// One line was doing two jobs and neither well. "Best for" answers the
-// question a first-timer actually has -- which of these matches tonight
-// -- and the second line says what changes, which is the part that
-// keeps a choice from being a surprise later.
+// Four descriptions on a first-run screen is sixty words asking someone
+// to compare features before they have seen any of them. The thing they
+// actually need to know is that the choice is not final -- so that is
+// said once, below all four, instead of four times inside them.
+export const ENVIRONMENT_REASSURANCE =
+  "There's no wrong answer. Each one just changes which screens you see, and you can switch at any time from the Bowl tab or Settings.";
+
+// Settings gets the full version, because someone here came ON PURPOSE.
 //
-// Three "Opens" and one "Hides" is the same deliberate asymmetry as
-// before: Open bowling is the only one that removes something, and the
-// mismatched verb is what makes someone read that line rather than skim
-// past it.
-//
-// "Vault" is gone from the casual line -- it was split into Gear and
-// Teams, and the sentence would have named a tab that no longer exists.
-export const ENVIRONMENT_BEST_FOR = {
-
-  practice: "working on one thing",
-
-  league: "bowling for the team",
-
-  tournament: "making the cut",
-
-  casual: "keeping score and nothing else",
-
-};
-
-
-
+// A first-timer is picking fast and wants to get on with it. Someone in
+// Settings is deliberately changing modes and the question in their head
+// is "what will this actually do" -- so this is plain prose that answers
+// it, not a feature list and not a tagline.
 export const ENVIRONMENT_DESCRIPTIONS = {
 
-  practice: "Opens drills, frame tracking and every detail field.",
+  practice: "For working on your game on your own. Drills, frame tracking and every detail field are available, and practice scores stay out of your league averages.",
 
-  league: "Opens your team, side pots, brackets and standings.",
+  league: "For your weekly team night. Your team roster and standings are available, along with the money games — quarter, dollar, high game and 3-6-9.",
 
-  tournament: "Opens blocks, squads, side pots and the cut line.",
+  tournament: "For squad play. Blocks, squads, side pots, brackets, match play and the cut line are all available.",
 
-  casual: "Hides History, Stats, Improve and Gear. Just the scoresheet and standings.",
+  casual: "For a night out. You get the scoresheet, standings and badges — History, Stats, Improve and Gear stay hidden to keep it quick. Nothing is deleted, and switching back brings it all straight in.",
 
 };
 
